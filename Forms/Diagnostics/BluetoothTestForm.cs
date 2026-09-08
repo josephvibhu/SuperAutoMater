@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Drawing;
@@ -7,7 +7,7 @@ using System.Runtime.InteropServices;
 using System.Threading.Tasks;
 using System.Windows.Forms;
 
-namespace ITAS_QC_Tool
+namespace SuperAutoMater
 {
     /// <summary>
     /// Bluetooth Hardware Controller & Radio Diagnostic Form.

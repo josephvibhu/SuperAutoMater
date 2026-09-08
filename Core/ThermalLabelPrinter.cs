@@ -5,7 +5,7 @@ using System.Drawing.Printing;
 using System.Windows.Forms;
 using QRCoder;
 
-namespace ITAS_QC_Tool
+namespace SuperAutoMater
 {
     /// <summary>
     /// Thermal Chassis Label & Sticker Printing Engine.
@@ -77,7 +77,7 @@ namespace ITAS_QC_Tool
             using (SolidBrush whiteBrush = new SolidBrush(Color.White))
             using (StringFormat sfHeader = new StringFormat { Alignment = StringAlignment.Center, LineAlignment = StringAlignment.Center })
             {
-                g.DrawString("AUTOMATER QC CERTIFIED", fontHeader, whiteBrush, headerRect, sfHeader);
+                g.DrawString("SUPERAUTOMATER QC CERTIFIED", fontHeader, whiteBrush, headerRect, sfHeader);
             }
 
             // 2. Content Layout: Left QR Code | Right Metadata

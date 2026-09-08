@@ -5,7 +5,7 @@ using System.Drawing.Imaging;
 using System.IO;
 using System.Text;
 
-namespace ITAS_QC_Tool
+namespace SuperAutoMater
 {
     /// <summary>
     /// Pure C# Zero-Dependency Vector PDF 1.4 Certificate & Report Generator.
@@ -81,9 +81,9 @@ namespace ITAS_QC_Tool
             sbContent.AppendLine($"0 {pageH - 94} {pageW} 4 re f");
 
             // Header Titles
-            DrawPdfText(sbContent, "AUTOMATER HARDWARE DIAGNOSTIC CERTIFICATE", "F2", 18, 28, pageH - 42, 0.95f, 0.98f, 1.0f);
+            DrawPdfText(sbContent, "SUPERAUTOMATER HARDWARE DIAGNOSTIC CERTIFICATE", "F2", 18, 28, pageH - 42, 0.95f, 0.98f, 1.0f);
             DrawPdfText(sbContent, "SYSTEM TELEMETRY, PRE-FLIGHT VERIFICATION & QUALITY SIGN-OFF", "F1", 9, 28, pageH - 60, 0.58f, 0.64f, 0.72f);
-            DrawPdfText(sbContent, $"DATE: {DateTime.Now:yyyy-MM-dd HH:mm:ss} | OPERATIONAL v6.3", "F1", 8.5f, 28, pageH - 74, 0.22f, 0.74f, 0.97f);
+            DrawPdfText(sbContent, $"DATE: {DateTime.Now:yyyy-MM-dd HH:mm:ss} | OPERATIONAL v0.1", "F1", 8.5f, 28, pageH - 74, 0.22f, 0.74f, 0.97f);
 
             // 3. Status Badge Box (Top Right of Header)
             float badgeX = pageW - 130;
@@ -174,7 +174,7 @@ namespace ITAS_QC_Tool
             sbContent.AppendLine("0.85 0.88 0.92 RG 1 w");
             sbContent.AppendLine($"28 {remGridTop - 75} {pageW - 56} 75 re S");
 
-            string remarkText = string.IsNullOrWhiteSpace(data.Remarks) ? "All core subsystems nominal. Verified compliant with AutoMater Grade standards." : data.Remarks;
+            string remarkText = string.IsNullOrWhiteSpace(data.Remarks) ? "All core subsystems nominal. Verified compliant with SuperAutoMater Grade standards." : data.Remarks;
             DrawPdfText(sbContent, "TECHNICIAN REMARKS:", "F2", 8.5f, 40, remGridTop - 22, 0.2f, 0.3f, 0.4f);
             DrawPdfText(sbContent, remarkText, "F1", 9f, 40, remGridTop - 40, 0.1f, 0.15f, 0.2f);
             DrawPdfText(sbContent, $"CERTIFIED BY: {data.Technician}  |  STATUS: CERTIFIED FOR INVENTORY DISPATCH", "F2", 8f, 40, remGridTop - 62, 0.05f, 0.55f, 0.25f);
@@ -182,7 +182,7 @@ namespace ITAS_QC_Tool
             // 7. Footer
             sbContent.AppendLine("0.9 0.92 0.94 RG 1 w");
             sbContent.AppendLine($"28 40 {pageW - 56} 0 re S");
-            DrawPdfText(sbContent, "AutoMater Diagnostic & QC Studio v6.3 · Official System Audit Certificate", "F1", 7.5f, 28, 26, 0.55f, 0.6f, 0.65f);
+            DrawPdfText(sbContent, "SuperAutoMater Diagnostic & QC Studio v0.1 · Official System Audit Certificate", "F1", 7.5f, 28, 26, 0.55f, 0.6f, 0.65f);
             DrawPdfText(sbContent, "Confidential · For Internal Inventory Management & Verification Only", "F1", 7.5f, pageW - 280, 26, 0.55f, 0.6f, 0.65f);
 
             byte[] contentBytes = Encoding.ASCII.GetBytes(sbContent.ToString());

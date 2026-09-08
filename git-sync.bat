@@ -1,5 +1,5 @@
 @echo off
-title AutoMater GitHub Sync
+title SuperAutoMater GitHub Sync
 cls
 powershell.exe -NoProfile -ExecutionPolicy Bypass -File "%~dp0Scripts\Sync-GitHub.ps1" %*
 if %ERRORLEVEL% NEQ 0 (

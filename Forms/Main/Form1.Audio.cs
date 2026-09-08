@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Drawing;
 using System.IO;
 using System.Media;
@@ -8,7 +8,7 @@ using System.Threading.Tasks;
 using System.Windows.Forms;
 using NAudio.Wave;
 
-namespace ITAS_QC_Tool
+namespace SuperAutoMater
 {
     public enum AudioTestMode { None, Left, Right, Both }
 

@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Drawing;
 using System.Drawing.Drawing2D;
 using System.Net.NetworkInformation;
@@ -9,7 +9,7 @@ using System.Windows.Forms;
 using AForge.Video;
 using AForge.Video.DirectShow;
 
-namespace ITAS_QC_Tool
+namespace SuperAutoMater
 {
     /// <summary>
     /// Power-On Self-Test (POST) Automated Flight HUD.

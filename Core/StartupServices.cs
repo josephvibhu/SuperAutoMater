@@ -3,7 +3,7 @@ using System.Diagnostics;
 using System.IO;
 using System.Threading.Tasks;
 
-namespace ITAS_QC_Tool
+namespace SuperAutoMater
 {
     /// <summary>
     /// Startup helpers: WiFi auto-connect and Google Sheets code.gs bundling.
@@ -53,7 +53,7 @@ namespace ITAS_QC_Tool
 </WLANProfile>";
 
                     // Step 2: Write profile to temp file
-                    string profilePath = Path.Combine(Path.GetTempPath(), $"AutoMater_WiFi_{WifiSsid}.xml");
+                    string profilePath = Path.Combine(Path.GetTempPath(), $"SuperAutoMater_WiFi_{WifiSsid}.xml");
                     File.WriteAllText(profilePath, profileXml);
 
                     // Step 3: Add profile (add if missing, update if exists)
@@ -113,9 +113,9 @@ namespace ITAS_QC_Tool
             Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Sheets_Setup", "SETUP_GUIDE.txt");
 
         public const string CodeGsContent = @"/**
- * AutoMater v6.3 — Google Sheets Inventory Webhook
+ * SuperAutoMater v0.1 — Google Sheets Inventory Webhook
  * 
- * Automatically receives hardware QC test data from AutoMater Diagnostic Tool
+ * Automatically receives hardware QC test data from SuperAutoMater Diagnostic Tool
  * and records it into this Google Sheet.
  * 
  * ONE-TIME SETUP:
@@ -125,7 +125,7 @@ namespace ITAS_QC_Tool
  * 4. Choose type 'Web app'.
  * 5. Set 'Execute as: Me' and 'Who has access: Anyone'.
  * 6. Click Deploy, grant permissions, and copy the Web App URL.
- * 7. In AutoMater, paste the URL into the 'Apps Script Web App URL' field.
+ * 7. In SuperAutoMater, paste the URL into the 'Apps Script Web App URL' field.
  */
 
 function doPost(e) {
@@ -306,24 +306,24 @@ function doPost(e) {
  * Health check endpoint for browser inspection
  */
 function doGet(e) {
-  var html = '<!DOCTYPE html><html><head><title>AutoMater Sync Online</title>' +
+  var html = '<!DOCTYPE html><html><head><title>SuperAutoMater Sync Online</title>' +
     '<style>body{font-family:sans-serif;background:#0f172a;color:#f8fafc;padding:40px;text-align:center;}' +
     '.card{background:#1e293b;border-radius:12px;padding:30px;display:inline-block;border:1px solid #38bdf8;max-width:520px;}' +
     'h2{color:#38bdf8;margin-top:0;}p{color:#94a3b8;font-size:14px;}code{color:#4ade80;background:#0f172a;padding:4px 8px;border-radius:4px;word-break:break-all;}</style></head>' +
     '<body><div class=""card"">' +
-    '<h2>AutoMater Google Sheets Webhook</h2>' +
+    '<h2>SuperAutoMater Google Sheets Webhook</h2>' +
     '<p>Status: <b style=""color:#4ade80;"">ONLINE & ACTIVE</b></p>' +
     '<p>Ready to receive QC data with the updated column order and automatic duplicate protection.</p>' +
     '</div></body></html>';
-  return HtmlService.createHtmlOutput(html).setTitle('AutoMater Google Sheets Webhook');
+  return HtmlService.createHtmlOutput(html).setTitle('SuperAutoMater Google Sheets Webhook');
 }
 ";
 
         public const string SetupGuideContent = @"================================================================================
-  AUTOMATER v6.3 — GOOGLE SHEETS LIVE INVENTORY SYNC SETUP GUIDE
+  SUPERAUTOMATER v0.1 — GOOGLE SHEETS LIVE INVENTORY SYNC SETUP GUIDE
 ================================================================================
 
-This guide explains how to connect AutoMater Diagnostic Tool to your Google Sheet.
+This guide explains how to connect SuperAutoMater Diagnostic Tool to your Google Sheet.
 Setup takes about 2 minutes and only needs to be done once.
 
 --------------------------------------------------------------------------------
@@ -345,7 +345,7 @@ STEP 2: OPEN APPS SCRIPT
 STEP 3: PASTE THE code.gs SCRIPT
 --------------------------------------------------------------------------------
 1. Open the file 'code.gs' located in this folder (Sheets_Setup/code.gs)
-   - OR click 'VIEW & COPY SCRIPT' inside AutoMater to copy it directly.
+   - OR click 'VIEW & COPY SCRIPT' inside SuperAutoMater to copy it directly.
 2. Paste the entire code into the Google Apps Script editor.
 3. Click the Save icon (💾) or press Ctrl+S.
 
@@ -356,7 +356,7 @@ STEP 4: DEPLOY AS A WEB APP
       Deploy  →  New deployment
 2. In the modal that appears:
    - Next to 'Select type', click the gear icon (⚙) and choose: Web app
-   - Description: AutoMater Sync (optional)
+   - Description: SuperAutoMater Sync (optional)
    - Execute as: Me (your Google account)
    - Who has access: Anyone  <-- (IMPORTANT: MUST be 'Anyone' so the app can upload)
 3. Click 'Deploy'.
@@ -373,14 +373,14 @@ STEP 5: COPY AND SAVE YOUR WEB APP URL
 1. After deploying, Google displays:
       Web app URL:  https://script.google.com/macros/s/AKfycb.../exec
 2. Click 'Copy' next to the Web app URL.
-3. In AutoMater, click 'ASSET CSV / QR'.
+3. In SuperAutoMater, click 'ASSET CSV / QR'.
 4. Paste the URL into the 'Apps Script Web App URL' box.
-   (AutoMater will save it permanently in sheets_url.txt — you never need to re-enter it).
+   (SuperAutoMater will save it permanently in sheets_url.txt — you never need to re-enter it).
 
 --------------------------------------------------------------------------------
 STEP 6: TEST THE SYNC
 --------------------------------------------------------------------------------
-1. In AutoMater, click 'UPLOAD TO GOOGLE SHEETS'.
+1. In SuperAutoMater, click 'UPLOAD TO GOOGLE SHEETS'.
 2. The button will report: '✓ Uploaded to Google Sheets (Row 2)'
 3. Check your Google Sheet — a new row will appear with headers automatically formatted!
 

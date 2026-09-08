@@ -1,6 +1,6 @@
 ﻿using NAudio.Wave;
 
-namespace ITAS_QC_Tool
+namespace SuperAutoMater
 {
     public class ChannelIsolatorSampleProvider : ISampleProvider
     {

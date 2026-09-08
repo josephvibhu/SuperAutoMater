@@ -10,7 +10,7 @@ using System.Threading.Tasks;
 using System.Windows.Forms;
 using QRCoder;
 
-namespace ITAS_QC_Tool
+namespace SuperAutoMater
 {
     /// <summary>
     /// Professional Asset Entry, PDF Certificate Generator, QR Code & Google Sheets Sync Dialog.
@@ -90,7 +90,7 @@ namespace ITAS_QC_Tool
             detectedStorage = Coerce(storage);
             detectedBattery = CleanBatteryHealth(batteryHealth);
 
-            this.Text = "AutoMater — Asset Record & Inventory Sync";
+            this.Text = "SuperAutoMater — Asset Record & Inventory Sync";
             this.Size = new Size(1020, 720);
             this.MinimumSize = new Size(940, 650);
             this.StartPosition = FormStartPosition.CenterParent;
@@ -712,7 +712,7 @@ namespace ITAS_QC_Tool
             try
             {
                 var sb = new StringBuilder();
-                sb.AppendLine("=== AUTOMATER QC DIAGNOSTIC SUMMARY ===");
+                sb.AppendLine("=== SUPERAUTOMATER QC DIAGNOSTIC SUMMARY ===");
                 sb.AppendLine($"Asset Tag      : {txtAssetNo?.Text?.Trim()}");
                 sb.AppendLine($"Serial Number  : {txtSerial?.Text?.Trim()}");
                 sb.AppendLine($"Model Name     : {txtModel?.Text?.Trim()}");
@@ -1094,7 +1094,7 @@ namespace ITAS_QC_Tool
                 Text = "1. Open your Google Sheet  →  Click Extensions  →  Apps Script.\n" +
                        "2. Delete all existing code, then click 'COPY CODE TO CLIPBOARD' below and paste it.\n" +
                        "3. Click Deploy  →  New deployment  →  Select type: Web app  →  Who has access: Anyone  →  Deploy.\n" +
-                       "4. Copy the Web App URL into AutoMater's 'Apps Script Web App URL' box. Done!"
+                       "4. Copy the Web App URL into SuperAutoMater's 'Apps Script Web App URL' box. Done!"
             };
             pnlSteps.Controls.Add(lblSteps);
             root.Controls.Add(pnlSteps, 0, 1);

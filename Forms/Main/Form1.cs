@@ -7,10 +7,10 @@ using System.Text;
 using System.Threading.Tasks;
 using System.Windows.Forms;
 
-namespace ITAS_QC_Tool
+namespace SuperAutoMater
 {
     /// <summary>
-    /// AutoMater QC Diagnostic Studio — Avionics HUD Interface v6.3.
+    /// SuperAutoMater QC Diagnostic Studio — Avionics HUD Interface v0.1.
     /// Single-sourced theming, scaling, and command dispatcher.
     /// </summary>
     public partial class Form1 : Form

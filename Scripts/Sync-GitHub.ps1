@@ -1,11 +1,11 @@
-﻿param(
+param(
     [string]$Message = ""
 )
 
 $ErrorActionPreference = "Stop"
 
 Write-Host "============================================================" -ForegroundColor Cyan
-Write-Host "    AUTOMATER DIAGNOSTIC TOOL — GITHUB SYNC ENGINE          " -ForegroundColor Cyan
+Write-Host "    SUPERAUTOMATER DIAGNOSTIC TOOL — GITHUB SYNC ENGINE     " -ForegroundColor Cyan
 Write-Host "============================================================" -ForegroundColor Cyan
 Write-Host ""
 
@@ -43,7 +43,7 @@ Write-Host "Modified / untracked files:" -ForegroundColor Yellow
 git status -s
 
 if ([string]::IsNullOrWhiteSpace($Message)) {
-    $defaultMsg = "Update AutoMater v6.4 source code [$(Get-Date -Format 'yyyy-MM-dd HH:mm')]"
+    $defaultMsg = "Update SuperAutoMater v0.1 source code [$(Get-Date -Format 'yyyy-MM-dd HH:mm')]"
     $inputMsg = Read-Host "`nEnter commit message (press Enter for default: '$defaultMsg')"
     if ([string]::IsNullOrWhiteSpace($inputMsg)) {
         $Message = $defaultMsg

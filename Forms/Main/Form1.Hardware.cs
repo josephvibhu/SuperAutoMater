@@ -10,7 +10,7 @@ using System.Text;
 using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 
-namespace ITAS_QC_Tool
+namespace SuperAutoMater
 {
     public partial class Form1
     {
@@ -768,7 +768,7 @@ namespace ITAS_QC_Tool
         {
             return await Task.Run(() =>
             {
-                string tempFile = Path.Combine(Path.GetTempPath(), $"AutoMater_Bench_{Guid.NewGuid():N}.tmp");
+                string tempFile = Path.Combine(Path.GetTempPath(), $"SuperAutoMater_Bench_{Guid.NewGuid():N}.tmp");
                 byte[] buffer = new byte[1024 * 1024]; // 1MB buffer
                 new Random().NextBytes(buffer);
                 int totalMB = 64; // 64MB test sample
@@ -983,7 +983,7 @@ namespace ITAS_QC_Tool
             await Task.WhenAll(sysCpuTask, graphicsWirelessTask, storageTask, batteryTask);
 
             StringBuilder sb = new StringBuilder();
-            sb.AppendLine("┌─ AUTOMATER SYSTEM TELEMETRY ──────────────────────────────────────────┐");
+            sb.AppendLine("┌─ SUPERAUTOMATER SYSTEM TELEMETRY ─────────────────────────────────────┐");
             sb.Append(await sysCpuTask);
             sb.Append(await graphicsWirelessTask);
             sb.AppendLine("├─ STORAGE & SMART HEALTH ───────────────────────────────────────────────┤");

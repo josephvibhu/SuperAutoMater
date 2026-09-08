@@ -1,6 +1,6 @@
 ﻿using System.Windows.Forms;
 
-namespace ITAS_QC_Tool
+namespace SuperAutoMater
 {
     public class BufferedPanel : Panel
     {

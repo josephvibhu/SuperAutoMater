@@ -3,7 +3,7 @@ using System.IO;
 using System.Reflection;
 using System.Windows.Forms;
 
-namespace ITAS_QC_Tool
+namespace SuperAutoMater
 {
     internal static class Program
     {
@@ -41,7 +41,7 @@ namespace ITAS_QC_Tool
                 Exception ex = e.ExceptionObject as Exception;
                 LogCrash("AppDomain Unhandled Exception", ex);
                 MessageBox.Show($"A critical error occurred:\n\n{ex?.Message ?? "Unknown Error"}\n\nA crash dump has been saved to the Logs folder.",
-                    "AutoMater Diagnostic - Fatal Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                    "SuperAutoMater Diagnostic - Fatal Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
             };
 
             System.Threading.Tasks.TaskScheduler.UnobservedTaskException += (s, e) =>
@@ -64,7 +64,7 @@ namespace ITAS_QC_Tool
                 string fullPath = Path.Combine(logsDir, filename);
 
                 string content = $"========================================\n" +
-                                 $"AUTOMATER QC DIAGNOSTIC TOOL - CRASH LOG\n" +
+                                 $"SUPERAUTOMATER QC DIAGNOSTIC TOOL - CRASH LOG\n" +
                                  $"Timestamp: {DateTime.Now:yyyy-MM-dd HH:mm:ss.fff}\n" +
                                  $"Category : {category}\n" +
                                  $"OS       : {Environment.OSVersion} ({(Environment.Is64BitOperatingSystem ? "64-bit" : "32-bit")})\n" +

@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Drawing;
 using System.Threading.Tasks;
 using System.Windows.Forms;
@@ -6,7 +6,7 @@ using AForge.Video;
 using AForge.Video.DirectShow;
 using NAudio.Wave;
 
-namespace ITAS_QC_Tool
+namespace SuperAutoMater
 {
     public sealed class MicMeterViewModel : IDisposable
     {

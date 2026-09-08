@@ -5,7 +5,7 @@ using System.IO;
 using System.Text.RegularExpressions;
 using System.Windows.Forms;
 
-namespace ITAS_QC_Tool
+namespace SuperAutoMater
 {
     public partial class Form1
     {
@@ -155,7 +155,7 @@ namespace ITAS_QC_Tool
                     return;
                 }
 
-                string content = $"AUTOMATER QC TELEMETRY DASHBOARD - FINAL REPORT\n";
+                string content = $"SUPERAUTOMATER QC TELEMETRY DASHBOARD - FINAL REPORT\n";
                 content += $"Timestamp:  {DateTime.Now:yyyy-MM-dd HH:mm:ss}\n";
                 content += $"Technician: {cleanTechName}\n";
                 content += $"-----------------------------------\n";

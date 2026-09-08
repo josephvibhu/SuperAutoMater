@@ -8,19 +8,19 @@ using System.IO;
 using System.Reflection;
 using System.Windows.Forms;
 
-namespace ITAS_QC_Tool
+namespace SuperAutoMater
 {
     #region App Version (Single Source of Truth)
 
     public static class AppVersion
     {
-        private static readonly Version _ver = Assembly.GetExecutingAssembly().GetName().Version ?? new Version(6, 4, 0, 0);
+        private static readonly Version _ver = Assembly.GetExecutingAssembly().GetName().Version ?? new Version(0, 1, 0, 0);
         public static string VersionString => $"{_ver.Major}.{_ver.Minor}";
-        public static string Display => $"AutoMater v{VersionString}";
-        public static string WindowTitle => $"AutoMater v{VersionString}";
+        public static string Display => $"SuperAutoMater v{VersionString}";
+        public static string WindowTitle => $"SuperAutoMater v{VersionString}";
         public static string StationTag => "● OPERATIONAL";
         public static string DrawerHeader => $"⌁ QC SIGN-OFF (v{VersionString})";
-        public static string ReportHeader => $"AUTOMATER QC TELEMETRY DASHBOARD - FINAL FLIGHT REPORT (v{VersionString})";
+        public static string ReportHeader => $"SUPERAUTOMATER QC TELEMETRY DASHBOARD - FINAL FLIGHT REPORT (v{VersionString})";
     }
 
     #endregion
