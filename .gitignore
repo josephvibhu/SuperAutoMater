@@ -1,0 +1,33 @@
+﻿# ====================================================================
+# AutoMater Diagnostic Tool — Git Ignore Rules
+# ====================================================================
+
+# Build & Compilation Output
+[Bb]in/
+[Oo]bj/
+out/
+publish/
+
+# Local Compiled Releases
+# Note: Standalone single-file EXEs (~150MB) exceed GitHub's 100MB file limit.
+# Releases are stored locally in the Releases/ folder and distributed via USB.
+Releases/
+
+# Local Diagnostic Telemetry & Workstation Caches
+offline_sync_queue.json
+*.log
+CrashDump/
+*.tmp
+
+# Visual Studio & IDE Configuration
+.vs/
+.vscode/
+*.user
+*.suo
+*.userosscache
+*.sln.docstates
+
+# Windows System Files
+Thumbs.db
+[Dd]esktop.ini
+$RECYCLE.BIN/
