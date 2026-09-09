@@ -58,7 +58,7 @@ namespace SuperAutoMater
         private Panel camPanel;
         private HudVuMeter micVuMeter;
         private Label lblMicState;
-        private Label lblMouseTest;
+        private BufferedPanel trackpadVisual;
         private TableLayoutPanel rootSplit;
         private Panel centerArea;
 
@@ -247,7 +247,7 @@ namespace SuperAutoMater
 
         private void BuildResponsiveLayout()
         {
-            // Root 3-Column Split: Column 0 (210px Left Suite Rail) | Column 1 (100% Bento Arena) | Column 2 (0-350px Sliding Drawer)
+            // Root 3-Column Split: Column 0 (235px Left Suite Rail) | Column 1 (100% Bento Arena) | Column 2 (0-350px Sliding Drawer)
             rootSplit = new TableLayoutPanel
             {
                 Dock = DockStyle.Fill,
@@ -257,7 +257,7 @@ namespace SuperAutoMater
                 Padding = new Padding(0),
                 BackColor = HudTheme.BgBase
             };
-            rootSplit.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 210F));  // Left Rail (reduced from 224 for better fit)
+            rootSplit.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 235F));  // Left Rail widened to 235px for clean unclipped buttons
             rootSplit.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100F));
             rootSplit.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 0F));
             rootSplit.RowStyles.Add(new RowStyle(SizeType.Percent, 100F));
@@ -457,8 +457,8 @@ namespace SuperAutoMater
             BentoCard railCard = new BentoCard
             {
                 Dock = DockStyle.Fill,
-                HeaderTitle = "DIAGNOSTIC PIPELINE",
-                HeaderSubtitle = "8 TESTS",
+                HeaderTitle = "DIAGNOSTICS",
+                HeaderSubtitle = "[8 TESTS]",
                 TagAccentColor = HudTheme.HudAccent,
                 CornerRadius = 12,
                 Margin = new Padding(2, 0, 2, 0)
@@ -877,8 +877,8 @@ namespace SuperAutoMater
                 Margin = new Padding(0)
             };
             camSensorGrid.RowStyles.Add(new RowStyle(SizeType.Percent, 100F)); // camPanel
-            camSensorGrid.RowStyles.Add(new RowStyle(SizeType.Absolute, 26F));  // Buttons (reduced from 28)
-            camSensorGrid.RowStyles.Add(new RowStyle(SizeType.Absolute, 34F));  // Mic Container (reduced from 40)
+            camSensorGrid.RowStyles.Add(new RowStyle(SizeType.Absolute, 26F));  // Buttons
+            camSensorGrid.RowStyles.Add(new RowStyle(SizeType.Absolute, 38F));  // Mic Container (38px gives clean clearance for text + bar)
 
             camPanel = BuildCameraPanel();
             camSensorGrid.Controls.Add(camPanel, 0, 0);
@@ -902,10 +902,11 @@ namespace SuperAutoMater
             lblMicState = new Label
             {
                 Text = "MIC: ACTIVE (44.1 kHz / 16-BIT)",
-                Font = HudTheme.FontMono9Bold,
+                Font = HudTheme.FontMono8Bold,
                 ForeColor = HudTheme.HudAccent,
                 Dock = DockStyle.Top,
-                Height = 12
+                Height = 16,
+                TextAlign = ContentAlignment.MiddleLeft
             };
             micVuMeter = new HudVuMeter { Dock = DockStyle.Fill };
             micContainer.Controls.Add(micVuMeter);
@@ -935,41 +936,83 @@ namespace SuperAutoMater
             usbTpGrid.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 48F));
             usbTpGrid.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 52F));
 
-            lblMouseTest = new Label
+            trackpadVisual = new BufferedPanel
             {
                 Dock = DockStyle.Fill,
-                Text = "⟨ TRACKPAD : [ L ] [ M ] [ R ] ⟩",
-                TextAlign = ContentAlignment.MiddleCenter,
-                Font = HudTheme.FontMono9Bold,
                 BackColor = Color.FromArgb(16, 9, 28),
-                ForeColor = HudTheme.HudAccent,
-                Cursor = Cursors.Cross,
+                Cursor = Cursors.Hand,
                 Margin = new Padding(2)
             };
-            lblMouseTest.Paint += (s, pe) =>
+
+            trackpadVisual.Paint += (s, pe) =>
             {
-                bool isPassed = (tpLeft && tpRight);
-                using (Pen p = new Pen(isPassed ? HudTheme.PassNominal : Color.FromArgb(40, 168, 85, 247), 1))
-                    pe.Graphics.DrawRectangle(p, 0, 0, lblMouseTest.Width - 1, lblMouseTest.Height - 1);
+                var g = pe.Graphics;
+                g.SmoothingMode = SmoothingMode.AntiAlias;
+                int w = trackpadVisual.Width;
+                int h = trackpadVisual.Height;
+
+                if (w <= 4 || h <= 4) return;
+
+                // Outer border
+                bool allPassed = tpLeft && tpRight;
+                using (Pen borderPen = new Pen(allPassed ? HudTheme.PassNominal : HudTheme.Bezel, 1f))
+                {
+                    g.DrawRectangle(borderPen, 0, 0, w - 1, h - 1);
+                }
+
+                // Split into Left Zone (45%), Middle Zone (10%), Right Zone (45%)
+                int midW = Math.Max(16, w / 8);
+                int sideW = (w - midW - 6) / 2;
+                Rectangle lRect = new Rectangle(2, 2, sideW, h - 5);
+                Rectangle mRect = new Rectangle(lRect.Right + 1, 2, midW, h - 5);
+                Rectangle rRect = new Rectangle(mRect.Right + 1, 2, w - mRect.Right - 3, h - 5);
+
+                // Draw Left Zone
+                Color lBg = tpLeft ? Color.FromArgb(28, 65, 52) : Color.FromArgb(22, 12, 38);
+                Color lBorder = tpLeft ? HudTheme.PassNominal : HudTheme.Bezel;
+                Color lText = tpLeft ? HudTheme.TextBright : HudTheme.HudAccentSoft;
+                using (SolidBrush b = new SolidBrush(lBg)) g.FillRectangle(b, lRect);
+                using (Pen p = new Pen(lBorder, 1f)) g.DrawRectangle(p, lRect);
+
+                // Draw Middle Zone
+                Color mBg = tpMiddle ? Color.FromArgb(28, 65, 52) : Color.FromArgb(18, 10, 30);
+                Color mBorder = tpMiddle ? HudTheme.PassNominal : Color.FromArgb(40, 25, 60);
+                Color mText = tpMiddle ? HudTheme.TextBright : HudTheme.Muted;
+                using (SolidBrush b = new SolidBrush(mBg)) g.FillRectangle(b, mRect);
+                using (Pen p = new Pen(mBorder, 1f)) g.DrawRectangle(p, mRect);
+
+                // Draw Right Zone
+                Color rBg = tpRight ? Color.FromArgb(28, 65, 52) : Color.FromArgb(22, 12, 38);
+                Color rBorder = tpRight ? HudTheme.PassNominal : HudTheme.Bezel;
+                Color rText = tpRight ? HudTheme.TextBright : HudTheme.HudAccentSoft;
+                using (SolidBrush b = new SolidBrush(rBg)) g.FillRectangle(b, rRect);
+                using (Pen p = new Pen(rBorder, 1f)) g.DrawRectangle(p, rRect);
+
+                // Draw text labels
+                using (StringFormat sf = new StringFormat { Alignment = StringAlignment.Center, LineAlignment = StringAlignment.Center, FormatFlags = StringFormatFlags.NoWrap })
+                {
+                    using (SolidBrush tb = new SolidBrush(lText))
+                        g.DrawString(tpLeft ? "✓ LEFT" : "LEFT BTN", HudTheme.FontMono8Bold, tb, lRect, sf);
+
+                    using (SolidBrush tb = new SolidBrush(mText))
+                        g.DrawString(tpMiddle ? "✓" : "MID", HudTheme.FontMono8, tb, mRect, sf);
+
+                    using (SolidBrush tb = new SolidBrush(rText))
+                        g.DrawString(tpRight ? "✓ RIGHT" : "RIGHT BTN", HudTheme.FontMono8Bold, tb, rRect, sf);
+                }
             };
-            lblMouseTest.MouseDown += (s, e) =>
+
+            trackpadVisual.MouseDown += (s, e) =>
             {
                 if (e.Button == MouseButtons.Left) tpLeft = true;
                 else if (e.Button == MouseButtons.Right) tpRight = true;
                 else if (e.Button == MouseButtons.Middle) tpMiddle = true;
 
-                lblMouseTest.BackColor = Color.FromArgb(28, 65, 52);
-                lblMouseTest.ForeColor = HudTheme.TextBright;
-                lblMouseTest.Text = $"⟨ TRACKPAD : [ {(tpLeft ? "✓ L" : "L")} ] [ {(tpMiddle ? "✓ M" : "M")} ] [ {(tpRight ? "✓ R" : "R")} ] ⟩";
-                lblMouseTest.Invalidate();
-                MarkTestComplete("Trackpad");
-            };
-            lblMouseTest.MouseUp += (s, e) =>
-            {
-                lblMouseTest.BackColor = Color.FromArgb(16, 9, 28);
-                lblMouseTest.ForeColor = HudTheme.PassNominal;
-                lblMouseTest.Text = $"⟨ TRACKPAD : [ {(tpLeft ? "✓ L" : "L")} ] [ {(tpMiddle ? "✓ M" : "M")} ] [ {(tpRight ? "✓ R" : "R")} ] ⟩";
-                lblMouseTest.Invalidate();
+                trackpadVisual.Invalidate();
+                if (tpLeft && tpRight)
+                {
+                    MarkTestComplete("Trackpad");
+                }
             };
 
             lblUsbTest = new Label
@@ -997,7 +1040,7 @@ namespace SuperAutoMater
                 lblUsbTest.Invalidate();
             };
 
-            usbTpGrid.Controls.Add(lblMouseTest, 0, 0);
+            usbTpGrid.Controls.Add(trackpadVisual, 0, 0);
             usbTpGrid.Controls.Add(lblUsbTest, 1, 0);
             cardUsb.Controls.Add(usbTpGrid);
             rightStack.Controls.Add(cardUsb, 0, 1);
@@ -1149,7 +1192,7 @@ namespace SuperAutoMater
                         double curGhz = pInfo[0].CurrentMhz / 1000.0;
                         double maxGhz = pInfo[0].MaxMhz / 1000.0;
                         lblCpuClock.Text = $"{curGhz:F2} GHz (Max {maxGhz:F2} GHz) · {pInfo.Length}T";
-                        if (cardCpu != null) cardCpu.HeaderSubtitle = $"{pInfo.Length} CORES NOMINAL";
+                        if (cardCpu != null) cardCpu.HeaderSubtitle = $"{pInfo.Length}C NOMINAL";
                     }
                     else
                     {
@@ -1222,7 +1265,7 @@ namespace SuperAutoMater
 
                     if (cardBattery != null)
                     {
-                        cardBattery.HeaderSubtitle = $"{battHealthVal:F0}% INTEGRITY";
+                        cardBattery.HeaderSubtitle = $"{battHealthVal:F0}% HEALTH";
                     }
 
                     uint pct = bState.MaxCapacity > 0 ? (bState.RemainingCapacity * 100 / bState.MaxCapacity) : 100;
@@ -1293,10 +1336,7 @@ namespace SuperAutoMater
             if (targetBtn != null)
             {
                 targetBtn.AccentColor = HudTheme.PassNominal;
-                if (!targetBtn.Text.StartsWith("✓"))
-                {
-                    targetBtn.Text = "✓ " + targetBtn.Text;
-                }
+                targetBtn.StatusBadge = "✓ PASS";
                 targetBtn.Invalidate();
             }
         }

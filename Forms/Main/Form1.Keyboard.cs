@@ -204,12 +204,9 @@ namespace SuperAutoMater
                 lblKeyboardCount.Text = "KEYS LOGGED: 0/104";
             }
 
-            if (lblMouseTest != null)
+            if (trackpadVisual != null)
             {
-                lblMouseTest.BackColor = HudTheme.PanelGlassTop;
-                lblMouseTest.ForeColor = HudTheme.HudAccent;
-                lblMouseTest.Text = "⟨ TRACKPAD // MOUSE TEST : [ L ] [ M ] [ R ] ⟩";
-                lblMouseTest.Invalidate();
+                trackpadVisual.Invalidate();
             }
         }
 

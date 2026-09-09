@@ -151,31 +151,45 @@ namespace SuperAutoMater
                     g.DrawLine(divPen, rect.Left + 8, hY, rect.Right - 8, hY);
                 }
 
-                // Tag indicator dot or bar
+                // Tag indicator dot
                 using (SolidBrush tagBrush = new SolidBrush(tagAccentColor))
                 {
-                    g.FillEllipse(tagBrush, rect.Left + 10, rect.Y + (headerHeight / 2) - 4, 8, 8);
+                    g.FillEllipse(tagBrush, rect.Left + 8, rect.Y + (headerHeight / 2) - 4, 7, 7);
                 }
 
-                // Header Title
-                Font titleFont = ScalingService.Instance.GetFont(HudFontRole.PanelHeader);
-                using (SolidBrush textBrush = new SolidBrush(HudTheme.TextBright))
-                {
-                    g.DrawString(headerTitle.ToUpperInvariant(), titleFont, textBrush, rect.Left + 24, rect.Y + (headerHeight / 2) - 7);
-                }
+                float subWidth = 0f;
+                Font subFont = ScalingService.Instance.GetFont(HudFontRole.Badge);
 
-                // Header Subtitle Badge
+                // Measure & Draw Header Subtitle Badge first
                 if (!string.IsNullOrEmpty(headerSubtitle))
                 {
-                    Font subFont = ScalingService.Instance.GetFont(HudFontRole.Badge);
                     SizeF subSize = g.MeasureString(headerSubtitle, subFont);
-                    float subX = rect.Right - subSize.Width - 12;
-                    float subY = rect.Y + (headerHeight / 2) - (subSize.Height / 2);
+                    subWidth = subSize.Width + 10f;
+                    float subX = Math.Max(rect.Left + 30, rect.Right - subSize.Width - 8);
+                    float subY = rect.Y + (headerHeight / 2f) - (subSize.Height / 2f);
 
                     using (SolidBrush subBrush = new SolidBrush(headerSubtitleColor))
                     {
                         g.DrawString(headerSubtitle, subFont, subBrush, subX, subY);
                     }
+                }
+
+                // Header Title (bounded rectangle so it never overlaps the subtitle badge)
+                Font titleFont = ScalingService.Instance.GetFont(HudFontRole.PanelHeader);
+                float titleX = rect.Left + 18;
+                float titleW = Math.Max(20f, rect.Right - titleX - subWidth - 4);
+                RectangleF titleRect = new RectangleF(titleX, rect.Y + 2, titleW, headerHeight - 3);
+
+                using (SolidBrush textBrush = new SolidBrush(HudTheme.TextBright))
+                using (StringFormat sf = new StringFormat
+                {
+                    Alignment = StringAlignment.Near,
+                    LineAlignment = StringAlignment.Center,
+                    Trimming = StringTrimming.EllipsisCharacter,
+                    FormatFlags = StringFormatFlags.NoWrap
+                })
+                {
+                    g.DrawString(headerTitle.ToUpperInvariant(), titleFont, textBrush, titleRect, sf);
                 }
             }
 

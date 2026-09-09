@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Media;
 using System.Threading.Tasks;
@@ -59,7 +59,7 @@ namespace SuperAutoMater
         {
             if (_insertionCount == 0)
             {
-                return "⟨ USB PORTS : PLUG FLASH DRIVE TO TEST ⟩";
+                return "⟨ USB: PLUG FLASH DRIVE TO TEST ⟩";
             }
 
             var parts = new List<string>();

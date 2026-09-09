@@ -375,7 +375,7 @@ namespace SuperAutoMater
                 if (micViewModel.IsMicConnected)
                 {
                     micViewModel.Start();
-                    if (lblMicState != null) lblMicState.Text = "MIC SENSOR : ACTIVE [44.1 kHz / 16-BIT]";
+                    if (lblMicState != null) lblMicState.Text = "MIC SENSOR : ACTIVE [44.1 kHz]";
                 }
                 else
                 {

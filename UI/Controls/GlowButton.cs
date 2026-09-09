@@ -41,6 +41,15 @@ namespace SuperAutoMater
             set { cornerRadius = Math.Max(0, value); Invalidate(); }
         }
 
+        private string statusBadge = "";
+
+        [DesignerSerializationVisibility(DesignerSerializationVisibility.Hidden)]
+        public string StatusBadge
+        {
+            get => statusBadge;
+            set { statusBadge = value; Invalidate(); }
+        }
+
         [DesignerSerializationVisibility(DesignerSerializationVisibility.Hidden)]
         public Color AccentColor
         {
@@ -146,31 +155,34 @@ namespace SuperAutoMater
                 HudTheme.DrawRoundedPanel(g, rect, cornerRadius, fillTop, fillBottom, bPen);
             }
 
-            // Calculate hotkey width
-            float hotkeyWidth = 0f;
-            if (!string.IsNullOrEmpty(hotkeyText))
+            // Calculate right badge width
+            float badgeAreaWidth = 0f;
+            string displayBadge = !string.IsNullOrEmpty(statusBadge) ? statusBadge : hotkeyText;
+            bool isSuccessBadge = !string.IsNullOrEmpty(statusBadge);
+
+            if (!string.IsNullOrEmpty(displayBadge))
             {
-                Font badgeFont = ScalingService.Instance.GetFont(HudFontRole.Badge);
-                string badgeStr = hotkeyText.StartsWith("[") && hotkeyText.EndsWith("]") ? hotkeyText : $"[{hotkeyText}]";
-                SizeF bSize = g.MeasureString(badgeStr, badgeFont);
-                hotkeyWidth = bSize.Width + 8;
+                Font bFont = ScalingService.Instance.GetFont(HudFontRole.Badge);
+                string bStr = displayBadge.StartsWith("[") && displayBadge.EndsWith("]") ? displayBadge : $"[{displayBadge}]";
+                SizeF bSize = g.MeasureString(bStr, bFont);
+                badgeAreaWidth = bSize.Width + 6;
 
-                Rectangle badgeRect = new Rectangle(rect.Right - (int)bSize.Width - 10, (this.Height - (int)bSize.Height) / 2, (int)bSize.Width + 6, (int)bSize.Height);
-                Color badgeBg = isPrimary ? Color.FromArgb(60, 0, 0, 0) : Color.FromArgb(35, 18, 55);
-                Color badgeText = isPrimary ? Color.FromArgb(235, 215, 255) : HudTheme.HudAccentSoft;
-                Color badgeBorder = isPrimary ? Color.FromArgb(80, 255, 255, 255) : HudTheme.Bezel;
+                Rectangle badgeRect = new Rectangle(rect.Right - (int)bSize.Width - 8, (this.Height - (int)bSize.Height) / 2, (int)bSize.Width + 5, (int)bSize.Height);
+                Color badgeBg = isSuccessBadge ? Color.FromArgb(12, 38, 28) : (isPrimary ? Color.FromArgb(60, 0, 0, 0) : Color.FromArgb(35, 18, 55));
+                Color badgeText = isSuccessBadge ? HudTheme.PassNominal : (isPrimary ? Color.FromArgb(235, 215, 255) : HudTheme.HudAccentSoft);
+                Color badgeBorder = isSuccessBadge ? HudTheme.PassNominal : (isPrimary ? Color.FromArgb(80, 255, 255, 255) : HudTheme.Bezel);
 
-                HudTheme.DrawPillBadge(g, badgeRect, badgeStr, badgeFont, badgeBg, badgeText, badgeBorder);
+                HudTheme.DrawPillBadge(g, badgeRect, bStr, bFont, badgeBg, badgeText, badgeBorder);
             }
 
             // Draw Button Text (use control's custom font if explicitly set, else fallback to role font)
             Font btnFont = this.Font ?? ScalingService.Instance.GetFont(HudFontRole.Button);
-            Rectangle textRect = new Rectangle(rect.Left + 8, rect.Top, Math.Max(10, rect.Width - 14 - (int)hotkeyWidth), rect.Height);
+            Rectangle textRect = new Rectangle(rect.Left + 8, rect.Top, Math.Max(10, rect.Width - 12 - (int)badgeAreaWidth), rect.Height);
 
             using (SolidBrush tb = new SolidBrush(textCol))
             using (StringFormat sf = new StringFormat
             {
-                Alignment = string.IsNullOrEmpty(hotkeyText) ? StringAlignment.Center : StringAlignment.Near,
+                Alignment = string.IsNullOrEmpty(displayBadge) ? StringAlignment.Center : StringAlignment.Near,
                 LineAlignment = StringAlignment.Center,
                 Trimming = StringTrimming.EllipsisCharacter,
                 FormatFlags = StringFormatFlags.NoWrap
