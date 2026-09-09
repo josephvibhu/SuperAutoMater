@@ -128,6 +128,7 @@ namespace SuperAutoMater
             };
 
             this.Load += Form1_Load;
+            this.Shown += Form1_Shown;
             this.FormClosing += Form1_FormClosing;
             this.KeyDown += Form1_KeyDown;
             this.KeyUp += Form1_KeyUp;
@@ -698,25 +699,49 @@ namespace SuperAutoMater
 
         #region Form Lifecycle
 
-        private async void Form1_Load(object sender, EventArgs e)
+        private void Form1_Load(object sender, EventArgs e)
         {
             try
             {
                 lblAdminWarning.Visible = !IsAdministrator();
                 _hookID = SetHook(_proc);
+            }
+            catch (Exception ex)
+            {
+                DarkMessageBox.Show($"Startup Hook Error: {ex.Message}", "System Failure");
+            }
+        }
 
-                // ── Background startup tasks (non-blocking) ──────────────────
-                // 1. Auto-connect to GTW WiFi silently
+        private async void Form1_Shown(object sender, EventArgs e)
+        {
+            // The UI frame and Bento controls are already visible and painted on the screen!
+            // All heavy operations run asynchronously in the background with zero UI freeze:
+            try
+            {
+                // 1. Silent background Wi-Fi connection
                 _ = StartupServices.ConnectToGtwWifiAsync();
 
-                // 2. Bundle Sheets code.gs + guide on first run
-                StartupServices.EnsureSheetsSetupFiles();
+                // 2. Background setup verification (non-blocking)
+                _ = Task.Run(() => StartupServices.EnsureSheetsSetupFiles());
 
-                StartMicVisualizer();
+                // 3. Deferred microphone visualizer initialization
+                _ = Task.Run(() =>
+                {
+                    try
+                    {
+                        if (this.IsHandleCreated && !this.IsDisposed)
+                        {
+                            this.BeginInvoke(new Action(StartMicVisualizer));
+                        }
+                    }
+                    catch { }
+                });
+
+                // 4. Asynchronous Hardware Telemetry Probe
                 await GenerateHardwareReport();
 
-                // 3. Passive background network status test (marks WiFi nav icon green)
-                _ = System.Threading.Tasks.Task.Run(async () =>
+                // 5. Passive background network status test
+                _ = Task.Run(async () =>
                 {
                     try
                     {
@@ -738,14 +763,14 @@ namespace SuperAutoMater
                     catch { }
                 });
 
-                // 4. Live background battery power wattage monitor (updates Card 5 every 2.5s)
+                // 6. Live background battery power wattage monitor
                 _powerTimer = new System.Windows.Forms.Timer { Interval = 2500 };
                 _powerTimer.Tick += (s, ev) => UpdateLiveBatteryTelemetryCard();
                 _powerTimer.Start();
             }
             catch (Exception ex)
             {
-                DarkMessageBox.Show($"Startup Error: {ex.Message}", "System Failure");
+                DarkMessageBox.Show($"Telemetry Initialization Error: {ex.Message}", "System Failure");
             }
         }
 

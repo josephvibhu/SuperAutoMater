@@ -171,36 +171,54 @@ namespace SuperAutoMater
         public static readonly Font FontTitle20Bold;
         public static readonly Font FontTitle28Bold;
 
-        static HudTheme()
+        private static bool IsFontAvailable(string familyName)
         {
-            string fontsDir = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "lib", "fonts");
-            if (Directory.Exists(fontsDir))
+            try
             {
-                foreach (var fontFile in Directory.GetFiles(fontsDir, "*.ttf"))
+                using (var test = new FontFamily(familyName))
                 {
-                    try { FontCollection.AddFontFile(fontFile); } catch { }
-                }
-                foreach (var fontFile in Directory.GetFiles(fontsDir, "*.otf"))
-                {
-                    try { FontCollection.AddFontFile(fontFile); } catch { }
+                    return string.Equals(test.Name, familyName, StringComparison.OrdinalIgnoreCase);
                 }
             }
+            catch
+            {
+                return false;
+            }
+        }
 
+        static HudTheme()
+        {
             string foundMono = "Consolas";
             string foundTitle = "Segoe UI";
 
-            foreach (var family in FontFamily.Families)
-            {
-                if (family.Name.Equals("JetBrains Mono", StringComparison.OrdinalIgnoreCase)) foundMono = family.Name;
-                if (family.Name.Equals("Orbitron", StringComparison.OrdinalIgnoreCase)) foundTitle = family.Name;
-                else if (family.Name.Equals("Michroma", StringComparison.OrdinalIgnoreCase) && foundTitle == "Segoe UI") foundTitle = family.Name;
-            }
+            // Fast direct font probing (instant 0.2ms - avoids scanning hundreds of system fonts)
+            if (IsFontAvailable("JetBrains Mono")) foundMono = "JetBrains Mono";
+            if (IsFontAvailable("Orbitron")) foundTitle = "Orbitron";
+            else if (IsFontAvailable("Michroma")) foundTitle = "Michroma";
 
-            foreach (var family in FontCollection.Families)
+            // Optional bundled fonts in lib/fonts (safe check)
+            try
             {
-                if (family.Name.IndexOf("Mono", StringComparison.OrdinalIgnoreCase) >= 0) foundMono = family.Name;
-                if (family.Name.IndexOf("Orbitron", StringComparison.OrdinalIgnoreCase) >= 0 || family.Name.IndexOf("Michroma", StringComparison.OrdinalIgnoreCase) >= 0) foundTitle = family.Name;
+                string fontsDir = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "lib", "fonts");
+                if (Directory.Exists(fontsDir))
+                {
+                    foreach (var fontFile in Directory.GetFiles(fontsDir, "*.*"))
+                    {
+                        if (fontFile.EndsWith(".ttf", StringComparison.OrdinalIgnoreCase) ||
+                            fontFile.EndsWith(".otf", StringComparison.OrdinalIgnoreCase))
+                        {
+                            try { FontCollection.AddFontFile(fontFile); } catch { }
+                        }
+                    }
+
+                    foreach (var family in FontCollection.Families)
+                    {
+                        if (family.Name.IndexOf("Mono", StringComparison.OrdinalIgnoreCase) >= 0) foundMono = family.Name;
+                        if (family.Name.IndexOf("Orbitron", StringComparison.OrdinalIgnoreCase) >= 0 || family.Name.IndexOf("Michroma", StringComparison.OrdinalIgnoreCase) >= 0) foundTitle = family.Name;
+                    }
+                }
             }
+            catch { }
 
             MonoFamily = foundMono;
             TitleFamily = foundTitle;

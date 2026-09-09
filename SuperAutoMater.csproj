@@ -21,7 +21,7 @@
 		<!-- High-Speed USB Execution & Pre-Compilation (Fast Load from Flash Drive) -->
 		<PublishReadyToRun>true</PublishReadyToRun>
 		<PublishReadyToRunComposite>true</PublishReadyToRunComposite>
-		<EnableCompressionInSingleFile>false</EnableCompressionInSingleFile>
+		<EnableCompressionInSingleFile>true</EnableCompressionInSingleFile>
 		<TieredCompilation>true</TieredCompilation>
 		<Optimize>true</Optimize>
 

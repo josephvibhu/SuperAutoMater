@@ -194,47 +194,47 @@ namespace SuperAutoMater
             cards.Clear();
             cards.Add(new TelemetryCardData
             {
-                Line1 = "MODEL : HP EliteBook 840 G8 | SN: 5CG1234XYZ",
-                Line2 = "CPU   : 11th Gen Intel Core i7-1165G7 (4C/8T) [PASS ✓]",
-                StatusBadge = "[ PASS ✓ ]",
+                Line1 = "MODEL : Detecting chassis identity & serial number...",
+                Line2 = "CPU   : Interrogating processor & microarchitecture...",
+                StatusBadge = "[ PROBING ]",
                 StripeColor = HudTheme.HudAccent,
-                BadgeColor = HudTheme.PassNominal
+                BadgeColor = HudTheme.HudAccentSoft
             });
 
             cards.Add(new TelemetryCardData
             {
-                Line1 = "RAM   : 16 GB Dual-Channel (8GB+8GB @ 3200 MHz)",
-                Line2 = "GPU   : Intel Iris Xe Graphics (1.0 GB VRAM)",
-                StatusBadge = "[ PASS ✓ ]",
-                StripeColor = HudTheme.PassNominal,
-                BadgeColor = HudTheme.PassNominal
+                Line1 = "RAM   : Scanning physical memory modules & topology...",
+                Line2 = "GPU   : Enumerating display adapter & VRAM capacity...",
+                StatusBadge = "[ PROBING ]",
+                StripeColor = HudTheme.HudAccent,
+                BadgeColor = HudTheme.HudAccentSoft
             });
 
             cards.Add(new TelemetryCardData
             {
-                Line1 = "NET   : Intel Wi-Fi 6 AX201 160MHz [Online]",
-                Line2 = "BIO   : Windows Biometric Framework [Ready]",
-                StatusBadge = "[ PASS ✓ ]",
-                StripeColor = HudTheme.WarnCaution,
-                BadgeColor = HudTheme.PassNominal
+                Line1 = "NET   : Scanning wireless adapter & interface...",
+                Line2 = "BIO   : Interrogating Windows Biometric Framework...",
+                StatusBadge = "[ PROBING ]",
+                StripeColor = HudTheme.HudAccent,
+                BadgeColor = HudTheme.HudAccentSoft
             });
 
             cards.Add(new TelemetryCardData
             {
-                Line1 = "DRIVE : 512 GB NVMe SSD - Western Digital PC SN740",
-                Line2 = "SMART : Health 100% PERFECT [✓], 38°C [HDSentinel / smartctl]",
-                StatusBadge = "[ PASS ✓ ]",
+                Line1 = "DRIVE : Scanning storage controller & NVMe topology...",
+                Line2 = "SMART : Probing drive lifetime health & S.M.A.R.T...",
+                StatusBadge = "[ PROBING ]",
                 StripeColor = HudTheme.StorageAux,
-                BadgeColor = HudTheme.PassNominal
+                BadgeColor = HudTheme.HudAccentSoft
             });
 
             cards.Add(new TelemetryCardData
             {
-                Line1 = "BATT  : 53.2 Wh / 53.2 Wh [Health: 98% GRADE A+ (OPTIMAL)]",
-                Line2 = "WEAR  : -2.0% Wear (-1064 mWh) | Healthy Lifespan [PASS ✓]",
-                StatusBadge = "[ PASS ✓ ]",
-                StripeColor = Color.FromArgb(40, 200, 120),
-                BadgeColor = HudTheme.PassNominal
+                Line1 = "BATT  : Reading battery embedded controller & wear...",
+                Line2 = "POWER : Measuring real-time wattage discharge rate...",
+                StatusBadge = "[ PROBING ]",
+                StripeColor = HudTheme.HudAccentSoft,
+                BadgeColor = HudTheme.HudAccentSoft
             });
 
             this.Invalidate();

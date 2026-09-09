@@ -401,10 +401,11 @@ HOW IT WORKS:
         {
             try
             {
+                if (File.Exists(CodeGsPath) && File.Exists(ReadmePath)) return;
                 string dir = Path.GetDirectoryName(CodeGsPath);
                 if (!Directory.Exists(dir)) Directory.CreateDirectory(dir);
-                File.WriteAllText(CodeGsPath, CodeGsContent);
-                File.WriteAllText(ReadmePath, SetupGuideContent);
+                if (!File.Exists(CodeGsPath)) File.WriteAllText(CodeGsPath, CodeGsContent);
+                if (!File.Exists(ReadmePath)) File.WriteAllText(ReadmePath, SetupGuideContent);
             }
             catch { }
         }

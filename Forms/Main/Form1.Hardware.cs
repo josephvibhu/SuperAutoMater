@@ -422,13 +422,41 @@ namespace SuperAutoMater
         private string GetSmartctlExecutablePath()
         {
             string baseDir = AppDomain.CurrentDomain.BaseDirectory;
+            string sourcePath = null;
+
             string libPath = Path.Combine(baseDir, "lib", "smartctl.exe");
-            if (File.Exists(libPath)) return libPath;
+            if (File.Exists(libPath)) sourcePath = libPath;
+            else
+            {
+                string rootPath = Path.Combine(baseDir, "smartctl.exe");
+                if (File.Exists(rootPath)) sourcePath = rootPath;
+            }
 
-            string rootPath = Path.Combine(baseDir, "smartctl.exe");
-            if (File.Exists(rootPath)) return rootPath;
+            if (sourcePath == null) return null;
 
-            return null;
+            // Fast RAM/Local Cache Optimization:
+            // Cache to local %TEMP%\SuperAutoMater\bin to eliminate slow USB bus read latency during process execution
+            try
+            {
+                string tempDir = Path.Combine(Path.GetTempPath(), "SuperAutoMater", "bin");
+                string localExe = Path.Combine(tempDir, "smartctl.exe");
+                if (!Directory.Exists(tempDir)) Directory.CreateDirectory(tempDir);
+
+                if (!File.Exists(localExe) || new FileInfo(localExe).Length != new FileInfo(sourcePath).Length)
+                {
+                    File.Copy(sourcePath, localExe, true);
+                    string sourceDb = Path.Combine(Path.GetDirectoryName(sourcePath), "drivedb.h");
+                    if (File.Exists(sourceDb))
+                    {
+                        File.Copy(sourceDb, Path.Combine(tempDir, "drivedb.h"), true);
+                    }
+                }
+                return localExe;
+            }
+            catch
+            {
+                return sourcePath;
+            }
         }
 
         private bool IsSafeDeviceId(string deviceId)
