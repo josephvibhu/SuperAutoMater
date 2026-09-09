@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Drawing;
 using System.Threading.Tasks;
 using System.Windows.Forms;
@@ -235,11 +235,13 @@ namespace SuperAutoMater
                 {
                     btnCameraToggle.Text = "STOP CAMERA TEST";
                     if (btnCameraToggle is HudButton hb) hb.HudAccentColor = HudTheme.FailWarning;
+                    else if (btnCameraToggle is GlowButton gb) gb.AccentColor = HudTheme.FailWarning;
                 }
                 else if (btnCameraToggle != null)
                 {
                     btnCameraToggle.Text = "START CAMERA TEST";
                     if (btnCameraToggle is HudButton hb) hb.HudAccentColor = HudTheme.HudAccent;
+                    else if (btnCameraToggle is GlowButton gb) gb.AccentColor = HudTheme.HudAccent;
                 }
             }
             finally
@@ -296,6 +298,7 @@ namespace SuperAutoMater
                 {
                     btnCameraToggle.Text = "START CAMERA TEST";
                     if (btnCameraToggle is HudButton hb) hb.HudAccentColor = HudTheme.HudAccent;
+                    else if (btnCameraToggle is GlowButton gb) gb.AccentColor = HudTheme.HudAccent;
                     btnCameraToggle.Enabled = true;
                     btnCameraToggle.Invalidate();
                 }

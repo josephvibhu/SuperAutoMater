@@ -124,6 +124,7 @@ namespace SuperAutoMater
 
             slidingDrawer?.MarkCheckComplete(test);
             navRail?.SetTestPassed(test);
+            UpdateSuiteButtonState(test);
         }
 
         private void SaveFinalReport(object sender, EventArgs e)

@@ -119,6 +119,8 @@ namespace SuperAutoMater
         public static readonly Color Muted            = Color.FromArgb(70, 48, 96);    // #463060 (Inactive / Dim Violet)
         public static readonly Color TextBright       = Color.FromArgb(243, 232, 255); // #F3E8FF (Primary readout - Lilac)
         public static readonly Color TextDim          = Color.FromArgb(139, 127, 163); // #8B7FA3 (Secondary readout - Lavender)
+        public static readonly Color TextNormal       = Color.FromArgb(190, 180, 210); // #BEB4D2 (Secondary text)
+        public static readonly Color BgBase           = BgGlass;                       // Base Background alias
 
         #endregion
 
@@ -155,6 +157,10 @@ namespace SuperAutoMater
         public static readonly string MonoFamily;
         public static readonly string TitleFamily;
 
+        public static readonly Font FontMono8;
+        public static readonly Font FontMono8Bold;
+        public static readonly Font FontMono9;
+        public static readonly Font FontMono9Bold;
         public static readonly Font FontMono11;
         public static readonly Font FontMono11Bold;
         public static readonly Font FontMono13;
@@ -223,6 +229,10 @@ namespace SuperAutoMater
             MonoFamily = foundMono;
             TitleFamily = foundTitle;
 
+            FontMono8      = new Font(MonoFamily, 8.0F, FontStyle.Regular);
+            FontMono8Bold  = new Font(MonoFamily, 8.0F, FontStyle.Bold);
+            FontMono9      = new Font(MonoFamily, 9.0F, FontStyle.Regular);
+            FontMono9Bold  = new Font(MonoFamily, 9.0F, FontStyle.Bold);
             FontMono11     = new Font(MonoFamily, 8.5F, FontStyle.Regular);
             FontMono11Bold = new Font(MonoFamily, 8.5F, FontStyle.Bold);
             FontMono13     = new Font(MonoFamily, 9.5F, FontStyle.Regular);

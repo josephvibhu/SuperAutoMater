@@ -888,32 +888,7 @@ namespace SuperAutoMater
             string reportText = await BuildHardwareReportTextAsync();
             if (reportBox != null) reportBox.Text = reportText;
 
-            if (telemetryCards != null)
-            {
-                string mLine1 = $"MODEL : {lastModel} | SN: {lastSerial}";
-                string mLine2 = $"CPU   : {lastCpu}";
-                telemetryCards.UpdateCardData(0, mLine1, mLine2, "[ PASS ✓ ]", HudTheme.HudAccent, HudTheme.PassNominal);
-
-                string rLine1 = $"RAM   : {lastRam}";
-                string rLine2 = $"GPU   : {lastGpu}";
-                telemetryCards.UpdateCardData(1, rLine1, rLine2, "[ PASS ✓ ]", HudTheme.PassNominal, HudTheme.PassNominal);
-
-                string nLine1 = $"NET   : {lastNetworkSummary}";
-                string nLine2 = $"BIO   : Windows Biometric Framework [Ready]";
-                telemetryCards.UpdateCardData(2, nLine1, nLine2, "[ PASS ✓ ]", HudTheme.WarnCaution, HudTheme.PassNominal);
-
-                string sLine1 = $"DRIVE : {lastStorageSummary}";
-                string sLine2 = $"SMART : {lastStorageHealth}";
-                telemetryCards.UpdateCardData(3, sLine1, sLine2, "[ PASS ✓ ]", HudTheme.StorageAux, HudTheme.PassNominal);
-
-                string bLine1 = lastBatteryCardLine1 ?? $"BATT  : {lastBatteryHealth}";
-                string bLine2 = "POWER : AC Line Mainline [PASS ✓]";
-                if (NativeMethods.TryGetBatteryState(out var bState))
-                {
-                    bLine2 = $"POWER : {FormatBatteryPowerFlow(bState)} [PASS ✓]";
-                }
-                telemetryCards.UpdateCardData(4, bLine1, bLine2, "[ PASS ✓ ]", Color.FromArgb(40, 200, 120), HudTheme.PassNominal);
-            }
+            UpdateBentoGridTelemetry();
         }
 
         private string GetProgressBar(int percentage, int width = 10)
@@ -1380,16 +1355,10 @@ namespace SuperAutoMater
 
         public void UpdateLiveBatteryTelemetryCard()
         {
-            if (telemetryCards == null || this.IsDisposed || !this.IsHandleCreated) return;
+            if (this.IsDisposed || !this.IsHandleCreated) return;
             try
             {
-                if (NativeMethods.TryGetBatteryState(out var bState))
-                {
-                    string flow = FormatBatteryPowerFlow(bState);
-                    string bLine2 = $"POWER : {flow} [PASS ✓]";
-                    string bLine1 = lastBatteryCardLine1 ?? $"BATT  : {lastBatteryHealth}";
-                    telemetryCards.UpdateCardData(4, bLine1, bLine2, "[ PASS ✓ ]", Color.FromArgb(40, 200, 120), HudTheme.PassNominal);
-                }
+                UpdateBentoGridTelemetry();
             }
             catch { }
         }

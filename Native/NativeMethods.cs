@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Runtime.InteropServices;
 
 namespace SuperAutoMater
@@ -26,6 +26,56 @@ namespace SuperAutoMater
 
         [DllImport("kernel32.dll", CharSet = CharSet.Auto, SetLastError = true)]
         public static extern IntPtr GetModuleHandle(string lpModuleName);
+
+        [DllImport("kernel32.dll", SetLastError = true)]
+        [return: MarshalAs(UnmanagedType.Bool)]
+        public static extern bool GetSystemTimes(
+            out System.Runtime.InteropServices.ComTypes.FILETIME lpIdleTime,
+            out System.Runtime.InteropServices.ComTypes.FILETIME lpKernelTime,
+            out System.Runtime.InteropServices.ComTypes.FILETIME lpUserTime);
+
+        private static ulong _prevIdleTime;
+        private static ulong _prevKernelTime;
+        private static ulong _prevUserTime;
+        private static bool _hasPrevTimes;
+
+        public static float GetSystemCpuUsage()
+        {
+            try
+            {
+                if (GetSystemTimes(out var idleFt, out var kernelFt, out var userFt))
+                {
+                    ulong idle = (((ulong)idleFt.dwHighDateTime) << 32) | (uint)idleFt.dwLowDateTime;
+                    ulong kernel = (((ulong)kernelFt.dwHighDateTime) << 32) | (uint)kernelFt.dwLowDateTime;
+                    ulong user = (((ulong)userFt.dwHighDateTime) << 32) | (uint)userFt.dwLowDateTime;
+
+                    if (!_hasPrevTimes)
+                    {
+                        _prevIdleTime = idle;
+                        _prevKernelTime = kernel;
+                        _prevUserTime = user;
+                        _hasPrevTimes = true;
+                        return 0f;
+                    }
+
+                    ulong idleDiff = idle - _prevIdleTime;
+                    ulong kernelDiff = kernel - _prevKernelTime;
+                    ulong userDiff = user - _prevUserTime;
+
+                    _prevIdleTime = idle;
+                    _prevKernelTime = kernel;
+                    _prevUserTime = user;
+
+                    ulong totalSys = kernelDiff + userDiff;
+                    if (totalSys == 0) return 0f;
+
+                    float cpu = (float)((totalSys - idleDiff) * 100.0 / totalSys);
+                    return Math.Clamp(cpu, 0f, 100f);
+                }
+            }
+            catch { }
+            return 0f;
+        }
 
         // --- HDSentinel nag screen automation ---
         public delegate bool EnumWindowsProc(IntPtr hWnd, IntPtr lParam);

@@ -51,8 +51,6 @@ namespace SuperAutoMater
 
         private Label lblAdminWarning;
         private RichTextBox reportBox = new RichTextBox();
-        private TelemetryCardsView telemetryCards;
-        private PerformanceGraphControl perfGraphs;
         private SlidingQcDrawer slidingDrawer;
         private NavRailPanel navRail;
 
@@ -71,6 +69,54 @@ namespace SuperAutoMater
         private readonly UsbPortTracker _usbTracker = new UsbPortTracker();
         private Label lblUsbTest;
         private System.Windows.Forms.Timer _powerTimer;
+        private System.Windows.Forms.Timer _cpuSampleTimer;
+
+        // Bento Grid Telemetry Cards & Controls
+        private BentoCard cardDevice;
+        private BentoCard cardCpu;
+        private BentoCard cardMemory;
+        private BentoCard cardBattery;
+
+        private Label lblDeviceModel;
+        private Label lblDeviceSerial;
+        private Label lblDeviceGrade;
+
+        private Label lblCpuName;
+        private Label lblCpuClock;
+        private TelemetrySparkline sparkCpu;
+
+        private Label lblMemorySpecs;
+        private Label lblStorageSummary;
+        private Label lblStorageSmartBadge;
+
+        private Label lblBatteryFlow;
+        private Label lblBatteryWear;
+        private RadialMeter meterBattery;
+
+        // Top Avionics Bar Telemetry Chips
+        private Label lblTopBattery;
+        private Label lblTopCpu;
+        private Label lblTopWifi;
+        private GlowButton btnTopExpressQC;
+
+        // Left Suite Test Pipeline Buttons
+        private GlowButton btnSuiteDisplay;
+        private GlowButton btnSuiteAudio;
+        private GlowButton btnSuiteWebcam;
+        private GlowButton btnSuiteKeyboard;
+        private GlowButton btnSuiteCpu;
+        private GlowButton btnSuiteGpu;
+        private GlowButton btnSuiteWifi;
+        private GlowButton btnSuiteStorage;
+        private GlowButton btnSuitePrintLabel;
+        private GlowButton btnSuiteSignOff;
+
+        // Bento Bottom Arena Controls
+        private Label lblKeyboardCount;
+        private BentoCard cardKeyboard;
+        private BentoCard cardSensors;
+        private BentoCard cardUsb;
+        private BentoCard cardWarehouse;
 
         public static Form1 Instance;
 
@@ -194,7 +240,7 @@ namespace SuperAutoMater
 
         private void BuildResponsiveLayout()
         {
-            // Root 3-Column Split: Column 0 (44px Left Rail) | Column 1 (100% Canvas) | Column 2 (0-350px QC Drawer)
+            // Root 3-Column Split: Column 0 (224px Left Suite Rail) | Column 1 (100% Bento Arena) | Column 2 (0-350px Sliding Drawer)
             rootSplit = new TableLayoutPanel
             {
                 Dock = DockStyle.Fill,
@@ -202,17 +248,20 @@ namespace SuperAutoMater
                 RowCount = 1,
                 Margin = new Padding(0),
                 Padding = new Padding(0),
-                BackColor = HudTheme.BgGlass
+                BackColor = HudTheme.BgBase
             };
-            rootSplit.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 44F));
+            rootSplit.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 224F));
             rootSplit.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100F));
             rootSplit.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 0F));
             rootSplit.RowStyles.Add(new RowStyle(SizeType.Percent, 100F));
 
-            // 1. Navigation Rail (Left Column 0: Test Status Indicators)
+            // Legacy navRail preserved so any existing item hooks don't null-ref
             navRail = new NavRailPanel();
             navRail.MenuButtonClicked += () => slidingDrawer.ToggleDrawer();
-            rootSplit.Controls.Add(navRail, 0, 0);
+
+            // 1. Diagnostic Suite Rail (Left Column 0)
+            Control leftRail = BuildLeftTestSuiteRail();
+            rootSplit.Controls.Add(leftRail, 0, 0);
 
             // 2. Sliding QC Drawer (Right Column 2)
             slidingDrawer = new SlidingQcDrawer();
@@ -224,253 +273,674 @@ namespace SuperAutoMater
             rootSplit.Controls.Add(slidingDrawer, 2, 0);
 
             // 3. Central Canvas Panel (Center Column 1)
-            centerArea = new Panel { Dock = DockStyle.Fill, Padding = new Padding(4, 4, 6, 4), BackColor = HudTheme.BgGlass };
-
-            // --- TOP BRANDING HEADER BANNER ---
-            Panel headerBanner = new Panel { Dock = DockStyle.Top, Height = 34, BackColor = Color.FromArgb(14, 20, 24), Margin = new Padding(0, 0, 0, 4) };
-            headerBanner.Paint += (s, e) =>
+            centerArea = new Panel
             {
-                e.Graphics.SmoothingMode = SmoothingMode.None;
-                using (Pen p = new Pen(HudTheme.Bezel, 1))
-                    e.Graphics.DrawRectangle(p, 0, 0, headerBanner.Width - 1, headerBanner.Height - 1);
-                using (Pen p = new Pen(HudTheme.HudAccent, 1))
+                Dock = DockStyle.Fill,
+                Padding = new Padding(4, 4, 6, 4),
+                BackColor = HudTheme.BgBase
+            };
+
+            TableLayoutPanel centerGrid = new TableLayoutPanel
+            {
+                Dock = DockStyle.Fill,
+                RowCount = 3,
+                ColumnCount = 1,
+                Margin = new Padding(0),
+                Padding = new Padding(0)
+            };
+            centerGrid.RowStyles.Add(new RowStyle(SizeType.Absolute, 40F));  // Top Avionics Bar
+            centerGrid.RowStyles.Add(new RowStyle(SizeType.Percent, 100F)); // Bento Dashboard Arena
+            centerGrid.RowStyles.Add(new RowStyle(SizeType.Absolute, 28F));  // Bottom Command Hotkey Bar
+
+            centerGrid.Controls.Add(BuildTopAvionicsBar(), 0, 0);
+            centerGrid.Controls.Add(BuildBentoDashboardArena(), 0, 1);
+            centerGrid.Controls.Add(BuildBottomCommandBar(), 0, 2);
+
+            centerArea.Controls.Add(centerGrid);
+            rootSplit.Controls.Add(centerArea, 1, 0);
+            this.Controls.Add(rootSplit);
+
+            Build104Keyboard();
+        }
+
+        private Control BuildTopAvionicsBar()
+        {
+            Panel bar = new Panel
+            {
+                Dock = DockStyle.Fill,
+                BackColor = Color.FromArgb(14, 8, 24),
+                Margin = new Padding(0, 0, 0, 4)
+            };
+            bar.Paint += (s, e) =>
+            {
+                e.Graphics.SmoothingMode = SmoothingMode.AntiAlias;
+                using (Pen p = new Pen(Color.FromArgb(50, 168, 85, 247), 1))
                 {
-                    e.Graphics.DrawLine(p, 0, 0, 8, 0);
-                    e.Graphics.DrawLine(p, 0, 0, 0, 8);
-                    e.Graphics.DrawLine(p, headerBanner.Width - 9, 0, headerBanner.Width - 1, 0);
-                    e.Graphics.DrawLine(p, headerBanner.Width - 1, 0, headerBanner.Width - 1, 8);
+                    e.Graphics.DrawRectangle(p, 0, 0, bar.Width - 1, bar.Height - 1);
                 }
             };
 
-            Label logoTitle = new Label
-            {
-                Text = AppVersion.Display,
-                Dock = DockStyle.Left,
-                AutoSize = true,
-                Font = HudTheme.FontTitle13Bold,
-                ForeColor = HudTheme.HudAccent,
-                TextAlign = ContentAlignment.MiddleLeft,
-                Padding = new Padding(8, 6, 0, 0)
-            };
-
-            HudButton btnOpenSign = new HudButton
-            {
-                Text = "🔏 QC SIGN-OFF ❯",
-                Dock = DockStyle.Right,
-                Width = 200,
-                HudAccentColor = HudTheme.PassNominal,
-                Font = HudTheme.FontMono11Bold
-            };
-            btnOpenSign.Click += (s, e) => slidingDrawer.ToggleDrawer();
-
-            Label authorTag = new Label
-            {
-                Text = AppVersion.StationTag,
-                Dock = DockStyle.Right,
-                AutoSize = true,
-                Font = HudTheme.FontMono11Bold,
-                ForeColor = HudTheme.PassNominal,
-                TextAlign = ContentAlignment.MiddleRight,
-                Padding = new Padding(0, 8, 12, 0)
-            };
-
-            headerBanner.Controls.Add(logoTitle);
-            headerBanner.Controls.Add(authorTag);
-            headerBanner.Controls.Add(btnOpenSign);
-            centerArea.Controls.Add(headerBanner);
-
-            // --- RESPONSIVE 2-ROW MAIN GRID ---
-            TableLayoutPanel mainGrid = new TableLayoutPanel { Dock = DockStyle.Fill, RowCount = 2, ColumnCount = 1, Margin = new Padding(0, 4, 0, 0) };
-            mainGrid.RowStyles.Add(new RowStyle(SizeType.Percent, 55F)); // Top Section: Telemetry, Controls, Camera & Mic
-            mainGrid.RowStyles.Add(new RowStyle(SizeType.Percent, 45F)); // Bottom Section: Perf Graphs & 104-Key Matrix
-
-            // --- TOP ROW: 3-COLUMN SPLIT (38% Telemetry Cards, 34% Controls, 28% Camera & Sensors) ---
-            TableLayoutPanel topGrid = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 3, RowCount = 1, Padding = new Padding(0, 0, 0, 4) };
-            topGrid.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 38F)); // System Telemetry Cards
-            topGrid.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 34F)); // Diagnostic Controls
-            topGrid.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 28F)); // Camera & Sensors
-
-            // 1. System Telemetry Panel (Structured 5-Card View)
-            HudBracketPanel grpSpecs = new HudBracketPanel
+            TableLayoutPanel barGrid = new TableLayoutPanel
             {
                 Dock = DockStyle.Fill,
-                BezelTitle = "SYSTEM TELEMETRY",
-                SubtitleBadge = "SPECIFICATIONS",
-                AccentColor = HudTheme.HudAccent
+                ColumnCount = 7,
+                RowCount = 1,
+                Margin = new Padding(0),
+                Padding = new Padding(6, 4, 6, 4)
+            };
+            barGrid.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));          // Brand & Subtitle
+            barGrid.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100F));      // Flexible spacer
+            barGrid.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));          // lblTopBattery chip
+            barGrid.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));          // lblTopCpu chip
+            barGrid.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));          // lblTopWifi chip
+            barGrid.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 170F));     // btnTopExpressQC
+            barGrid.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 140F));     // btnSignDrawer
+
+            // Brand Header
+            Panel brandPanel = new Panel { AutoSize = true, Dock = DockStyle.Fill };
+            Label lblBrand = new Label
+            {
+                Text = "⚡ SUPERAUTOMATER",
+                Font = HudTheme.FontTitle13Bold,
+                ForeColor = HudTheme.HudAccent,
+                AutoSize = true,
+                Location = new Point(0, 5)
+            };
+            Label lblSub = new Label
+            {
+                Text = "v0.1 CORE LABS",
+                Font = HudTheme.FontMono9Bold,
+                ForeColor = HudTheme.HudAccentSoft,
+                AutoSize = true,
+                Location = new Point(lblBrand.Right + 10, 8)
+            };
+            brandPanel.Controls.Add(lblBrand);
+            brandPanel.Controls.Add(lblSub);
+            barGrid.Controls.Add(brandPanel, 0, 0);
+
+            // Flexible Spacer
+            barGrid.Controls.Add(new Panel { Dock = DockStyle.Fill }, 1, 0);
+
+            // Quick Telemetry Chips
+            lblTopBattery = new Label
+            {
+                Text = "⚡ BATT: 100% (AC Line)",
+                Font = HudTheme.FontMono9Bold,
+                ForeColor = HudTheme.PassNominal,
+                BackColor = Color.FromArgb(20, 10, 35),
+                TextAlign = ContentAlignment.MiddleCenter,
+                Padding = new Padding(8, 4, 8, 4),
+                AutoSize = true,
+                Margin = new Padding(3, 2, 3, 2)
+            };
+            lblTopBattery.Paint += (s, e) =>
+            {
+                using (Pen p = new Pen(Color.FromArgb(40, 168, 85, 247), 1))
+                    e.Graphics.DrawRectangle(p, 0, 0, lblTopBattery.Width - 1, lblTopBattery.Height - 1);
+            };
+            barGrid.Controls.Add(lblTopBattery, 2, 0);
+
+            lblTopCpu = new Label
+            {
+                Text = "⚡ CPU: 0%",
+                Font = HudTheme.FontMono9Bold,
+                ForeColor = HudTheme.HudAccent,
+                BackColor = Color.FromArgb(20, 10, 35),
+                TextAlign = ContentAlignment.MiddleCenter,
+                Padding = new Padding(8, 4, 8, 4),
+                AutoSize = true,
+                Margin = new Padding(3, 2, 3, 2)
+            };
+            lblTopCpu.Paint += (s, e) =>
+            {
+                using (Pen p = new Pen(Color.FromArgb(40, 168, 85, 247), 1))
+                    e.Graphics.DrawRectangle(p, 0, 0, lblTopCpu.Width - 1, lblTopCpu.Height - 1);
+            };
+            barGrid.Controls.Add(lblTopCpu, 3, 0);
+
+            lblTopWifi = new Label
+            {
+                Text = "📶 NET: STANDBY",
+                Font = HudTheme.FontMono9Bold,
+                ForeColor = Color.FromArgb(56, 189, 248),
+                BackColor = Color.FromArgb(20, 10, 35),
+                TextAlign = ContentAlignment.MiddleCenter,
+                Padding = new Padding(8, 4, 8, 4),
+                AutoSize = true,
+                Margin = new Padding(3, 2, 6, 2)
+            };
+            lblTopWifi.Paint += (s, e) =>
+            {
+                using (Pen p = new Pen(Color.FromArgb(40, 168, 85, 247), 1))
+                    e.Graphics.DrawRectangle(p, 0, 0, lblTopWifi.Width - 1, lblTopWifi.Height - 1);
+            };
+            barGrid.Controls.Add(lblTopWifi, 4, 0);
+
+            // Express QC Primary Button
+            btnTopExpressQC = new GlowButton
+            {
+                Text = "⚡ 10S EXPRESS QC",
+                HotkeyText = "[F5]",
+                IsPrimary = true,
+                AccentColor = HudTheme.HudAccent,
+                Dock = DockStyle.Fill,
+                Margin = new Padding(2, 0, 4, 0)
+            };
+            btnTopExpressQC.Click += async (s, e) => await RunExpressQCSequenceAsync();
+            barGrid.Controls.Add(btnTopExpressQC, 5, 0);
+
+            // QC Sign-off Drawer Toggle Button
+            GlowButton btnSignDrawer = new GlowButton
+            {
+                Text = "🔏 QC SIGN-OFF",
+                HotkeyText = "[Enter]",
+                AccentColor = HudTheme.PassNominal,
+                Dock = DockStyle.Fill,
+                Margin = new Padding(2, 0, 0, 0)
+            };
+            btnSignDrawer.Click += (s, e) => slidingDrawer.ToggleDrawer();
+            barGrid.Controls.Add(btnSignDrawer, 6, 0);
+
+            bar.Controls.Add(barGrid);
+            return bar;
+        }
+
+        private Control BuildLeftTestSuiteRail()
+        {
+            BentoCard railCard = new BentoCard
+            {
+                Dock = DockStyle.Fill,
+                HeaderTitle = "DIAGNOSTIC PIPELINE",
+                HeaderSubtitle = "8 TESTS",
+                TagAccentColor = HudTheme.HudAccent,
+                CornerRadius = 12,
+                Margin = new Padding(2, 0, 2, 0)
             };
 
-            telemetryCards = new TelemetryCardsView { Dock = DockStyle.Fill };
+            TableLayoutPanel railGrid = new TableLayoutPanel
+            {
+                Dock = DockStyle.Fill,
+                ColumnCount = 1,
+                RowCount = 11,
+                Margin = new Padding(0),
+                Padding = new Padding(4, 2, 4, 4)
+            };
+            for (int i = 0; i < 8; i++) railGrid.RowStyles.Add(new RowStyle(SizeType.Percent, 9.5F));
+            railGrid.RowStyles.Add(new RowStyle(SizeType.Percent, 8F));  // Admin / Status / Spacer
+            railGrid.RowStyles.Add(new RowStyle(SizeType.Percent, 11F)); // Print Label
+            railGrid.RowStyles.Add(new RowStyle(SizeType.Percent, 11F)); // Pass QC & Sign-Off
 
+            // 1. Display Test
+            btnSuiteDisplay = new GlowButton { Text = "SCREEN COLORS", HotkeyText = "[F1]", Dock = DockStyle.Fill, Margin = new Padding(0, 1, 0, 2) };
+            btnSuiteDisplay.Click += (s, e) => LaunchDisplayTest();
+            railGrid.Controls.Add(btnSuiteDisplay, 0, 0);
+
+            // 2. Audio Test
+            btnSuiteAudio = new GlowButton { Text = "AUDIO STEREO", HotkeyText = "[F2]", Dock = DockStyle.Fill, Margin = new Padding(0, 1, 0, 2) };
+            btnSuiteAudio.Click += (s, e) => LaunchAudioTest();
+            railGrid.Controls.Add(btnSuiteAudio, 0, 1);
+
+            // 3. Webcam & Sensors
+            btnSuiteWebcam = new GlowButton { Text = "CAMERA & MIC", HotkeyText = "[F3]", Dock = DockStyle.Fill, Margin = new Padding(0, 1, 0, 2) };
+            btnSuiteWebcam.Click += (s, e) => ToggleWebcam(btnCameraToggle, EventArgs.Empty);
+            railGrid.Controls.Add(btnSuiteWebcam, 0, 2);
+
+            // 4. Keyboard Matrix
+            btnSuiteKeyboard = new GlowButton { Text = "KEYBOARD MATRIX", HotkeyText = "[F4]", Dock = DockStyle.Fill, Margin = new Padding(0, 1, 0, 2) };
+            btnSuiteKeyboard.Click += (s, e) => FocusKeyboardMatrix();
+            railGrid.Controls.Add(btnSuiteKeyboard, 0, 3);
+
+            // 5. CPU & RAM Burn
+            btnSuiteCpu = new GlowButton { Text = "CPU / RAM BURN", HotkeyText = "[F6]", Dock = DockStyle.Fill, Margin = new Padding(0, 1, 0, 2) };
+            btnSuiteCpu.Click += (s, e) => LaunchCpuBurn();
+            railGrid.Controls.Add(btnSuiteCpu, 0, 4);
+
+            // 6. GPU 3D Benchmark
+            btnSuiteGpu = new GlowButton { Text = "GPU 3D RENDER", HotkeyText = "[F7]", Dock = DockStyle.Fill, Margin = new Padding(0, 1, 0, 2) };
+            btnSuiteGpu.Click += (s, e) => LaunchGpuBenchmark();
+            railGrid.Controls.Add(btnSuiteGpu, 0, 5);
+
+            // 7. Wi-Fi & Bluetooth Radar
+            btnSuiteWifi = new GlowButton { Text = "WI-FI RADAR", HotkeyText = "[F8]", Dock = DockStyle.Fill, Margin = new Padding(0, 1, 0, 2) };
+            btnSuiteWifi.Click += (s, e) => LaunchWifiRadar();
+            railGrid.Controls.Add(btnSuiteWifi, 0, 6);
+
+            // 8. Storage Speed Benchmark
+            btnSuiteStorage = new GlowButton { Text = "STORAGE BENCH", HotkeyText = "[F9]", Dock = DockStyle.Fill, Margin = new Padding(0, 1, 0, 2) };
+            btnSuiteStorage.Click += (s, e) => LaunchStorageBenchmark();
+            railGrid.Controls.Add(btnSuiteStorage, 0, 7);
+
+            // Row 8: Admin Warning / Status
             lblAdminWarning = new Label
+            {
+                Text = "⚠ RUN AS ADMIN FOR FULL SMART",
+                Font = HudTheme.FontMono9Bold,
+                ForeColor = HudTheme.WarnCaution,
+                BackColor = Color.FromArgb(30, 20, 10),
+                TextAlign = ContentAlignment.MiddleCenter,
+                Dock = DockStyle.Fill,
+                Visible = false,
+                Margin = new Padding(0, 2, 0, 2)
+            };
+            railGrid.Controls.Add(lblAdminWarning, 0, 8);
+
+            // Action: Print Label
+            btnSuitePrintLabel = new GlowButton
+            {
+                Text = "🖨 PRINT CHASSIS LABEL",
+                HotkeyText = "[Ctrl+P]",
+                Dock = DockStyle.Fill,
+                AccentColor = HudTheme.HudAccentSoft,
+                Margin = new Padding(0, 2, 0, 2)
+            };
+            btnSuitePrintLabel.Click += (s, e) => TriggerLabelPrint();
+            railGrid.Controls.Add(btnSuitePrintLabel, 0, 9);
+
+            // Action: Pass QC & Sign-Off
+            btnSuiteSignOff = new GlowButton
+            {
+                Text = "🔏 PASS QC & SIGN-OFF",
+                HotkeyText = "[Enter]",
+                IsPrimary = true,
+                AccentColor = HudTheme.PassNominal,
+                Dock = DockStyle.Fill,
+                Margin = new Padding(0, 2, 0, 0)
+            };
+            btnSuiteSignOff.Click += (s, e) => slidingDrawer.ToggleDrawer();
+            railGrid.Controls.Add(btnSuiteSignOff, 0, 10);
+
+            railCard.Controls.Add(railGrid);
+            return railCard;
+        }
+
+        private Control BuildBentoDashboardArena()
+        {
+            TableLayoutPanel arena = new TableLayoutPanel
+            {
+                Dock = DockStyle.Fill,
+                RowCount = 2,
+                ColumnCount = 1,
+                Margin = new Padding(0),
+                Padding = new Padding(0)
+            };
+            arena.RowStyles.Add(new RowStyle(SizeType.Absolute, 114F)); // 4 Top Bento Metric Tiles
+            arena.RowStyles.Add(new RowStyle(SizeType.Percent, 100F));  // Main Interactive Area (Keyboard + Sensors/USB Stack)
+
+            // --- 1. TOP BENTO TILES (4 CARDS) ---
+            TableLayoutPanel topCardsGrid = new TableLayoutPanel
+            {
+                Dock = DockStyle.Fill,
+                ColumnCount = 4,
+                RowCount = 1,
+                Margin = new Padding(0, 0, 0, 4),
+                Padding = new Padding(0)
+            };
+            topCardsGrid.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 25F));
+            topCardsGrid.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 25F));
+            topCardsGrid.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 25F));
+            topCardsGrid.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 25F));
+
+            // Tile 1: Chassis Identity
+            cardDevice = new BentoCard
+            {
+                Dock = DockStyle.Fill,
+                HeaderTitle = "CHASSIS IDENTITY",
+                HeaderSubtitle = "OEM SYSTEM",
+                TagAccentColor = HudTheme.HudAccent,
+                Margin = new Padding(0, 0, 3, 0)
+            };
+            lblDeviceModel = new Label
+            {
+                Dock = DockStyle.Top,
+                Height = 22,
+                Font = HudTheme.FontMono11Bold,
+                ForeColor = HudTheme.TextBright,
+                Text = "Detecting Chassis...",
+                TextAlign = ContentAlignment.MiddleLeft
+            };
+            Panel devSub = new Panel { Dock = DockStyle.Fill, Padding = new Padding(0, 4, 0, 0) };
+            lblDeviceSerial = new Label
+            {
+                Dock = DockStyle.Left,
+                AutoSize = true,
+                Font = HudTheme.FontMono9,
+                ForeColor = HudTheme.HudAccentSoft,
+                Text = "SN: Detecting...",
+                TextAlign = ContentAlignment.MiddleLeft
+            };
+            lblDeviceGrade = new Label
+            {
+                Dock = DockStyle.Right,
+                AutoSize = true,
+                Font = HudTheme.FontMono9Bold,
+                ForeColor = HudTheme.PassNominal,
+                BackColor = Color.FromArgb(25, 16, 185, 129),
+                Text = "GRADE A+",
+                Padding = new Padding(6, 2, 6, 2),
+                TextAlign = ContentAlignment.MiddleCenter
+            };
+            devSub.Controls.Add(lblDeviceSerial);
+            devSub.Controls.Add(lblDeviceGrade);
+            cardDevice.Controls.Add(devSub);
+            cardDevice.Controls.Add(lblDeviceModel);
+            topCardsGrid.Controls.Add(cardDevice, 0, 0);
+
+            // Tile 2: CPU & Thermals
+            cardCpu = new BentoCard
+            {
+                Dock = DockStyle.Fill,
+                HeaderTitle = "CPU & THERMALS",
+                HeaderSubtitle = "NOMINAL",
+                TagAccentColor = HudTheme.HudAccent,
+                Margin = new Padding(3, 0, 3, 0)
+            };
+            lblCpuName = new Label
             {
                 Dock = DockStyle.Top,
                 Height = 20,
-                Text = "⚠ CAUTION: Run as Administrator for deep NVMe SMART & battery wear analytics",
-                BackColor = Color.FromArgb(40, 30, 15),
-                ForeColor = HudTheme.WarnCaution,
-                TextAlign = ContentAlignment.MiddleCenter,
                 Font = HudTheme.FontMono11Bold,
-                Visible = false
+                ForeColor = HudTheme.TextBright,
+                Text = "Detecting CPU...",
+                TextAlign = ContentAlignment.MiddleLeft
             };
-
-            grpSpecs.Controls.Add(telemetryCards);
-            grpSpecs.Controls.Add(lblAdminWarning);
-            topGrid.Controls.Add(grpSpecs, 0, 0);
-
-            // 2. Diagnostic Controls Panel (Avionics Launchpad)
-            HudBracketPanel grpTools = new HudBracketPanel
+            lblCpuClock = new Label
+            {
+                Dock = DockStyle.Top,
+                Height = 16,
+                Font = HudTheme.FontMono9,
+                ForeColor = HudTheme.HudAccentSoft,
+                Text = "Clock: -- GHz",
+                TextAlign = ContentAlignment.MiddleLeft
+            };
+            sparkCpu = new TelemetrySparkline
             {
                 Dock = DockStyle.Fill,
-                BezelTitle = "DIAGNOSTIC CONTROLS",
-                SubtitleBadge = "POST LABS",
-                AccentColor = HudTheme.WarnCaution
+                LineColor = HudTheme.HudAccent,
+                Capacity = 60,
+                MinValue = 0f,
+                MaxValue = 100f,
+                ShowCurrentBadge = true
             };
+            cardCpu.Controls.Add(sparkCpu);
+            cardCpu.Controls.Add(lblCpuClock);
+            cardCpu.Controls.Add(lblCpuName);
+            topCardsGrid.Controls.Add(cardCpu, 1, 0);
 
-            TableLayoutPanel toolGrid = new TableLayoutPanel { Dock = DockStyle.Fill, RowCount = 10, ColumnCount = 1 };
-            for (int i = 0; i < 10; i++) toolGrid.RowStyles.Add(new RowStyle(SizeType.Percent, 10F));
-
-            // Row 0: Hero 10-Second Express QC Button
-            HudButton btnExpress = new HudButton
+            // Tile 3: Storage & Memory
+            cardMemory = new BentoCard
             {
-                Text = "⚡ RUN 10-SECOND EXPRESS QC (POST)",
                 Dock = DockStyle.Fill,
-                HudAccentColor = HudTheme.HudAccent,
-                Font = HudTheme.FontMono11Bold
+                HeaderTitle = "STORAGE & MEMORY",
+                HeaderSubtitle = "NVMe / RAM",
+                TagAccentColor = HudTheme.WarnCaution,
+                Margin = new Padding(3, 0, 3, 0)
             };
-            btnExpress.Click += async (s, e) => await RunExpressQCSequenceAsync();
-            toolGrid.Controls.Add(btnExpress, 0, 0);
-
-            // Row 1: Screen Tests (Quick Colors | Advanced Lab)
-            TableLayoutPanel screenGrid = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 2, RowCount = 1, Margin = new Padding(0) };
-            screenGrid.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 50F));
-            screenGrid.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 50F));
-
-            HudButton btnScreenQuick = new HudButton { Text = "SCREEN COLORS", Dock = DockStyle.Fill, HudAccentColor = HudTheme.HudAccent };
-            btnScreenQuick.Click += (s, e) => LaunchDisplayTest();
-
-            HudButton btnScreenAdv = new HudButton { Text = "ADV DISPLAY LAB", Dock = DockStyle.Fill, HudAccentColor = HudTheme.StorageAux };
-            btnScreenAdv.Click += (s, e) =>
+            lblMemorySpecs = new Label
             {
-                using (var adf = new AdvancedDisplayTestForm()) { adf.ShowDialog(); }
+                Dock = DockStyle.Top,
+                Height = 20,
+                Font = HudTheme.FontMono11Bold,
+                ForeColor = HudTheme.TextBright,
+                Text = "RAM: Detecting...",
+                TextAlign = ContentAlignment.MiddleLeft
             };
-
-            screenGrid.Controls.Add(btnScreenQuick, 0, 0);
-            screenGrid.Controls.Add(btnScreenAdv, 1, 0);
-            toolGrid.Controls.Add(screenGrid, 0, 1);
-
-            // Row 2: Touchscreen & Storage Benchmark
-            TableLayoutPanel touchStorageGrid = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 2, RowCount = 1, Margin = new Padding(0) };
-            touchStorageGrid.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 50F));
-            touchStorageGrid.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 50F));
-
-            HudButton btnTouch = new HudButton { Text = "TOUCH DIGITIZER", Dock = DockStyle.Fill, HudAccentColor = HudTheme.PassNominal };
-            btnTouch.Click += (s, e) =>
+            lblStorageSummary = new Label
             {
-                using (var ttf = new TouchscreenTestForm()) { ttf.ShowDialog(); }
+                Dock = DockStyle.Top,
+                Height = 18,
+                Font = HudTheme.FontMono9,
+                ForeColor = HudTheme.TextNormal,
+                Text = "Drive: Detecting...",
+                TextAlign = ContentAlignment.MiddleLeft
             };
-
-            HudButton btnStorage = new HudButton { Text = "STORAGE SPEED BENCH", Dock = DockStyle.Fill, HudAccentColor = HudTheme.HudAccent };
-            btnStorage.Click += (s, e) => LaunchStorageBenchmark();
-
-            touchStorageGrid.Controls.Add(btnTouch, 0, 0);
-            touchStorageGrid.Controls.Add(btnStorage, 1, 0);
-            toolGrid.Controls.Add(touchStorageGrid, 0, 2);
-
-            // Row 3: 3-Way Split Speaker Test Row (Left | Both | Right)
-            TableLayoutPanel speakerGrid = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 3, RowCount = 1, Margin = new Padding(0) };
-            speakerGrid.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 32F));
-            speakerGrid.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 36F));
-            speakerGrid.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 32F));
-
-            HudButton btnSpkLeft = new HudButton { Text = "◄ LEFT", Dock = DockStyle.Fill, HudAccentColor = HudTheme.HudAccent };
-            btnSpkLeft.Click += async (s, e) => await PlayAudioTest(true, false, AudioTestMode.Left, btnSpkLeft);
-
-            HudButton btnSpkBoth = new HudButton { Text = "STEREO BOTH", Dock = DockStyle.Fill, HudAccentColor = HudTheme.WarnCaution };
-            btnSpkBoth.Click += async (s, e) => await PlayAudioTest(true, true, AudioTestMode.Both, btnSpkBoth);
-
-            HudButton btnSpkRight = new HudButton { Text = "RIGHT ►", Dock = DockStyle.Fill, HudAccentColor = HudTheme.StorageAux };
-            btnSpkRight.Click += async (s, e) => await PlayAudioTest(false, true, AudioTestMode.Right, btnSpkRight);
-
-            speakerGrid.Controls.Add(btnSpkLeft, 0, 0);
-            speakerGrid.Controls.Add(btnSpkBoth, 1, 0);
-            speakerGrid.Controls.Add(btnSpkRight, 2, 0);
-            toolGrid.Controls.Add(speakerGrid, 0, 3);
-
-            // Row 4: WiFi, Bluetooth & Fingerprint
-            TableLayoutPanel netBioGrid = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 3, RowCount = 1, Margin = new Padding(0) };
-            netBioGrid.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 33.3F));
-            netBioGrid.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 33.3F));
-            netBioGrid.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 33.4F));
-
-            HudButton btnWifi = new HudButton { Text = "WI-FI RADAR", Dock = DockStyle.Fill, HudAccentColor = HudTheme.HudAccent };
-            btnWifi.Click += (s, e) => LaunchWifiRadar();
-
-            HudButton btnBluetooth = new HudButton { Text = "BLUETOOTH RADAR", Dock = DockStyle.Fill, HudAccentColor = HudTheme.PassNominal };
-            btnBluetooth.Click += (s, e) => LaunchBluetoothTest();
-
-            HudButton btnFingerprint = new HudButton { Text = "FINGERPRINT BIO", Dock = DockStyle.Fill, HudAccentColor = HudTheme.StorageAux };
-            btnFingerprint.Click += (s, e) => LaunchFingerprintTest();
-
-            netBioGrid.Controls.Add(btnWifi, 0, 0);
-            netBioGrid.Controls.Add(btnBluetooth, 1, 0);
-            netBioGrid.Controls.Add(btnFingerprint, 2, 0);
-            toolGrid.Controls.Add(netBioGrid, 0, 4);
-
-            // Row 5: CPU & RAM | GPU Stress
-            TableLayoutPanel cpuGpuGrid = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 2, RowCount = 1, Margin = new Padding(0) };
-            cpuGpuGrid.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 50F));
-            cpuGpuGrid.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 50F));
-
-            HudButton btnCpuRam = new HudButton { Text = "CPU / RAM BURN", Dock = DockStyle.Fill, HudAccentColor = HudTheme.HudAccent };
-            btnCpuRam.Click += (s, e) => LaunchCpuBurn();
-
-            HudButton btnGpu = new HudButton { Text = "GPU 3D RENDER", Dock = DockStyle.Fill, HudAccentColor = HudTheme.StorageAux };
-            btnGpu.Click += (s, e) =>
+            lblStorageSmartBadge = new Label
             {
-                using (var gpuForm = new GpuBenchmarkForm(gpuName: lastModel, vram: "Dedicated / Dynamic")) { gpuForm.ShowDialog(); }
-                MarkTestComplete("GPU");
+                Dock = DockStyle.Fill,
+                Font = HudTheme.FontMono9Bold,
+                ForeColor = HudTheme.PassNominal,
+                Text = "SMART: 100% HEALTH [PASS]",
+                TextAlign = ContentAlignment.BottomLeft
+            };
+            cardMemory.Controls.Add(lblStorageSmartBadge);
+            cardMemory.Controls.Add(lblStorageSummary);
+            cardMemory.Controls.Add(lblMemorySpecs);
+            topCardsGrid.Controls.Add(cardMemory, 2, 0);
+
+            // Tile 4: Battery Telemetry & Arc Flow
+            cardBattery = new BentoCard
+            {
+                Dock = DockStyle.Fill,
+                HeaderTitle = "BATTERY TELEMETRY",
+                HeaderSubtitle = "FLOW / HEALTH",
+                TagAccentColor = HudTheme.PassNominal,
+                Margin = new Padding(3, 0, 0, 0)
+            };
+            TableLayoutPanel battGrid = new TableLayoutPanel
+            {
+                Dock = DockStyle.Fill,
+                ColumnCount = 2,
+                RowCount = 1,
+                Margin = new Padding(0)
+            };
+            battGrid.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 65F));
+            battGrid.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 35F));
+
+            Panel battTextPanel = new Panel { Dock = DockStyle.Fill };
+            lblBatteryFlow = new Label
+            {
+                Dock = DockStyle.Top,
+                Height = 20,
+                Font = HudTheme.FontMono11Bold,
+                ForeColor = HudTheme.TextBright,
+                Text = "Discharge: --W",
+                TextAlign = ContentAlignment.MiddleLeft
+            };
+            lblBatteryWear = new Label
+            {
+                Dock = DockStyle.Top,
+                Height = 22,
+                Font = HudTheme.FontMono9,
+                ForeColor = HudTheme.WarnCaution,
+                Text = "Health: 100% (AC Line)",
+                TextAlign = ContentAlignment.MiddleLeft
+            };
+            battTextPanel.Controls.Add(lblBatteryWear);
+            battTextPanel.Controls.Add(lblBatteryFlow);
+            battGrid.Controls.Add(battTextPanel, 0, 0);
+
+            meterBattery = new RadialMeter
+            {
+                Dock = DockStyle.Fill,
+                Value = 100f,
+                MeterColor = HudTheme.PassNominal,
+                TitleText = "BATT",
+                TrackWidth = 6f
+            };
+            battGrid.Controls.Add(meterBattery, 1, 0);
+            cardBattery.Controls.Add(battGrid);
+            topCardsGrid.Controls.Add(cardBattery, 3, 0);
+
+            arena.Controls.Add(topCardsGrid, 0, 0);
+
+            // --- 2. BOTTOM TIER: 62% KEYBOARD MATRIX / 38% MULTI-STACK ---
+            TableLayoutPanel bottomSplit = new TableLayoutPanel
+            {
+                Dock = DockStyle.Fill,
+                ColumnCount = 2,
+                RowCount = 1,
+                Margin = new Padding(0),
+                Padding = new Padding(0)
+            };
+            bottomSplit.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 62F));
+            bottomSplit.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 38F));
+
+            // Left: 104-Key Virtual Keyboard Matrix
+            cardKeyboard = new BentoCard
+            {
+                Dock = DockStyle.Fill,
+                HeaderTitle = "INPUT // 104-KEY MATRIX",
+                HeaderSubtitle = "REAL-TIME RAW INTERRUPT",
+                TagAccentColor = HudTheme.PassNominal,
+                Margin = new Padding(0, 2, 3, 0)
             };
 
-            cpuGpuGrid.Controls.Add(btnCpuRam, 0, 0);
-            cpuGpuGrid.Controls.Add(btnGpu, 1, 0);
-            toolGrid.Controls.Add(cpuGpuGrid, 0, 5);
+            Panel kbHeaderStrip = new Panel
+            {
+                Dock = DockStyle.Top,
+                Height = 26,
+                BackColor = Color.FromArgb(14, 8, 24),
+                Padding = new Padding(8, 2, 8, 2)
+            };
+            lblKeyboardCount = new Label
+            {
+                Dock = DockStyle.Left,
+                AutoSize = true,
+                Font = HudTheme.FontMono9Bold,
+                ForeColor = HudTheme.HudAccentSoft,
+                Text = "KEYS LOGGED: 0/104",
+                TextAlign = ContentAlignment.MiddleLeft
+            };
+            Button btnResetKb = new Button
+            {
+                Dock = DockStyle.Right,
+                Width = 90,
+                Text = "RESET [ESC]",
+                Font = HudTheme.FontMono9Bold,
+                BackColor = Color.FromArgb(25, 12, 40),
+                ForeColor = HudTheme.TextBright,
+                FlatStyle = FlatStyle.Flat,
+                Cursor = Cursors.Hand
+            };
+            btnResetKb.FlatAppearance.BorderColor = Color.FromArgb(60, 168, 85, 247);
+            btnResetKb.Click += (s, e) => ResetKeyboardUI();
 
-            // Row 6: Export & QR
-            TableLayoutPanel copyQrGrid = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 2, RowCount = 1, Margin = new Padding(0) };
-            copyQrGrid.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 50F));
-            copyQrGrid.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 50F));
+            Label lblKbHook = new Label
+            {
+                Dock = DockStyle.Fill,
+                Font = HudTheme.FontMono9,
+                ForeColor = HudTheme.PassNominal,
+                Text = "● Raw Windows Low-Level Hook Active (1000Hz)",
+                TextAlign = ContentAlignment.MiddleCenter
+            };
+            kbHeaderStrip.Controls.Add(lblKbHook);
+            kbHeaderStrip.Controls.Add(lblKeyboardCount);
+            kbHeaderStrip.Controls.Add(btnResetKb);
 
-            HudButton btnCopy = new HudButton { Text = "COPY TELEMETRY", Dock = DockStyle.Fill, HudAccentColor = HudTheme.HudAccent };
-            btnCopy.Click += (s, e) => CopyTelemetryToClipboard();
+            keyboardPanel = new BufferedPanel
+            {
+                Dock = DockStyle.Fill,
+                BackColor = Color.FromArgb(11, 6, 20),
+                Margin = new Padding(0)
+            };
+            keyboardPanel.Paint += KeyboardPanel_Paint;
 
-            HudButton btnQR = new HudButton { Text = "ASSET & QC RECORD", Dock = DockStyle.Fill, HudAccentColor = HudTheme.HudAccent };
-            btnQR.Click += (s, e) => ShowQRCode();
+            cardKeyboard.Controls.Add(keyboardPanel);
+            cardKeyboard.Controls.Add(kbHeaderStrip);
+            bottomSplit.Controls.Add(cardKeyboard, 0, 0);
 
-            copyQrGrid.Controls.Add(btnCopy, 0, 0);
-            copyQrGrid.Controls.Add(btnQR, 1, 0);
-            toolGrid.Controls.Add(copyQrGrid, 0, 6);
+            // Right: Multi-Stack (Sensors + USB Radar + Warehouse Pipeline)
+            TableLayoutPanel rightStack = new TableLayoutPanel
+            {
+                Dock = DockStyle.Fill,
+                ColumnCount = 1,
+                RowCount = 3,
+                Margin = new Padding(3, 2, 0, 0),
+                Padding = new Padding(0)
+            };
+            rightStack.RowStyles.Add(new RowStyle(SizeType.Percent, 48F)); // Sensors & Camera
+            rightStack.RowStyles.Add(new RowStyle(SizeType.Percent, 28F)); // USB Radar & Trackpad
+            rightStack.RowStyles.Add(new RowStyle(SizeType.Percent, 24F)); // Warehouse Pipeline
 
-            // Row 7: Trackpad Test & Live USB Port Plug Tracker
-            TableLayoutPanel tpUsbGrid = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 2, RowCount = 1, Margin = new Padding(0) };
-            tpUsbGrid.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 48F));
-            tpUsbGrid.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 52F));
+            // Card A: Camera & Audio Sensors
+            cardSensors = new BentoCard
+            {
+                Dock = DockStyle.Fill,
+                HeaderTitle = "CAMERA & AUDIO SENSORS",
+                HeaderSubtitle = "LIVE STREAM",
+                TagAccentColor = HudTheme.HudAccent,
+                Margin = new Padding(0, 0, 0, 3)
+            };
+            TableLayoutPanel camSensorGrid = new TableLayoutPanel
+            {
+                Dock = DockStyle.Fill,
+                RowCount = 3,
+                ColumnCount = 1,
+                Margin = new Padding(0)
+            };
+            camSensorGrid.RowStyles.Add(new RowStyle(SizeType.Percent, 100F)); // camPanel
+            camSensorGrid.RowStyles.Add(new RowStyle(SizeType.Absolute, 28F));  // Buttons
+            camSensorGrid.RowStyles.Add(new RowStyle(SizeType.Absolute, 40F));  // Mic Container
+
+            camPanel = BuildCameraPanel();
+            camSensorGrid.Controls.Add(camPanel, 0, 0);
+
+            TableLayoutPanel camBtns = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 2, RowCount = 1, Margin = new Padding(0, 1, 0, 1) };
+            camBtns.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 65F));
+            camBtns.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 35F));
+
+            btnCameraToggle = new GlowButton { Text = "START CAMERA TEST", HotkeyText = "[F3]", Dock = DockStyle.Fill, AccentColor = HudTheme.HudAccent };
+            btnCameraToggle.Click += (s, e) => ToggleWebcam(btnCameraToggle, EventArgs.Empty);
+
+            btnCameraSwitch = new GlowButton { Text = "⇄ CAM", Dock = DockStyle.Fill, AccentColor = HudTheme.StorageAux };
+            btnCameraSwitch.Click += (s, e) => SwitchCamera();
+
+            camBtns.Controls.Add(btnCameraToggle, 0, 0);
+            camBtns.Controls.Add(btnCameraSwitch, 1, 0);
+            camSensorGrid.Controls.Add(camBtns, 0, 1);
+
+            // Mic visualizer container
+            Panel micContainer = new Panel { Dock = DockStyle.Fill, BackColor = Color.FromArgb(14, 8, 24), Padding = new Padding(4, 2, 4, 2) };
+            lblMicState = new Label
+            {
+                Text = "MIC: ACTIVE (44.1 kHz / 16-BIT)",
+                Font = HudTheme.FontMono9Bold,
+                ForeColor = HudTheme.HudAccent,
+                Dock = DockStyle.Top,
+                Height = 14
+            };
+            micVuMeter = new HudVuMeter { Dock = DockStyle.Fill };
+            micContainer.Controls.Add(micVuMeter);
+            micContainer.Controls.Add(lblMicState);
+            camSensorGrid.Controls.Add(micContainer, 0, 2);
+
+            cardSensors.Controls.Add(camSensorGrid);
+            rightStack.Controls.Add(cardSensors, 0, 0);
+
+            // Card B: USB Radar & Trackpad
+            cardUsb = new BentoCard
+            {
+                Dock = DockStyle.Fill,
+                HeaderTitle = "USB RADAR & TRACKPAD",
+                HeaderSubtitle = "HARDWARE BUS",
+                TagAccentColor = HudTheme.WarnCaution,
+                Margin = new Padding(0, 2, 0, 2)
+            };
+            TableLayoutPanel usbTpGrid = new TableLayoutPanel
+            {
+                Dock = DockStyle.Fill,
+                ColumnCount = 2,
+                RowCount = 1,
+                Margin = new Padding(0),
+                Padding = new Padding(2)
+            };
+            usbTpGrid.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 48F));
+            usbTpGrid.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 52F));
 
             lblMouseTest = new Label
             {
                 Dock = DockStyle.Fill,
                 Text = "⟨ TRACKPAD : [ L ] [ M ] [ R ] ⟩",
                 TextAlign = ContentAlignment.MiddleCenter,
-                Font = HudTheme.FontMono11Bold,
-                BackColor = Color.FromArgb(14, 20, 24),
+                Font = HudTheme.FontMono9Bold,
+                BackColor = Color.FromArgb(16, 9, 28),
                 ForeColor = HudTheme.HudAccent,
                 Cursor = Cursors.Cross,
                 Margin = new Padding(2)
             };
             lblMouseTest.Paint += (s, pe) =>
             {
-                pe.Graphics.SmoothingMode = SmoothingMode.None;
                 bool isPassed = (tpLeft && tpRight);
-                using (Pen p = new Pen(isPassed ? HudTheme.PassNominal : HudTheme.Bezel, 1))
+                using (Pen p = new Pen(isPassed ? HudTheme.PassNominal : Color.FromArgb(40, 168, 85, 247), 1))
                     pe.Graphics.DrawRectangle(p, 0, 0, lblMouseTest.Width - 1, lblMouseTest.Height - 1);
             };
             lblMouseTest.MouseDown += (s, e) =>
@@ -483,12 +953,11 @@ namespace SuperAutoMater
                 lblMouseTest.ForeColor = HudTheme.TextBright;
                 lblMouseTest.Text = $"⟨ TRACKPAD : [ {(tpLeft ? "✓ L" : "L")} ] [ {(tpMiddle ? "✓ M" : "M")} ] [ {(tpRight ? "✓ R" : "R")} ] ⟩";
                 lblMouseTest.Invalidate();
-
                 MarkTestComplete("Trackpad");
             };
             lblMouseTest.MouseUp += (s, e) =>
             {
-                lblMouseTest.BackColor = Color.FromArgb(16, 38, 30);
+                lblMouseTest.BackColor = Color.FromArgb(16, 9, 28);
                 lblMouseTest.ForeColor = HudTheme.PassNominal;
                 lblMouseTest.Text = $"⟨ TRACKPAD : [ {(tpLeft ? "✓ L" : "L")} ] [ {(tpMiddle ? "✓ M" : "M")} ] [ {(tpRight ? "✓ R" : "R")} ] ⟩";
                 lblMouseTest.Invalidate();
@@ -499,17 +968,16 @@ namespace SuperAutoMater
                 Dock = DockStyle.Fill,
                 Text = _usbTracker.GetHudStatusText(),
                 TextAlign = ContentAlignment.MiddleCenter,
-                Font = HudTheme.FontMono11Bold,
-                BackColor = Color.FromArgb(14, 20, 24),
+                Font = HudTheme.FontMono9Bold,
+                BackColor = Color.FromArgb(16, 9, 28),
                 ForeColor = HudTheme.HudAccent,
                 Cursor = Cursors.Hand,
                 Margin = new Padding(2)
             };
             lblUsbTest.Paint += (s, pe) =>
             {
-                pe.Graphics.SmoothingMode = SmoothingMode.None;
                 bool isPassed = _usbTracker.TestedPortsCount > 0;
-                using (Pen p = new Pen(isPassed ? HudTheme.PassNominal : HudTheme.Bezel, 1))
+                using (Pen p = new Pen(isPassed ? HudTheme.PassNominal : Color.FromArgb(40, 168, 85, 247), 1))
                     pe.Graphics.DrawRectangle(p, 0, 0, lblUsbTest.Width - 1, lblUsbTest.Height - 1);
             };
             lblUsbTest.Click += (s, e) =>
@@ -520,130 +988,369 @@ namespace SuperAutoMater
                 lblUsbTest.Invalidate();
             };
 
-            tpUsbGrid.Controls.Add(lblMouseTest, 0, 0);
-            tpUsbGrid.Controls.Add(lblUsbTest, 1, 0);
-            toolGrid.Controls.Add(tpUsbGrid, 0, 7);
+            usbTpGrid.Controls.Add(lblMouseTest, 0, 0);
+            usbTpGrid.Controls.Add(lblUsbTest, 1, 0);
+            cardUsb.Controls.Add(usbTpGrid);
+            rightStack.Controls.Add(cardUsb, 0, 1);
 
-            // Row 8: Reset Matrix Highlights
-            HudButton btnReset = new HudButton { Text = "RESET KEYBOARD & TRACKPAD", Dock = DockStyle.Fill, HudAccentColor = HudTheme.Muted };
-            btnReset.Click += (s, e) => ResetKeyboardUI();
-            toolGrid.Controls.Add(btnReset, 0, 8);
-
-            // Row 9: Finish & Exit
-            HudButton btnExit = new HudButton { Text = "EXIT DIAGNOSTIC STUDIO", Dock = DockStyle.Fill, HudAccentColor = HudTheme.FailWarning };
-            btnExit.Click += (s, e) => this.Close();
-            toolGrid.Controls.Add(btnExit, 0, 9);
-
-            grpTools.Controls.Add(toolGrid);
-            topGrid.Controls.Add(grpTools, 1, 0);
-
-            // 3. Camera & Sensors Panel (Full-View Live Video + Dedicated Mic Section)
-            HudBracketPanel grpMedia = new HudBracketPanel
+            // Card C: Warehouse Cloud & Label Dispatch
+            cardWarehouse = new BentoCard
             {
                 Dock = DockStyle.Fill,
-                BezelTitle = "CAMERA & SENSORS",
-                SubtitleBadge = "LIVE STREAM",
-                AccentColor = HudTheme.HudAccent
+                HeaderTitle = "WAREHOUSE PIPELINE",
+                HeaderSubtitle = "GOOGLE SHEETS & ESC/POS",
+                TagAccentColor = HudTheme.StorageAux,
+                Margin = new Padding(0, 2, 0, 0)
             };
-
-            TableLayoutPanel mediaGrid = new TableLayoutPanel { Dock = DockStyle.Fill, RowCount = 3, ColumnCount = 1 };
-            mediaGrid.RowStyles.Add(new RowStyle(SizeType.Percent, 65F)); // Full-sized Camera Viewport
-            mediaGrid.RowStyles.Add(new RowStyle(SizeType.Absolute, 30F));  // Camera Action Buttons
-            mediaGrid.RowStyles.Add(new RowStyle(SizeType.Absolute, 46F));  // Dedicated Mic Container
-
-            camPanel = BuildCameraPanel();
-            mediaGrid.Controls.Add(camPanel, 0, 0);
-
-            // Single Row of Camera Action Buttons
-            TableLayoutPanel camBtnRow = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 2, RowCount = 1, Margin = new Padding(0, 2, 0, 2) };
-            camBtnRow.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 68F));
-            camBtnRow.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 32F));
-
-            btnCameraToggle = new HudButton { Text = "START CAMERA TEST", Dock = DockStyle.Fill, HudAccentColor = HudTheme.HudAccent };
-            btnCameraToggle.Click += (s, e) => ToggleWebcam(btnCameraToggle, EventArgs.Empty);
-
-            btnCameraSwitch = new HudButton { Text = "⇄ CAM", Dock = DockStyle.Fill, HudAccentColor = HudTheme.StorageAux };
-            btnCameraSwitch.Click += (s, e) => SwitchCamera();
-
-            camBtnRow.Controls.Add(btnCameraToggle, 0, 0);
-            camBtnRow.Controls.Add(btnCameraSwitch, 1, 0);
-            mediaGrid.Controls.Add(camBtnRow, 0, 1);
-
-            // Dedicated Mic Section Container (Never Hidden or Squeezed)
-            Panel micPanel = new Panel { Dock = DockStyle.Fill, BackColor = Color.FromArgb(14, 20, 24), Padding = new Padding(6, 3, 6, 3) };
-            micPanel.Paint += (s, e) =>
+            TableLayoutPanel whGrid = new TableLayoutPanel
             {
-                using (Pen p = new Pen(HudTheme.Bezel, 1))
-                    e.Graphics.DrawRectangle(p, 0, 0, micPanel.Width - 1, micPanel.Height - 1);
+                Dock = DockStyle.Fill,
+                RowCount = 3,
+                ColumnCount = 1,
+                Margin = new Padding(0),
+                Padding = new Padding(6, 2, 6, 2)
             };
+            whGrid.RowStyles.Add(new RowStyle(SizeType.Absolute, 18F));
+            whGrid.RowStyles.Add(new RowStyle(SizeType.Absolute, 18F));
+            whGrid.RowStyles.Add(new RowStyle(SizeType.Percent, 100F));
 
-            TableLayoutPanel micGrid = new TableLayoutPanel { Dock = DockStyle.Fill, RowCount = 2, ColumnCount = 1 };
-            micGrid.RowStyles.Add(new RowStyle(SizeType.Absolute, 16F));
-            micGrid.RowStyles.Add(new RowStyle(SizeType.Percent, 100F));
-
-            lblMicState = new Label
+            Label lblSheet = new Label
             {
-                Text = "MIC SENSOR : ACTIVE [44.1 kHz / 16-BIT]",
-                ForeColor = HudTheme.HudAccent,
-                Font = HudTheme.FontMono11Bold,
+                Text = "Cloud Sheet: Refurb_Inventory_2026",
+                Font = HudTheme.FontMono9,
+                ForeColor = HudTheme.HudAccentSoft,
                 Dock = DockStyle.Fill,
                 TextAlign = ContentAlignment.MiddleLeft
             };
+            Label lblQueue = new Label
+            {
+                Text = $"Queue: {OfflineSyncQueue.Instance.PendingCount} Pending | Printer: Zebra ESC/POS",
+                Font = HudTheme.FontMono9,
+                ForeColor = HudTheme.PassNominal,
+                Dock = DockStyle.Fill,
+                TextAlign = ContentAlignment.MiddleLeft
+            };
+            GlowButton btnOpenAsset = new GlowButton
+            {
+                Text = "ASSET & QR CODE LAB",
+                HotkeyText = "[Ctrl+P]",
+                Dock = DockStyle.Fill,
+                AccentColor = HudTheme.HudAccentSoft,
+                Margin = new Padding(0, 2, 0, 0)
+            };
+            btnOpenAsset.Click += (s, e) => ShowQRCode();
 
-            micVuMeter = new HudVuMeter { Dock = DockStyle.Fill };
-            micGrid.Controls.Add(lblMicState, 0, 0);
-            micGrid.Controls.Add(micVuMeter, 0, 1);
-            micPanel.Controls.Add(micGrid);
+            whGrid.Controls.Add(lblSheet, 0, 0);
+            whGrid.Controls.Add(lblQueue, 0, 1);
+            whGrid.Controls.Add(btnOpenAsset, 0, 2);
+            cardWarehouse.Controls.Add(whGrid);
+            rightStack.Controls.Add(cardWarehouse, 0, 2);
 
-            mediaGrid.Controls.Add(micPanel, 0, 2);
-            grpMedia.Controls.Add(mediaGrid);
-            topGrid.Controls.Add(grpMedia, 2, 0);
+            bottomSplit.Controls.Add(rightStack, 1, 0);
+            arena.Controls.Add(bottomSplit, 0, 1);
 
-            mainGrid.Controls.Add(topGrid, 0, 0);
+            return arena;
+        }
 
-            // --- BOTTOM ROW: 2-COLUMN SPLIT (30% Performance Graphs, 70% 104-Key Matrix) ---
-            TableLayoutPanel bottomGrid = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 2, RowCount = 1, Margin = new Padding(0, 4, 0, 0) };
-            bottomGrid.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 30F)); // System Performance & Utilization Graphs
-            bottomGrid.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 70F)); // 104-Key Matrix
-
-            // 4. System Performance & Utilization Graphs Panel
-            HudBracketPanel grpPerf = new HudBracketPanel
+        private Control BuildBottomCommandBar()
+        {
+            Panel bar = new Panel
             {
                 Dock = DockStyle.Fill,
-                BezelTitle = "SYSTEM PERFORMANCE & UTILIZATION",
-                SubtitleBadge = "OSCILLOSCOPE",
-                AccentColor = HudTheme.HudAccent
+                BackColor = Color.FromArgb(12, 6, 20),
+                Margin = new Padding(0, 2, 0, 0),
+                Padding = new Padding(8, 0, 8, 0)
             };
-            perfGraphs = new PerformanceGraphControl { Dock = DockStyle.Fill };
-            grpPerf.Controls.Add(perfGraphs);
-            bottomGrid.Controls.Add(grpPerf, 0, 0);
-
-            // 5. 104-Key Virtual Keyboard Matrix Panel
-            HudBracketPanel grpKeyboard = new HudBracketPanel
+            bar.Paint += (s, e) =>
             {
-                Dock = DockStyle.Fill,
-                BezelTitle = "INPUT // 104-KEY MATRIX",
-                SubtitleBadge = "REAL-TIME INTERRUPT",
-                AccentColor = HudTheme.PassNominal
+                using (Pen p = new Pen(Color.FromArgb(40, 168, 85, 247), 1))
+                    e.Graphics.DrawLine(p, 0, 0, bar.Width, 0);
             };
 
-            keyboardPanel = new BufferedPanel
+            Label lblShortcuts = new Label
             {
-                Dock = DockStyle.Fill,
-                BackColor = Color.FromArgb(14, 20, 24),
-                Margin = new Padding(0)
+                Text = "[F1-F9] Test Suites  ·  [F5] Express QC  ·  [Ctrl+P] Print Label  ·  [Enter] QC Sign-off  ·  [Esc] Reset Keyboard",
+                Font = HudTheme.FontMono9Bold,
+                ForeColor = HudTheme.HudAccentSoft,
+                Dock = DockStyle.Left,
+                AutoSize = true,
+                TextAlign = ContentAlignment.MiddleLeft
             };
-            keyboardPanel.Paint += KeyboardPanel_Paint;
-            grpKeyboard.Controls.Add(keyboardPanel);
-            bottomGrid.Controls.Add(grpKeyboard, 1, 0);
 
-            mainGrid.Controls.Add(bottomGrid, 0, 1);
-            centerArea.Controls.Add(mainGrid);
+            Label lblStation = new Label
+            {
+                Text = "SUPERAUTOMATER v0.1 · HIGH-THROUGHPUT QC PIPELINE · STATION 04",
+                Font = HudTheme.FontMono9Bold,
+                ForeColor = HudTheme.PassNominal,
+                Dock = DockStyle.Right,
+                AutoSize = true,
+                TextAlign = ContentAlignment.MiddleRight
+            };
 
-            rootSplit.Controls.Add(centerArea, 1, 0);
-            this.Controls.Add(rootSplit);
+            bar.Controls.Add(lblShortcuts);
+            bar.Controls.Add(lblStation);
+            return bar;
+        }
 
-            Build104Keyboard();
+        public void UpdateBentoGridTelemetry()
+        {
+            if (this.IsDisposed || !this.IsHandleCreated) return;
+            if (this.InvokeRequired)
+            {
+                this.BeginInvoke(new Action(UpdateBentoGridTelemetry));
+                return;
+            }
+
+            try
+            {
+                // 1. Chassis Identity Tile
+                if (lblDeviceModel != null)
+                {
+                    lblDeviceModel.Text = string.IsNullOrWhiteSpace(lastModel) || lastModel == "N/A"
+                        ? "Detecting Chassis..."
+                        : lastModel;
+                }
+                if (lblDeviceSerial != null)
+                {
+                    lblDeviceSerial.Text = $"SN: {(string.IsNullOrWhiteSpace(lastSerial) ? "N/A" : lastSerial)}";
+                }
+                if (cardDevice != null && !string.IsNullOrWhiteSpace(lastModel) && lastModel != "N/A")
+                {
+                    string manufacturer = "OEM System";
+                    if (lastModel.Contains("Dell", StringComparison.OrdinalIgnoreCase)) manufacturer = "Dell Inc.";
+                    else if (lastModel.Contains("ThinkPad", StringComparison.OrdinalIgnoreCase) || lastModel.Contains("Lenovo", StringComparison.OrdinalIgnoreCase)) manufacturer = "Lenovo Group";
+                    else if (lastModel.Contains("HP", StringComparison.OrdinalIgnoreCase) || lastModel.Contains("Hewlett", StringComparison.OrdinalIgnoreCase)) manufacturer = "HP Inc.";
+                    else if (lastModel.Contains("Apple", StringComparison.OrdinalIgnoreCase) || lastModel.Contains("MacBook", StringComparison.OrdinalIgnoreCase)) manufacturer = "Apple Inc.";
+                    else if (lastModel.Contains("ASUS", StringComparison.OrdinalIgnoreCase)) manufacturer = "ASUS Corp";
+                    else if (lastModel.Contains("Acer", StringComparison.OrdinalIgnoreCase)) manufacturer = "Acer Inc.";
+                    cardDevice.HeaderSubtitle = manufacturer;
+                }
+
+                // 2. CPU & Thermals Tile
+                if (lblCpuName != null)
+                {
+                    lblCpuName.Text = string.IsNullOrWhiteSpace(lastCpu) || lastCpu == "N/A"
+                        ? "Detecting CPU..."
+                        : lastCpu;
+                }
+                if (lblCpuClock != null)
+                {
+                    if (NativeMethods.TryGetProcessorPowerInfo(out var pInfo) && pInfo != null && pInfo.Length > 0)
+                    {
+                        double curGhz = pInfo[0].CurrentMhz / 1000.0;
+                        double maxGhz = pInfo[0].MaxMhz / 1000.0;
+                        lblCpuClock.Text = $"{curGhz:F2} GHz (Max {maxGhz:F2} GHz) · {pInfo.Length}T";
+                        if (cardCpu != null) cardCpu.HeaderSubtitle = $"{pInfo.Length} CORES NOMINAL";
+                    }
+                    else
+                    {
+                        lblCpuClock.Text = $"{Environment.ProcessorCount} Logical Cores Active";
+                    }
+                }
+
+                // 3. Storage & Memory Tile
+                if (lblMemorySpecs != null)
+                {
+                    lblMemorySpecs.Text = string.IsNullOrWhiteSpace(lastRam) || lastRam == "N/A"
+                        ? "RAM: Detecting..."
+                        : $"RAM: {lastRam}";
+                }
+                if (lblStorageSummary != null)
+                {
+                    lblStorageSummary.Text = string.IsNullOrWhiteSpace(lastStorageSummary) || lastStorageSummary == "N/A"
+                        ? "Drive: Detecting..."
+                        : $"NVMe: {lastStorageSummary}";
+                }
+                if (lblStorageSmartBadge != null)
+                {
+                    if (!string.IsNullOrWhiteSpace(lastStorageHealth) && (lastStorageHealth.Contains("100%") || lastStorageHealth.Contains("PASS")))
+                    {
+                        lblStorageSmartBadge.Text = "SMART: 100% HEALTH [PASS]";
+                        lblStorageSmartBadge.ForeColor = HudTheme.PassNominal;
+                    }
+                    else if (!string.IsNullOrWhiteSpace(lastStorageHealth) && lastStorageHealth != "N/A")
+                    {
+                        lblStorageSmartBadge.Text = $"SMART: {lastStorageHealth}";
+                        lblStorageSmartBadge.ForeColor = HudTheme.WarnCaution;
+                    }
+                }
+
+                // 4. Battery Telemetry Tile & Top Bar Chip
+                string flowText = "AC Direct Power";
+                float battHealthVal = 100f;
+
+                if (NativeMethods.TryGetBatteryState(out var bState) && bState.BatteryPresent)
+                {
+                    flowText = FormatBatteryPowerFlow(bState);
+
+                    if (lblBatteryFlow != null)
+                    {
+                        lblBatteryFlow.Text = flowText;
+                    }
+
+                    if (!string.IsNullOrWhiteSpace(lastBatteryHealth) && lastBatteryHealth != "N/A")
+                    {
+                        string cleaned = lastBatteryHealth.Replace("%", "").Trim();
+                        if (float.TryParse(cleaned, out float parsed))
+                        {
+                            battHealthVal = Math.Clamp(parsed, 0, 100);
+                        }
+                    }
+
+                    if (lblBatteryWear != null)
+                    {
+                        string timeStr = bState.Discharging && bState.EstimatedTime > 0 && bState.EstimatedTime < 86400
+                            ? $"{bState.EstimatedTime / 3600}h {(bState.EstimatedTime % 3600) / 60}m left"
+                            : (bState.Charging ? "Charging" : "AC Line Connected");
+                        lblBatteryWear.Text = $"Health: {battHealthVal:F0}% · {timeStr}";
+                    }
+
+                    if (meterBattery != null)
+                    {
+                        meterBattery.Value = battHealthVal;
+                        meterBattery.MeterColor = battHealthVal >= 80f ? HudTheme.PassNominal : (battHealthVal >= 60f ? HudTheme.WarnCaution : HudTheme.FailWarning);
+                    }
+
+                    if (cardBattery != null)
+                    {
+                        cardBattery.HeaderSubtitle = $"{battHealthVal:F0}% INTEGRITY";
+                    }
+
+                    uint pct = bState.MaxCapacity > 0 ? (bState.RemainingCapacity * 100 / bState.MaxCapacity) : 100;
+                    if (lblTopBattery != null)
+                    {
+                        lblTopBattery.Text = $"⚡ BATT: {pct}% ({flowText})";
+                        lblTopBattery.ForeColor = bState.Discharging ? HudTheme.WarnCaution : HudTheme.PassNominal;
+                    }
+                }
+                else
+                {
+                    if (lblBatteryFlow != null) lblBatteryFlow.Text = "AC Line Mainline (No Battery)";
+                    if (lblBatteryWear != null) lblBatteryWear.Text = "Standard AC Subsystem Active";
+                    if (meterBattery != null)
+                    {
+                        meterBattery.Value = 100f;
+                        meterBattery.MeterColor = HudTheme.PassNominal;
+                    }
+                    if (cardBattery != null) cardBattery.HeaderSubtitle = "AC MAINS";
+                    if (lblTopBattery != null)
+                    {
+                        lblTopBattery.Text = "⚡ AC POWER [DESKTOP]";
+                        lblTopBattery.ForeColor = HudTheme.PassNominal;
+                    }
+                }
+
+                // Top bar network chip
+                if (lblTopWifi != null)
+                {
+                    if (!string.IsNullOrWhiteSpace(lastNetworkSummary) && lastNetworkSummary.Contains("Wi-Fi", StringComparison.OrdinalIgnoreCase))
+                    {
+                        lblTopWifi.Text = "📶 WI-FI: LINKED";
+                        lblTopWifi.ForeColor = Color.FromArgb(56, 189, 248);
+                    }
+                    else if (!string.IsNullOrWhiteSpace(lastNetworkSummary) && lastNetworkSummary != "N/A")
+                    {
+                        lblTopWifi.Text = "🌐 ETH: ONLINE";
+                        lblTopWifi.ForeColor = HudTheme.PassNominal;
+                    }
+                    else
+                    {
+                        lblTopWifi.Text = "📶 NET: STANDBY";
+                        lblTopWifi.ForeColor = HudTheme.HudAccentSoft;
+                    }
+                }
+            }
+            catch { }
+        }
+
+        public void UpdateSuiteButtonState(string test)
+        {
+            if (InvokeRequired)
+            {
+                BeginInvoke(new Action(() => UpdateSuiteButtonState(test)));
+                return;
+            }
+
+            GlowButton targetBtn = null;
+            if (test.Equals("Display", StringComparison.OrdinalIgnoreCase)) targetBtn = btnSuiteDisplay;
+            else if (test.Equals("Audio", StringComparison.OrdinalIgnoreCase)) targetBtn = btnSuiteAudio;
+            else if (test.Equals("Camera", StringComparison.OrdinalIgnoreCase) || test.Equals("Webcam", StringComparison.OrdinalIgnoreCase)) targetBtn = btnSuiteWebcam;
+            else if (test.Equals("Keyboard", StringComparison.OrdinalIgnoreCase)) targetBtn = btnSuiteKeyboard;
+            else if (test.Equals("CPU", StringComparison.OrdinalIgnoreCase)) targetBtn = btnSuiteCpu;
+            else if (test.Equals("GPU", StringComparison.OrdinalIgnoreCase) || test.Equals("GPU Stress", StringComparison.OrdinalIgnoreCase)) targetBtn = btnSuiteGpu;
+            else if (test.Equals("WiFi", StringComparison.OrdinalIgnoreCase)) targetBtn = btnSuiteWifi;
+            else if (test.Equals("Storage", StringComparison.OrdinalIgnoreCase)) targetBtn = btnSuiteStorage;
+
+            if (targetBtn != null)
+            {
+                targetBtn.AccentColor = HudTheme.PassNominal;
+                if (!targetBtn.Text.StartsWith("✓"))
+                {
+                    targetBtn.Text = "✓ " + targetBtn.Text;
+                }
+                targetBtn.Invalidate();
+            }
+        }
+
+        public void LaunchGpuBenchmark()
+        {
+            using (var gpuForm = new GpuBenchmarkForm(gpuName: lastModel, vram: "Dedicated / Dynamic"))
+            {
+                gpuForm.ShowDialog(this);
+            }
+            MarkTestComplete("GPU");
+        }
+
+        public void TriggerLabelPrint()
+        {
+            try
+            {
+                int bHealth = 100;
+                if (!string.IsNullOrWhiteSpace(lastBatteryHealth))
+                {
+                    string clean = lastBatteryHealth.Replace("%", "").Trim();
+                    if (int.TryParse(clean, out int parsed)) bHealth = parsed;
+                }
+
+                var record = new AssetQueueRecord
+                {
+                    Asset_Tag = $"ASSET-{DateTime.Now:yyyyMMddHHmm}",
+                    Model = string.IsNullOrWhiteSpace(lastModel) || lastModel == "N/A" ? "Refurbished Unit" : lastModel,
+                    Serial_Number = string.IsNullOrWhiteSpace(lastSerial) ? "N/A" : lastSerial,
+                    Processor = string.IsNullOrWhiteSpace(lastCpu) ? "Intel / AMD Core" : lastCpu,
+                    Memory = string.IsNullOrWhiteSpace(lastRam) ? "16GB" : lastRam,
+                    Battery_Health = bHealth,
+                    Physical_Grade = "A+",
+                    Timestamp = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss"),
+                    QueuedAt = DateTime.Now
+                };
+                ThermalLabelPrinter.PrintLabel(record, this);
+            }
+            catch (Exception ex)
+            {
+                DarkMessageBox.Show($"Thermal Print Error: {ex.Message}", "Printer Error");
+            }
+        }
+
+        private void StartCpuSampleTimer()
+        {
+            _cpuSampleTimer = new System.Windows.Forms.Timer { Interval = 1200 };
+            _cpuSampleTimer.Tick += (s, ev) =>
+            {
+                try
+                {
+                    if (this.IsDisposed || !this.IsHandleCreated) return;
+                    float cpuUsage = NativeMethods.GetSystemCpuUsage();
+                    sparkCpu?.AddValue(cpuUsage);
+                    if (lblTopCpu != null)
+                    {
+                        lblTopCpu.Text = $"⚡ CPU: {cpuUsage:F0}%";
+                        lblTopCpu.ForeColor = cpuUsage > 80f ? HudTheme.WarnCaution : (cpuUsage > 92f ? HudTheme.FailWarning : HudTheme.HudAccent);
+                    }
+                }
+                catch { }
+            };
+            _cpuSampleTimer.Start();
         }
 
         private void CopyTelemetryToClipboard()
@@ -767,6 +1474,9 @@ namespace SuperAutoMater
                 _powerTimer = new System.Windows.Forms.Timer { Interval = 2500 };
                 _powerTimer.Tick += (s, ev) => UpdateLiveBatteryTelemetryCard();
                 _powerTimer.Start();
+
+                // 7. Live background CPU usage telemetry sparkline sampler
+                StartCpuSampleTimer();
             }
             catch (Exception ex)
             {
@@ -778,6 +1488,7 @@ namespace SuperAutoMater
         {
             // Stop background timers
             try { _powerTimer?.Stop(); _powerTimer?.Dispose(); } catch { }
+            try { _cpuSampleTimer?.Stop(); _cpuSampleTimer?.Dispose(); } catch { }
 
             // Unhook keyboard
             if (_hookID != IntPtr.Zero)
@@ -808,6 +1519,23 @@ namespace SuperAutoMater
         private void Form1_KeyDown(object sender, KeyEventArgs e)
         {
             HighlightKey(e.KeyCode, true);
+
+            // Technician Hotkey shortcuts (disabled when typing inside a text box)
+            if (!(this.ActiveControl is TextBox) && !(this.ActiveControl is RichTextBox))
+            {
+                if (e.KeyCode == Keys.F1) { e.Handled = true; LaunchDisplayTest(); }
+                else if (e.KeyCode == Keys.F2) { e.Handled = true; LaunchAudioTest(); }
+                else if (e.KeyCode == Keys.F3) { e.Handled = true; ToggleWebcam(btnCameraToggle, EventArgs.Empty); }
+                else if (e.KeyCode == Keys.F4) { e.Handled = true; FocusKeyboardMatrix(); }
+                else if (e.KeyCode == Keys.F5) { e.Handled = true; _ = RunExpressQCSequenceAsync(); }
+                else if (e.KeyCode == Keys.F6) { e.Handled = true; LaunchCpuBurn(); }
+                else if (e.KeyCode == Keys.F7) { e.Handled = true; LaunchGpuBenchmark(); }
+                else if (e.KeyCode == Keys.F8) { e.Handled = true; LaunchWifiRadar(); }
+                else if (e.KeyCode == Keys.F9) { e.Handled = true; LaunchStorageBenchmark(); }
+                else if (e.Control && e.KeyCode == Keys.P) { e.Handled = true; TriggerLabelPrint(); }
+                else if (e.KeyCode == Keys.Enter && (e.Modifiers == Keys.None || e.Modifiers == Keys.Control)) { e.Handled = true; slidingDrawer?.ToggleDrawer(); }
+                else if (e.KeyCode == Keys.Escape) { e.Handled = true; ResetKeyboardUI(); }
+            }
         }
 
         private void Form1_KeyUp(object sender, KeyEventArgs e)

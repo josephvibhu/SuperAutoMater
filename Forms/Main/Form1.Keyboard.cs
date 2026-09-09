@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Drawing;
@@ -131,20 +131,20 @@ namespace SuperAutoMater
                 cachedKeyFont = new Font("Consolas", fontSize, FontStyle.Bold);
                 cachedSf = new StringFormat { Alignment = StringAlignment.Center, LineAlignment = StringAlignment.Center };
                 
-                // Normal unpressed/untested
-                cachedNormalBrush = new SolidBrush(Color.FromArgb(14, 20, 24));
+                // Normal unpressed/untested (Obsidian Glass)
+                cachedNormalBrush = new SolidBrush(Color.FromArgb(18, 10, 30));
                 cachedNormalTextBrush = new SolidBrush(HudTheme.Muted);
                 cachedNormalPen = new Pen(HudTheme.Bezel, 1f);
 
-                // Persistent Tested / Passed state
-                cachedTestedBrush = new SolidBrush(Color.FromArgb(16, 38, 30));
+                // Persistent Tested / Passed state (Emerald Pass)
+                cachedTestedBrush = new SolidBrush(Color.FromArgb(16, 45, 30));
                 cachedTestedTextBrush = new SolidBrush(HudTheme.PassNominal);
                 cachedTestedPen = new Pen(HudTheme.PassNominal, 1f);
 
-                // Live Active Pressed state (mild subtle highlight)
-                cachedPressedBrush = new SolidBrush(Color.FromArgb(28, 65, 52));
-                cachedPressedTextBrush = new SolidBrush(HudTheme.TextBright);
-                cachedPressedPen = new Pen(HudTheme.HudAccent, 1f);
+                // Live Active Pressed state (Vibrant Electric Violet with glow text)
+                cachedPressedBrush = new SolidBrush(Color.FromArgb(95, 45, 160));
+                cachedPressedTextBrush = new SolidBrush(Color.White);
+                cachedPressedPen = new Pen(HudTheme.HudAccentSoft, 1.5f);
 
                 lastScale = scale;
             }
@@ -189,7 +189,7 @@ namespace SuperAutoMater
             }
         }
 
-        private void ResetKeyboardUI()
+        public void ResetKeyboardUI()
         {
             activeKeys.Clear();
             currentlyPressedKeys.Clear();
@@ -199,9 +199,14 @@ namespace SuperAutoMater
             tpRight = false;
             tpMiddle = false;
 
+            if (lblKeyboardCount != null)
+            {
+                lblKeyboardCount.Text = "KEYS LOGGED: 0/104";
+            }
+
             if (lblMouseTest != null)
             {
-                lblMouseTest.BackColor = Color.FromArgb(14, 20, 24);
+                lblMouseTest.BackColor = HudTheme.PanelGlassTop;
                 lblMouseTest.ForeColor = HudTheme.HudAccent;
                 lblMouseTest.Text = "⟨ TRACKPAD // MOUSE TEST : [ L ] [ M ] [ R ] ⟩";
                 lblMouseTest.Invalidate();
@@ -224,6 +229,11 @@ namespace SuperAutoMater
             else
             {
                 currentlyPressedKeys.Remove(key);
+            }
+
+            if (lblKeyboardCount != null)
+            {
+                lblKeyboardCount.Text = $"KEYS LOGGED: {activeKeys.Count}/104";
             }
 
             keyboardPanel?.Invalidate();
