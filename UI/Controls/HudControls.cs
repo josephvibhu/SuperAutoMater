@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.ComponentModel;
 using System.Diagnostics;
@@ -47,9 +47,9 @@ namespace SuperAutoMater
             this.DoubleBuffered = true;
             this.Dock = DockStyle.Fill;
             this.Margin = new Padding(0);
-            this.BackColor = Color.FromArgb(8, 12, 14);
+            this.BackColor = HudTheme.BgGlass;
 
-            toolTip.BackColor = Color.FromArgb(14, 20, 24);
+            toolTip.BackColor = HudTheme.PanelGlassTop;
             toolTip.ForeColor = HudTheme.HudAccent;
 
             // 0. Top Menu Button (Opens Drawer)
@@ -185,7 +185,7 @@ namespace SuperAutoMater
         {
             this.DoubleBuffered = true;
             this.SetStyle(ControlStyles.AllPaintingInWmPaint | ControlStyles.UserPaint | ControlStyles.OptimizedDoubleBuffer | ControlStyles.ResizeRedraw, true);
-            this.BackColor = HudTheme.PanelGlassTop;
+            this.BackColor = HudTheme.BgGlass;
             LoadDefaultCards();
         }
 
@@ -275,22 +275,13 @@ namespace SuperAutoMater
                 int h = cardH - 4;
                 Rectangle cardRect = new Rectangle(4, y, this.Width - 8, h);
 
-                // Card Background
-                using (SolidBrush bg = new SolidBrush(Color.FromArgb(14, 20, 24)))
-                {
-                    g.FillRectangle(bg, cardRect);
-                }
-
-                // Outline
-                using (Pen p = new Pen(HudTheme.Bezel, 1f))
-                {
-                    g.DrawRectangle(p, cardRect);
-                }
+                // Card Background & Outline (Obsidian & Violet Glass)
+                HudTheme.DrawRoundedPanel(g, cardRect, 6, HudTheme.PanelGlassTop, HudTheme.PanelGlassBottom, HudTheme.PenBezel);
 
                 // Left Accent Stripe
                 using (SolidBrush stripe = new SolidBrush(card.StripeColor))
                 {
-                    g.FillRectangle(stripe, cardRect.X + 1, cardRect.Y + 1, 3, cardRect.Height - 2);
+                    g.FillRectangle(stripe, cardRect.X + 2, cardRect.Y + 4, 3, cardRect.Height - 8);
                 }
 
                 // Measure badge first
@@ -360,7 +351,7 @@ namespace SuperAutoMater
         {
             this.DoubleBuffered = true;
             this.SetStyle(ControlStyles.AllPaintingInWmPaint | ControlStyles.UserPaint | ControlStyles.OptimizedDoubleBuffer | ControlStyles.ResizeRedraw, true);
-            this.BackColor = HudTheme.PanelGlassTop;
+            this.BackColor = HudTheme.BgGlass;
 
             Random rnd = new Random();
             for (int i = 0; i < 60; i++)
@@ -421,7 +412,7 @@ namespace SuperAutoMater
             Rectangle bounds = new Rectangle(x + 4, y, w - 8, h);
 
             // Channel Box
-            using (SolidBrush bg = new SolidBrush(Color.FromArgb(12, 16, 20)))
+            using (SolidBrush bg = new SolidBrush(Color.FromArgb(14, 8, 22)))
                 g.FillRectangle(bg, bounds);
 
             using (Pen borderPen = new Pen(HudTheme.Bezel, 1f))
@@ -528,7 +519,7 @@ namespace SuperAutoMater
             this.DoubleBuffered = true;
             this.Dock = DockStyle.Fill;
             this.Width = 0;
-            this.BackColor = Color.FromArgb(12, 16, 20);
+            this.BackColor = HudTheme.PanelGlassBottom;
             this.Padding = new Padding(10);
             this.Visible = false;
 
@@ -623,7 +614,7 @@ namespace SuperAutoMater
             {
                 Dock = DockStyle.Bottom,
                 Height = 24,
-                BackColor = Color.FromArgb(18, 24, 30),
+                BackColor = Color.FromArgb(24, 14, 38),
                 ForeColor = HudTheme.TextBright,
                 Font = HudTheme.FontMono11Bold,
                 BorderStyle = BorderStyle.FixedSingle
@@ -639,7 +630,7 @@ namespace SuperAutoMater
             {
                 Dock = DockStyle.Bottom,
                 DropDownStyle = ComboBoxStyle.DropDownList,
-                BackColor = Color.FromArgb(18, 24, 30),
+                BackColor = Color.FromArgb(24, 14, 38),
                 ForeColor = HudTheme.PassNominal,
                 Font = HudTheme.FontMono11Bold,
                 FlatStyle = FlatStyle.Flat

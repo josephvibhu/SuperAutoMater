@@ -105,39 +105,42 @@ namespace SuperAutoMater
     {
         #region Color Tokens
 
-        public static readonly Color BgGlass          = Color.FromArgb(10, 13, 14);    // #0A0D0E (App background)
-        public static readonly Color PanelGlassTop    = Color.FromArgb(16, 22, 26);    // #10161A (Panel glass top)
-        public static readonly Color PanelGlassBottom = Color.FromArgb(13, 18, 20);    // #0D1214 (Panel glass bottom)
-        public static readonly Color Bezel            = Color.FromArgb(34, 49, 51);    // #223133 (Hairline frame)
-        public static readonly Color BezelActive      = Color.FromArgb(50, 75, 80);    // #324B50 (Active bezel)
-        public static readonly Color HudAccent        = Color.FromArgb(139, 233, 253); // #8BE9FD (HUD Cyan chrome & ticks)
-        public static readonly Color PassNominal      = Color.FromArgb(80, 250, 123);  // #50FA7B (Nominal / PASS)
-        public static readonly Color WarnCaution      = Color.FromArgb(255, 184, 108); // #FFB86C (Caution / WARN)
-        public static readonly Color FailWarning      = Color.FromArgb(255, 85, 85);   // #FF5555 (Master-warning / FAIL)
-        public static readonly Color StorageAux       = Color.FromArgb(189, 147, 249); // #BD93F9 (Aux / Storage telemetry)
-        public static readonly Color Muted            = Color.FromArgb(58, 74, 77);    // #3A4A4D (Inactive / off)
-        public static readonly Color TextBright       = Color.FromArgb(248, 248, 242); // #F8F8F2 (Primary readout)
-        public static readonly Color TextDim          = Color.FromArgb(98, 114, 164);  // #6272A4 (Secondary readout)
+        public static readonly Color BgGlass          = Color.FromArgb(6, 4, 10);      // #06040A (Deep Obsidian Black)
+        public static readonly Color PanelGlassTop    = Color.FromArgb(18, 10, 30);    // #120A1E (Amethyst Glass Top)
+        public static readonly Color PanelGlassBottom = Color.FromArgb(11, 6, 20);     // #0B0614 (Obsidian Glass Bottom)
+        public static readonly Color Bezel            = Color.FromArgb(46, 25, 73);    // #2E1949 (Hairline Violet)
+        public static readonly Color BezelActive      = Color.FromArgb(88, 43, 140);   // #582B8C (Active Glowing Violet)
+        public static readonly Color HudAccent        = Color.FromArgb(168, 85, 247);  // #A855F7 (Electric Violet)
+        public static readonly Color HudAccentSoft    = Color.FromArgb(192, 132, 252); // #C084FC (Radiant Lavender)
+        public static readonly Color PassNominal      = Color.FromArgb(16, 185, 129);  // #10B981 (Nominal / PASS)
+        public static readonly Color WarnCaution      = Color.FromArgb(245, 158, 11);  // #F59E0B (Caution / WARN)
+        public static readonly Color FailWarning      = Color.FromArgb(239, 68, 68);   // #EF4444 (Master-warning / FAIL)
+        public static readonly Color StorageAux       = Color.FromArgb(217, 70, 239);  // #D946EF (Neon Fuchsia / Aux)
+        public static readonly Color Muted            = Color.FromArgb(70, 48, 96);    // #463060 (Inactive / Dim Violet)
+        public static readonly Color TextBright       = Color.FromArgb(243, 232, 255); // #F3E8FF (Primary readout - Lilac)
+        public static readonly Color TextDim          = Color.FromArgb(139, 127, 163); // #8B7FA3 (Secondary readout - Lavender)
 
         #endregion
 
         #region Pre-cached GDI+ Brushes & Pens (Zero Allocation on OnPaint)
 
-        public static readonly SolidBrush BrushBgGlass     = new SolidBrush(BgGlass);
-        public static readonly SolidBrush BrushPanelGlass  = new SolidBrush(PanelGlassTop);
-        public static readonly SolidBrush BrushHudAccent   = new SolidBrush(HudAccent);
-        public static readonly SolidBrush BrushPassNominal = new SolidBrush(PassNominal);
-        public static readonly SolidBrush BrushWarnCaution = new SolidBrush(WarnCaution);
-        public static readonly SolidBrush BrushFailWarning = new SolidBrush(FailWarning);
-        public static readonly SolidBrush BrushStorageAux  = new SolidBrush(StorageAux);
-        public static readonly SolidBrush BrushMuted       = new SolidBrush(Muted);
-        public static readonly SolidBrush BrushTextBright  = new SolidBrush(TextBright);
-        public static readonly SolidBrush BrushTextDim     = new SolidBrush(TextDim);
+        public static readonly SolidBrush BrushBgGlass      = new SolidBrush(BgGlass);
+        public static readonly SolidBrush BrushPanelGlass   = new SolidBrush(PanelGlassTop);
+        public static readonly SolidBrush BrushHudAccent    = new SolidBrush(HudAccent);
+        public static readonly SolidBrush BrushHudAccentSoft= new SolidBrush(HudAccentSoft);
+        public static readonly SolidBrush BrushPassNominal  = new SolidBrush(PassNominal);
+        public static readonly SolidBrush BrushWarnCaution  = new SolidBrush(WarnCaution);
+        public static readonly SolidBrush BrushFailWarning  = new SolidBrush(FailWarning);
+        public static readonly SolidBrush BrushStorageAux   = new SolidBrush(StorageAux);
+        public static readonly SolidBrush BrushMuted        = new SolidBrush(Muted);
+        public static readonly SolidBrush BrushTextBright   = new SolidBrush(TextBright);
+        public static readonly SolidBrush BrushTextDim      = new SolidBrush(TextDim);
 
         public static readonly Pen PenBezel          = new Pen(Bezel, 1f);
         public static readonly Pen PenBezelActive    = new Pen(BezelActive, 1f);
         public static readonly Pen PenHudAccent      = new Pen(HudAccent, 1f);
         public static readonly Pen PenHudAccentThick = new Pen(HudAccent, 1.5f);
+        public static readonly Pen PenHudAccentSoft  = new Pen(HudAccentSoft, 1f);
         public static readonly Pen PenPassNominal    = new Pen(PassNominal, 1f);
         public static readonly Pen PenWarnCaution    = new Pen(WarnCaution, 1f);
         public static readonly Pen PenFailWarning    = new Pen(FailWarning, 1f);
@@ -251,6 +254,95 @@ namespace SuperAutoMater
             g.DrawLine(bracketPen, r, b, r, b - arm);
         }
 
+        /// <summary>
+        /// Generates a GraphicsPath representing a rounded rectangle.
+        /// </summary>
+        public static GraphicsPath GetRoundedPath(Rectangle bounds, int radius)
+        {
+            GraphicsPath path = new GraphicsPath();
+            if (radius <= 0)
+            {
+                path.AddRectangle(bounds);
+                return path;
+            }
+
+            int diameter = radius * 2;
+            Size size = new Size(diameter, diameter);
+            Rectangle arc = new Rectangle(bounds.Location, size);
+
+            // Top-left
+            path.AddArc(arc, 180, 90);
+
+            // Top-right
+            arc.X = bounds.Right - diameter;
+            path.AddArc(arc, 270, 90);
+
+            // Bottom-right
+            arc.Y = bounds.Bottom - diameter;
+            path.AddArc(arc, 0, 90);
+
+            // Bottom-left
+            arc.X = bounds.Left;
+            path.AddArc(arc, 90, 90);
+
+            path.CloseFigure();
+            return path;
+        }
+
+        /// <summary>
+        /// Draws a modern double-buffered rounded bento panel with gradient fill and hairline border.
+        /// </summary>
+        public static void DrawRoundedPanel(Graphics g, Rectangle bounds, int radius, Color topColor, Color bottomColor, Pen borderPen)
+        {
+            if (bounds.Width <= 0 || bounds.Height <= 0) return;
+            g.SmoothingMode = SmoothingMode.AntiAlias;
+
+            using (GraphicsPath path = GetRoundedPath(bounds, radius))
+            {
+                using (LinearGradientBrush fill = new LinearGradientBrush(bounds, topColor, bottomColor, 90f))
+                {
+                    g.FillPath(fill, path);
+                }
+
+                if (borderPen != null)
+                {
+                    g.DrawPath(borderPen, path);
+                }
+            }
+        }
+
+        /// <summary>
+        /// Draws a pill-shaped status or telemetry badge.
+        /// </summary>
+        public static void DrawPillBadge(Graphics g, Rectangle bounds, string text, Font font, Color bgColor, Color textColor, Color borderColor)
+        {
+            if (bounds.Width <= 0 || bounds.Height <= 0) return;
+            g.SmoothingMode = SmoothingMode.AntiAlias;
+
+            int radius = bounds.Height / 2;
+            using (GraphicsPath path = GetRoundedPath(bounds, radius))
+            {
+                using (SolidBrush bg = new SolidBrush(bgColor))
+                {
+                    g.FillPath(bg, path);
+                }
+
+                if (borderColor != Color.Transparent)
+                {
+                    using (Pen borderPen = new Pen(borderColor, 1f))
+                    {
+                        g.DrawPath(borderPen, path);
+                    }
+                }
+
+                using (SolidBrush textBrush = new SolidBrush(textColor))
+                using (StringFormat sf = new StringFormat { Alignment = StringAlignment.Center, LineAlignment = StringAlignment.Center })
+                {
+                    g.DrawString(text, font, textBrush, bounds, sf);
+                }
+            }
+        }
+
         #endregion
     }
 
@@ -309,7 +401,7 @@ namespace SuperAutoMater
             if (!string.IsNullOrEmpty(BezelTitle))
             {
                 int headerHeight = 20;
-                using (SolidBrush plateBrush = new SolidBrush(Color.FromArgb(20, 28, 32)))
+                using (SolidBrush plateBrush = new SolidBrush(Color.FromArgb(24, 14, 38)))
                 {
                     g.FillRectangle(plateBrush, 1, 1, this.Width - 2, headerHeight);
                 }
@@ -370,7 +462,7 @@ namespace SuperAutoMater
             this.SetStyle(ControlStyles.Selectable | ControlStyles.StandardClick, true);
             this.Cursor = Cursors.Hand;
             this.Font = HudTheme.FontMono11Bold;
-            this.BackColor = Color.FromArgb(14, 20, 24);
+            this.BackColor = Color.FromArgb(18, 10, 30);
             this.ForeColor = HudTheme.HudAccent;
             this.Margin = new Padding(2);
         }
@@ -391,20 +483,20 @@ namespace SuperAutoMater
 
             if (isPressed || IsArmed)
             {
-                bg = Color.FromArgb(28, 48, 56);
-                borderCol = HudAccentColor;
+                bg = Color.FromArgb(64, 28, 108);
+                borderCol = HudTheme.HudAccentSoft;
                 textCol = HudTheme.TextBright;
             }
             else if (isHovered)
             {
-                bg = Color.FromArgb(20, 30, 36);
+                bg = Color.FromArgb(42, 20, 72);
                 borderCol = HudAccentColor;
-                textCol = HudAccentColor;
+                textCol = HudTheme.HudAccentSoft;
             }
             else
             {
-                bg = Color.FromArgb(14, 20, 24);
-                borderCol = this.Enabled ? HudTheme.Bezel : Color.FromArgb(20, 28, 30);
+                bg = Color.FromArgb(18, 10, 30);
+                borderCol = this.Enabled ? HudTheme.Bezel : Color.FromArgb(28, 16, 44);
                 textCol = this.Enabled ? HudAccentColor : HudTheme.Muted;
             }
 
