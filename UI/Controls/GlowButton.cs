@@ -151,11 +151,11 @@ namespace SuperAutoMater
             if (!string.IsNullOrEmpty(hotkeyText))
             {
                 Font badgeFont = ScalingService.Instance.GetFont(HudFontRole.Badge);
-                string badgeStr = $"[{hotkeyText}]";
+                string badgeStr = hotkeyText.StartsWith("[") && hotkeyText.EndsWith("]") ? hotkeyText : $"[{hotkeyText}]";
                 SizeF bSize = g.MeasureString(badgeStr, badgeFont);
-                hotkeyWidth = bSize.Width + 12;
+                hotkeyWidth = bSize.Width + 8;
 
-                Rectangle badgeRect = new Rectangle(rect.Right - (int)bSize.Width - 14, (this.Height - (int)bSize.Height) / 2, (int)bSize.Width + 8, (int)bSize.Height);
+                Rectangle badgeRect = new Rectangle(rect.Right - (int)bSize.Width - 10, (this.Height - (int)bSize.Height) / 2, (int)bSize.Width + 6, (int)bSize.Height);
                 Color badgeBg = isPrimary ? Color.FromArgb(60, 0, 0, 0) : Color.FromArgb(35, 18, 55);
                 Color badgeText = isPrimary ? Color.FromArgb(235, 215, 255) : HudTheme.HudAccentSoft;
                 Color badgeBorder = isPrimary ? Color.FromArgb(80, 255, 255, 255) : HudTheme.Bezel;
@@ -163,16 +163,17 @@ namespace SuperAutoMater
                 HudTheme.DrawPillBadge(g, badgeRect, badgeStr, badgeFont, badgeBg, badgeText, badgeBorder);
             }
 
-            // Draw Button Text
-            Font btnFont = ScalingService.Instance.GetFont(HudFontRole.Button);
-            Rectangle textRect = new Rectangle(rect.Left + 10, rect.Top, rect.Width - 20 - (int)hotkeyWidth, rect.Height);
+            // Draw Button Text (use control's custom font if explicitly set, else fallback to role font)
+            Font btnFont = this.Font ?? ScalingService.Instance.GetFont(HudFontRole.Button);
+            Rectangle textRect = new Rectangle(rect.Left + 8, rect.Top, Math.Max(10, rect.Width - 14 - (int)hotkeyWidth), rect.Height);
 
             using (SolidBrush tb = new SolidBrush(textCol))
             using (StringFormat sf = new StringFormat
             {
                 Alignment = string.IsNullOrEmpty(hotkeyText) ? StringAlignment.Center : StringAlignment.Near,
                 LineAlignment = StringAlignment.Center,
-                Trimming = StringTrimming.EllipsisCharacter
+                Trimming = StringTrimming.EllipsisCharacter,
+                FormatFlags = StringFormatFlags.NoWrap
             })
             {
                 g.DrawString(this.Text, btnFont, tb, textRect, sf);

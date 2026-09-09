@@ -534,11 +534,12 @@ namespace SuperAutoMater
             // Action: Print Label
             btnSuitePrintLabel = new GlowButton
             {
-                Text = "🖨 PRINT CHASSIS LABEL",
+                Text = "🖨 PRINT LABEL",
                 HotkeyText = "[Ctrl+P]",
+                Font = HudTheme.FontMono9Bold,
                 Dock = DockStyle.Fill,
                 AccentColor = HudTheme.HudAccentSoft,
-                Margin = new Padding(0, 2, 0, 2)
+                Margin = new Padding(0, 1, 0, 1)
             };
             btnSuitePrintLabel.Click += (s, e) => TriggerLabelPrint();
             railGrid.Controls.Add(btnSuitePrintLabel, 0, 9);
@@ -546,12 +547,13 @@ namespace SuperAutoMater
             // Action: Pass QC & Sign-Off
             btnSuiteSignOff = new GlowButton
             {
-                Text = "🔏 PASS QC & SIGN-OFF",
+                Text = "🔏 PASS & SIGN-OFF",
                 HotkeyText = "[Enter]",
+                Font = HudTheme.FontMono9Bold,
                 IsPrimary = true,
                 AccentColor = HudTheme.PassNominal,
                 Dock = DockStyle.Fill,
-                Margin = new Padding(0, 2, 0, 0)
+                Margin = new Padding(0, 1, 0, 0)
             };
             btnSuiteSignOff.Click += (s, e) => slidingDrawer.ToggleDrawer();
             railGrid.Controls.Add(btnSuiteSignOff, 0, 10);
