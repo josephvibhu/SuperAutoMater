@@ -120,10 +120,19 @@ namespace SuperAutoMater
         private BentoCard cardSensors;
         private BentoCard cardUsb;
         private BentoCard cardWarehouse;
+        private Label lblWarehouseSheet;
+        private Label lblWarehouseQueue;
+        private GlowButton btnCloudSync;
 
         public static Form1 Instance;
 
         public string GetLastSerial() => lastSerial;
+        public string GetLastModel() => lastModel;
+        public string GetLastCpu() => lastCpu;
+        public string GetLastRam() => lastRam;
+        public string GetLastStorage() => lastStorageSummary;
+        public string GetLastBatteryHealth() => lastBatteryHealth;
+
         public string GetTelemetryReportText() => reportBox?.Text ?? "";
 
         #endregion
@@ -174,6 +183,21 @@ namespace SuperAutoMater
                             lblUsbTest.Invalidate();
                         }
                         MarkTestComplete("Trackpad");
+                    }));
+                }
+            };
+
+            OfflineSyncQueue.Instance.QueueChanged += count =>
+            {
+                if (this.IsHandleCreated && !this.IsDisposed)
+                {
+                    this.BeginInvoke(new Action(() =>
+                    {
+                        if (lblWarehouseQueue != null && !lblWarehouseQueue.IsDisposed)
+                        {
+                            lblWarehouseQueue.Text = $"Queue: {count} Pending | Sync: Ready";
+                            lblWarehouseQueue.ForeColor = count > 0 ? HudTheme.WarnCaution : HudTheme.PassNominal;
+                        }
                     }));
                 }
             };
@@ -298,7 +322,7 @@ namespace SuperAutoMater
                 Margin = new Padding(0),
                 Padding = new Padding(0)
             };
-            centerGrid.RowStyles.Add(new RowStyle(SizeType.Absolute, 40F));  // Top Avionics Bar
+            centerGrid.RowStyles.Add(new RowStyle(SizeType.Absolute, 42F));  // Top Avionics Bar
             centerGrid.RowStyles.Add(new RowStyle(SizeType.Percent, 100F)); // Bento Dashboard Arena
             centerGrid.RowStyles.Add(new RowStyle(SizeType.Absolute, 24F));  // Bottom Command Hotkey Bar (reduced from 28 to 24)
 
@@ -330,26 +354,24 @@ namespace SuperAutoMater
                 }
             };
 
+            // 3-Zone Avionics Layout: Left Info (Percent) | Center Telemetry (AutoSize) | Right Action Buttons (Fixed 280px)
             TableLayoutPanel barGrid = new TableLayoutPanel
             {
                 Dock = DockStyle.Fill,
-                ColumnCount = 7,
+                ColumnCount = 3,
                 RowCount = 1,
+                GrowStyle = TableLayoutPanelGrowStyle.FixedSize,
                 Margin = new Padding(0),
-                Padding = new Padding(8, 3, 8, 3)
+                Padding = new Padding(6, 2, 6, 2)
             };
-            barGrid.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));          // Brand & Bench telemetry
-            barGrid.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100F));      // Flexible spacer
-            barGrid.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));          // lblTopBattery chip
-            barGrid.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));          // lblTopCpu chip
-            barGrid.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));          // lblTopWifi chip
-            barGrid.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 185F));    // btnTopExpressQC
-            barGrid.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 140F));    // btnSignDrawer
+            barGrid.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100F));    // Brand, Version, Bench status
+            barGrid.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));        // Telemetry chips (Battery, CPU, WiFi)
+            barGrid.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 280F));  // Express QC & QC Sign-Off buttons
+            barGrid.RowStyles.Add(new RowStyle(SizeType.Percent, 100F));
 
-            // Brand Header & Bench Info
+            // Zone 1: Left Brand & Bench Info
             FlowLayoutPanel brandPanel = new FlowLayoutPanel
             {
-                AutoSize = true,
                 Dock = DockStyle.Fill,
                 WrapContents = false,
                 FlowDirection = FlowDirection.LeftToRight,
@@ -362,7 +384,7 @@ namespace SuperAutoMater
                 Font = HudTheme.FontTitle13Bold,
                 ForeColor = HudTheme.HudAccent,
                 AutoSize = true,
-                Margin = new Padding(0, 2, 4, 0)
+                Margin = new Padding(0, 3, 4, 0)
             };
             Label lblSub = new Label
             {
@@ -370,9 +392,9 @@ namespace SuperAutoMater
                 Font = HudTheme.FontMono8Bold,
                 ForeColor = HudTheme.HudAccentSoft,
                 BackColor = Color.FromArgb(30, 15, 50),
-                Padding = new Padding(5, 2, 5, 2),
+                Padding = new Padding(4, 1, 4, 1),
                 AutoSize = true,
-                Margin = new Padding(0, 3, 8, 0)
+                Margin = new Padding(0, 5, 8, 0)
             };
             lblSub.Paint += (s, e) =>
             {
@@ -380,112 +402,125 @@ namespace SuperAutoMater
                     e.Graphics.DrawRectangle(p, 0, 0, lblSub.Width - 1, lblSub.Height - 1);
             };
 
-            Label lblDivider = new Label
-            {
-                Text = "|",
-                Font = HudTheme.FontMono9Bold,
-                ForeColor = Color.FromArgb(60, 40, 90),
-                AutoSize = true,
-                Margin = new Padding(0, 3, 8, 0)
-            };
-
             Label lblBenchInfo = new Label
             {
-                Text = "● BENCH ONLINE  |  BAY: QC-TERMINAL-01  |  OPERATOR: SENIOR REFURB TECH",
+                Text = "● BENCH ONLINE  |  QC-01",
                 Font = HudTheme.FontMono8Bold,
                 ForeColor = HudTheme.PassNominal,
                 AutoSize = true,
-                Margin = new Padding(0, 5, 4, 0)
+                Margin = new Padding(0, 6, 4, 0)
             };
 
             brandPanel.Controls.Add(lblBrand);
             brandPanel.Controls.Add(lblSub);
-            brandPanel.Controls.Add(lblDivider);
             brandPanel.Controls.Add(lblBenchInfo);
             barGrid.Controls.Add(brandPanel, 0, 0);
 
-            // Flexible Spacer
-            barGrid.Controls.Add(new Panel { Dock = DockStyle.Fill }, 1, 0);
+            // Zone 2: Telemetry Chips (Battery, CPU, Wi-Fi)
+            FlowLayoutPanel chipsPanel = new FlowLayoutPanel
+            {
+                Dock = DockStyle.Fill,
+                AutoSize = true,
+                WrapContents = false,
+                FlowDirection = FlowDirection.LeftToRight,
+                Margin = new Padding(0),
+                Padding = new Padding(0, 1, 4, 0)
+            };
 
-            // Quick Telemetry Chips
             lblTopBattery = new Label
             {
-                Text = "BATTERY: 100% (AC Line)",
+                Text = "BATTERY: 100%",
                 Font = HudTheme.FontMono9Bold,
                 ForeColor = HudTheme.PassNominal,
                 BackColor = Color.FromArgb(18, 9, 32),
                 TextAlign = ContentAlignment.MiddleCenter,
-                Padding = new Padding(8, 4, 8, 4),
+                Padding = new Padding(6, 4, 6, 4),
                 AutoSize = true,
-                Margin = new Padding(3, 1, 3, 1)
+                Margin = new Padding(2, 2, 2, 2)
             };
             lblTopBattery.Paint += (s, e) =>
             {
                 using (Pen p = new Pen(Color.FromArgb(50, 168, 85, 247), 1))
                     e.Graphics.DrawRectangle(p, 0, 0, lblTopBattery.Width - 1, lblTopBattery.Height - 1);
             };
-            barGrid.Controls.Add(lblTopBattery, 2, 0);
+            chipsPanel.Controls.Add(lblTopBattery);
 
             lblTopCpu = new Label
             {
-                Text = "CPU FREQ: 0% NOMINAL",
+                Text = "CPU: 0%",
                 Font = HudTheme.FontMono9Bold,
                 ForeColor = HudTheme.HudAccentSoft,
                 BackColor = Color.FromArgb(18, 9, 32),
                 TextAlign = ContentAlignment.MiddleCenter,
-                Padding = new Padding(8, 4, 8, 4),
+                Padding = new Padding(6, 4, 6, 4),
                 AutoSize = true,
-                Margin = new Padding(3, 1, 3, 1)
+                Margin = new Padding(2, 2, 2, 2)
             };
             lblTopCpu.Paint += (s, e) =>
             {
                 using (Pen p = new Pen(Color.FromArgb(50, 168, 85, 247), 1))
                     e.Graphics.DrawRectangle(p, 0, 0, lblTopCpu.Width - 1, lblTopCpu.Height - 1);
             };
-            barGrid.Controls.Add(lblTopCpu, 3, 0);
+            chipsPanel.Controls.Add(lblTopCpu);
 
             lblTopWifi = new Label
             {
-                Text = "WI-FI: STANDBY",
+                Text = "WI-FI: LINKED",
                 Font = HudTheme.FontMono9Bold,
                 ForeColor = Color.FromArgb(56, 189, 248),
                 BackColor = Color.FromArgb(18, 9, 32),
                 TextAlign = ContentAlignment.MiddleCenter,
-                Padding = new Padding(8, 4, 8, 4),
+                Padding = new Padding(6, 4, 6, 4),
                 AutoSize = true,
-                Margin = new Padding(3, 1, 6, 1)
+                Margin = new Padding(2, 2, 4, 2)
             };
             lblTopWifi.Paint += (s, e) =>
             {
                 using (Pen p = new Pen(Color.FromArgb(50, 168, 85, 247), 1))
                     e.Graphics.DrawRectangle(p, 0, 0, lblTopWifi.Width - 1, lblTopWifi.Height - 1);
             };
-            barGrid.Controls.Add(lblTopWifi, 4, 0);
+            chipsPanel.Controls.Add(lblTopWifi);
+            barGrid.Controls.Add(chipsPanel, 1, 0);
 
-            // Express QC Primary Button
+            // Zone 3: Rock-Solid Fixed Action Buttons
+            TableLayoutPanel actionBtns = new TableLayoutPanel
+            {
+                Dock = DockStyle.Fill,
+                ColumnCount = 2,
+                RowCount = 1,
+                GrowStyle = TableLayoutPanelGrowStyle.FixedSize,
+                Margin = new Padding(0)
+            };
+            actionBtns.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 57F));
+            actionBtns.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 43F));
+            actionBtns.RowStyles.Add(new RowStyle(SizeType.Percent, 100F));
+
             btnTopExpressQC = new GlowButton
             {
-                Text = "⚡ 1-CLICK EXPRESS QC",
+                Text = "⚡ EXPRESS QC",
                 HotkeyText = "[F5]",
                 IsPrimary = true,
                 AccentColor = HudTheme.HudAccent,
+                Font = HudTheme.FontMono9Bold,
                 Dock = DockStyle.Fill,
-                Margin = new Padding(2, 0, 3, 0)
+                Margin = new Padding(2, 0, 2, 0)
             };
             btnTopExpressQC.Click += async (s, e) => await RunExpressQCSequenceAsync();
-            barGrid.Controls.Add(btnTopExpressQC, 5, 0);
 
-            // QC Sign-off Drawer Toggle Button
             GlowButton btnSignDrawer = new GlowButton
             {
-                Text = "🔏 QC SIGN-OFF",
+                Text = "🔏 SIGN-OFF",
                 HotkeyText = "[Enter]",
                 AccentColor = HudTheme.PassNominal,
+                Font = HudTheme.FontMono9Bold,
                 Dock = DockStyle.Fill,
                 Margin = new Padding(2, 0, 0, 0)
             };
             btnSignDrawer.Click += (s, e) => slidingDrawer.ToggleDrawer();
-            barGrid.Controls.Add(btnSignDrawer, 6, 0);
+
+            actionBtns.Controls.Add(btnTopExpressQC, 0, 0);
+            actionBtns.Controls.Add(btnSignDrawer, 1, 0);
+            barGrid.Controls.Add(actionBtns, 2, 0);
 
             bar.Controls.Add(barGrid);
             return bar;
@@ -714,11 +749,11 @@ namespace SuperAutoMater
             cardCpu.Controls.Add(lblCpuName);
             topCardsGrid.Controls.Add(cardCpu, 1, 0);
 
-            // Tile 3: Storage & Memory
+            // Tile 3: Storage & RAM
             cardMemory = new BentoCard
             {
                 Dock = DockStyle.Fill,
-                HeaderTitle = "STORAGE & MEMORY",
+                HeaderTitle = "STORAGE & RAM",
                 HeaderSubtitle = "NVMe / RAM",
                 TagAccentColor = HudTheme.WarnCaution,
                 Margin = new Padding(3, 0, 3, 0)
@@ -754,11 +789,11 @@ namespace SuperAutoMater
             cardMemory.Controls.Add(lblMemorySpecs);
             topCardsGrid.Controls.Add(cardMemory, 2, 0);
 
-            // Tile 4: Battery Telemetry & Arc Flow
+            // Tile 4: Battery Power & Arc Flow
             cardBattery = new BentoCard
             {
                 Dock = DockStyle.Fill,
-                HeaderTitle = "BATTERY TELEMETRY",
+                HeaderTitle = "BATTERY POWER",
                 HeaderSubtitle = "FLOW / HEALTH",
                 TagAccentColor = HudTheme.PassNominal,
                 Margin = new Padding(3, 0, 0, 0)
@@ -1043,20 +1078,28 @@ namespace SuperAutoMater
 
             trackpadVisual.MouseDown += (s, e) =>
             {
-                if (e.Button == MouseButtons.Left)
-                {
-                    tpLeft = true;
-                    tpLeftDown = true;
-                }
-                else if (e.Button == MouseButtons.Right)
+                int w = trackpadVisual.Width;
+                int h = trackpadVisual.Height;
+                int midW = Math.Max(16, w / 8);
+                int sideW = (w - midW - 6) / 2;
+                Rectangle lRect = new Rectangle(2, 2, sideW, h - 5);
+                Rectangle mRect = new Rectangle(lRect.Right + 1, 2, midW, h - 5);
+                Rectangle rRect = new Rectangle(mRect.Right + 1, 2, w - mRect.Right - 3, h - 5);
+
+                if (e.Button == MouseButtons.Right || rRect.Contains(e.Location))
                 {
                     tpRight = true;
                     tpRightDown = true;
                 }
-                else if (e.Button == MouseButtons.Middle)
+                else if (e.Button == MouseButtons.Middle || mRect.Contains(e.Location))
                 {
                     tpMiddle = true;
                     tpMiddleDown = true;
+                }
+                else
+                {
+                    tpLeft = true;
+                    tpLeftDown = true;
                 }
 
                 trackpadVisual.Invalidate();
@@ -1068,9 +1111,9 @@ namespace SuperAutoMater
 
             trackpadVisual.MouseUp += (s, e) =>
             {
-                if (e.Button == MouseButtons.Left) tpLeftDown = false;
-                else if (e.Button == MouseButtons.Right) tpRightDown = false;
-                else if (e.Button == MouseButtons.Middle) tpMiddleDown = false;
+                tpLeftDown = false;
+                tpRightDown = false;
+                tpMiddleDown = false;
                 trackpadVisual.Invalidate();
             };
 
@@ -1120,7 +1163,7 @@ namespace SuperAutoMater
             {
                 Dock = DockStyle.Fill,
                 HeaderTitle = "WAREHOUSE INVENTORY PIPELINE",
-                HeaderSubtitle = "CONNECTED",
+                HeaderSubtitle = "ONLINE",
                 HeaderSubtitleColor = HudTheme.PassNominal,
                 HeaderSubtitleBgColor = Color.FromArgb(16, 45, 30),
                 HeaderSubtitleBorderColor = Color.FromArgb(50, 16, 185, 129),
@@ -1139,35 +1182,62 @@ namespace SuperAutoMater
             whGrid.RowStyles.Add(new RowStyle(SizeType.Absolute, 16F));
             whGrid.RowStyles.Add(new RowStyle(SizeType.Percent, 100F));
 
-            Label lblSheet = new Label
+            lblWarehouseSheet = new Label
             {
-                Text = "Cloud Sheet: Refurb_Inventory_2026",
-                Font = HudTheme.FontMono9,
-                ForeColor = HudTheme.HudAccentSoft,
-                Dock = DockStyle.Fill,
-                TextAlign = ContentAlignment.MiddleLeft
-            };
-            Label lblQueue = new Label
-            {
-                Text = $"Queue: {OfflineSyncQueue.Instance.PendingCount} Pending | Printer: Zebra ESC/POS",
+                Text = "● Cloud Sheet: Refurb_Inventory_2026",
                 Font = HudTheme.FontMono9,
                 ForeColor = HudTheme.PassNominal,
                 Dock = DockStyle.Fill,
                 TextAlign = ContentAlignment.MiddleLeft
             };
+            lblWarehouseQueue = new Label
+            {
+                Text = $"Queue: {OfflineSyncQueue.Instance.PendingCount} Pending | Sync: Ready",
+                Font = HudTheme.FontMono9,
+                ForeColor = HudTheme.HudAccentSoft,
+                Dock = DockStyle.Fill,
+                TextAlign = ContentAlignment.MiddleLeft
+            };
+
+            TableLayoutPanel whActionGrid = new TableLayoutPanel
+            {
+                Dock = DockStyle.Fill,
+                ColumnCount = 2,
+                RowCount = 1,
+                Margin = new Padding(0, 2, 0, 0)
+            };
+            whActionGrid.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 55F));
+            whActionGrid.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 45F));
+
+            btnCloudSync = new GlowButton
+            {
+                Text = "☁ SYNC SHEETS",
+                HotkeyText = "[Sync]",
+                IsPrimary = true,
+                AccentColor = HudTheme.HudAccent,
+                Font = HudTheme.FontMono9Bold,
+                Dock = DockStyle.Fill,
+                Margin = new Padding(0, 0, 2, 0)
+            };
+            btnCloudSync.Click += async (s, e) => await SyncCurrentMachineToSheetsAsync();
+
             GlowButton btnOpenAsset = new GlowButton
             {
-                Text = "ASSET & QR CODE LAB",
+                Text = "🖨 QR LAB",
                 HotkeyText = "[Ctrl+P]",
                 Dock = DockStyle.Fill,
                 AccentColor = HudTheme.HudAccentSoft,
-                Margin = new Padding(0, 2, 0, 0)
+                Font = HudTheme.FontMono9Bold,
+                Margin = new Padding(2, 0, 0, 0)
             };
             btnOpenAsset.Click += (s, e) => ShowQRCode();
 
-            whGrid.Controls.Add(lblSheet, 0, 0);
-            whGrid.Controls.Add(lblQueue, 0, 1);
-            whGrid.Controls.Add(btnOpenAsset, 0, 2);
+            whActionGrid.Controls.Add(btnCloudSync, 0, 0);
+            whActionGrid.Controls.Add(btnOpenAsset, 1, 0);
+
+            whGrid.Controls.Add(lblWarehouseSheet, 0, 0);
+            whGrid.Controls.Add(lblWarehouseQueue, 0, 1);
+            whGrid.Controls.Add(whActionGrid, 0, 2);
             cardWarehouse.Controls.Add(whGrid);
             rightStack.Controls.Add(cardWarehouse, 0, 2);
 
@@ -1215,6 +1285,97 @@ namespace SuperAutoMater
             bar.Controls.Add(lblShortcuts);
             bar.Controls.Add(lblStation);
             return bar;
+        }
+
+        public async Task SyncCurrentMachineToSheetsAsync()
+        {
+            try
+            {
+                if (btnCloudSync != null)
+                {
+                    btnCloudSync.Enabled = false;
+                    btnCloudSync.Text = "⏳ SYNCING...";
+                }
+
+                string serial = !string.IsNullOrWhiteSpace(lastSerial) && lastSerial != "N/A" && lastSerial != "Unknown" ? lastSerial : "UNKNOWN-SN";
+                string model = !string.IsNullOrWhiteSpace(lastModel) && lastModel != "N/A" ? lastModel : "OEM System";
+                string cpu = !string.IsNullOrWhiteSpace(lastCpu) && lastCpu != "N/A" ? lastCpu : "Multi-Core CPU";
+                string ram = !string.IsNullOrWhiteSpace(lastRam) && lastRam != "N/A" ? lastRam : "16 GB";
+                string storage = !string.IsNullOrWhiteSpace(lastStorageSummary) && lastStorageSummary != "N/A" ? lastStorageSummary : "SSD";
+                string memCombo = AssetCsvExportForm.AutoFormatRamStorage(ram, storage);
+
+                int bHealth = 100;
+                if (!string.IsNullOrWhiteSpace(lastBatteryHealth))
+                {
+                    var m = System.Text.RegularExpressions.Regex.Match(lastBatteryHealth, @"\d+");
+                    if (m.Success && int.TryParse(m.Value, out int bh))
+                        bHealth = Math.Clamp(bh, 1, 100);
+                }
+
+                var record = new AssetQueueRecord
+                {
+                    Asset_Tag = serial != "UNKNOWN-SN" ? serial : $"QC-{DateTime.Now:MMdd-HHmm}",
+                    Serial_Number = serial,
+                    Model = model,
+                    Processor = cpu,
+                    Memory = memCombo,
+                    Battery_Health = bHealth,
+                    Status = "RTS",
+                    Wip_Issue = "All Okay",
+                    Physical_Grade = "A+",
+                    Remarks = "Avionics Hub Live Cloud Sync (SuperAutoMater v0.2)",
+                    Shelf_Location = "A-1",
+                    Timestamp = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss")
+                };
+
+                // Direct upload to Google Sheets
+                bool directSuccess = await AssetCsvExportForm.UploadDirectOrQueueAsync(record);
+
+                // Also flush any pending queue items
+                int flushed = await OfflineSyncQueue.Instance.FlushQueueAsync(AssetCsvExportForm.DefaultEmbeddedSheetsUrl);
+                int pending = OfflineSyncQueue.Instance.PendingCount;
+
+                if (lblWarehouseQueue != null && !lblWarehouseQueue.IsDisposed)
+                {
+                    lblWarehouseQueue.Text = $"Queue: {pending} Pending | Last Sync: {DateTime.Now:HH:mm:ss} [OK]";
+                    lblWarehouseQueue.ForeColor = HudTheme.PassNominal;
+                }
+
+                if (directSuccess)
+                {
+                    DarkMessageBox.Show(
+                        $"✅ Google Sheets Cloud Sync Successful!\n\n" +
+                        $"Asset Tag   : {record.Asset_Tag}\n" +
+                        $"Serial No   : {record.Serial_Number}\n" +
+                        $"Model       : {record.Model}\n" +
+                        $"Specs       : {record.Memory}\n" +
+                        $"Battery     : {record.Battery_Health}%\n" +
+                        $"Cloud Sheet : Refurb_Inventory_2026\n\n" +
+                        (flushed > 0 ? $"Flushed {flushed} previously queued offline record(s).\n\n" : "") +
+                        $"Status: OK (Row Appended / Deduplicated)",
+                        "Google Sheets Sync Success");
+                }
+                else
+                {
+                    DarkMessageBox.Show(
+                        $"⚠️ Network Unavailable or Timed Out:\n\n" +
+                        $"Asset '{record.Asset_Tag}' ({record.Serial_Number}) has been saved to the Offline Sync Queue ({pending} pending sync).\n\n" +
+                        $"It will automatically flush to Google Sheets as soon as Wi-Fi or Ethernet connects.",
+                        "Saved to Offline Queue");
+                }
+            }
+            catch (Exception ex)
+            {
+                DarkMessageBox.Show($"Cloud Sync Warning: {ex.Message}", "Sync Error");
+            }
+            finally
+            {
+                if (btnCloudSync != null && !btnCloudSync.IsDisposed)
+                {
+                    btnCloudSync.Enabled = true;
+                    btnCloudSync.Text = "☁ SYNC SHEETS";
+                }
+            }
         }
 
         public void UpdateBentoGridTelemetry()

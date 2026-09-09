@@ -220,6 +220,17 @@ namespace SuperAutoMater
                 float titleW = Math.Max(20f, rect.Right - titleX - subWidth - 4);
                 RectangleF titleRect = new RectangleF(titleX, rect.Y + 2, titleW, headerHeight - 3);
 
+                string upperTitle = headerTitle.ToUpperInvariant();
+                Font activeTitleFont = titleFont;
+                bool customFont = false;
+                SizeF titleSize = g.MeasureString(upperTitle, titleFont);
+                if (titleSize.Width > titleW && titleFont.Size > 7.5f)
+                {
+                    float newSize = Math.Max(7.5f, titleFont.Size * (titleW / titleSize.Width));
+                    activeTitleFont = new Font(titleFont.FontFamily, newSize, titleFont.Style);
+                    customFont = true;
+                }
+
                 using (SolidBrush textBrush = new SolidBrush(HudTheme.TextBright))
                 using (StringFormat sf = new StringFormat
                 {
@@ -229,8 +240,10 @@ namespace SuperAutoMater
                     FormatFlags = StringFormatFlags.NoWrap
                 })
                 {
-                    g.DrawString(headerTitle.ToUpperInvariant(), titleFont, textBrush, titleRect, sf);
+                    g.DrawString(upperTitle, activeTitleFont, textBrush, titleRect, sf);
                 }
+
+                if (customFont) activeTitleFont.Dispose();
             }
 
             base.OnPaint(e);

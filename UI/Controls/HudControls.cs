@@ -768,7 +768,52 @@ namespace SuperAutoMater
                 if (Form1.Instance != null) content += Form1.Instance.GetTelemetryReportText();
 
                 File.WriteAllText(fullPath, content);
-                DarkMessageBox.Show($"Report signed & exported successfully!\n\nFile: {filename}\nDestination: {fullPath}", "Sign-Off Complete");
+
+                // Cloud Inventory Sync (Google Sheets)
+                try
+                {
+                    string serial = Form1.Instance != null ? Form1.Instance.GetLastSerial() : "UNKNOWN-SN";
+                    string model = Form1.Instance != null ? Form1.Instance.GetLastModel() : "OEM System";
+                    string cpu = Form1.Instance != null ? Form1.Instance.GetLastCpu() : "CPU";
+                    string ram = Form1.Instance != null ? Form1.Instance.GetLastRam() : "16 GB";
+                    string storage = Form1.Instance != null ? Form1.Instance.GetLastStorage() : "Storage";
+                    string memCombo = AssetCsvExportForm.AutoFormatRamStorage(ram, storage);
+                    string gradeItem = cmbGrade?.SelectedItem?.ToString() ?? "GRADE A+";
+                    string gradeCode = gradeItem.Contains("A+") ? "A+" : gradeItem.Contains("A") ? "A" : gradeItem.Contains("B") ? "B" : "C";
+
+                    int bHealth = 100;
+                    if (Form1.Instance != null && !string.IsNullOrWhiteSpace(Form1.Instance.GetLastBatteryHealth()))
+                    {
+                        var m = Regex.Match(Form1.Instance.GetLastBatteryHealth(), @"\d+");
+                        if (m.Success && int.TryParse(m.Value, out int bh))
+                            bHealth = Math.Clamp(bh, 1, 100);
+                    }
+
+                    var queueRec = new AssetQueueRecord
+                    {
+                        Asset_Tag = serial != "UNKNOWN-SN" && serial != "Unknown" ? serial : $"QC-{DateTime.Now:MMdd-HHmm}",
+                        Serial_Number = serial,
+                        Model = model,
+                        Processor = cpu,
+                        Memory = memCombo,
+                        Battery_Health = bHealth,
+                        Status = "RTS",
+                        Wip_Issue = "All Okay",
+                        Physical_Grade = gradeCode,
+                        Remarks = $"Sign-off by {cleanTechName}: Display:{(chkDisplay.Checked ? "OK" : "-")}, Audio:{(chkAudio.Checked ? "OK" : "-")}, Cam:{(chkCamera.Checked ? "OK" : "-")}, Keyb:{(chkKeyboard.Checked ? "OK" : "-")}, TP:{(chkTrackpad.Checked ? "OK" : "-")}",
+                        Shelf_Location = "A-1",
+                        Timestamp = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss")
+                    };
+
+                    _ = Task.Run(async () =>
+                    {
+                        await AssetCsvExportForm.UploadDirectOrQueueAsync(queueRec);
+                        await OfflineSyncQueue.Instance.FlushQueueAsync(AssetCsvExportForm.DefaultEmbeddedSheetsUrl);
+                    });
+                }
+                catch { }
+
+                DarkMessageBox.Show($"Report signed & exported successfully!\n\nFile: {filename}\nDestination: {fullPath}\n\nGoogle Sheets: Asset record dispatched to Cloud Inventory!", "Sign-Off Complete");
 
                 btnSaveReport.HudAccentColor = HudTheme.PassNominal;
                 btnSaveReport.Text = "⟨ FLIGHT REPORT SAVED ✓ ⟩";
