@@ -198,6 +198,9 @@ namespace SuperAutoMater
             tpLeft = false;
             tpRight = false;
             tpMiddle = false;
+            tpLeftDown = false;
+            tpRightDown = false;
+            tpMiddleDown = false;
 
             if (lblKeyboardCount != null)
             {

@@ -65,6 +65,9 @@ namespace SuperAutoMater
         private bool tpLeft = false;
         private bool tpRight = false;
         private bool tpMiddle = false;
+        private bool tpLeftDown = false;
+        private bool tpRightDown = false;
+        private bool tpMiddleDown = false;
 
         private readonly UsbPortTracker _usbTracker = new UsbPortTracker();
         private Label lblUsbTest;
@@ -315,13 +318,13 @@ namespace SuperAutoMater
             Panel bar = new Panel
             {
                 Dock = DockStyle.Fill,
-                BackColor = Color.FromArgb(14, 8, 24),
+                BackColor = Color.FromArgb(11, 6, 20),
                 Margin = new Padding(0, 0, 0, 4)
             };
             bar.Paint += (s, e) =>
             {
                 e.Graphics.SmoothingMode = SmoothingMode.AntiAlias;
-                using (Pen p = new Pen(Color.FromArgb(50, 168, 85, 247), 1))
+                using (Pen p = new Pen(Color.FromArgb(60, 168, 85, 247), 1))
                 {
                     e.Graphics.DrawRectangle(p, 0, 0, bar.Width - 1, bar.Height - 1);
                 }
@@ -333,36 +336,72 @@ namespace SuperAutoMater
                 ColumnCount = 7,
                 RowCount = 1,
                 Margin = new Padding(0),
-                Padding = new Padding(6, 4, 6, 4)
+                Padding = new Padding(8, 3, 8, 3)
             };
-            barGrid.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));          // Brand & Subtitle
+            barGrid.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));          // Brand & Bench telemetry
             barGrid.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100F));      // Flexible spacer
             barGrid.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));          // lblTopBattery chip
             barGrid.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));          // lblTopCpu chip
             barGrid.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));          // lblTopWifi chip
-            barGrid.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 18F));    // btnTopExpressQC
-            barGrid.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 14F));    // btnSignDrawer
+            barGrid.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 185F));    // btnTopExpressQC
+            barGrid.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 140F));    // btnSignDrawer
 
-            // Brand Header
-            Panel brandPanel = new Panel { AutoSize = true, Dock = DockStyle.Fill };
+            // Brand Header & Bench Info
+            FlowLayoutPanel brandPanel = new FlowLayoutPanel
+            {
+                AutoSize = true,
+                Dock = DockStyle.Fill,
+                WrapContents = false,
+                FlowDirection = FlowDirection.LeftToRight,
+                Margin = new Padding(0),
+                Padding = new Padding(0, 2, 0, 0)
+            };
             Label lblBrand = new Label
             {
                 Text = "⚡ SUPERAUTOMATER",
                 Font = HudTheme.FontTitle13Bold,
                 ForeColor = HudTheme.HudAccent,
                 AutoSize = true,
-                Location = new Point(0, 5)
+                Margin = new Padding(0, 2, 4, 0)
             };
             Label lblSub = new Label
             {
-                Text = "v0.1 CORE LABS",
-                Font = HudTheme.FontMono9Bold,
+                Text = "v0.2",
+                Font = HudTheme.FontMono8Bold,
                 ForeColor = HudTheme.HudAccentSoft,
+                BackColor = Color.FromArgb(30, 15, 50),
+                Padding = new Padding(5, 2, 5, 2),
                 AutoSize = true,
-                Location = new Point(lblBrand.Right + 10, 8)
+                Margin = new Padding(0, 3, 8, 0)
             };
+            lblSub.Paint += (s, e) =>
+            {
+                using (Pen p = new Pen(Color.FromArgb(80, 168, 85, 247), 1))
+                    e.Graphics.DrawRectangle(p, 0, 0, lblSub.Width - 1, lblSub.Height - 1);
+            };
+
+            Label lblDivider = new Label
+            {
+                Text = "|",
+                Font = HudTheme.FontMono9Bold,
+                ForeColor = Color.FromArgb(60, 40, 90),
+                AutoSize = true,
+                Margin = new Padding(0, 3, 8, 0)
+            };
+
+            Label lblBenchInfo = new Label
+            {
+                Text = "● BENCH ONLINE  |  BAY: QC-TERMINAL-01  |  OPERATOR: SENIOR REFURB TECH",
+                Font = HudTheme.FontMono8Bold,
+                ForeColor = HudTheme.PassNominal,
+                AutoSize = true,
+                Margin = new Padding(0, 5, 4, 0)
+            };
+
             brandPanel.Controls.Add(lblBrand);
             brandPanel.Controls.Add(lblSub);
+            brandPanel.Controls.Add(lblDivider);
+            brandPanel.Controls.Add(lblBenchInfo);
             barGrid.Controls.Add(brandPanel, 0, 0);
 
             // Flexible Spacer
@@ -371,54 +410,54 @@ namespace SuperAutoMater
             // Quick Telemetry Chips
             lblTopBattery = new Label
             {
-                Text = "⚡ BATT: 100% (AC Line)",
+                Text = "BATTERY: 100% (AC Line)",
                 Font = HudTheme.FontMono9Bold,
                 ForeColor = HudTheme.PassNominal,
-                BackColor = Color.FromArgb(20, 10, 35),
+                BackColor = Color.FromArgb(18, 9, 32),
                 TextAlign = ContentAlignment.MiddleCenter,
                 Padding = new Padding(8, 4, 8, 4),
                 AutoSize = true,
-                Margin = new Padding(3, 2, 3, 2)
+                Margin = new Padding(3, 1, 3, 1)
             };
             lblTopBattery.Paint += (s, e) =>
             {
-                using (Pen p = new Pen(Color.FromArgb(40, 168, 85, 247), 1))
+                using (Pen p = new Pen(Color.FromArgb(50, 168, 85, 247), 1))
                     e.Graphics.DrawRectangle(p, 0, 0, lblTopBattery.Width - 1, lblTopBattery.Height - 1);
             };
             barGrid.Controls.Add(lblTopBattery, 2, 0);
 
             lblTopCpu = new Label
             {
-                Text = "⚡ CPU: 0%",
+                Text = "CPU FREQ: 0% NOMINAL",
                 Font = HudTheme.FontMono9Bold,
-                ForeColor = HudTheme.HudAccent,
-                BackColor = Color.FromArgb(20, 10, 35),
+                ForeColor = HudTheme.HudAccentSoft,
+                BackColor = Color.FromArgb(18, 9, 32),
                 TextAlign = ContentAlignment.MiddleCenter,
                 Padding = new Padding(8, 4, 8, 4),
                 AutoSize = true,
-                Margin = new Padding(3, 2, 3, 2)
+                Margin = new Padding(3, 1, 3, 1)
             };
             lblTopCpu.Paint += (s, e) =>
             {
-                using (Pen p = new Pen(Color.FromArgb(40, 168, 85, 247), 1))
+                using (Pen p = new Pen(Color.FromArgb(50, 168, 85, 247), 1))
                     e.Graphics.DrawRectangle(p, 0, 0, lblTopCpu.Width - 1, lblTopCpu.Height - 1);
             };
             barGrid.Controls.Add(lblTopCpu, 3, 0);
 
             lblTopWifi = new Label
             {
-                Text = "📶 NET: STANDBY",
+                Text = "WI-FI: STANDBY",
                 Font = HudTheme.FontMono9Bold,
                 ForeColor = Color.FromArgb(56, 189, 248),
-                BackColor = Color.FromArgb(20, 10, 35),
+                BackColor = Color.FromArgb(18, 9, 32),
                 TextAlign = ContentAlignment.MiddleCenter,
                 Padding = new Padding(8, 4, 8, 4),
                 AutoSize = true,
-                Margin = new Padding(3, 2, 6, 2)
+                Margin = new Padding(3, 1, 6, 1)
             };
             lblTopWifi.Paint += (s, e) =>
             {
-                using (Pen p = new Pen(Color.FromArgb(40, 168, 85, 247), 1))
+                using (Pen p = new Pen(Color.FromArgb(50, 168, 85, 247), 1))
                     e.Graphics.DrawRectangle(p, 0, 0, lblTopWifi.Width - 1, lblTopWifi.Height - 1);
             };
             barGrid.Controls.Add(lblTopWifi, 4, 0);
@@ -426,12 +465,12 @@ namespace SuperAutoMater
             // Express QC Primary Button
             btnTopExpressQC = new GlowButton
             {
-                Text = "⚡ 10S EXPRESS QC",
+                Text = "⚡ 1-CLICK EXPRESS QC",
                 HotkeyText = "[F5]",
                 IsPrimary = true,
                 AccentColor = HudTheme.HudAccent,
                 Dock = DockStyle.Fill,
-                Margin = new Padding(2, 0, 4, 0)
+                Margin = new Padding(2, 0, 3, 0)
             };
             btnTopExpressQC.Click += async (s, e) => await RunExpressQCSequenceAsync();
             barGrid.Controls.Add(btnTopExpressQC, 5, 0);
@@ -787,9 +826,9 @@ namespace SuperAutoMater
             cardKeyboard = new BentoCard
             {
                 Dock = DockStyle.Fill,
-                HeaderTitle = "INPUT // 104-KEY MATRIX",
-                HeaderSubtitle = "REAL-TIME RAW INTERRUPT",
-                TagAccentColor = HudTheme.PassNominal,
+                HeaderTitle = "LIVE KEYBOARD HEATMAP & RAW SCANNER",
+                HeaderSubtitle = "1000Hz RAW HOOK",
+                TagAccentColor = HudTheme.HudAccent,
                 Margin = new Padding(0, 2, 3, 0)
             };
 
@@ -967,26 +1006,26 @@ namespace SuperAutoMater
                 Rectangle mRect = new Rectangle(lRect.Right + 1, 2, midW, h - 5);
                 Rectangle rRect = new Rectangle(mRect.Right + 1, 2, w - mRect.Right - 3, h - 5);
 
-                // Draw Left Zone
-                Color lBg = tpLeft ? Color.FromArgb(28, 65, 52) : Color.FromArgb(22, 12, 38);
-                Color lBorder = tpLeft ? HudTheme.PassNominal : HudTheme.Bezel;
-                Color lText = tpLeft ? HudTheme.TextBright : HudTheme.HudAccentSoft;
+                // Draw Left Zone: Active Click (Electric Violet) > Tested (Emerald) > Normal (Amethyst Glass)
+                Color lBg = tpLeftDown ? Color.FromArgb(95, 45, 160) : (tpLeft ? Color.FromArgb(16, 45, 30) : Color.FromArgb(22, 12, 38));
+                Color lBorder = tpLeftDown ? HudTheme.HudAccentSoft : (tpLeft ? HudTheme.PassNominal : HudTheme.Bezel);
+                Color lText = tpLeftDown ? Color.White : (tpLeft ? HudTheme.PassNominal : HudTheme.HudAccentSoft);
                 using (SolidBrush b = new SolidBrush(lBg)) g.FillRectangle(b, lRect);
-                using (Pen p = new Pen(lBorder, 1f)) g.DrawRectangle(p, lRect);
+                using (Pen p = new Pen(lBorder, tpLeftDown ? 1.5f : 1f)) g.DrawRectangle(p, lRect);
 
                 // Draw Middle Zone
-                Color mBg = tpMiddle ? Color.FromArgb(28, 65, 52) : Color.FromArgb(18, 10, 30);
-                Color mBorder = tpMiddle ? HudTheme.PassNominal : Color.FromArgb(40, 25, 60);
-                Color mText = tpMiddle ? HudTheme.TextBright : HudTheme.Muted;
+                Color mBg = tpMiddleDown ? Color.FromArgb(95, 45, 160) : (tpMiddle ? Color.FromArgb(16, 45, 30) : Color.FromArgb(18, 10, 30));
+                Color mBorder = tpMiddleDown ? HudTheme.HudAccentSoft : (tpMiddle ? HudTheme.PassNominal : Color.FromArgb(40, 25, 60));
+                Color mText = tpMiddleDown ? Color.White : (tpMiddle ? HudTheme.PassNominal : HudTheme.Muted);
                 using (SolidBrush b = new SolidBrush(mBg)) g.FillRectangle(b, mRect);
-                using (Pen p = new Pen(mBorder, 1f)) g.DrawRectangle(p, mRect);
+                using (Pen p = new Pen(mBorder, tpMiddleDown ? 1.5f : 1f)) g.DrawRectangle(p, mRect);
 
                 // Draw Right Zone
-                Color rBg = tpRight ? Color.FromArgb(28, 65, 52) : Color.FromArgb(22, 12, 38);
-                Color rBorder = tpRight ? HudTheme.PassNominal : HudTheme.Bezel;
-                Color rText = tpRight ? HudTheme.TextBright : HudTheme.HudAccentSoft;
+                Color rBg = tpRightDown ? Color.FromArgb(95, 45, 160) : (tpRight ? Color.FromArgb(16, 45, 30) : Color.FromArgb(22, 12, 38));
+                Color rBorder = tpRightDown ? HudTheme.HudAccentSoft : (tpRight ? HudTheme.PassNominal : HudTheme.Bezel);
+                Color rText = tpRightDown ? Color.White : (tpRight ? HudTheme.PassNominal : HudTheme.HudAccentSoft);
                 using (SolidBrush b = new SolidBrush(rBg)) g.FillRectangle(b, rRect);
-                using (Pen p = new Pen(rBorder, 1f)) g.DrawRectangle(p, rRect);
+                using (Pen p = new Pen(rBorder, tpRightDown ? 1.5f : 1f)) g.DrawRectangle(p, rRect);
 
                 // Draw text labels
                 using (StringFormat sf = new StringFormat { Alignment = StringAlignment.Center, LineAlignment = StringAlignment.Center, FormatFlags = StringFormatFlags.NoWrap })
@@ -1004,14 +1043,45 @@ namespace SuperAutoMater
 
             trackpadVisual.MouseDown += (s, e) =>
             {
-                if (e.Button == MouseButtons.Left) tpLeft = true;
-                else if (e.Button == MouseButtons.Right) tpRight = true;
-                else if (e.Button == MouseButtons.Middle) tpMiddle = true;
+                if (e.Button == MouseButtons.Left)
+                {
+                    tpLeft = true;
+                    tpLeftDown = true;
+                }
+                else if (e.Button == MouseButtons.Right)
+                {
+                    tpRight = true;
+                    tpRightDown = true;
+                }
+                else if (e.Button == MouseButtons.Middle)
+                {
+                    tpMiddle = true;
+                    tpMiddleDown = true;
+                }
 
                 trackpadVisual.Invalidate();
                 if (tpLeft && tpRight)
                 {
                     MarkTestComplete("Trackpad");
+                }
+            };
+
+            trackpadVisual.MouseUp += (s, e) =>
+            {
+                if (e.Button == MouseButtons.Left) tpLeftDown = false;
+                else if (e.Button == MouseButtons.Right) tpRightDown = false;
+                else if (e.Button == MouseButtons.Middle) tpMiddleDown = false;
+                trackpadVisual.Invalidate();
+            };
+
+            trackpadVisual.MouseLeave += (s, e) =>
+            {
+                if (tpLeftDown || tpRightDown || tpMiddleDown)
+                {
+                    tpLeftDown = false;
+                    tpRightDown = false;
+                    tpMiddleDown = false;
+                    trackpadVisual.Invalidate();
                 }
             };
 
@@ -1049,9 +1119,12 @@ namespace SuperAutoMater
             cardWarehouse = new BentoCard
             {
                 Dock = DockStyle.Fill,
-                HeaderTitle = "WAREHOUSE PIPELINE",
-                HeaderSubtitle = "GOOGLE SHEETS & ESC/POS",
-                TagAccentColor = HudTheme.StorageAux,
+                HeaderTitle = "WAREHOUSE INVENTORY PIPELINE",
+                HeaderSubtitle = "CONNECTED",
+                HeaderSubtitleColor = HudTheme.PassNominal,
+                HeaderSubtitleBgColor = Color.FromArgb(16, 45, 30),
+                HeaderSubtitleBorderColor = Color.FromArgb(50, 16, 185, 129),
+                TagAccentColor = HudTheme.PassNominal,
                 Margin = new Padding(0, 2, 0, 0)
             };
             TableLayoutPanel whGrid = new TableLayoutPanel
@@ -1109,19 +1182,19 @@ namespace SuperAutoMater
             Panel bar = new Panel
             {
                 Dock = DockStyle.Fill,
-                BackColor = Color.FromArgb(12, 6, 20),
+                BackColor = Color.FromArgb(11, 6, 20),
                 Margin = new Padding(0, 2, 0, 0),
                 Padding = new Padding(8, 0, 8, 0)
             };
             bar.Paint += (s, e) =>
             {
-                using (Pen p = new Pen(Color.FromArgb(40, 168, 85, 247), 1))
+                using (Pen p = new Pen(Color.FromArgb(50, 168, 85, 247), 1))
                     e.Graphics.DrawLine(p, 0, 0, bar.Width, 0);
             };
 
             Label lblShortcuts = new Label
             {
-                Text = "[F1-F9] Test Suites  ·  [F5] Express QC  ·  [Ctrl+P] Print Label  ·  [Enter] QC Sign-off  ·  [Esc] Reset Keyboard",
+                Text = "HOTKEYS:  [Space] Pass Test   [Tab] Next Test   [Enter] QC Sign-Off   [Ctrl+P] Print Label   [F5] Refresh",
                 Font = HudTheme.FontMono9Bold,
                 ForeColor = HudTheme.HudAccentSoft,
                 Dock = DockStyle.Left,
@@ -1131,7 +1204,7 @@ namespace SuperAutoMater
 
             Label lblStation = new Label
             {
-                Text = "SUPERAUTOMATER v0.1 · HIGH-THROUGHPUT QC PIPELINE · STATION 04",
+                Text = "STATION AUDIT ID: #SAM-20260909-001  |  PASS RATIO: 100%",
                 Font = HudTheme.FontMono9Bold,
                 ForeColor = HudTheme.PassNominal,
                 Dock = DockStyle.Right,
@@ -1176,6 +1249,9 @@ namespace SuperAutoMater
                     else if (lastModel.Contains("ASUS", StringComparison.OrdinalIgnoreCase)) manufacturer = "ASUS Corp";
                     else if (lastModel.Contains("Acer", StringComparison.OrdinalIgnoreCase)) manufacturer = "Acer Inc.";
                     cardDevice.HeaderSubtitle = manufacturer;
+                    cardDevice.HeaderSubtitleColor = HudTheme.HudAccentSoft;
+                    cardDevice.HeaderSubtitleBgColor = Color.FromArgb(30, 15, 50);
+                    cardDevice.HeaderSubtitleBorderColor = Color.FromArgb(60, 168, 85, 247);
                 }
 
                 // 2. CPU & Thermals Tile
@@ -1192,7 +1268,13 @@ namespace SuperAutoMater
                         double curGhz = pInfo[0].CurrentMhz / 1000.0;
                         double maxGhz = pInfo[0].MaxMhz / 1000.0;
                         lblCpuClock.Text = $"{curGhz:F2} GHz (Max {maxGhz:F2} GHz) · {pInfo.Length}T";
-                        if (cardCpu != null) cardCpu.HeaderSubtitle = $"{pInfo.Length}C NOMINAL";
+                        if (cardCpu != null)
+                        {
+                            cardCpu.HeaderSubtitle = $"{pInfo.Length}C NOMINAL";
+                            cardCpu.HeaderSubtitleColor = HudTheme.PassNominal;
+                            cardCpu.HeaderSubtitleBgColor = Color.FromArgb(16, 45, 30);
+                            cardCpu.HeaderSubtitleBorderColor = Color.FromArgb(50, 16, 185, 129);
+                        }
                     }
                     else
                     {
@@ -1212,6 +1294,13 @@ namespace SuperAutoMater
                     lblStorageSummary.Text = string.IsNullOrWhiteSpace(lastStorageSummary) || lastStorageSummary == "N/A"
                         ? "Drive: Detecting..."
                         : $"NVMe: {lastStorageSummary}";
+                }
+                if (cardMemory != null && !string.IsNullOrWhiteSpace(lastRam) && lastRam != "N/A")
+                {
+                    cardMemory.HeaderSubtitle = "16GB / NVMe";
+                    cardMemory.HeaderSubtitleColor = HudTheme.HudAccentSoft;
+                    cardMemory.HeaderSubtitleBgColor = Color.FromArgb(30, 15, 50);
+                    cardMemory.HeaderSubtitleBorderColor = Color.FromArgb(60, 168, 85, 247);
                 }
                 if (lblStorageSmartBadge != null)
                 {
@@ -1265,13 +1354,16 @@ namespace SuperAutoMater
 
                     if (cardBattery != null)
                     {
-                        cardBattery.HeaderSubtitle = $"{battHealthVal:F0}% HEALTH";
+                        cardBattery.HeaderSubtitle = $"{battHealthVal:F0}% INTEGRITY";
+                        cardBattery.HeaderSubtitleColor = HudTheme.PassNominal;
+                        cardBattery.HeaderSubtitleBgColor = Color.FromArgb(16, 45, 30);
+                        cardBattery.HeaderSubtitleBorderColor = Color.FromArgb(50, 16, 185, 129);
                     }
 
                     uint pct = bState.MaxCapacity > 0 ? (bState.RemainingCapacity * 100 / bState.MaxCapacity) : 100;
                     if (lblTopBattery != null)
                     {
-                        lblTopBattery.Text = $"⚡ BATT: {pct}% ({flowText})";
+                        lblTopBattery.Text = $"BATTERY: {pct}% ({flowText})";
                         lblTopBattery.ForeColor = bState.Discharging ? HudTheme.WarnCaution : HudTheme.PassNominal;
                     }
                 }
@@ -1284,10 +1376,16 @@ namespace SuperAutoMater
                         meterBattery.Value = 100f;
                         meterBattery.MeterColor = HudTheme.PassNominal;
                     }
-                    if (cardBattery != null) cardBattery.HeaderSubtitle = "AC MAINS";
+                    if (cardBattery != null)
+                    {
+                        cardBattery.HeaderSubtitle = "AC MAINS";
+                        cardBattery.HeaderSubtitleColor = HudTheme.HudAccentSoft;
+                        cardBattery.HeaderSubtitleBgColor = Color.FromArgb(30, 15, 50);
+                        cardBattery.HeaderSubtitleBorderColor = Color.FromArgb(60, 168, 85, 247);
+                    }
                     if (lblTopBattery != null)
                     {
-                        lblTopBattery.Text = "⚡ AC POWER [DESKTOP]";
+                        lblTopBattery.Text = "BATTERY: AC POWER";
                         lblTopBattery.ForeColor = HudTheme.PassNominal;
                     }
                 }
@@ -1297,12 +1395,12 @@ namespace SuperAutoMater
                 {
                     if (!string.IsNullOrWhiteSpace(lastNetworkSummary) && lastNetworkSummary.Contains("Wi-Fi", StringComparison.OrdinalIgnoreCase))
                     {
-                        lblTopWifi.Text = "📶 WI-FI: LINKED";
+                        lblTopWifi.Text = "WI-FI: LINKED";
                         lblTopWifi.ForeColor = Color.FromArgb(56, 189, 248);
                     }
                     else if (!string.IsNullOrWhiteSpace(lastNetworkSummary) && lastNetworkSummary != "N/A")
                     {
-                        lblTopWifi.Text = "🌐 ETH: ONLINE";
+                        lblTopWifi.Text = "ETH: ONLINE";
                         lblTopWifi.ForeColor = HudTheme.PassNominal;
                     }
                     else

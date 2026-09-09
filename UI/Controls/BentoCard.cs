@@ -15,6 +15,8 @@ namespace SuperAutoMater
         private string headerTitle = "";
         private string headerSubtitle = "";
         private Color headerSubtitleColor = HudTheme.HudAccentSoft;
+        private Color headerSubtitleBgColor = Color.Empty;
+        private Color headerSubtitleBorderColor = Color.Empty;
         private Color tagAccentColor = HudTheme.HudAccent;
         private int cornerRadius = 12;
         private bool showHeader = true;
@@ -41,6 +43,20 @@ namespace SuperAutoMater
         {
             get => headerSubtitleColor;
             set { headerSubtitleColor = value; Invalidate(); }
+        }
+
+        [DesignerSerializationVisibility(DesignerSerializationVisibility.Hidden)]
+        public Color HeaderSubtitleBgColor
+        {
+            get => headerSubtitleBgColor;
+            set { headerSubtitleBgColor = value; Invalidate(); }
+        }
+
+        [DesignerSerializationVisibility(DesignerSerializationVisibility.Hidden)]
+        public Color HeaderSubtitleBorderColor
+        {
+            get => headerSubtitleBorderColor;
+            set { headerSubtitleBorderColor = value; Invalidate(); }
         }
 
         [DesignerSerializationVisibility(DesignerSerializationVisibility.Hidden)]
@@ -164,13 +180,37 @@ namespace SuperAutoMater
                 if (!string.IsNullOrEmpty(headerSubtitle))
                 {
                     SizeF subSize = g.MeasureString(headerSubtitle, subFont);
-                    subWidth = subSize.Width + 10f;
-                    float subX = Math.Max(rect.Left + 30, rect.Right - subSize.Width - 8);
-                    float subY = rect.Y + (headerHeight / 2f) - (subSize.Height / 2f);
+                    float padH = headerSubtitleBgColor != Color.Empty ? 6f : 0f;
+                    float padV = headerSubtitleBgColor != Color.Empty ? 2f : 0f;
+                    subWidth = subSize.Width + (padH * 2) + 6f;
+                    float badgeW = subSize.Width + (padH * 2);
+                    float badgeH = subSize.Height + (padV * 2);
+                    float subX = Math.Max(rect.Left + 30, rect.Right - badgeW - 6);
+                    float subY = rect.Y + (headerHeight / 2f) - (badgeH / 2f);
 
-                    using (SolidBrush subBrush = new SolidBrush(headerSubtitleColor))
+                    if (headerSubtitleBgColor != Color.Empty)
                     {
-                        g.DrawString(headerSubtitle, subFont, subBrush, subX, subY);
+                        RectangleF badgeRect = new RectangleF(subX, subY, badgeW, badgeH);
+                        using (GraphicsPath bPath = HudTheme.GetRoundedPath(Rectangle.Round(badgeRect), 4))
+                        {
+                            using (SolidBrush bb = new SolidBrush(headerSubtitleBgColor))
+                                g.FillPath(bb, bPath);
+
+                            Color borderCol = headerSubtitleBorderColor != Color.Empty ? headerSubtitleBorderColor : Color.FromArgb(40, headerSubtitleColor);
+                            using (Pen bp = new Pen(borderCol, 1f))
+                                g.DrawPath(bp, bPath);
+                        }
+                        using (SolidBrush subBrush = new SolidBrush(headerSubtitleColor))
+                        {
+                            g.DrawString(headerSubtitle, subFont, subBrush, subX + padH, subY + padV);
+                        }
+                    }
+                    else
+                    {
+                        using (SolidBrush subBrush = new SolidBrush(headerSubtitleColor))
+                        {
+                            g.DrawString(headerSubtitle, subFont, subBrush, subX, subY);
+                        }
                     }
                 }
 
