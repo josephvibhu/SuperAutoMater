@@ -18,7 +18,7 @@ namespace SuperAutoMater
         private Color tagAccentColor = HudTheme.HudAccent;
         private int cornerRadius = 12;
         private bool showHeader = true;
-        private int headerHeight = 30;
+        private int headerHeight = 26;
         private bool activeGlow = false;
         private Color activeGlowColor = HudTheme.HudAccent;
 

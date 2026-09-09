@@ -137,8 +137,10 @@ namespace SuperAutoMater
         public Form1()
         {
             Instance = this;
+            this.AutoScaleMode = AutoScaleMode.Dpi;
+            this.AutoScaleDimensions = new System.Drawing.SizeF(96F, 96F);
             this.Size = new Size(1440, 920);
-            this.MinimumSize = new Size(1024, 700);
+            this.MinimumSize = new Size(1200, 720);
             this.StartPosition = FormStartPosition.CenterScreen;
             this.Text = AppVersion.WindowTitle;
             this.BackColor = HudTheme.BgGlass;
@@ -181,6 +183,11 @@ namespace SuperAutoMater
             this.Resize += Form1_Resize;
             this.DpiChanged += (s, e) => HandleDpiOrSizeChange();
         }
+
+        /// <summary>
+        /// Scales a pixel value by the current device DPI relative to 96 DPI baseline.
+        /// </summary>
+        private int DpiScaled(int px) => (int)Math.Round(px * (this.DeviceDpi / 96f));
 
         private void Form1_Resize(object sender, EventArgs e)
         {
@@ -240,7 +247,7 @@ namespace SuperAutoMater
 
         private void BuildResponsiveLayout()
         {
-            // Root 3-Column Split: Column 0 (224px Left Suite Rail) | Column 1 (100% Bento Arena) | Column 2 (0-350px Sliding Drawer)
+            // Root 3-Column Split: Column 0 (210px Left Suite Rail) | Column 1 (100% Bento Arena) | Column 2 (0-350px Sliding Drawer)
             rootSplit = new TableLayoutPanel
             {
                 Dock = DockStyle.Fill,
@@ -250,7 +257,7 @@ namespace SuperAutoMater
                 Padding = new Padding(0),
                 BackColor = HudTheme.BgBase
             };
-            rootSplit.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 224F));
+            rootSplit.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 210F));  // Left Rail (reduced from 224 for better fit)
             rootSplit.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100F));
             rootSplit.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 0F));
             rootSplit.RowStyles.Add(new RowStyle(SizeType.Percent, 100F));
@@ -290,7 +297,7 @@ namespace SuperAutoMater
             };
             centerGrid.RowStyles.Add(new RowStyle(SizeType.Absolute, 40F));  // Top Avionics Bar
             centerGrid.RowStyles.Add(new RowStyle(SizeType.Percent, 100F)); // Bento Dashboard Arena
-            centerGrid.RowStyles.Add(new RowStyle(SizeType.Absolute, 28F));  // Bottom Command Hotkey Bar
+            centerGrid.RowStyles.Add(new RowStyle(SizeType.Absolute, 24F));  // Bottom Command Hotkey Bar (reduced from 28 to 24)
 
             centerGrid.Controls.Add(BuildTopAvionicsBar(), 0, 0);
             centerGrid.Controls.Add(BuildBentoDashboardArena(), 0, 1);
@@ -333,8 +340,8 @@ namespace SuperAutoMater
             barGrid.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));          // lblTopBattery chip
             barGrid.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));          // lblTopCpu chip
             barGrid.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));          // lblTopWifi chip
-            barGrid.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 170F));     // btnTopExpressQC
-            barGrid.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 140F));     // btnSignDrawer
+            barGrid.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 18F));    // btnTopExpressQC
+            barGrid.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 14F));    // btnSignDrawer
 
             // Brand Header
             Panel brandPanel = new Panel { AutoSize = true, Dock = DockStyle.Fill };
@@ -463,7 +470,7 @@ namespace SuperAutoMater
                 ColumnCount = 1,
                 RowCount = 11,
                 Margin = new Padding(0),
-                Padding = new Padding(4, 2, 4, 4)
+                Padding = new Padding(4, 1, 4, 2)  // Tightened to gain vertical room
             };
             for (int i = 0; i < 8; i++) railGrid.RowStyles.Add(new RowStyle(SizeType.Percent, 9.5F));
             railGrid.RowStyles.Add(new RowStyle(SizeType.Percent, 8F));  // Admin / Status / Spacer
@@ -471,42 +478,42 @@ namespace SuperAutoMater
             railGrid.RowStyles.Add(new RowStyle(SizeType.Percent, 11F)); // Pass QC & Sign-Off
 
             // 1. Display Test
-            btnSuiteDisplay = new GlowButton { Text = "SCREEN COLORS", HotkeyText = "[F1]", Dock = DockStyle.Fill, Margin = new Padding(0, 1, 0, 2) };
+            btnSuiteDisplay = new GlowButton { Text = "SCREEN COLORS", HotkeyText = "[F1]", Font = HudTheme.FontMono9Bold, Dock = DockStyle.Fill, Margin = new Padding(0, 1, 0, 1) };
             btnSuiteDisplay.Click += (s, e) => LaunchDisplayTest();
             railGrid.Controls.Add(btnSuiteDisplay, 0, 0);
 
             // 2. Audio Test
-            btnSuiteAudio = new GlowButton { Text = "AUDIO STEREO", HotkeyText = "[F2]", Dock = DockStyle.Fill, Margin = new Padding(0, 1, 0, 2) };
+            btnSuiteAudio = new GlowButton { Text = "AUDIO STEREO", HotkeyText = "[F2]", Font = HudTheme.FontMono9Bold, Dock = DockStyle.Fill, Margin = new Padding(0, 1, 0, 1) };
             btnSuiteAudio.Click += (s, e) => LaunchAudioTest();
             railGrid.Controls.Add(btnSuiteAudio, 0, 1);
 
             // 3. Webcam & Sensors
-            btnSuiteWebcam = new GlowButton { Text = "CAMERA & MIC", HotkeyText = "[F3]", Dock = DockStyle.Fill, Margin = new Padding(0, 1, 0, 2) };
+            btnSuiteWebcam = new GlowButton { Text = "CAMERA & MIC", HotkeyText = "[F3]", Font = HudTheme.FontMono9Bold, Dock = DockStyle.Fill, Margin = new Padding(0, 1, 0, 1) };
             btnSuiteWebcam.Click += (s, e) => ToggleWebcam(btnCameraToggle, EventArgs.Empty);
             railGrid.Controls.Add(btnSuiteWebcam, 0, 2);
 
             // 4. Keyboard Matrix
-            btnSuiteKeyboard = new GlowButton { Text = "KEYBOARD MATRIX", HotkeyText = "[F4]", Dock = DockStyle.Fill, Margin = new Padding(0, 1, 0, 2) };
+            btnSuiteKeyboard = new GlowButton { Text = "KEYBOARD MATRIX", HotkeyText = "[F4]", Font = HudTheme.FontMono9Bold, Dock = DockStyle.Fill, Margin = new Padding(0, 1, 0, 1) };
             btnSuiteKeyboard.Click += (s, e) => FocusKeyboardMatrix();
             railGrid.Controls.Add(btnSuiteKeyboard, 0, 3);
 
             // 5. CPU & RAM Burn
-            btnSuiteCpu = new GlowButton { Text = "CPU / RAM BURN", HotkeyText = "[F6]", Dock = DockStyle.Fill, Margin = new Padding(0, 1, 0, 2) };
+            btnSuiteCpu = new GlowButton { Text = "CPU / RAM BURN", HotkeyText = "[F6]", Font = HudTheme.FontMono9Bold, Dock = DockStyle.Fill, Margin = new Padding(0, 1, 0, 1) };
             btnSuiteCpu.Click += (s, e) => LaunchCpuBurn();
             railGrid.Controls.Add(btnSuiteCpu, 0, 4);
 
             // 6. GPU 3D Benchmark
-            btnSuiteGpu = new GlowButton { Text = "GPU 3D RENDER", HotkeyText = "[F7]", Dock = DockStyle.Fill, Margin = new Padding(0, 1, 0, 2) };
+            btnSuiteGpu = new GlowButton { Text = "GPU 3D RENDER", HotkeyText = "[F7]", Font = HudTheme.FontMono9Bold, Dock = DockStyle.Fill, Margin = new Padding(0, 1, 0, 1) };
             btnSuiteGpu.Click += (s, e) => LaunchGpuBenchmark();
             railGrid.Controls.Add(btnSuiteGpu, 0, 5);
 
             // 7. Wi-Fi & Bluetooth Radar
-            btnSuiteWifi = new GlowButton { Text = "WI-FI RADAR", HotkeyText = "[F8]", Dock = DockStyle.Fill, Margin = new Padding(0, 1, 0, 2) };
+            btnSuiteWifi = new GlowButton { Text = "WI-FI RADAR", HotkeyText = "[F8]", Font = HudTheme.FontMono9Bold, Dock = DockStyle.Fill, Margin = new Padding(0, 1, 0, 1) };
             btnSuiteWifi.Click += (s, e) => LaunchWifiRadar();
             railGrid.Controls.Add(btnSuiteWifi, 0, 6);
 
             // 8. Storage Speed Benchmark
-            btnSuiteStorage = new GlowButton { Text = "STORAGE BENCH", HotkeyText = "[F9]", Dock = DockStyle.Fill, Margin = new Padding(0, 1, 0, 2) };
+            btnSuiteStorage = new GlowButton { Text = "STORAGE BENCH", HotkeyText = "[F9]", Font = HudTheme.FontMono9Bold, Dock = DockStyle.Fill, Margin = new Padding(0, 1, 0, 1) };
             btnSuiteStorage.Click += (s, e) => LaunchStorageBenchmark();
             railGrid.Controls.Add(btnSuiteStorage, 0, 7);
 
@@ -563,7 +570,7 @@ namespace SuperAutoMater
                 Margin = new Padding(0),
                 Padding = new Padding(0)
             };
-            arena.RowStyles.Add(new RowStyle(SizeType.Absolute, 114F)); // 4 Top Bento Metric Tiles
+            arena.RowStyles.Add(new RowStyle(SizeType.Absolute, 130F)); // 4 Top Bento Metric Tiles (increased from 114 for content fit)
             arena.RowStyles.Add(new RowStyle(SizeType.Percent, 100F));  // Main Interactive Area (Keyboard + Sensors/USB Stack)
 
             // --- 1. TOP BENTO TILES (4 CARDS) ---
@@ -592,7 +599,7 @@ namespace SuperAutoMater
             lblDeviceModel = new Label
             {
                 Dock = DockStyle.Top,
-                Height = 22,
+                Height = 18,
                 Font = HudTheme.FontMono11Bold,
                 ForeColor = HudTheme.TextBright,
                 Text = "Detecting Chassis...",
@@ -637,7 +644,7 @@ namespace SuperAutoMater
             lblCpuName = new Label
             {
                 Dock = DockStyle.Top,
-                Height = 20,
+                Height = 18,
                 Font = HudTheme.FontMono11Bold,
                 ForeColor = HudTheme.TextBright,
                 Text = "Detecting CPU...",
@@ -646,7 +653,7 @@ namespace SuperAutoMater
             lblCpuClock = new Label
             {
                 Dock = DockStyle.Top,
-                Height = 16,
+                Height = 15,
                 Font = HudTheme.FontMono9,
                 ForeColor = HudTheme.HudAccentSoft,
                 Text = "Clock: -- GHz",
@@ -678,7 +685,7 @@ namespace SuperAutoMater
             lblMemorySpecs = new Label
             {
                 Dock = DockStyle.Top,
-                Height = 20,
+                Height = 18,
                 Font = HudTheme.FontMono11Bold,
                 ForeColor = HudTheme.TextBright,
                 Text = "RAM: Detecting...",
@@ -687,7 +694,7 @@ namespace SuperAutoMater
             lblStorageSummary = new Label
             {
                 Dock = DockStyle.Top,
-                Height = 18,
+                Height = 16,
                 Font = HudTheme.FontMono9,
                 ForeColor = HudTheme.TextNormal,
                 Text = "Drive: Detecting...",
@@ -729,7 +736,7 @@ namespace SuperAutoMater
             lblBatteryFlow = new Label
             {
                 Dock = DockStyle.Top,
-                Height = 20,
+                Height = 18,
                 Font = HudTheme.FontMono11Bold,
                 ForeColor = HudTheme.TextBright,
                 Text = "Discharge: --W",
@@ -738,7 +745,7 @@ namespace SuperAutoMater
             lblBatteryWear = new Label
             {
                 Dock = DockStyle.Top,
-                Height = 22,
+                Height = 18,
                 Font = HudTheme.FontMono9,
                 ForeColor = HudTheme.WarnCaution,
                 Text = "Health: 100% (AC Line)",
@@ -868,8 +875,8 @@ namespace SuperAutoMater
                 Margin = new Padding(0)
             };
             camSensorGrid.RowStyles.Add(new RowStyle(SizeType.Percent, 100F)); // camPanel
-            camSensorGrid.RowStyles.Add(new RowStyle(SizeType.Absolute, 28F));  // Buttons
-            camSensorGrid.RowStyles.Add(new RowStyle(SizeType.Absolute, 40F));  // Mic Container
+            camSensorGrid.RowStyles.Add(new RowStyle(SizeType.Absolute, 26F));  // Buttons (reduced from 28)
+            camSensorGrid.RowStyles.Add(new RowStyle(SizeType.Absolute, 34F));  // Mic Container (reduced from 40)
 
             camPanel = BuildCameraPanel();
             camSensorGrid.Controls.Add(camPanel, 0, 0);
@@ -896,7 +903,7 @@ namespace SuperAutoMater
                 Font = HudTheme.FontMono9Bold,
                 ForeColor = HudTheme.HudAccent,
                 Dock = DockStyle.Top,
-                Height = 14
+                Height = 12
             };
             micVuMeter = new HudVuMeter { Dock = DockStyle.Fill };
             micContainer.Controls.Add(micVuMeter);
@@ -1010,8 +1017,8 @@ namespace SuperAutoMater
                 Margin = new Padding(0),
                 Padding = new Padding(6, 2, 6, 2)
             };
-            whGrid.RowStyles.Add(new RowStyle(SizeType.Absolute, 18F));
-            whGrid.RowStyles.Add(new RowStyle(SizeType.Absolute, 18F));
+            whGrid.RowStyles.Add(new RowStyle(SizeType.Absolute, 16F));
+            whGrid.RowStyles.Add(new RowStyle(SizeType.Absolute, 16F));
             whGrid.RowStyles.Add(new RowStyle(SizeType.Percent, 100F));
 
             Label lblSheet = new Label
@@ -1410,6 +1417,9 @@ namespace SuperAutoMater
         {
             try
             {
+                // Bootstrap DPI-aware scaling immediately on load with actual device DPI
+                ScalingService.Instance.Recalculate(this.ClientSize.Height, this.DeviceDpi);
+
                 lblAdminWarning.Visible = !IsAdministrator();
                 _hookID = SetHook(_proc);
             }

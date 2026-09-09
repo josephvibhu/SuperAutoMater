@@ -58,7 +58,6 @@ namespace SuperAutoMater
             this.Font = HudTheme.FontMono11Bold;
             this.BackColor = Color.FromArgb(18, 10, 30);
             this.ForeColor = HudTheme.TextBright;
-            this.Height = 36;
         }
 
         protected override void OnMouseEnter(EventArgs e) { isHovered = true; base.OnMouseEnter(e); Invalidate(); }
