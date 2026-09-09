@@ -614,7 +614,7 @@ namespace SuperAutoMater
                 AutoSize = true,
                 Font = HudTheme.FontMono9Bold,
                 ForeColor = HudTheme.PassNominal,
-                BackColor = Color.FromArgb(25, 16, 185, 129),
+                BackColor = Color.FromArgb(12, 38, 28),
                 Text = "GRADE A+",
                 Padding = new Padding(6, 2, 6, 2),
                 TextAlign = ContentAlignment.MiddleCenter

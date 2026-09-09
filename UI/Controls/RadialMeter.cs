@@ -88,7 +88,7 @@ namespace SuperAutoMater
             this.DoubleBuffered = true;
             this.SetStyle(ControlStyles.AllPaintingInWmPaint | ControlStyles.UserPaint | ControlStyles.OptimizedDoubleBuffer | ControlStyles.ResizeRedraw, true);
             this.Size = new Size(110, 110);
-            this.BackColor = Color.Transparent;
+            this.BackColor = Color.FromArgb(14, 8, 24);
         }
 
         protected override void OnPaint(PaintEventArgs e)
@@ -96,6 +96,11 @@ namespace SuperAutoMater
             Graphics g = e.Graphics;
             g.SmoothingMode = SmoothingMode.AntiAlias;
             g.TextRenderingHint = System.Drawing.Text.TextRenderingHint.ClearTypeGridFit;
+
+            using (SolidBrush bgBrush = new SolidBrush(this.BackColor))
+            {
+                g.FillRectangle(bgBrush, this.ClientRectangle);
+            }
 
             int pad = (int)Math.Ceiling(trackWidth / 2f) + 4;
             int size = Math.Min(this.Width - (pad * 2), this.Height - (pad * 2));

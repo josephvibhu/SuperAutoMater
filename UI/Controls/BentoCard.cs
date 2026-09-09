@@ -99,7 +99,7 @@ namespace SuperAutoMater
         {
             this.DoubleBuffered = true;
             this.SetStyle(ControlStyles.AllPaintingInWmPaint | ControlStyles.UserPaint | ControlStyles.OptimizedDoubleBuffer | ControlStyles.ResizeRedraw, true);
-            this.BackColor = Color.Transparent;
+            this.BackColor = HudTheme.BgBase;
             UpdatePadding();
         }
 
@@ -114,6 +114,11 @@ namespace SuperAutoMater
             Graphics g = e.Graphics;
             g.SmoothingMode = SmoothingMode.AntiAlias;
             g.TextRenderingHint = System.Drawing.Text.TextRenderingHint.ClearTypeGridFit;
+
+            using (SolidBrush bgBrush = new SolidBrush(this.BackColor))
+            {
+                g.FillRectangle(bgBrush, this.ClientRectangle);
+            }
 
             Rectangle rect = new Rectangle(1, 1, this.Width - 3, this.Height - 3);
             if (rect.Width <= 0 || rect.Height <= 0) return;
