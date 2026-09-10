@@ -80,20 +80,29 @@ namespace SuperAutoMater.Wpf.Services
             _viewModel = viewModel;
             _cts = new CancellationTokenSource();
 
-            // 1. Detect LAN IPv4 address
-            LocalIpAddress = DetectBestLanIp();
+            Task.Run(() =>
+            {
+                try
+                {
+                    // 1. Detect LAN IPv4 address
+                    LocalIpAddress = DetectBestLanIp();
 
-            // 2. Generate QR Code pointing to mobile dashboard
-            GenerateQrCodeImage();
+                    // 2. Generate QR Code pointing to mobile dashboard
+                    GenerateQrCodeImage();
 
-            // 3. Start embedded HttpListener
-            StartHttpServer();
+                    // 3. Start embedded HttpListener
+                    StartHttpServer();
 
-            // 4. Start UDP Discovery Mesh
-            StartUdpDiscovery();
+                    // 4. Start UDP Discovery Mesh
+                    StartUdpDiscovery();
 
-            // 5. Start periodic cleanup of stale peer benches
-            _cleanupTimer = new Timer(CleanupStalePeers, null, TimeSpan.FromSeconds(3), TimeSpan.FromSeconds(3));
+                    // 5. Start periodic cleanup of stale peer benches
+                    _cleanupTimer = new Timer(CleanupStalePeers, null, TimeSpan.FromSeconds(3), TimeSpan.FromSeconds(3));
+
+                    FleetUpdated?.Invoke();
+                }
+                catch { }
+            });
         }
 
         public void StopService()

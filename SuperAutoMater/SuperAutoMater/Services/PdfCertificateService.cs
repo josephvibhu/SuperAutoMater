@@ -24,6 +24,8 @@ namespace SuperAutoMater.Wpf.Services
         public string BatteryCapacities { get; set; } = "48,000 mWh";
         public string GpuModel { get; set; } = "Display Adapter";
         public string PhysicalGrade { get; set; } = "A+";
+        public string CosmeticDefectsSummary { get; set; } = "Pristine (No Defects)";
+        public string BatteryCellTopology { get; set; } = "3S1P (3 Cells) · Balanced";
         public string TechnicianName { get; set; } = "QC Station #1";
         public string CloudAuditUrl { get; set; } = "https://docs.google.com/spreadsheets";
         public List<string> PassedTests { get; set; } = new List<string>();
@@ -156,7 +158,7 @@ namespace SuperAutoMater.Wpf.Services
 
                 DrawKeyValue(contentSb, 40, 504, "NVMe SSD STORAGE:", $"{d.StorageModel} [{d.StorageHealthPercent}% SMART Health]");
                 DrawKeyValue(contentSb, 40, 486, "DRIVE LIFETIME:", $"{d.StoragePowerOn} · Written: Nominal");
-                DrawKeyValue(contentSb, 40, 468, "BATTERY HEALTH:", d.BatteryHealthSummary);
+                DrawKeyValue(contentSb, 40, 468, "BATTERY HEALTH:", $"{d.BatteryHealthSummary} ({d.BatteryCellTopology})");
                 DrawKeyValue(contentSb, 40, 450, "BATTERY CAPACITY:", d.BatteryCapacities);
                 DrawKeyValue(contentSb, 40, 432, "GRAPHICS ACCEL:", d.GpuModel);
 
@@ -200,7 +202,9 @@ namespace SuperAutoMater.Wpf.Services
                 contentSb.Append("BT /F2 26 Tf 0.25 0.73 0.38 rg 40 128 Td (GRADE ")
                          .Append(EscapePdf(d.PhysicalGrade))
                          .Append(") Tj ET\n");
-                contentSb.Append("BT /F1 9 Tf 0.85 0.87 0.91 rg 40 110 Td (Certified Operational: 100% Core Subsystems Nominal) Tj ET\n");
+                contentSb.Append("BT /F1 9 Tf 0.85 0.87 0.91 rg 40 110 Td (Defect Audit: ")
+                         .Append(EscapePdf(d.CosmeticDefectsSummary))
+                         .Append(") Tj ET\n");
                 contentSb.Append("BT /F1 8 Tf 0.55 0.58 0.63 rg 40 92 Td (Inspected by: ")
                          .Append(EscapePdf(d.TechnicianName))
                          .Append(" · Cloud Verification Active) Tj ET\n");

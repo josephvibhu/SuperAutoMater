@@ -24,6 +24,8 @@ namespace SuperAutoMater
             public string Status { get; set; } = "RTS";
             public string WipIssue { get; set; } = "All Okay";
             public string PhysicalGrade { get; set; } = "A+";
+            public string CosmeticDefects { get; set; } = "Pristine";
+            public string BatteryCellTopology { get; set; } = "Nominal";
             public string ShelfLocation { get; set; } = "Shelf A-1";
             public string Remarks { get; set; } = "";
             public string Technician { get; set; } = "QA Inspector";
@@ -174,7 +176,9 @@ namespace SuperAutoMater
             sbContent.AppendLine("0.85 0.88 0.92 RG 1 w");
             sbContent.AppendLine($"28 {remGridTop - 75} {pageW - 56} 75 re S");
 
-            string remarkText = string.IsNullOrWhiteSpace(data.Remarks) ? "All core subsystems nominal. Verified compliant with SuperAutoMater Grade standards." : data.Remarks;
+            string remarkText = string.IsNullOrWhiteSpace(data.Remarks) 
+                ? $"Defect Audit: {data.CosmeticDefects} | Battery: {data.BatteryCellTopology} | All core subsystems nominal." 
+                : data.Remarks;
             DrawPdfText(sbContent, "TECHNICIAN REMARKS:", "F2", 8.5f, 40, remGridTop - 22, 0.2f, 0.3f, 0.4f);
             DrawPdfText(sbContent, remarkText, "F1", 9f, 40, remGridTop - 40, 0.1f, 0.15f, 0.2f);
             DrawPdfText(sbContent, $"CERTIFIED BY: {data.Technician}  |  STATUS: CERTIFIED FOR INVENTORY DISPATCH", "F2", 8f, 40, remGridTop - 62, 0.05f, 0.55f, 0.25f);

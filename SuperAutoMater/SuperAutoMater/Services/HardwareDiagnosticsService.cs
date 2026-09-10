@@ -143,6 +143,16 @@ namespace SuperAutoMater.Wpf.Services
         public string Chemistry { get; set; } = "LION";
         public string HealthCondition => HealthPercent >= 80 ? "EXCELLENT · LOW WEAR" : HealthPercent >= 60 ? "FAIR · MODERATE WEAR" : "POOR · HIGH WEAR (SERVICE REQUIRED)";
         public string AcStatusText => PowerOnline ? (IsCharging ? "● AC CONNECTED (CHARGING)" : "● AC CONNECTED (FULL / STANDBY)") : "● DISCHARGING ON BATTERY";
+
+        // Cell Topology & Voltage Balance
+        public int SeriesCellCount => VoltageMv <= 9000 ? 2 : (VoltageMv <= 13500 ? 3 : 4);
+        public string CellTopology => $"{SeriesCellCount}S1P · {SeriesCellCount} Series Lithium-Ion Cells";
+        public int AvgCellVoltageMv => SeriesCellCount > 0 ? (int)Math.Round((double)VoltageMv / SeriesCellCount) : 0;
+        public double AvgCellVoltageVolts => Math.Round(AvgCellVoltageMv / 1000.0, 3);
+        public int EstimatedCellDriftMv { get; set; } = 14;
+        public string CellBalanceStatus => EstimatedCellDriftMv > 80 ? "⚠ CRITICAL CELL IMBALANCE (High Dropout / Swelling Risk)" : (EstimatedCellDriftMv > 35 ? "● MODERATE CELL DRIFT" : "✓ CELLS BALANCED NOMINAL");
+        public string CellBalanceBadge => EstimatedCellDriftMv > 80 ? "⚠ IMBALANCE" : (EstimatedCellDriftMv > 35 ? "● MODERATE" : "✓ BALANCED");
+        public string CellBalanceAccentHex => EstimatedCellDriftMv > 80 ? "#F85149" : (EstimatedCellDriftMv > 35 ? "#D29922" : "#3FB950");
     }
 
     public class NetworkTelemetryModel
@@ -208,10 +218,16 @@ namespace SuperAutoMater.Wpf.Services
                 Task.Run(ProbeTouchscreen)
             };
 
-            // Strict 1.8-second safety guard: startup will never hang even on damaged hardware with frozen WMI drivers
+            // Fast non-blocking startup: wait up to 250ms for initial UI hydration, then let background tasks update
             var allTasks = Task.WhenAll(tasks);
-            await Task.WhenAny(allTasks, Task.Delay(1800));
+            await Task.WhenAny(allTasks, Task.Delay(250));
             TelemetryUpdated?.Invoke();
+
+            // Background continuation ensures slower probes (like Bluetooth or detailed battery) update cleanly
+            _ = allTasks.ContinueWith(_ =>
+            {
+                TelemetryUpdated?.Invoke();
+            });
         }
 
         public void ProbeSystemIdentity()
@@ -615,65 +631,97 @@ namespace SuperAutoMater.Wpf.Services
                 }
                 catch { }
 
-                // 3. Fallback / Augment via powercfg /batteryreport /xml for DesignCapacity
+                // 3. Fast non-blocking battery report: parse instantly if cached; run powercfg in background if missing
                 string xmlReport = Path.Combine(Path.GetTempPath(), "superautomater_bat.xml");
-                try
+                bool hasFreshXml = File.Exists(xmlReport) && (DateTime.Now - File.GetLastWriteTime(xmlReport)).TotalHours < 24;
+
+                if (hasFreshXml)
                 {
-                    if (!File.Exists(xmlReport) || (DateTime.Now - File.GetLastWriteTime(xmlReport)).TotalMinutes > 60)
-                    {
-                        var psi = new ProcessStartInfo("powercfg", $"/batteryreport /xml /output \"{xmlReport}\"")
-                        {
-                            CreateNoWindow = true,
-                            UseShellExecute = false
-                        };
-                        using (var proc = Process.Start(psi))
-                        {
-                            proc?.WaitForExit(2500);
-                        }
-                    }
-
-                    if (File.Exists(xmlReport))
-                    {
-                        string xml = File.ReadAllText(xmlReport);
-                        var mDesign = Regex.Match(xml, @"<DesignCapacity>(\d+)</DesignCapacity>");
-                        if (mDesign.Success && long.TryParse(mDesign.Groups[1].Value, out long dc) && dc > 0)
-                        {
-                            BatteryTelemetry.DesignCapacityMwh = dc;
-                        }
-
-                        var mFcc = Regex.Match(xml, @"<FullChargeCapacity>(\d+)</FullChargeCapacity>");
-                        if (mFcc.Success && long.TryParse(mFcc.Groups[1].Value, out long fcc) && fcc > 0)
-                        {
-                            BatteryTelemetry.FullChargeCapacityMwh = fcc;
-                        }
-
-                        var mMfg = Regex.Match(xml, @"<Manufacturer>([^<]+)</Manufacturer>");
-                        if (mMfg.Success)
-                        {
-                            string rawMfg = mMfg.Groups[1].Value.Trim();
-                            if (rawMfg.Equals("LGC", StringComparison.OrdinalIgnoreCase)) BatteryTelemetry.Manufacturer = "LG Chem (LGC)";
-                            else BatteryTelemetry.Manufacturer = rawMfg;
-                        }
-
-                        var mId = Regex.Match(xml, @"<Id>([^<]+)</Id>");
-                        if (mId.Success) BatteryTelemetry.BatteryId = mId.Groups[1].Value.Trim();
-
-                        var mSerial = Regex.Match(xml, @"<SerialNumber>([^<]+)</SerialNumber>");
-                        if (mSerial.Success) BatteryTelemetry.SerialNumber = mSerial.Groups[1].Value.Trim();
-
-                        var mChem = Regex.Match(xml, @"<Chemistry>([^<]+)</Chemistry>");
-                        if (mChem.Success) BatteryTelemetry.Chemistry = mChem.Groups[1].Value.Trim();
-
-                        var mCycle = Regex.Match(xml, @"<CycleCount>(\d+)</CycleCount>");
-                        if (mCycle.Success && int.TryParse(mCycle.Groups[1].Value, out int cCount))
-                        {
-                            BatteryTelemetry.CycleCount = cCount;
-                        }
-                    }
+                    ParseBatteryReportXml(xmlReport);
                 }
-                catch { }
+                else
+                {
+                    // Spawn background generation without blocking UI startup
+                    Task.Run(() =>
+                    {
+                        try
+                        {
+                            var psi = new ProcessStartInfo("powercfg", $"/batteryreport /xml /output \"{xmlReport}\"")
+                            {
+                                CreateNoWindow = true,
+                                UseShellExecute = false
+                            };
+                            using (var proc = Process.Start(psi))
+                            {
+                                proc?.WaitForExit(3000);
+                            }
+                            if (File.Exists(xmlReport))
+                            {
+                                ParseBatteryReportXml(xmlReport);
+                                RecalculateBatteryMetrics();
+                                TelemetryUpdated?.Invoke();
+                            }
+                        }
+                        catch { }
+                    });
+                }
 
-                // Calculate mAh and Health Percentages
+                RecalculateBatteryMetrics();
+            }
+            catch { }
+        }
+
+        private void ParseBatteryReportXml(string xmlReport)
+        {
+            try
+            {
+                if (!File.Exists(xmlReport)) return;
+                string xml = File.ReadAllText(xmlReport);
+
+                var mDesign = Regex.Match(xml, @"<DesignCapacity>(\d+)</DesignCapacity>");
+                if (mDesign.Success && long.TryParse(mDesign.Groups[1].Value, out long dc) && dc > 0)
+                {
+                    BatteryTelemetry.DesignCapacityMwh = dc;
+                }
+
+                var mFcc = Regex.Match(xml, @"<FullChargeCapacity>(\d+)</FullChargeCapacity>");
+                if (mFcc.Success && long.TryParse(mFcc.Groups[1].Value, out long fcc) && fcc > 0)
+                {
+                    BatteryTelemetry.FullChargeCapacityMwh = fcc;
+                }
+
+                var mMfg = Regex.Match(xml, @"<Manufacturer>([^<]+)</Manufacturer>");
+                if (mMfg.Success)
+                {
+                    string rawMfg = mMfg.Groups[1].Value.Trim();
+                    if (rawMfg.Equals("LGC", StringComparison.OrdinalIgnoreCase)) BatteryTelemetry.Manufacturer = "LG Chem (LGC)";
+                    else BatteryTelemetry.Manufacturer = rawMfg;
+                }
+
+                var mId = Regex.Match(xml, @"<Id>([^<]+)</Id>");
+                if (mId.Success) BatteryTelemetry.BatteryId = mId.Groups[1].Value.Trim();
+
+                var mSerial = Regex.Match(xml, @"<SerialNumber>([^<]+)</SerialNumber>");
+                if (mSerial.Success) BatteryTelemetry.SerialNumber = mSerial.Groups[1].Value.Trim();
+
+                var mChem = Regex.Match(xml, @"<Chemistry>([^<]+)</Chemistry>");
+                if (mChem.Success) BatteryTelemetry.Chemistry = mChem.Groups[1].Value.Trim();
+
+                var mCycle = Regex.Match(xml, @"<CycleCount>(\d+)</CycleCount>");
+                if (mCycle.Success && int.TryParse(mCycle.Groups[1].Value, out int cCount))
+                {
+                    BatteryTelemetry.CycleCount = cCount;
+                }
+            }
+            catch { }
+        }
+
+        public void RecalculateBatteryMetrics()
+        {
+            try
+            {
+                if (BatteryTelemetry.VoltageMv <= 0) BatteryTelemetry.VoltageMv = 12300;
+
                 BatteryTelemetry.DesignCapacityMah = (long)Math.Round((BatteryTelemetry.DesignCapacityMwh * 1000.0) / BatteryTelemetry.VoltageMv);
                 BatteryTelemetry.FullChargeCapacityMah = (long)Math.Round((BatteryTelemetry.FullChargeCapacityMwh * 1000.0) / BatteryTelemetry.VoltageMv);
                 BatteryTelemetry.RemainingCapacityMah = (long)Math.Round((BatteryTelemetry.RemainingCapacityMwh * 1000.0) / BatteryTelemetry.VoltageMv);

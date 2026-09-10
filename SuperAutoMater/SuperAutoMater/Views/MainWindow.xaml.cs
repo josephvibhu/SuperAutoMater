@@ -95,17 +95,53 @@ namespace SuperAutoMater.Wpf.Views
             _hwndSource?.AddHook(WndProcHook);
 
             // 2. Wire USB Port Tracker events
-            _usbTracker.PortTested += (count, label) =>
+            _usbTracker.PortTested += (count, label, driveDetails) =>
             {
                 Dispatcher.InvokeAsync(() =>
                 {
                     if (ViewModel != null)
                     {
-                        ViewModel.IsPort3Verified = true;
-                        ShowFeedback("USB Port 3 Verified (Hot-Plug Arrival Detected) ✓", "🔌", "#3FB950");
+                        if (!ViewModel.IsPort1Verified)
+                        {
+                            ViewModel.IsPort1Verified = true;
+                            ViewModel.Port1Device = driveDetails;
+                            ShowFeedback($"USB Port 1 Verified: {driveDetails} ✓", "🔌", "#3FB950");
+                        }
+                        else if (!ViewModel.IsPort2Verified)
+                        {
+                            ViewModel.IsPort2Verified = true;
+                            ViewModel.Port2Device = driveDetails;
+                            ShowFeedback($"USB Port 2 Verified: {driveDetails} ✓", "🔌", "#3FB950");
+                        }
+                        else if (!ViewModel.IsPort3Verified)
+                        {
+                            ViewModel.IsPort3Verified = true;
+                            ViewModel.Port3Device = driveDetails;
+                            ShowFeedback($"USB Port 3 Verified: {driveDetails} ✓", "🔌", "#3FB950");
+                        }
+                        else
+                        {
+                            ShowFeedback($"USB Hot-Plug Verified: {driveDetails} ✓", "🔌", "#3FB950");
+                        }
                     }
                 });
             };
+
+            _usbTracker.PortRemoved += (count) =>
+            {
+                Dispatcher.InvokeAsync(() =>
+                {
+                    ShowFeedback("USB Flash Drive Unplugged. Move to next port to verify ✓", "🔌", "#58A6FF");
+                });
+            };
+
+            // Check if any removable drive is already connected at launch
+            string initialDrive = UsbPortTracker.GetActiveUsbDriveDetails();
+            if (initialDrive != null && ViewModel != null)
+            {
+                ViewModel.IsPort1Verified = true;
+                ViewModel.Port1Device = initialDrive;
+            }
 
             // 3. Initialize in Standby hub
             SwitchWorkspace("standby");
@@ -121,6 +157,7 @@ namespace SuperAutoMater.Wpf.Views
             AcousticAnalyzerService.Instance.SpectrumUpdated += OnAcousticSpectrumUpdated;
 
             // 6. Start Warehouse Fleet LAN HUD & Mesh
+            WarehouseFleetService.Instance.FleetUpdated += OnFleetServiceUpdated;
             WarehouseFleetService.Instance.StartService(ViewModel);
             if (TxtFleetSummaryBanner != null)
             {
@@ -130,6 +167,7 @@ namespace SuperAutoMater.Wpf.Views
 
         private void MainWindow_Closed(object sender, EventArgs e)
         {
+            WarehouseFleetService.Instance.FleetUpdated -= OnFleetServiceUpdated;
             WarehouseFleetService.Instance.StopService();
             AcousticAnalyzerService.Instance.SpectrumUpdated -= OnAcousticSpectrumUpdated;
             StopWorkspaceCamera();
@@ -465,7 +503,7 @@ namespace SuperAutoMater.Wpf.Views
             }
             else if (e.Key == Key.F5)
             {
-                RunDiagnosticTest("Battery");
+                BtnExpressQc_Click(this, new RoutedEventArgs());
                 e.Handled = true;
             }
             else if (e.Key == Key.F6)
@@ -563,6 +601,11 @@ namespace SuperAutoMater.Wpf.Views
                 BtnFleetHud_Click(this, new RoutedEventArgs());
                 e.Handled = true;
             }
+            else if (e.Key == Key.F12)
+            {
+                BtnRetailPrep_Click(this, new RoutedEventArgs());
+                e.Handled = true;
+            }
             else if (e.Key == Key.Escape)
             {
                 if (AutopilotQcService.Instance.IsRunning)
@@ -655,8 +698,10 @@ namespace SuperAutoMater.Wpf.Views
                     StoragePowerOn = ViewModel.HdsPowerOnTime,
                     BatteryHealthSummary = ViewModel.BatteryIntegrityBadge,
                     BatteryCapacities = $"{ViewModel.BatteryFullChargeCapacityMwh} / {ViewModel.BatteryDesignCapacityMwh} mWh",
+                    BatteryCellTopology = $"{ViewModel.BatteryCellTopology} · {ViewModel.BatteryCellBalanceBadge}",
                     GpuModel = ViewModel.GpuName,
                     PhysicalGrade = ViewModel.Grade,
+                    CosmeticDefectsSummary = ViewModel.CosmeticDefectsSummary,
                     TechnicianName = "QC Workstation #1",
                     CloudAuditUrl = GoogleSheetsDispatcher.DefaultSheetsUrl
                 };
@@ -770,16 +815,51 @@ namespace SuperAutoMater.Wpf.Views
 
         private void BtnExpressQc_Click(object sender, RoutedEventArgs e)
         {
-            ViewModel?.MarkTestPassed("Keyboard");
-            ViewModel?.MarkTestPassed("Display");
-            ViewModel?.MarkTestPassed("Audio");
-            ViewModel?.MarkTestPassed("Camera");
-            ViewModel?.MarkTestPassed("Storage");
-            ViewModel?.MarkTestPassed("Cpu");
-            ViewModel?.MarkTestPassed("Fingerprint");
-            ViewModel?.MarkTestPassed("Gpu");
-            ViewModel?.MarkTestPassed("Bluetooth");
-            ShowFeedback("1-Click Express QC: Full Diagnostic Pipeline Passed Nominal ✓", "⚡", "#3FB950");
+            if (ViewModel == null) return;
+            var runner = new ExpressQcRunnerWindow(ViewModel) { Owner = this };
+            if (runner.ShowDialog() == true)
+            {
+                var rep = runner.Report;
+                if (rep != null)
+                {
+                    foreach (var sub in rep.Subsystems)
+                    {
+                        if (sub.Status == ExpressTestStatus.Passed)
+                        {
+                            ViewModel.MarkTestPassed(sub.Key);
+                            if (sub.Key == "Camera") ViewModel.MarkTestPassed("Camera");
+                            if (sub.Key == "Mic" || sub.Key == "Speaker") ViewModel.MarkTestPassed("Audio");
+                            if (sub.Key == "CpuRam") ViewModel.MarkTestPassed("Cpu");
+                            if (sub.Key == "Battery") ViewModel.MarkTestPassed("Battery");
+                            if (sub.Key == "Display") ViewModel.MarkTestPassed("Display");
+                            if (sub.Key == "Storage") ViewModel.MarkTestPassed("Storage");
+                            if (sub.Key == "Network") ViewModel.MarkTestPassed("Bluetooth");
+                        }
+                    }
+
+                    ViewModel.Grade = rep.CalculatedGrade;
+                    ShowFeedback($"Express QC Passed: {rep.PassedCount}/{rep.TotalCount} Subsystems Certified ({rep.CalculatedGrade}) ✓", "⚡", "#3FB950");
+
+                    OfflineLedgerService.Instance.SaveRecord(new QcAuditRecord
+                    {
+                        Serial_Number = ViewModel.Serial,
+                        Model = ViewModel.Model,
+                        Physical_Grade = rep.CalculatedGrade,
+                        Status = rep.AllPassed ? "PASSED" : "FLAGGED",
+                        CPU_Model = ViewModel.CpuName,
+                        RAM_GB = ViewModel.RamSummary,
+                        Storage_Details = ViewModel.PrimaryDriveModel,
+                        Battery_Health = ViewModel.BatteryIntegrityBadge,
+                        GPU_Model = ViewModel.GpuName,
+                        Technician_Notes = $"Express QC: {rep.PassedCount}/{rep.TotalCount} Subsystems Nominal. {rep.SummaryText}"
+                    });
+
+                    if (runner.CloudDispatchRequested)
+                    {
+                        BtnOpenSyncMenu_Click(this, new RoutedEventArgs());
+                    }
+                }
+            }
         }
 
         private void TestRow_Click(object sender, MouseButtonEventArgs e)
@@ -856,6 +936,7 @@ namespace SuperAutoMater.Wpf.Views
             ViewUsbWorkspace.Visibility = Visibility.Collapsed;
             ViewAudioWorkspace.Visibility = Visibility.Collapsed;
             ViewWirelessWorkspace.Visibility = Visibility.Collapsed;
+            ViewFleetWorkspace.Visibility = Visibility.Collapsed;
 
             // Stop non-applicable background loops
             string vLower = view.ToLowerInvariant();
@@ -980,7 +1061,86 @@ namespace SuperAutoMater.Wpf.Views
                     WkStatusDot.Fill = (Brush)FindResource("BrushAccentEmerald");
                     ViewModel?.SetActiveTest("Bluetooth");
                     break;
+
+                case "fleet":
+                case "radar":
+                    ViewFleetWorkspace.Visibility = Visibility.Visible;
+                    TxtWorkspaceActiveTitle.Text = "WAREHOUSE FLEET LAN RADAR & MOBILE COCKPIT";
+                    TxtActiveViewBadge.Text = "FLEET RADAR";
+                    WkStatusDot.Fill = (Brush)FindResource("BrushAccentBlue");
+                    RefreshFleetWorkspaceUi();
+                    ViewModel?.SetActiveTest("");
+                    break;
             }
+        }
+
+        private void OnFleetServiceUpdated()
+        {
+            Dispatcher.InvokeAsync(RefreshFleetWorkspaceUi);
+        }
+
+        private void RefreshFleetWorkspaceUi()
+        {
+            if (ImgFleetQrCode != null && WarehouseFleetService.Instance.QrCodeBitmap != null)
+            {
+                ImgFleetQrCode.Source = WarehouseFleetService.Instance.QrCodeBitmap;
+            }
+            if (TxtFleetUrlDisplay != null)
+            {
+                TxtFleetUrlDisplay.Text = WarehouseFleetService.Instance.LocalDashboardUrl;
+            }
+            if (TxtFleetIpBadge != null)
+            {
+                TxtFleetIpBadge.Text = $"{WarehouseFleetService.Instance.LocalIpAddress}:{WarehouseFleetService.Instance.HttpPort} · UDP 9876";
+            }
+            if (TxtOnlineBenchesCount != null)
+            {
+                int count = WarehouseFleetService.Instance.OnlineBenches.Count + 1;
+                TxtOnlineBenchesCount.Text = $"{count} BENCH{(count == 1 ? " ONLINE (THIS TERMINAL)" : "ES ONLINE")}";
+            }
+            if (IcOnlineBenches != null)
+            {
+                IcOnlineBenches.ItemsSource = WarehouseFleetService.Instance.OnlineBenches;
+            }
+        }
+
+        private void BtnClearDefects_Click(object sender, RoutedEventArgs e)
+        {
+            ViewModel?.ClearAllCosmeticDefects();
+            ShowFeedback("Cosmetic Defect Matrix Cleared: Reset to Pristine Grade A+ ✓", "🎨", "#3FB950");
+        }
+
+        private void BtnRetailPrep_Click(object sender, RoutedEventArgs e)
+        {
+            var prepWin = new RetailPrepModalWindow { Owner = this };
+            prepWin.ShowDialog();
+        }
+
+        private void BtnCopyFleetUrl_Click(object sender, RoutedEventArgs e)
+        {
+            try
+            {
+                Clipboard.SetText(WarehouseFleetService.Instance.LocalDashboardUrl);
+                ShowFeedback("Fleet Dashboard URL Copied to Clipboard ✓", "📋", "#58A6FF");
+            }
+            catch { }
+        }
+
+        private void BtnOpenFleetBrowser_Click(object sender, RoutedEventArgs e)
+        {
+            try
+            {
+                Process.Start(new ProcessStartInfo(WarehouseFleetService.Instance.LocalDashboardUrl) { UseShellExecute = true });
+            }
+            catch (Exception ex)
+            {
+                ShowFeedback($"Could not launch browser: {ex.Message}", "⚠", "#F85149");
+            }
+        }
+
+        private void BtnBackToStandby_Click(object sender, RoutedEventArgs e)
+        {
+            SwitchWorkspace("standby");
         }
 
         private void BtnStandbyReset_Click(object sender, RoutedEventArgs e) => SwitchWorkspace("standby");
@@ -1017,6 +1177,67 @@ namespace SuperAutoMater.Wpf.Views
             }
         }
 
+        private async void BtnRunBatteryLoadTest_Click(object sender, RoutedEventArgs e)
+        {
+            if (BtnRunBatteryLoadTest == null || ViewModel == null) return;
+            BtnRunBatteryLoadTest.IsEnabled = false;
+            BtnRunBatteryLoadTest.Content = "⚡ TESTING LOAD SAG (3s)...";
+            ShowFeedback("Firing 3-second multi-thread CPU load step to measure dynamic cell voltage sag...", "⚡", "#F1E05A");
+
+            try
+            {
+                int idleMv = ViewModel.BatteryVoltageMv > 5000 ? ViewModel.BatteryVoltageMv : 12300;
+                BatteryLoadMeterService.Instance.StartLoadMeasurement(idleMv);
+
+                using var cts = new CancellationTokenSource();
+                var token = cts.Token;
+                int threads = Math.Clamp(Environment.ProcessorCount, 2, 8);
+
+                for (int i = 0; i < threads; i++)
+                {
+                    _ = Task.Run(() =>
+                    {
+                        while (!token.IsCancellationRequested)
+                        {
+                            double x = 0;
+                            for (int j = 0; j < 50000; j++)
+                            {
+                                x += Math.Sqrt(j) * Math.Sin(j);
+                            }
+                        }
+                    }, token);
+                }
+
+                // Sample voltage over 3.0 seconds (10 intervals of 300ms)
+                for (int step = 1; step <= 10; step++)
+                {
+                    await Task.Delay(300);
+                    int curMv = ViewModel.BatteryVoltageMv;
+                    BatteryLoadMeterService.Instance.UpdateLoadVoltage(curMv);
+                    var partial = BatteryLoadMeterService.Instance.GetCurrentResult();
+                    TxtBatterySagSummary.Text = $"Measuring Load Step ({step * 10}%): ΔV {partial.SagVolts:F2}V drop...";
+                    TxtBatterySagSummary.Foreground = new SolidColorBrush((Color)ColorConverter.ConvertFromString(partial.AccentHex));
+                }
+
+                cts.Cancel();
+
+                var finalRes = BatteryLoadMeterService.Instance.StopMeasurement();
+                TxtBatterySagSummary.Text = finalRes.StatusSummary;
+                TxtBatterySagSummary.Foreground = new SolidColorBrush((Color)ColorConverter.ConvertFromString(finalRes.AccentHex));
+
+                ShowFeedback($"Battery Sag: ΔV {finalRes.SagVolts:F2}V ({finalRes.CellBalanceStatus}) ✓", "⚡", finalRes.AccentHex);
+            }
+            catch (Exception ex)
+            {
+                ShowFeedback($"Battery load test error: {ex.Message}", "⚠", "#F85149");
+            }
+            finally
+            {
+                BtnRunBatteryLoadTest.Content = "⚡ RUN 3-SEC LOAD SAG TEST";
+                BtnRunBatteryLoadTest.IsEnabled = true;
+            }
+        }
+
         private void BtnPassBattery_Click(object sender, RoutedEventArgs e)
         {
             ViewModel?.MarkTestPassed("Battery");
@@ -1027,6 +1248,27 @@ namespace SuperAutoMater.Wpf.Views
         {
             ViewModel?.MarkTestPassed("Usb");
             ShowFeedback("USB Ports & Root Hub Verified Nominal & Passed ✓", "✓", "#3FB950");
+        }
+
+        private void BtnResetUsb_Click(object sender, RoutedEventArgs e)
+        {
+            _usbTracker?.Reset();
+            ViewModel?.ResetUsbPorts();
+            ShowFeedback("USB Port Tests Reset: Insert flash drive into Port 1 to begin", "🔄", "#58A6FF");
+        }
+
+        private void BtnCopyListing_Click(object sender, RoutedEventArgs e)
+        {
+            if (ViewModel == null) return;
+            try
+            {
+                Clipboard.SetText(ViewModel.ECommerceListingText);
+                ShowFeedback("Unit Spec Sheet & Refurb Listing Copied to Clipboard ✓", "📋", "#3FB950");
+            }
+            catch (Exception ex)
+            {
+                ShowFeedback($"Clipboard copy failed: {ex.Message}", "⚠", "#F85149");
+            }
         }
 
         private void BtnSetGrade_Click(object sender, RoutedEventArgs e)

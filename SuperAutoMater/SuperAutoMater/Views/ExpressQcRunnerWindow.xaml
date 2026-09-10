@@ -1,0 +1,321 @@
+<Window x:Class="SuperAutoMater.Wpf.Views.ExpressQcRunnerWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Express QC — Autonomous Hardware Certification Engine"
+        Height="660" Width="940"
+        MinHeight="540" MinWidth="800"
+        WindowStartupLocation="CenterOwner"
+        Background="{StaticResource BrushObsidianRadial}"
+        Icon="pack://application:,,,/app.ico"
+        UseLayoutRounding="True"
+        SnapsToDevicePixels="True"
+        TextOptions.TextFormattingMode="Display"
+        TextOptions.TextRenderingMode="ClearType"
+        KeyDown="Window_KeyDown">
+
+    <Grid Margin="16">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/> <!-- Top Avionics Header & Progress -->
+            <RowDefinition Height="*"/>    <!-- 8 Subsystem Telemetry Cards Grid -->
+            <RowDefinition Height="Auto"/> <!-- Bottom Grade & Acceptance Controls -->
+        </Grid.RowDefinitions>
+
+        <!-- 1. TOP AVIONICS RUNNER BANNER -->
+        <Border Grid.Row="0"
+                Background="{StaticResource BrushTopBarGradient}"
+                BorderBrush="{StaticResource BrushHairlineViolet}"
+                BorderThickness="1"
+                CornerRadius="14"
+                Padding="16,12"
+                Margin="0,0,0,12"
+                Effect="{StaticResource EffectBarShadow}">
+            <Grid>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="Auto"/>
+                </Grid.RowDefinitions>
+
+                <DockPanel Grid.Row="0" LastChildFill="False" Margin="0,0,0,8">
+                    <StackPanel Orientation="Horizontal" DockPanel.Dock="Left" VerticalAlignment="Center">
+                        <TextBlock Text="⚡" FontSize="20" Foreground="#58A6FF" Margin="0,0,10,0" VerticalAlignment="Center"/>
+                        <StackPanel>
+                            <StackPanel Orientation="Horizontal">
+                                <TextBlock Text="EXPRESS QC // HARDWARE CERTIFICATION COCKPIT" FontFamily="{StaticResource FontSans}" FontWeight="ExtraBold" FontSize="14" Foreground="{StaticResource BrushTextWhite}"/>
+                                <Border Background="#1B4D3E" BorderBrush="#3FB950" BorderThickness="1" CornerRadius="4" Padding="6,1" Margin="10,0,0,0" VerticalAlignment="Center">
+                                    <TextBlock x:Name="TxtRunnerState" Text="● ACTIVE AUDIT" FontFamily="{StaticResource FontMono}" FontSize="10" FontWeight="Bold" Foreground="#3FB950"/>
+                                </Border>
+                            </StackPanel>
+                            <TextBlock x:Name="TxtStatusDetail" Text="Initializing parallel sensor probes &amp; direct optical capture..." FontFamily="{StaticResource FontMono}" FontSize="11" Foreground="#8B949E" Margin="0,2,0,0"/>
+                        </StackPanel>
+                    </StackPanel>
+
+                    <StackPanel Orientation="Horizontal" DockPanel.Dock="Right" VerticalAlignment="Center">
+                        <TextBlock x:Name="TxtProgressPct" Text="0%" FontFamily="{StaticResource FontMono}" FontWeight="Bold" FontSize="18" Foreground="#58A6FF" VerticalAlignment="Center" Margin="0,0,12,0"/>
+                        <Button Content="✕ ABORT [ESC]" Style="{StaticResource StyleDarkActionBtn}" Click="BtnAbort_Click" Padding="10,4" FontSize="10"/>
+                    </StackPanel>
+                </DockPanel>
+
+                <!-- Runner Progress Bar -->
+                <ProgressBar Grid.Row="1" x:Name="ProgRunner" Height="8" Minimum="0" Maximum="100" Value="0"
+                             Foreground="#58A6FF" Background="#0E1116" BorderThickness="0"/>
+            </Grid>
+        </Border>
+
+        <!-- 2. 8 SUBSYSTEM TELEMETRY CARDS (4 COLUMNS x 2 ROWS) -->
+        <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="*"/>
+                </Grid.ColumnDefinitions>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="*"/>
+                    <RowDefinition Height="*"/>
+                </Grid.RowDefinitions>
+
+            <!-- Card 0: Camera Optics (Col 0, Row 0) -->
+            <Border x:Name="CardCam" Grid.Column="0" Grid.Row="0" Background="#161B22" BorderBrush="#262C36" BorderThickness="1" CornerRadius="10" Padding="10" Margin="0,0,6,6">
+                <Grid>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="*"/>
+                        <RowDefinition Height="Auto"/>
+                    </Grid.RowDefinitions>
+                    <DockPanel Grid.Row="0" LastChildFill="False">
+                        <StackPanel Orientation="Horizontal" DockPanel.Dock="Left">
+                            <TextBlock Text="📷" FontSize="12" Margin="0,0,6,0"/>
+                            <TextBlock Text="WEBCAM OPTICS" FontFamily="{StaticResource FontMono}" FontWeight="Bold" FontSize="10" Foreground="#FFFFFF"/>
+                        </StackPanel>
+                        <TextBlock x:Name="BadgeCam" DockPanel.Dock="Right" Text="● QUEUED" FontFamily="{StaticResource FontMono}" FontWeight="Bold" FontSize="9" Foreground="#8B949E"/>
+                    </DockPanel>
+                    <StackPanel Grid.Row="1" VerticalAlignment="Center" Margin="0,6,0,6">
+                        <TextBlock x:Name="HeadlineCam" Text="DirectShow Capture..." FontFamily="{StaticResource FontSans}" FontWeight="SemiBold" FontSize="11" Foreground="#F0F6FC" TextWrapping="Wrap"/>
+                        <TextBlock x:Name="DetailCam" Text="Testing light capture &amp; shutter..." FontFamily="{StaticResource FontMono}" FontSize="9" Foreground="#8B949E" TextWrapping="Wrap" Margin="0,3,0,0"/>
+                    </StackPanel>
+                    <DockPanel Grid.Row="2" LastChildFill="False">
+                        <Border DockPanel.Dock="Left" Background="#21262D" CornerRadius="4" Padding="6,2">
+                            <TextBlock x:Name="MetricCam" Text="-- FPS" FontFamily="{StaticResource FontMono}" FontWeight="Bold" FontSize="9" Foreground="#58A6FF"/>
+                        </Border>
+                        <!-- Live Snapshot Thumbnail Box -->
+                        <Border DockPanel.Dock="Right" Width="44" Height="28" Background="#0E1116" BorderBrush="#30363D" BorderThickness="1" CornerRadius="3" ClipToBounds="True">
+                            <Image x:Name="ImgCamThumb" Stretch="UniformToFill"/>
+                        </Border>
+                    </DockPanel>
+                </Grid>
+            </Border>
+
+            <!-- Card 1: Mic Array (Col 1, Row 0) -->
+            <Border x:Name="CardMic" Grid.Column="1" Grid.Row="0" Background="#161B22" BorderBrush="#262C36" BorderThickness="1" CornerRadius="10" Padding="10" Margin="0,0,6,6">
+                <Grid>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="*"/>
+                        <RowDefinition Height="Auto"/>
+                    </Grid.RowDefinitions>
+                    <DockPanel Grid.Row="0" LastChildFill="False">
+                        <StackPanel Orientation="Horizontal" DockPanel.Dock="Left">
+                            <TextBlock Text="🎤" FontSize="12" Margin="0,0,6,0"/>
+                            <TextBlock Text="MIC ARRAY" FontFamily="{StaticResource FontMono}" FontWeight="Bold" FontSize="10" Foreground="#FFFFFF"/>
+                        </StackPanel>
+                        <TextBlock x:Name="BadgeMic" DockPanel.Dock="Right" Text="● QUEUED" FontFamily="{StaticResource FontMono}" FontWeight="Bold" FontSize="9" Foreground="#8B949E"/>
+                    </DockPanel>
+                    <StackPanel Grid.Row="1" VerticalAlignment="Center" Margin="0,6,0,6">
+                        <TextBlock x:Name="HeadlineMic" Text="Sampling Acoustic Waves..." FontFamily="{StaticResource FontSans}" FontWeight="SemiBold" FontSize="11" Foreground="#F0F6FC" TextWrapping="Wrap"/>
+                        <TextBlock x:Name="DetailMic" Text="Measuring RMS amplitude..." FontFamily="{StaticResource FontMono}" FontSize="9" Foreground="#8B949E" TextWrapping="Wrap" Margin="0,3,0,0"/>
+                    </StackPanel>
+                    <DockPanel Grid.Row="2" LastChildFill="False">
+                        <Border DockPanel.Dock="Left" Background="#21262D" CornerRadius="4" Padding="6,2">
+                            <TextBlock x:Name="MetricMic" Text="-- dBFS" FontFamily="{StaticResource FontMono}" FontWeight="Bold" FontSize="9" Foreground="#58A6FF"/>
+                        </Border>
+                        <ProgressBar x:Name="ProgMicVu" DockPanel.Dock="Right" Width="60" Height="8" Minimum="0" Maximum="100" Value="0" Foreground="#3FB950" Background="#0E1116" BorderThickness="0" VerticalAlignment="Center"/>
+                    </DockPanel>
+                </Grid>
+            </Border>
+
+            <!-- Card 2: Stereo Speakers (Col 2, Row 0) -->
+            <Border x:Name="CardSpk" Grid.Column="2" Grid.Row="0" Background="#161B22" BorderBrush="#262C36" BorderThickness="1" CornerRadius="10" Padding="10" Margin="0,0,6,6">
+                <Grid>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="*"/>
+                        <RowDefinition Height="Auto"/>
+                    </Grid.RowDefinitions>
+                    <DockPanel Grid.Row="0" LastChildFill="False">
+                        <StackPanel Orientation="Horizontal" DockPanel.Dock="Left">
+                            <TextBlock Text="🔊" FontSize="12" Margin="0,0,6,0"/>
+                            <TextBlock Text="STEREO ACOUSTICS" FontFamily="{StaticResource FontMono}" FontWeight="Bold" FontSize="10" Foreground="#FFFFFF"/>
+                        </StackPanel>
+                        <TextBlock x:Name="BadgeSpk" DockPanel.Dock="Right" Text="● QUEUED" FontFamily="{StaticResource FontMono}" FontWeight="Bold" FontSize="9" Foreground="#8B949E"/>
+                    </DockPanel>
+                    <StackPanel Grid.Row="1" VerticalAlignment="Center" Margin="0,6,0,6">
+                        <TextBlock x:Name="HeadlineSpk" Text="Chirp Sweep Playback..." FontFamily="{StaticResource FontSans}" FontWeight="SemiBold" FontSize="11" Foreground="#F0F6FC" TextWrapping="Wrap"/>
+                        <TextBlock x:Name="DetailSpk" Text="FFT THD % Rattle Detection..." FontFamily="{StaticResource FontMono}" FontSize="9" Foreground="#8B949E" TextWrapping="Wrap" Margin="0,3,0,0"/>
+                    </StackPanel>
+                    <DockPanel Grid.Row="2" LastChildFill="False">
+                        <Border DockPanel.Dock="Left" Background="#21262D" CornerRadius="4" Padding="6,2">
+                            <TextBlock x:Name="MetricSpk" Text="THD: --%" FontFamily="{StaticResource FontMono}" FontWeight="Bold" FontSize="9" Foreground="#3FB950"/>
+                        </Border>
+                    </DockPanel>
+                </Grid>
+            </Border>
+
+            <!-- Card 3: Storage NVMe (Col 3, Row 0) -->
+            <Border x:Name="CardStore" Grid.Column="3" Grid.Row="0" Background="#161B22" BorderBrush="#262C36" BorderThickness="1" CornerRadius="10" Padding="10" Margin="0,0,0,6">
+                <Grid>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="*"/>
+                        <RowDefinition Height="Auto"/>
+                    </Grid.RowDefinitions>
+                    <DockPanel Grid.Row="0" LastChildFill="False">
+                        <StackPanel Orientation="Horizontal" DockPanel.Dock="Left">
+                            <TextBlock Text="💾" FontSize="12" Margin="0,0,6,0"/>
+                            <TextBlock Text="NVMe STORAGE" FontFamily="{StaticResource FontMono}" FontWeight="Bold" FontSize="10" Foreground="#FFFFFF"/>
+                        </StackPanel>
+                        <TextBlock x:Name="BadgeStore" DockPanel.Dock="Right" Text="● QUEUED" FontFamily="{StaticResource FontMono}" FontWeight="Bold" FontSize="9" Foreground="#8B949E"/>
+                    </DockPanel>
+                    <StackPanel Grid.Row="1" VerticalAlignment="Center" Margin="0,6,0,6">
+                        <TextBlock x:Name="HeadlineStore" Text="16MB I/O Speed Benchmark..." FontFamily="{StaticResource FontSans}" FontWeight="SemiBold" FontSize="11" Foreground="#F0F6FC" TextWrapping="Wrap"/>
+                        <TextBlock x:Name="DetailStore" Text="SMART Bad Sectors &amp; Health..." FontFamily="{StaticResource FontMono}" FontSize="9" Foreground="#8B949E" TextWrapping="Wrap" Margin="0,3,0,0"/>
+                    </StackPanel>
+                    <DockPanel Grid.Row="2" LastChildFill="False">
+                        <Border DockPanel.Dock="Left" Background="#21262D" CornerRadius="4" Padding="6,2">
+                            <TextBlock x:Name="MetricStore" Text="-- MB/s" FontFamily="{StaticResource FontMono}" FontWeight="Bold" FontSize="9" Foreground="#58A6FF"/>
+                        </Border>
+                    </DockPanel>
+                </Grid>
+            </Border>
+
+            <!-- Card 4: CPU & RAM (Col 0, Row 1) -->
+            <Border x:Name="CardCpu" Grid.Column="0" Grid.Row="1" Background="#161B22" BorderBrush="#262C36" BorderThickness="1" CornerRadius="10" Padding="10" Margin="0,0,6,0">
+                <Grid>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="*"/>
+                        <RowDefinition Height="Auto"/>
+                    </Grid.RowDefinitions>
+                    <DockPanel Grid.Row="0" LastChildFill="False">
+                        <StackPanel Orientation="Horizontal" DockPanel.Dock="Left">
+                            <TextBlock Text="⚡" FontSize="12" Margin="0,0,6,0"/>
+                            <TextBlock Text="CPU &amp; RAM" FontFamily="{StaticResource FontMono}" FontWeight="Bold" FontSize="10" Foreground="#FFFFFF"/>
+                        </StackPanel>
+                        <TextBlock x:Name="BadgeCpu" DockPanel.Dock="Right" Text="● QUEUED" FontFamily="{StaticResource FontMono}" FontWeight="Bold" FontSize="9" Foreground="#8B949E"/>
+                    </DockPanel>
+                    <StackPanel Grid.Row="1" VerticalAlignment="Center" Margin="0,6,0,6">
+                        <TextBlock x:Name="HeadlineCpu" Text="Multi-Core Compute..." FontFamily="{StaticResource FontSans}" FontWeight="SemiBold" FontSize="11" Foreground="#F0F6FC" TextWrapping="Wrap"/>
+                        <TextBlock x:Name="DetailCpu" Text="64MB RAM bit-flip test..." FontFamily="{StaticResource FontMono}" FontSize="9" Foreground="#8B949E" TextWrapping="Wrap" Margin="0,3,0,0"/>
+                    </StackPanel>
+                    <DockPanel Grid.Row="2" LastChildFill="False">
+                        <Border DockPanel.Dock="Left" Background="#21262D" CornerRadius="4" Padding="6,2">
+                            <TextBlock x:Name="MetricCpu" Text="-- Cores · --°C" FontFamily="{StaticResource FontMono}" FontWeight="Bold" FontSize="9" Foreground="#58A6FF"/>
+                        </Border>
+                    </DockPanel>
+                </Grid>
+            </Border>
+
+            <!-- Card 5: Battery System (Col 1, Row 1) -->
+            <Border x:Name="CardBat" Grid.Column="1" Grid.Row="1" Background="#161B22" BorderBrush="#262C36" BorderThickness="1" CornerRadius="10" Padding="10" Margin="0,0,6,0">
+                <Grid>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="*"/>
+                        <RowDefinition Height="Auto"/>
+                    </Grid.RowDefinitions>
+                    <DockPanel Grid.Row="0" LastChildFill="False">
+                        <StackPanel Orientation="Horizontal" DockPanel.Dock="Left">
+                            <TextBlock Text="🔋" FontSize="12" Margin="0,0,6,0"/>
+                            <TextBlock Text="BATTERY POWER" FontFamily="{StaticResource FontMono}" FontWeight="Bold" FontSize="10" Foreground="#FFFFFF"/>
+                        </StackPanel>
+                        <TextBlock x:Name="BadgeBat" DockPanel.Dock="Right" Text="● QUEUED" FontFamily="{StaticResource FontMono}" FontWeight="Bold" FontSize="9" Foreground="#8B949E"/>
+                    </DockPanel>
+                    <StackPanel Grid.Row="1" VerticalAlignment="Center" Margin="0,6,0,6">
+                        <TextBlock x:Name="HeadlineBat" Text="Sampling Wear Level..." FontFamily="{StaticResource FontSans}" FontWeight="SemiBold" FontSize="11" Foreground="#F0F6FC" TextWrapping="Wrap"/>
+                        <TextBlock x:Name="DetailBat" Text="Design vs Actual mWh..." FontFamily="{StaticResource FontMono}" FontSize="9" Foreground="#8B949E" TextWrapping="Wrap" Margin="0,3,0,0"/>
+                    </StackPanel>
+                    <DockPanel Grid.Row="2" LastChildFill="False">
+                        <Border DockPanel.Dock="Left" Background="#21262D" CornerRadius="4" Padding="6,2">
+                            <TextBlock x:Name="MetricBat" Text="--% Health" FontFamily="{StaticResource FontMono}" FontWeight="Bold" FontSize="9" Foreground="#3FB950"/>
+                        </Border>
+                    </DockPanel>
+                </Grid>
+            </Border>
+
+            <!-- Card 6: Display VSync (Col 2, Row 1) -->
+            <Border x:Name="CardDisp" Grid.Column="2" Grid.Row="1" Background="#161B22" BorderBrush="#262C36" BorderThickness="1" CornerRadius="10" Padding="10" Margin="0,0,6,0">
+                <Grid>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="*"/>
+                        <RowDefinition Height="Auto"/>
+                    </Grid.RowDefinitions>
+                    <DockPanel Grid.Row="0" LastChildFill="False">
+                        <StackPanel Orientation="Horizontal" DockPanel.Dock="Left">
+                            <TextBlock Text="🖥" FontSize="12" Margin="0,0,6,0"/>
+                            <TextBlock Text="DISPLAY VSYNC" FontFamily="{StaticResource FontMono}" FontWeight="Bold" FontSize="10" Foreground="#FFFFFF"/>
+                        </StackPanel>
+                        <TextBlock x:Name="BadgeDisp" DockPanel.Dock="Right" Text="● QUEUED" FontFamily="{StaticResource FontMono}" FontWeight="Bold" FontSize="9" Foreground="#8B949E"/>
+                    </DockPanel>
+                    <StackPanel Grid.Row="1" VerticalAlignment="Center" Margin="0,6,0,6">
+                        <TextBlock x:Name="HeadlineDisp" Text="VSync Hardware Timing..." FontFamily="{StaticResource FontSans}" FontWeight="SemiBold" FontSize="11" Foreground="#F0F6FC" TextWrapping="Wrap"/>
+                        <TextBlock x:Name="DetailDisp" Text="Measuring microsecond jitter..." FontFamily="{StaticResource FontMono}" FontSize="9" Foreground="#8B949E" TextWrapping="Wrap" Margin="0,3,0,0"/>
+                    </StackPanel>
+                    <DockPanel Grid.Row="2" LastChildFill="False">
+                        <Border DockPanel.Dock="Left" Background="#21262D" CornerRadius="4" Padding="6,2">
+                            <TextBlock x:Name="MetricDisp" Text="-- Hz" FontFamily="{StaticResource FontMono}" FontWeight="Bold" FontSize="9" Foreground="#58A6FF"/>
+                        </Border>
+                    </DockPanel>
+                </Grid>
+            </Border>
+
+            <!-- Card 7: Network & BT (Col 3, Row 1) -->
+            <Border x:Name="CardNet" Grid.Column="3" Grid.Row="1" Background="#161B22" BorderBrush="#262C36" BorderThickness="1" CornerRadius="10" Padding="10" Margin="0,0,0,0">
+                <Grid>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="*"/>
+                        <RowDefinition Height="Auto"/>
+                    </Grid.RowDefinitions>
+                    <DockPanel Grid.Row="0" LastChildFill="False">
+                        <StackPanel Orientation="Horizontal" DockPanel.Dock="Left">
+                            <TextBlock Text="📶" FontSize="12" Margin="0,0,6,0"/>
+                            <TextBlock Text="WI-FI &amp; BLUETOOTH" FontFamily="{StaticResource FontMono}" FontWeight="Bold" FontSize="10" Foreground="#FFFFFF"/>
+                        </StackPanel>
+                        <TextBlock x:Name="BadgeNet" DockPanel.Dock="Right" Text="● QUEUED" FontFamily="{StaticResource FontMono}" FontWeight="Bold" FontSize="9" Foreground="#8B949E"/>
+                    </DockPanel>
+                    <StackPanel Grid.Row="1" VerticalAlignment="Center" Margin="0,6,0,6">
+                        <TextBlock x:Name="HeadlineNet" Text="ICMP Gateway Ping..." FontFamily="{StaticResource FontSans}" FontWeight="SemiBold" FontSize="11" Foreground="#F0F6FC" TextWrapping="Wrap"/>
+                        <TextBlock x:Name="DetailNet" Text="Wi-Fi 6 &amp; BT transceiver..." FontFamily="{StaticResource FontMono}" FontSize="9" Foreground="#8B949E" TextWrapping="Wrap" Margin="0,3,0,0"/>
+                    </StackPanel>
+                    <DockPanel Grid.Row="2" LastChildFill="False">
+                        <Border DockPanel.Dock="Left" Background="#21262D" CornerRadius="4" Padding="6,2">
+                            <TextBlock x:Name="MetricNet" Text="-- ms" FontFamily="{StaticResource FontMono}" FontWeight="Bold" FontSize="9" Foreground="#58A6FF"/>
+                        </Border>
+                    </DockPanel>
+                </Grid>
+            </Border>
+        </Grid>
+        </ScrollViewer>
+
+        <!-- 3. BOTTOM AUDIT SUMMARY & GRADE SIGN-OFF -->
+        <Border Grid.Row="2" Background="#161B22" BorderBrush="#262C36" BorderThickness="1" CornerRadius="12" Padding="14,10" Margin="0,12,0,0">
+            <DockPanel LastChildFill="False">
+                <StackPanel Orientation="Horizontal" DockPanel.Dock="Left" VerticalAlignment="Center">
+                    <Border x:Name="BorderGradeBadge" Background="#BC8CFF" CornerRadius="6" Padding="10,6" Margin="0,0,12,0">
+                        <TextBlock x:Name="TxtCalculatedGrade" Text="GRADE A+" FontFamily="{StaticResource FontMono}" FontWeight="ExtraBold" FontSize="14" Foreground="#000000"/>
+                    </Border>
+                    <StackPanel VerticalAlignment="Center">
+                        <TextBlock x:Name="TxtAuditSummary" Text="Running autonomous Power-On Self-Test (POST)..." FontFamily="{StaticResource FontSans}" FontWeight="SemiBold" FontSize="12" Foreground="#F0F6FC"/>
+                        <TextBlock x:Name="TxtAuditNotes" Text="Automated certification across 8 subsystems without human intervention." FontFamily="{StaticResource FontMono}" FontSize="10" Foreground="#8B949E" Margin="0,2,0,0"/>
+                    </StackPanel>
+                </StackPanel>
+
+                <StackPanel Orientation="Horizontal" DockPanel.Dock="Right" VerticalAlignment="Center">
+                    <Button x:Name="BtnCloudDispatch" Content="☁ CLOUD DISPATCH [S]" Style="{StaticResource StyleDarkActionBtn}" Click="BtnCloudDispatch_Click" IsEnabled="False" Padding="10,6" FontSize="11" Margin="0,0,8,0"/>
+                    <Button x:Name="BtnAcceptAll" Content="✓ ACCEPT &amp; PASS ALL [ENTER]" Style="{StaticResource StyleCloudPassButton}" Click="BtnAcceptAll_Click" IsEnabled="False" Padding="14,6" FontSize="11"/>
+                </StackPanel>
+            </DockPanel>
+        </Border>
+    </Grid>
+</Window>

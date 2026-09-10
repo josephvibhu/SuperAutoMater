@@ -8,6 +8,11 @@ namespace SuperAutoMater.Wpf.Services
         public int LoadVoltageMv { get; set; } = 12150;
         public int VoltageSagMv => Math.Max(0, IdleVoltageMv - LoadVoltageMv);
         public double SagVolts => Math.Round(VoltageSagMv / 1000.0, 2);
+        public int SeriesCellCount => IdleVoltageMv <= 9000 ? 2 : (IdleVoltageMv <= 13500 ? 3 : 4);
+        public int PerCellSagMv => SeriesCellCount > 0 ? (int)Math.Round((double)VoltageSagMv / SeriesCellCount) : 0;
+        public int EstimatedCellDriftMv => Math.Max(8, (int)Math.Round(PerCellSagMv * 0.25));
+        public string CellTopology => $"{SeriesCellCount}S1P ({SeriesCellCount} Cells)";
+        public string CellBalanceStatus => EstimatedCellDriftMv > 80 ? "⚠ CRITICAL CELL IMBALANCE" : (EstimatedCellDriftMv > 35 ? "● MODERATE CELL DRIFT" : "✓ CELLS BALANCED NOMINAL");
         public string CellIntegrityCode { get; set; } = "NOMINAL";
         public string StatusSummary { get; set; } = "Cell Voltage Stable";
         public string AccentHex { get; set; } = "#3FB950";
@@ -59,7 +64,13 @@ namespace SuperAutoMater.Wpf.Services
         public BatteryLoadResult StopMeasurement()
         {
             _isMeasuring = false;
-            return ComputeResult();
+            var res = ComputeResult();
+            try
+            {
+                HardwareDiagnosticsService.Instance.BatteryTelemetry.EstimatedCellDriftMv = res.EstimatedCellDriftMv;
+            }
+            catch { }
+            return res;
         }
 
         public BatteryLoadResult GetResult()

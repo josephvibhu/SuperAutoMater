@@ -1,0 +1,123 @@
+<Window x:Class="SuperAutoMater.Wpf.Views.RetailPrepModalWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="1-Click Retail Prep &amp; Sanitizer"
+        Height="540" Width="680"
+        WindowStartupLocation="CenterOwner"
+        WindowStyle="None"
+        AllowsTransparency="True"
+        Background="Transparent">
+
+    <Border Background="#0D1117" BorderBrush="#30363D" BorderThickness="1.5" CornerRadius="12" Padding="20">
+        <Grid>
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto"/> <!-- Header -->
+                <RowDefinition Height="Auto"/> <!-- Options Cards -->
+                <RowDefinition Height="*"/>    <!-- Progress & Terminal Log -->
+                <RowDefinition Height="Auto"/> <!-- Action Buttons -->
+            </Grid.RowDefinitions>
+
+            <!-- Header -->
+            <DockPanel Grid.Row="0" Margin="0,0,0,16" LastChildFill="False">
+                <StackPanel DockPanel.Dock="Left">
+                    <StackPanel Orientation="Horizontal">
+                        <TextBlock Text="🧹 " FontSize="18" VerticalAlignment="Center"/>
+                        <TextBlock Text="1-CLICK RETAIL PREP &amp; CUSTOMER SANITIZER" 
+                                   FontFamily="{StaticResource FontSans}" 
+                                   FontWeight="Bold" 
+                                   FontSize="15" 
+                                   Foreground="#FFFFFF"/>
+                        <Border Background="#1A3FB950" BorderBrush="#3FB950" BorderThickness="1" CornerRadius="4" Padding="6,2" Margin="10,0,0,0">
+                            <TextBlock Text="ENTERPRISE DISPATCH" FontFamily="{StaticResource FontMono}" FontSize="10" FontWeight="Bold" Foreground="#3FB950"/>
+                        </Border>
+                    </StackPanel>
+                    <TextBlock Text="Wipes diagnostic artifacts, event logs, and preps laptop for retail unboxing." 
+                               FontFamily="{StaticResource FontMono}" 
+                               FontSize="11" 
+                               Foreground="#8B949E" 
+                               Margin="0,4,0,0"/>
+                </StackPanel>
+                <Button DockPanel.Dock="Right" 
+                        Content="✕" 
+                        FontFamily="{StaticResource FontSans}" 
+                        FontWeight="Bold" 
+                        FontSize="14" 
+                        Foreground="#8B949E" 
+                        Background="Transparent" 
+                        BorderThickness="0" 
+                        Click="BtnClose_Click" 
+                        Cursor="Hand"/>
+            </DockPanel>
+
+            <!-- Options Cards -->
+            <Border Grid.Row="1" Background="#161B22" BorderBrush="#21262D" BorderThickness="1" CornerRadius="8" Padding="14,10" Margin="0,0,0,14">
+                <StackPanel>
+                    <TextBlock Text="SELECT SANITIZATION PIPELINES:" FontFamily="{StaticResource FontMono}" FontWeight="Bold" FontSize="11" Foreground="#58A6FF" Margin="0,0,0,8"/>
+
+                    <CheckBox x:Name="ChkCleanTemp" IsChecked="True" Content="Purge diagnostic temp files, benchmark cache &amp; XML dumps" 
+                              FontFamily="{StaticResource FontSans}" FontSize="12" Foreground="#C9D1D9" Margin="0,0,0,6"/>
+                    <CheckBox x:Name="ChkEmptyRecycle" IsChecked="True" Content="Empty Windows Recycle Bin across all mounted volumes" 
+                              FontFamily="{StaticResource FontSans}" FontSize="12" Foreground="#C9D1D9" Margin="0,0,0,6"/>
+                    <CheckBox x:Name="ChkClearLogs" IsChecked="True" Content="Sanitize Windows Event Logs (Application, System, Setup)" 
+                              FontFamily="{StaticResource FontSans}" FontSize="12" Foreground="#C9D1D9" Margin="0,0,0,6"/>
+                    <CheckBox x:Name="ChkResetPower" IsChecked="True" Content="Reset power scheme back to default Windows Balanced energy profile" 
+                              FontFamily="{StaticResource FontSans}" FontSize="12" Foreground="#C9D1D9" Margin="0,0,0,8"/>
+
+                    <!-- OOBE Sysprep Option -->
+                    <Border Background="#1C1814" BorderBrush="#D29922" BorderThickness="1" CornerRadius="6" Padding="10,8">
+                        <StackPanel>
+                            <CheckBox x:Name="ChkOobeSysprep" IsChecked="False" 
+                                      Content="Arm unit with Windows Customer OOBE on Next Boot &amp; Shutdown" 
+                                      FontFamily="{StaticResource FontSans}" FontWeight="Bold" FontSize="12" Foreground="#F0883E"/>
+                            <TextBlock Text="Uses safe Sysprep /oobe /shutdown. Does NOT strip drivers and will never fail on Store Apps." 
+                                       FontFamily="{StaticResource FontMono}" FontSize="10" Foreground="#8B949E" Margin="22,3,0,0"/>
+                        </StackPanel>
+                    </Border>
+                </StackPanel>
+            </Border>
+
+            <!-- Progress & Terminal Log -->
+            <Grid Grid.Row="2" Margin="0,0,0,14">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="*"/>
+                </Grid.RowDefinitions>
+
+                <!-- Progress Bar -->
+                <Grid Grid.Row="0" Margin="0,0,0,6">
+                    <DockPanel LastChildFill="False" Margin="0,0,0,4">
+                        <TextBlock x:Name="TxtStatusStage" DockPanel.Dock="Left" Text="READY FOR PREP" FontFamily="{StaticResource FontMono}" FontWeight="Bold" FontSize="11" Foreground="#8B949E"/>
+                        <TextBlock x:Name="TxtPercent" DockPanel.Dock="Right" Text="0%" FontFamily="{StaticResource FontMono}" FontWeight="Bold" FontSize="11" Foreground="#3FB950"/>
+                    </DockPanel>
+                    <Border Margin="0,18,0,0" Background="#161B22" BorderBrush="#30363D" BorderThickness="1" CornerRadius="4" Padding="1">
+                        <ProgressBar x:Name="PbRetailPrep" Height="6" Minimum="0" Maximum="100" Value="0" Foreground="#3FB950" Background="Transparent" BorderThickness="0"/>
+                    </Border>
+                </Grid>
+
+                <!-- Console Output ScrollBox -->
+                <Border Grid.Row="1" Background="#06090E" BorderBrush="#21262D" BorderThickness="1" CornerRadius="6" Padding="10,8">
+                    <ScrollViewer x:Name="ScrollLogs" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+                        <TextBlock x:Name="TxtTerminalLog" 
+                                   Text="[Awaiting initiation. Select pipelines and click EXECUTE RETAIL PREP below.]" 
+                                   FontFamily="{StaticResource FontMono}" 
+                                   FontSize="10" 
+                                   LineHeight="15" 
+                                   Foreground="#8B949E" 
+                                   TextWrapping="Wrap"/>
+                    </ScrollViewer>
+                </Border>
+            </Grid>
+
+            <!-- Action Buttons -->
+            <DockPanel Grid.Row="3" LastChildFill="False">
+                <Button DockPanel.Dock="Left" Content="CLOSE [ESC]" Style="{StaticResource StyleDarkActionBtn}" Click="BtnClose_Click" Padding="14,8"/>
+                <Button x:Name="BtnExecutePrep" DockPanel.Dock="Right" 
+                        Content="🧹 EXECUTE RETAIL PREP" 
+                        Style="{StaticResource StyleCloudPassButton}" 
+                        Click="BtnExecutePrep_Click" 
+                        Padding="18,8" 
+                        FontWeight="Bold"/>
+            </DockPanel>
+        </Grid>
+    </Border>
+</Window>
