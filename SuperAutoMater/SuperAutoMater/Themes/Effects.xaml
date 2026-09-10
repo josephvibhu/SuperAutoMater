@@ -1,0 +1,35 @@
+<ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+
+    <!-- Clean GPU Shadow & Subtle Accent Effects -->
+    <DropShadowEffect x:Key="EffectGlowViolet"
+                      Color="#A855F7"
+                      BlurRadius="16"
+                      ShadowDepth="0"
+                      Opacity="0.45"/>
+
+    <DropShadowEffect x:Key="EffectGlowPurpleSm"
+                      Color="#A855F7"
+                      BlurRadius="10"
+                      ShadowDepth="0"
+                      Opacity="0.50"/>
+
+    <DropShadowEffect x:Key="EffectGlowEmerald"
+                      Color="#2EA043"
+                      BlurRadius="14"
+                      ShadowDepth="0"
+                      Opacity="0.45"/>
+
+    <DropShadowEffect x:Key="EffectCardShadow"
+                      Color="#000000"
+                      BlurRadius="12"
+                      ShadowDepth="4"
+                      Opacity="0.45"/>
+
+    <DropShadowEffect x:Key="EffectBarShadow"
+                      Color="#000000"
+                      BlurRadius="16"
+                      ShadowDepth="4"
+                      Opacity="0.55"/>
+
+</ResourceDictionary>

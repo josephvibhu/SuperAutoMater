@@ -1,0 +1,8 @@
+<Solution>
+  <Folder Name="/old/">
+    <Project Path="old/Automater/Automater.csproj" />
+  </Folder>
+  <Folder Name="/SuperAutoMater/">
+    <Project Path="SuperAutoMater/SuperAutoMater/SuperAutoMater.csproj" />
+  </Folder>
+</Solution>

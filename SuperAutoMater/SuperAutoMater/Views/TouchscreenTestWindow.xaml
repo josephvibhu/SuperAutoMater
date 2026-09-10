@@ -1,0 +1,69 @@
+<Window x:Class="SuperAutoMater.Wpf.Views.TouchscreenTestWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Touchscreen Digitizer Matrix Test"
+        WindowState="Maximized"
+        WindowStyle="None"
+        Topmost="True"
+        Background="#080B10"
+        Cursor="Cross"
+        KeyDown="Window_KeyDown"
+        UseLayoutRounding="True"
+        SnapsToDevicePixels="True"
+        TextOptions.TextFormattingMode="Display"
+        TextOptions.TextRenderingMode="ClearType">
+
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/> <!-- Top Avionics HUD Banner -->
+            <RowDefinition Height="*"/>    <!-- 14x9 Interactive Digitizer Matrix -->
+        </Grid.RowDefinitions>
+
+        <!-- Top Avionics HUD Banner -->
+        <Border Grid.Row="0" Background="#161B22" BorderBrush="#262C36" BorderThickness="0,0,0,1" Padding="16,10">
+            <DockPanel LastChildFill="False">
+                <StackPanel Orientation="Horizontal" DockPanel.Dock="Left" VerticalAlignment="Center">
+                    <TextBlock Text="👆" FontSize="18" Margin="0,0,10,0"/>
+                    <TextBlock Text="MULTI-TOUCH DIGITIZER &amp; SENSOR COVERAGE MATRIX" FontFamily="Segoe UI" FontWeight="Bold" FontSize="14" Foreground="#FFFFFF" Margin="0,0,14,0" VerticalAlignment="Center"/>
+                    <Border x:Name="BorderHwStatus" Background="#1F3528" BorderBrush="#2EA043" BorderThickness="1" CornerRadius="6" Padding="8,2" Margin="0,0,8,0" VerticalAlignment="Center">
+                        <TextBlock x:Name="TxtHwStatus" Text="DIGITIZER ACTIVE" FontFamily="Consolas" FontWeight="Bold" FontSize="11" Foreground="#3FB950"/>
+                    </Border>
+                    <Border Background="#21262D" BorderBrush="#30363D" BorderThickness="1" CornerRadius="6" Padding="8,2" VerticalAlignment="Center">
+                        <TextBlock x:Name="TxtMaxTouches" Text="10 TOUCH CONTACTS" FontFamily="Consolas" FontSize="11" Foreground="#58A6FF"/>
+                    </Border>
+                </StackPanel>
+
+                <StackPanel Orientation="Horizontal" DockPanel.Dock="Right" VerticalAlignment="Center">
+                    <Border Background="#21262D" BorderBrush="#30363D" BorderThickness="1" CornerRadius="6" Padding="10,4" Margin="0,0,10,0">
+                        <StackPanel Orientation="Horizontal">
+                            <TextBlock Text="COVERAGE: " FontFamily="Consolas" FontSize="11" Foreground="#8B949E"/>
+                            <TextBlock x:Name="TxtCoverage" Text="0/126 BLOCKS (0%)" FontFamily="Consolas" FontWeight="Bold" FontSize="11" Foreground="#3FB950"/>
+                        </StackPanel>
+                    </Border>
+
+                    <Border Background="#21262D" BorderBrush="#30363D" BorderThickness="1" CornerRadius="4" Padding="6,2" Margin="0,0,6,0">
+                        <TextBlock Text="[C] Reset" FontFamily="Consolas" FontSize="10" Foreground="#8B949E"/>
+                    </Border>
+                    <Border Background="#21262D" BorderBrush="#30363D" BorderThickness="1" CornerRadius="4" Padding="6,2" Margin="0,0,10,0">
+                        <TextBlock Text="[Esc] Exit" FontFamily="Consolas" FontSize="10" Foreground="#8B949E"/>
+                    </Border>
+                    <Button Content="✓ PASS TOUCH MATRIX [ENTER]" Background="#238636" Foreground="#FFFFFF" BorderThickness="0" Padding="14,6" FontFamily="Segoe UI" FontWeight="Bold" FontSize="11" Cursor="Hand" Click="BtnPass_Click"/>
+                </StackPanel>
+            </DockPanel>
+        </Border>
+
+        <!-- 14x9 Interactive Digitizer Grid -->
+        <Grid x:Name="DigitizerGrid" Grid.Row="1" Margin="8"
+              MouseDown="Grid_MouseDown"
+              MouseMove="Grid_MouseMove"
+              MouseUp="Grid_MouseUp"
+              TouchDown="Grid_TouchDown"
+              TouchMove="Grid_TouchMove"
+              TouchUp="Grid_TouchUp">
+            <!-- Dynamically populated 14 columns x 9 rows UniformGrid / Grid -->
+            <UniformGrid x:Name="BlocksContainer" Columns="14" Rows="9"/>
+            <!-- Trail Canvas -->
+            <Canvas x:Name="TrailCanvas" IsHitTestVisible="False"/>
+        </Grid>
+    </Grid>
+</Window>

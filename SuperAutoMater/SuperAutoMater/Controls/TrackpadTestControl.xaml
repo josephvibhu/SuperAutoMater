@@ -1,0 +1,203 @@
+<UserControl x:Class="SuperAutoMater.Wpf.Controls.TrackpadTestControl"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             x:Name="RootTp"
+             ContextMenu="{x:Null}">
+    <Border Background="#0D1117" BorderBrush="#21262D" BorderThickness="1" CornerRadius="10" Padding="10,8">
+        <Grid>
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto"/> <!-- Trackpad Header & Status Pills -->
+                <RowDefinition Height="*"/>    <!-- Interactive Trackpad Surface & Physical Buttons -->
+            </Grid.RowDefinitions>
+
+            <!-- Row 0: Header & Compact Status Chips -->
+            <DockPanel Grid.Row="0" LastChildFill="False" Margin="0,0,0,6">
+                <StackPanel Orientation="Horizontal" DockPanel.Dock="Left" VerticalAlignment="Center">
+                    <Ellipse x:Name="DotTpStatus" Width="7" Height="7" Fill="#58A6FF" Margin="0,0,6,0"/>
+                    <TextBlock Text="TRACKPAD &amp; BUTTONS" FontFamily="{DynamicResource FontSans}" FontWeight="Bold" FontSize="11" Foreground="{DynamicResource BrushTextWhite}"/>
+                    <Border x:Name="BorderOverallStatus" Background="#1C2128" BorderBrush="#30363D" BorderThickness="1" CornerRadius="4" Padding="5,1" Margin="8,0,0,0">
+                        <TextBlock x:Name="TxtOverallStatus" Text="AWAITING INPUT" FontFamily="{DynamicResource FontMono}" FontWeight="Bold" FontSize="9.5" Foreground="#8B949E"/>
+                    </Border>
+                </StackPanel>
+
+                <!-- Right: Compact Status Chips & Reset -->
+                <StackPanel Orientation="Horizontal" DockPanel.Dock="Right" VerticalAlignment="Center">
+                    <!-- Motion Chip -->
+                    <Border x:Name="BadgeMotion" Background="#161B22" BorderBrush="#30363D" BorderThickness="1" CornerRadius="4" Padding="5,1.5" Margin="0,0,3,0">
+                        <TextBlock x:Name="TxtMotionBadge" Text="MOTION [0px]" FontFamily="{DynamicResource FontMono}" FontSize="9.5" Foreground="#8B949E"/>
+                    </Border>
+                    <!-- Scroll Chip -->
+                    <Border x:Name="BadgeScroll" Background="#161B22" BorderBrush="#30363D" BorderThickness="1" CornerRadius="4" Padding="5,1.5" Margin="0,0,3,0">
+                        <TextBlock x:Name="TxtScrollBadge" Text="SCROLL [0]" FontFamily="{DynamicResource FontMono}" FontSize="9.5" Foreground="#8B949E"/>
+                    </Border>
+                    <!-- Left Click Chip -->
+                    <Border x:Name="BadgeLeft" Background="#161B22" BorderBrush="#30363D" BorderThickness="1" CornerRadius="4" Padding="5,1.5" Margin="0,0,3,0">
+                        <TextBlock x:Name="TxtLeftBadge" Text="LMB" FontFamily="{DynamicResource FontMono}" FontSize="9.5" Foreground="#8B949E"/>
+                    </Border>
+                    <!-- Middle Click Chip -->
+                    <Border x:Name="BadgeMiddle" Background="#161B22" BorderBrush="#30363D" BorderThickness="1" CornerRadius="4" Padding="5,1.5" Margin="0,0,3,0">
+                        <TextBlock x:Name="TxtMiddleBadge" Text="MMB" FontFamily="{DynamicResource FontMono}" FontSize="9.5" Foreground="#8B949E"/>
+                    </Border>
+                    <!-- Right Click Chip -->
+                    <Border x:Name="BadgeRight" Background="#161B22" BorderBrush="#30363D" BorderThickness="1" CornerRadius="4" Padding="5,1.5" Margin="0,0,6,0">
+                        <TextBlock x:Name="TxtRightBadge" Text="RMB" FontFamily="{DynamicResource FontMono}" FontSize="9.5" Foreground="#8B949E"/>
+                    </Border>
+                    <!-- Reset Button -->
+                    <Button Content="↺ RESET" Style="{DynamicResource StyleDarkActionBtn}" Click="BtnReset_Click" Padding="6,1.5" FontSize="9.5"/>
+                </StackPanel>
+            </DockPanel>
+
+            <!-- Row 1: Interactive Trackpad & Buttons Assembly -->
+            <Grid Grid.Row="1" MinHeight="115">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="2.2*"/> <!-- Trackpad Surface -->
+                    <ColumnDefinition Width="*"/>    <!-- Physical Click Targets / Diagnostic Cards -->
+                </Grid.ColumnDefinitions>
+
+                <!-- Left Column: Trackpad Sensor Surface -->
+                <Border Grid.Column="0"
+                        x:Name="TrackpadSensorSurface"
+                        Background="#0A0D13"
+                        BorderBrush="#30363D"
+                        BorderThickness="1.5"
+                        CornerRadius="10"
+                        ClipToBounds="True"
+                        Cursor="Cross"
+                        ContextMenu="{x:Null}"
+                        PreviewMouseMove="Trackpad_PreviewMouseMove"
+                        PreviewMouseDown="Trackpad_PreviewMouseDown"
+                        PreviewMouseUp="Trackpad_PreviewMouseUp"
+                        PreviewMouseWheel="Trackpad_PreviewMouseWheel"
+                        MouseLeave="Trackpad_MouseLeave"
+                        Margin="0,0,6,0">
+                    <Grid>
+                        <!-- Canvas for puck and trail -->
+                        <Canvas x:Name="TrackpadCanvas" Background="Transparent" ClipToBounds="True">
+                            <!-- Animated Tracking Puck -->
+                            <Grid x:Name="TrackingPuck" Width="32" Height="32" Visibility="Collapsed" IsHitTestVisible="False">
+                                <Ellipse Width="32" Height="32" Fill="#25388BFD" Stroke="#58A6FF" StrokeThickness="1"/>
+                                <Ellipse Width="8" Height="8" Fill="#3FB950" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                            </Grid>
+                        </Canvas>
+
+                        <!-- Centered Guide Hint (Fades on interaction) -->
+                        <StackPanel x:Name="StackGuideHint" HorizontalAlignment="Center" VerticalAlignment="Center" IsHitTestVisible="False">
+                            <TextBlock Text="👆 MOVE FINGER OR DRAG POINTER ACROSS SURFACE" FontFamily="{DynamicResource FontMono}" FontWeight="Bold" FontSize="10.5" Foreground="#484F58" HorizontalAlignment="Center"/>
+                            <TextBlock Text="Scroll wheel / dual-finger swipe to test scroll · Click buttons to verify actuation" FontFamily="{DynamicResource FontMono}" FontSize="9" Foreground="#30363D" HorizontalAlignment="Center" Margin="0,2,0,0"/>
+                        </StackPanel>
+
+                        <!-- Coordinate Overlay Tag (Top-Right) -->
+                        <Border Background="#CC161B22" BorderBrush="#30363D" BorderThickness="1" CornerRadius="4" Padding="5,1.5" HorizontalAlignment="Right" VerticalAlignment="Top" Margin="6" IsHitTestVisible="False">
+                            <TextBlock x:Name="TxtCoordReadout" Text="X: 000 · Y: 000" FontFamily="{DynamicResource FontMono}" FontSize="9" Foreground="#58A6FF"/>
+                        </Border>
+
+                        <!-- Tap / Gesture Tag (Bottom-Left) -->
+                        <Border Background="#CC161B22" BorderBrush="#30363D" BorderThickness="1" CornerRadius="4" Padding="5,1.5" HorizontalAlignment="Left" VerticalAlignment="Bottom" Margin="6" IsHitTestVisible="False">
+                            <TextBlock x:Name="TxtGestureReadout" Text="SWIPE / POINTER READY" FontFamily="{DynamicResource FontMono}" FontSize="9" Foreground="#8B949E"/>
+                        </Border>
+                    </Grid>
+                </Border>
+
+                <!-- Right Column: Physical Click Buttons Strip -->
+                <Grid Grid.Column="1">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="*"/> <!-- Left Click Button -->
+                        <RowDefinition Height="*"/> <!-- Middle Click Button -->
+                        <RowDefinition Height="*"/> <!-- Right Click Button -->
+                    </Grid.RowDefinitions>
+
+                    <!-- 1. Left Click Target -->
+                    <Border Grid.Row="0"
+                            x:Name="CardLeftBtn"
+                            Background="#161B22"
+                            BorderBrush="#30363D"
+                            BorderThickness="1.5"
+                            CornerRadius="7"
+                            Padding="8,4"
+                            Cursor="Hand"
+                            ContextMenu="{x:Null}"
+                            PreviewMouseDown="BtnLeft_MouseDown"
+                            PreviewMouseUp="BtnLeft_MouseUp"
+                            Margin="0,0,0,3">
+                        <Grid VerticalAlignment="Center">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto"/>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="Auto"/>
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Grid.Column="0" Text="⯇" FontSize="12" Foreground="#58A6FF" VerticalAlignment="Center" Margin="0,0,6,0"/>
+                            <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                                <TextBlock Text="LEFT BUTTON" FontFamily="{DynamicResource FontMono}" FontWeight="Bold" FontSize="10" Foreground="{DynamicResource BrushTextWhite}"/>
+                                <TextBlock Text="Primary Select [LMB]" Style="{DynamicResource TextBadgeMono}" FontSize="8.5" Foreground="#8B949E"/>
+                            </StackPanel>
+                            <Border Grid.Column="2" x:Name="BadgeLeftState" Background="#21262D" CornerRadius="4" Padding="5,1" VerticalAlignment="Center">
+                                <TextBlock x:Name="TxtLeftState" Text="READY" FontFamily="{DynamicResource FontMono}" FontWeight="Bold" FontSize="9" Foreground="#8B949E"/>
+                            </Border>
+                        </Grid>
+                    </Border>
+
+                    <!-- 2. Middle Click / Scroll Target -->
+                    <Border Grid.Row="1"
+                            x:Name="CardMiddleBtn"
+                            Background="#161B22"
+                            BorderBrush="#30363D"
+                            BorderThickness="1.5"
+                            CornerRadius="7"
+                            Padding="8,4"
+                            Cursor="Hand"
+                            ContextMenu="{x:Null}"
+                            PreviewMouseDown="BtnMiddle_MouseDown"
+                            PreviewMouseUp="BtnMiddle_MouseUp"
+                            PreviewMouseWheel="Trackpad_PreviewMouseWheel"
+                            Margin="0,0,0,3">
+                        <Grid VerticalAlignment="Center">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto"/>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="Auto"/>
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Grid.Column="0" Text="◉" FontSize="12" Foreground="#D29922" VerticalAlignment="Center" Margin="0,0,6,0"/>
+                            <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                                <TextBlock Text="MIDDLE / SCROLL" FontFamily="{DynamicResource FontMono}" FontWeight="Bold" FontSize="10" Foreground="{DynamicResource BrushTextWhite}"/>
+                                <TextBlock Text="Wheel / Pan [MMB]" Style="{DynamicResource TextBadgeMono}" FontSize="8.5" Foreground="#8B949E"/>
+                            </StackPanel>
+                            <Border Grid.Column="2" x:Name="BadgeMiddleState" Background="#21262D" CornerRadius="4" Padding="5,1" VerticalAlignment="Center">
+                                <TextBlock x:Name="TxtMiddleState" Text="READY" FontFamily="{DynamicResource FontMono}" FontWeight="Bold" FontSize="9" Foreground="#8B949E"/>
+                            </Border>
+                        </Grid>
+                    </Border>
+
+                    <!-- 3. Right Click Target -->
+                    <Border Grid.Row="2"
+                            x:Name="CardRightBtn"
+                            Background="#161B22"
+                            BorderBrush="#30363D"
+                            BorderThickness="1.5"
+                            CornerRadius="7"
+                            Padding="8,4"
+                            Cursor="Hand"
+                            ContextMenu="{x:Null}"
+                            PreviewMouseDown="BtnRight_MouseDown"
+                            PreviewMouseUp="BtnRight_MouseUp"
+                            Margin="0,0,0,0">
+                        <Grid VerticalAlignment="Center">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto"/>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="Auto"/>
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Grid.Column="0" Text="⯈" FontSize="12" Foreground="#58A6FF" VerticalAlignment="Center" Margin="0,0,6,0"/>
+                            <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                                <TextBlock Text="RIGHT BUTTON" FontFamily="{DynamicResource FontMono}" FontWeight="Bold" FontSize="10" Foreground="{DynamicResource BrushTextWhite}"/>
+                                <TextBlock Text="Context Action [RMB]" Style="{DynamicResource TextBadgeMono}" FontSize="8.5" Foreground="#8B949E"/>
+                            </StackPanel>
+                            <Border Grid.Column="2" x:Name="BadgeRightState" Background="#21262D" CornerRadius="4" Padding="5,1" VerticalAlignment="Center">
+                                <TextBlock x:Name="TxtRightState" Text="READY" FontFamily="{DynamicResource FontMono}" FontWeight="Bold" FontSize="9" Foreground="#8B949E"/>
+                            </Border>
+                        </Grid>
+                    </Border>
+                </Grid>
+            </Grid>
+        </Grid>
+    </Border>
+</UserControl>

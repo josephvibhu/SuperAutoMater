@@ -1,0 +1,54 @@
+<UserControl x:Class="SuperAutoMater.Wpf.Controls.KeyboardMatrixControl"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             x:Name="RootKb">
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <!-- Top Header Controls -->
+        <DockPanel Grid.Row="0" LastChildFill="False" Margin="0,0,0,4">
+            <StackPanel Orientation="Horizontal" DockPanel.Dock="Left" VerticalAlignment="Center">
+                <Ellipse Width="8" Height="8" Fill="{DynamicResource BrushAccentBlue}" Margin="0,0,8,0"/>
+                <TextBlock Text="LIVE KEYBOARD HEATMAP &amp; RAW SCANNER" Style="{DynamicResource TextCardHeader}" Foreground="{DynamicResource BrushTextWhite}"/>
+            </StackPanel>
+
+            <StackPanel Orientation="Horizontal" DockPanel.Dock="Right" VerticalAlignment="Center">
+                <Button x:Name="BtnToggleNumpad" Content="[+ EXPAND NUMPAD]" Style="{DynamicResource StyleDarkActionBtn}" Click="BtnToggleNumpad_Click" Padding="8,2" Margin="0,0,8,0" ToolTip="Toggle dynamic Numpad block (also auto-expands on numpad keypress)"/>
+                <TextBlock Text="KEYS LOGGED: " Style="{DynamicResource TextAvionicsChip}" Foreground="{DynamicResource BrushTextVioletMuted}"/>
+                <TextBlock x:Name="TxtLoggedCount" Text="0/84" Style="{DynamicResource TextAvionicsChip}" FontWeight="Bold" Foreground="{DynamicResource BrushTextWhite}" Margin="0,0,12,0"/>
+                <Button x:Name="BtnReset" Content="RESET [ESC]" Style="{DynamicResource StyleDarkActionBtn}" Click="BtnReset_Click" Padding="8,2"/>
+            </StackPanel>
+        </DockPanel>
+
+        <!-- Keyboard Key Matrix Rows -->
+        <Border Grid.Row="1" Background="#0D1117" CornerRadius="10" BorderBrush="#21262D" BorderThickness="1" Padding="8,6">
+            <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" VerticalAlignment="Center">
+                <!-- Main Keyboard Section -->
+                <StackPanel x:Name="StackKeyRows" Orientation="Vertical" VerticalAlignment="Center" HorizontalAlignment="Center">
+                    <!-- Generated dynamically in codebehind for instant performance -->
+                </StackPanel>
+
+                <!-- Dynamic Numpad Separator Divider -->
+                <Rectangle x:Name="NumpadDivider" Width="1" Fill="#30363D" Margin="10,2,10,2" Visibility="Collapsed"/>
+
+                <!-- Dynamic Numpad Section -->
+                <StackPanel x:Name="StackNumpadRows" Orientation="Vertical" VerticalAlignment="Center" HorizontalAlignment="Center" Visibility="Collapsed">
+                    <!-- Numpad rows generated dynamically -->
+                </StackPanel>
+            </StackPanel>
+        </Border>
+
+        <!-- Footer Bar -->
+        <DockPanel Grid.Row="2" LastChildFill="False" Margin="0,4,0,0">
+            <StackPanel Orientation="Horizontal" DockPanel.Dock="Left">
+                <Ellipse Width="6" Height="6" Fill="{DynamicResource BrushAccentEmerald}" Margin="0,0,6,0"/>
+                <TextBlock Text="Raw Windows Low-Level Input Hook Active" Style="{DynamicResource TextBadgeMono}" Foreground="{DynamicResource BrushTextEmerald}"/>
+            </StackPanel>
+            <TextBlock DockPanel.Dock="Right" Text="Actuating any NumPad key automatically expands the layout" Style="{DynamicResource TextBadgeMono}" Foreground="{DynamicResource BrushTextVioletSubdued}"/>
+        </DockPanel>
+    </Grid>
+</UserControl>

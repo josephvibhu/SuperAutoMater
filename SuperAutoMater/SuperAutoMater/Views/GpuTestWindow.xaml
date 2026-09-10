@@ -1,0 +1,67 @@
+﻿<Window x:Class="SuperAutoMater.Wpf.Views.GpuTestWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="GPU 3D Acceleration &amp; Render Diagnostic"
+        Height="540" Width="760"
+        WindowStartupLocation="CenterOwner"
+        ResizeMode="NoResize"
+        Background="#0E1116"
+        Icon="pack://application:,,,/app.ico">
+
+    <Grid Margin="16">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/> <!-- Header -->
+            <RowDefinition Height="*"/>    <!-- 3D Render Canvas -->
+            <RowDefinition Height="Auto"/> <!-- Footer Actions -->
+        </Grid.RowDefinitions>
+
+        <!-- Top Header & Device Info -->
+        <Border Grid.Row="0" Background="#161B22" BorderBrush="#2D333B" BorderThickness="1" CornerRadius="10" Padding="14,10" Margin="0,0,0,12">
+            <DockPanel LastChildFill="False">
+                <StackPanel Orientation="Horizontal" DockPanel.Dock="Left" VerticalAlignment="Center">
+                    <Ellipse Width="9" Height="9" Fill="{StaticResource BrushAccentEmerald}" Margin="0,0,8,0"/>
+                    <TextBlock Text="GPU 3D ACCELERATION BENCHMARK" FontFamily="{StaticResource FontMono}" FontWeight="Bold" FontSize="12" Foreground="{StaticResource BrushTextWhite}" VerticalAlignment="Center"/>
+                </StackPanel>
+
+                <StackPanel Orientation="Horizontal" DockPanel.Dock="Right" VerticalAlignment="Center">
+                    <TextBlock x:Name="TxtFps" Text="60.0 FPS" FontFamily="{StaticResource FontMono}" FontWeight="Bold" FontSize="12" Foreground="{StaticResource BrushAccentEmeraldLight}" VerticalAlignment="Center" Margin="0,0,10,0"/>
+                    <Border Background="#21262D" BorderBrush="#30363D" BorderThickness="1" CornerRadius="6" Padding="6,2">
+                        <TextBlock x:Name="TxtVram" Text="VRAM: Nominal" FontFamily="{StaticResource FontMono}" FontSize="11" Foreground="#58A6FF"/>
+                    </Border>
+                </StackPanel>
+            </DockPanel>
+        </Border>
+
+        <!-- Render Viewport -->
+        <Border Grid.Row="1" Background="#000000" BorderBrush="#2D333B" BorderThickness="1" CornerRadius="10" ClipToBounds="True">
+            <Grid>
+                <!-- Dynamic 3D Particle & Wireframe Canvas -->
+                <Canvas x:Name="RenderCanvas" Background="#040608"/>
+
+                <!-- Telemetry HUD Overlay -->
+                <Border HorizontalAlignment="Left" VerticalAlignment="Top" Background="#B0161B22" BorderBrush="#30363D" BorderThickness="1" CornerRadius="8" Padding="12,8" Margin="14">
+                    <StackPanel>
+                        <TextBlock x:Name="TxtGpuName" Text="Direct3D 11/12 GPU Adapter" FontFamily="{StaticResource FontSans}" FontWeight="Bold" FontSize="13" Foreground="#FFFFFF"/>
+                        <TextBlock x:Name="TxtDriver" Text="Driver: Up-to-date" FontFamily="{StaticResource FontMono}" FontSize="11" Foreground="#8B949E" Margin="0,2,0,0"/>
+                        <TextBlock Text="Geometry Workload: 400 Vertex Particles · Hardware Accelerated" FontFamily="{StaticResource FontMono}" FontSize="11" Foreground="#3FB950" Margin="0,4,0,0"/>
+                    </StackPanel>
+                </Border>
+            </Grid>
+        </Border>
+
+        <!-- Footer Bar -->
+        <Border Grid.Row="2" Background="#161B22" BorderBrush="#2D333B" BorderThickness="1" CornerRadius="10" Padding="14,10" Margin="0,12,0,0">
+            <DockPanel LastChildFill="False">
+                <StackPanel Orientation="Horizontal" DockPanel.Dock="Left" VerticalAlignment="Center">
+                    <TextBlock Text="● DIRECTX ACCELERATION OK" FontFamily="{StaticResource FontMono}" FontSize="11" Foreground="{StaticResource BrushTextEmerald}" FontWeight="Bold"/>
+                    <TextBlock Text=" | Zero artifacting observed" FontFamily="{StaticResource FontMono}" FontSize="11" Foreground="#8B949E"/>
+                </StackPanel>
+
+                <StackPanel Orientation="Horizontal" DockPanel.Dock="Right">
+                    <Button Content="CANCEL / CLOSE [ESC]" Style="{StaticResource StyleDarkActionBtn}" Click="BtnCancel_Click" Margin="0,0,8,0" Width="170"/>
+                    <Button Content="✓ PASS GPU TEST [ENTER]" Style="{StaticResource StyleCloudPassButton}" Click="BtnPass_Click" Width="220"/>
+                </StackPanel>
+            </DockPanel>
+        </Border>
+    </Grid>
+</Window>

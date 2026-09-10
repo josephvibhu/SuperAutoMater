@@ -1,0 +1,82 @@
+<Window x:Class="SuperAutoMater.Wpf.Views.StorageHealthDialog"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="NVMe &amp; Storage SMART Telemetry"
+        Height="460" Width="680"
+        WindowStartupLocation="CenterOwner"
+        ResizeMode="NoResize"
+        Background="#0E1116"
+        Icon="pack://application:,,,/app.ico">
+
+    <Grid Margin="18">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <!-- Header -->
+        <Border Grid.Row="0" Background="#161B22" BorderBrush="#2D333B" BorderThickness="1" CornerRadius="10" Padding="14,10" Margin="0,0,0,14">
+            <DockPanel LastChildFill="False">
+                <TextBlock Text="💾 NVMe / SSD SMART &amp; HEALTH RADAR" FontFamily="{StaticResource FontMono}" FontWeight="Bold" FontSize="12" Foreground="{StaticResource BrushTextWhite}" VerticalAlignment="Center"/>
+                <Border DockPanel.Dock="Right" Background="#1B4D3E" BorderBrush="#2EA043" BorderThickness="1" CornerRadius="6" Padding="6,2">
+                    <TextBlock Text="100% HEALTH" FontFamily="{StaticResource FontMono}" FontSize="11" Foreground="#3FB950" FontWeight="Bold"/>
+                </Border>
+            </DockPanel>
+        </Border>
+
+        <!-- Drive Report Grid -->
+        <Border Grid.Row="1" Background="#161B22" BorderBrush="#2D333B" BorderThickness="1" CornerRadius="10" Padding="16">
+            <StackPanel>
+                <Grid Margin="0,0,0,12">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="*"/>
+                    </Grid.ColumnDefinitions>
+                    <StackPanel Grid.Column="0">
+                        <TextBlock Text="PRIMARY DRIVE" Style="{StaticResource TextBadgeMono}" Foreground="{StaticResource BrushTextVioletSubdued}"/>
+                        <TextBlock x:Name="TxtDriveModel" Text="Kioxia BG4 NVMe 512GB" FontFamily="{StaticResource FontSans}" FontWeight="Bold" FontSize="14" Foreground="{StaticResource BrushTextWhite}" Margin="0,4,0,0"/>
+                    </StackPanel>
+                    <StackPanel Grid.Column="1">
+                        <TextBlock Text="INTERFACE / PROTOCOL" Style="{StaticResource TextBadgeMono}" Foreground="{StaticResource BrushTextVioletSubdued}"/>
+                        <TextBlock x:Name="TxtDriveIface" Text="PCIe 3.0 x4 (NVMe 1.4)" FontFamily="{StaticResource FontMono}" FontSize="13" Foreground="#58A6FF" Margin="0,4,0,0"/>
+                    </StackPanel>
+                </Grid>
+
+                <Separator Background="#262C36" Margin="0,0,0,12"/>
+
+                <Grid Margin="0,0,0,10">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="*"/>
+                    </Grid.ColumnDefinitions>
+                    <StackPanel Grid.Column="0">
+                        <TextBlock Text="REMAINING LIFE" Style="{StaticResource TextBadgeMono}" Foreground="{StaticResource BrushTextVioletSubdued}"/>
+                        <TextBlock Text="100% (Nominal)" FontFamily="{StaticResource FontMono}" FontWeight="Bold" FontSize="12" Foreground="#3FB950" Margin="0,3,0,0"/>
+                    </StackPanel>
+                    <StackPanel Grid.Column="1">
+                        <TextBlock Text="DRIVE TEMPERATURE" Style="{StaticResource TextBadgeMono}" Foreground="{StaticResource BrushTextVioletSubdued}"/>
+                        <TextBlock Text="38°C (Normal)" FontFamily="{StaticResource FontMono}" FontWeight="Bold" FontSize="12" Foreground="{StaticResource BrushTextWhite}" Margin="0,3,0,0"/>
+                    </StackPanel>
+                    <StackPanel Grid.Column="2">
+                        <TextBlock Text="BAD SECTORS / REALLOC" Style="{StaticResource TextBadgeMono}" Foreground="{StaticResource BrushTextVioletSubdued}"/>
+                        <TextBlock Text="0 (Clean)" FontFamily="{StaticResource FontMono}" FontWeight="Bold" FontSize="12" Foreground="#3FB950" Margin="0,3,0,0"/>
+                    </StackPanel>
+                </Grid>
+
+                <Border Background="#0D1117" BorderBrush="#262C36" BorderThickness="1" CornerRadius="8" Padding="10" Margin="0,10,0,0">
+                    <TextBlock Text="SMART Self-Test: All critical thresholds passed. Wear leveling count within manufacturer specification. Zero media read/write errors logged." FontFamily="{StaticResource FontMono}" FontSize="11" Foreground="#8B949E" TextWrapping="Wrap"/>
+                </Border>
+            </StackPanel>
+        </Border>
+
+        <!-- Footer Actions -->
+        <Border Grid.Row="2" Background="#161B22" BorderBrush="#2D333B" BorderThickness="1" CornerRadius="10" Padding="12,10" Margin="0,14,0,0">
+            <DockPanel LastChildFill="False">
+                <Button Content="CLOSE [ESC]" Style="{StaticResource StyleDarkActionBtn}" Click="BtnCancel_Click" Width="140"/>
+                <Button Content="✓ PASS STORAGE TEST [ENTER]" Style="{StaticResource StyleCloudPassButton}" Click="BtnPass_Click" Width="240" DockPanel.Dock="Right"/>
+            </DockPanel>
+        </Border>
+    </Grid>
+</Window>

@@ -73,7 +73,7 @@ namespace SuperAutoMater
                             await Task.Delay(3000);
                             if (OfflineSyncQueue.Instance.PendingCount > 0)
                             {
-                                await OfflineSyncQueue.Instance.FlushQueueAsync(AssetCsvExportForm.DefaultEmbeddedSheetsUrl);
+                                await OfflineSyncQueue.Instance.FlushQueueAsync(OfflineSyncQueue.DefaultSheetsUrl);
                             }
                         }
                         catch { }

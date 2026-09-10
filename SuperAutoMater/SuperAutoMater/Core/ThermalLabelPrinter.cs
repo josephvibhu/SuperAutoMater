@@ -45,7 +45,7 @@ namespace SuperAutoMater
             }
             catch (Exception ex)
             {
-                DarkMessageBox.Show("Printing Error: " + ex.Message, "Label Printer Error");
+                MessageBox.Show("Printing Error: " + ex.Message, "Label Printer Error");
             }
         }
 

@@ -1,0 +1,62 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+	<PropertyGroup>
+		<OutputType>WinExe</OutputType>
+		<TargetFramework>net10.0-windows</TargetFramework>
+		<Nullable>disable</Nullable>
+		<UseWPF>true</UseWPF>
+		<UseWindowsForms>true</UseWindowsForms>
+		<AssemblyName>SuperAutoMater</AssemblyName>
+		<Product>SuperAutoMater</Product>
+		<Company>SuperAutoMater</Company>
+		<Version>1.1.0</Version>
+		<AssemblyVersion>1.1.0.0</AssemblyVersion>
+		<FileVersion>1.1.0.0</FileVersion>
+		<ApplicationIcon>app.ico</ApplicationIcon>
+		<NoWarn>NU1701;WFO1000</NoWarn>
+
+		<!-- Standalone single EXE publish settings -->
+		<PublishSingleFile>true</PublishSingleFile>
+		<SelfContained>true</SelfContained>
+		<PublishReadyToRun>true</PublishReadyToRun>
+		<PublishReadyToRunComposite>true</PublishReadyToRunComposite>
+		<EnableCompressionInSingleFile>false</EnableCompressionInSingleFile>
+		<TieredCompilation>true</TieredCompilation>
+		<Optimize>true</Optimize>
+		<IncludeNativeLibrariesForSelfExtract>true</IncludeNativeLibrariesForSelfExtract>
+		<SatelliteResourceLanguages>en</SatelliteResourceLanguages>
+		<ExcludeSatelliteAssemblies>true</ExcludeSatelliteAssemblies>
+
+		<!-- Administrator elevation manifest -->
+		<ApplicationManifest>app.manifest</ApplicationManifest>
+	</PropertyGroup>
+
+	<ItemGroup>
+		<Resource Include="app.ico" />
+	</ItemGroup>
+
+	<ItemGroup>
+		<!-- Native disk and diagnostic tools bundled in lib/ -->
+		<None Include="lib\**\*">
+			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+			<TargetPath>lib\%(RecursiveDir)%(Filename)%(Extension)</TargetPath>
+		</None>
+		<None Include="test_audio.mp3" Condition="Exists('test_audio.mp3')">
+			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+			<TargetPath>lib\test_audio.mp3</TargetPath>
+		</None>
+		<None Include="test_audio.wav" Condition="Exists('test_audio.wav')">
+			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+			<TargetPath>lib\test_audio.wav</TargetPath>
+		</None>
+	</ItemGroup>
+
+	<ItemGroup>
+		<PackageReference Include="AForge.Video" Version="2.2.5" />
+		<PackageReference Include="AForge.Video.DirectShow" Version="2.2.5" />
+		<PackageReference Include="NAudio" Version="2.3.0" />
+		<PackageReference Include="QRCoder" Version="1.8.0" />
+		<PackageReference Include="System.Management" Version="10.0.10" />
+	</ItemGroup>
+
+</Project>

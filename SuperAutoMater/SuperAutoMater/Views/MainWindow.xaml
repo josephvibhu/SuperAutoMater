@@ -1,0 +1,1548 @@
+<Window x:Class="SuperAutoMater.Wpf.Views.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:controls="clr-namespace:SuperAutoMater.Wpf.Controls"
+        xmlns:vm="clr-namespace:SuperAutoMater.Wpf.ViewModels"
+        Title="SuperAutoMater v1.0 — Hardware Diagnostic &amp; QC Cockpit"
+        Height="840" Width="1360"
+        MinHeight="720" MinWidth="1180"
+        WindowState="Maximized"
+        WindowStartupLocation="CenterScreen"
+        Background="{StaticResource BrushObsidianRadial}"
+        Icon="pack://application:,,,/app.ico"
+        UseLayoutRounding="True"
+        SnapsToDevicePixels="True"
+        TextOptions.TextFormattingMode="Display"
+        TextOptions.TextRenderingMode="ClearType"
+        PreviewKeyDown="Window_PreviewKeyDown">
+
+    <Window.DataContext>
+        <vm:MainViewModel/>
+    </Window.DataContext>
+
+    <Grid Margin="12">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/> <!-- Top Avionics Status Bar -->
+            <RowDefinition Height="*"/>    <!-- Main Cockpit Workspace -->
+            <RowDefinition Height="Auto"/> <!-- Bottom Avionics Command Bar -->
+        </Grid.RowDefinitions>
+
+        <!-- ============================================================== -->
+        <!-- AVIONICS LIVE FEEDBACK TOAST NOTIFICATION BANNER               -->
+        <!-- ============================================================== -->
+        <Border x:Name="ToastBanner"
+                Grid.Row="0"
+                Background="#1C2128"
+                BorderBrush="#388BFD"
+                BorderThickness="1.5"
+                CornerRadius="10"
+                Padding="16,8"
+                HorizontalAlignment="Center"
+                VerticalAlignment="Top"
+                Margin="0,4,0,0"
+                Panel.ZIndex="1000"
+                Visibility="Collapsed"
+                Effect="{StaticResource EffectCardShadow}">
+            <StackPanel Orientation="Horizontal">
+                <TextBlock x:Name="TxtToastIcon" Text="✓" FontFamily="{StaticResource FontMono}" FontWeight="Bold" FontSize="14" Foreground="#3FB950" Margin="0,0,10,0" VerticalAlignment="Center"/>
+                <TextBlock x:Name="TxtToastMessage" Text="Action Feedback" FontFamily="{StaticResource FontMono}" FontWeight="SemiBold" FontSize="12" Foreground="#FFFFFF" VerticalAlignment="Center"/>
+            </StackPanel>
+        </Border>
+
+        <!-- ============================================================== -->
+        <!-- 1. TOP AVIONICS STATUS BAR (Neutral Dark Slate & Clean Logo)    -->
+        <!-- ============================================================== -->
+        <Border Grid.Row="0"
+                Background="{StaticResource BrushTopBarGradient}"
+                BorderBrush="{StaticResource BrushHairlineViolet}"
+                BorderThickness="1"
+                CornerRadius="16"
+                Padding="16,10"
+                Margin="0,0,0,10"
+                Effect="{StaticResource EffectBarShadow}">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto"/> <!-- Brand & Bay Info -->
+                    <ColumnDefinition Width="*"/>    <!-- Spacer -->
+                    <ColumnDefinition Width="Auto"/> <!-- Telemetry Chips & Express QC -->
+                </Grid.ColumnDefinitions>
+
+                <!-- Left Zone: Brand & Operational State (Purple isolated to Logo ONLY) -->
+                <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center">
+                    <!-- Pulsing Live Dot (Purple ONLY) -->
+                    <Grid Width="12" Height="12" Margin="0,0,10,0" VerticalAlignment="Center">
+                        <Ellipse Width="12" Height="12" Fill="{StaticResource BrushLogoPurple}" Opacity="0.4"/>
+                        <Ellipse Width="8" Height="8" Fill="{StaticResource BrushLogoPurpleLight}" Effect="{StaticResource EffectGlowPurpleSm}"/>
+                    </Grid>
+
+                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                        <TextBlock Text="SUPER" Style="{StaticResource TextHeaderBrand}" Foreground="{StaticResource BrushTextWhite}"/>
+                        <TextBlock Text="AUTOMATER" Style="{StaticResource TextHeaderBrand}" Foreground="{StaticResource BrushLogoPurpleLight}"/>
+                    </StackPanel>
+
+                    <Border Background="#21262D" BorderBrush="#30363D" BorderThickness="1" CornerRadius="6" Padding="6,2" Margin="10,0,14,0" VerticalAlignment="Center">
+                        <TextBlock Text="v1.0.0" Style="{StaticResource TextBadgeMono}" Foreground="{StaticResource BrushTextVioletMuted}"/>
+                    </Border>
+
+                    <Rectangle Width="1" Height="16" Fill="#30363D" Margin="0,0,14,0" VerticalAlignment="Center"/>
+
+                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                        <TextBlock Text="● BENCH ONLINE" Style="{StaticResource TextBadgeMono}" Foreground="{StaticResource BrushTextEmerald}" FontWeight="Bold" Margin="0,0,8,0"/>
+                        <TextBlock Text="|" Style="{StaticResource TextBadgeMono}" Foreground="#30363D" Margin="0,0,8,0"/>
+                        <StackPanel Orientation="Horizontal">
+                            <TextBlock Text="BAY: " Style="{StaticResource TextBadgeMono}" Foreground="#8B949E"/>
+                            <TextBlock Text="QC-TERMINAL-01" Style="{StaticResource TextBadgeMono}" FontWeight="Bold" Foreground="{StaticResource BrushTextWhite}"/>
+                        </StackPanel>
+                        <TextBlock Text="|" Style="{StaticResource TextBadgeMono}" Foreground="#30363D" Margin="8,0,8,0"/>
+                        <StackPanel Orientation="Horizontal">
+                            <TextBlock Text="OPERATOR: " Style="{StaticResource TextBadgeMono}" Foreground="#8B949E"/>
+                            <TextBlock Text="SENIOR REFURB TECH" Style="{StaticResource TextBadgeMono}" FontWeight="Bold" Foreground="{StaticResource BrushTextVioletMuted}"/>
+                        </StackPanel>
+                    </StackPanel>
+                </StackPanel>
+
+                <!-- Right Zone: Telemetry Chips & Action Button -->
+                <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center">
+                    <!-- Battery Chip -->
+                    <Border Style="{StaticResource StyleTelemetryChip}" Margin="0,0,8,0">
+                        <StackPanel Orientation="Horizontal">
+                            <TextBlock Text="BATTERY " Style="{StaticResource TextAvionicsChip}" Foreground="{StaticResource BrushTextVioletMuted}"/>
+                            <TextBlock Text="{Binding BatteryCharge, StringFormat='{}{0}%'}" Style="{StaticResource TextAvionicsChip}" FontWeight="Bold" Foreground="{StaticResource BrushTextEmerald}"/>
+                            <TextBlock Text="{Binding BatteryFlowWatts, StringFormat=' ({0})'}" Style="{StaticResource TextAvionicsChip}" Foreground="{StaticResource BrushTextVioletSubdued}"/>
+                        </StackPanel>
+                    </Border>
+
+                    <!-- CPU Freq Chip -->
+                    <Border Style="{StaticResource StyleTelemetryChip}" Margin="0,0,8,0">
+                        <StackPanel Orientation="Horizontal">
+                            <TextBlock Text="CPU FREQ " Style="{StaticResource TextAvionicsChip}" Foreground="{StaticResource BrushTextVioletMuted}"/>
+                            <TextBlock Text="{Binding ClockSummary}" Style="{StaticResource TextAvionicsChip}" FontWeight="Bold" Foreground="{StaticResource BrushTextVioletLight}"/>
+                            <TextBlock Text=" TURBO" Style="{StaticResource TextBadgeMono}" Foreground="{StaticResource BrushTextEmerald}" Margin="4,0,0,0"/>
+                        </StackPanel>
+                    </Border>
+
+                    <!-- Wi-Fi Chip -->
+                    <Border Style="{StaticResource StyleTelemetryChip}" Margin="0,0,12,0">
+                        <StackPanel Orientation="Horizontal">
+                            <TextBlock Text="WI-FI " Style="{StaticResource TextAvionicsChip}" Foreground="{StaticResource BrushTextVioletMuted}"/>
+                            <TextBlock Text="{Binding WifiSummary}" Style="{StaticResource TextAvionicsChip}" FontWeight="Bold" Foreground="{StaticResource BrushTextVioletLight}"/>
+                        </StackPanel>
+                    </Border>
+
+                    <!-- 1-Click Express QC Button -->
+                    <Button Style="{StaticResource StylePrimaryExpressQcButton}" Click="BtnExpressQc_Click">
+                        <StackPanel Orientation="Horizontal">
+                            <TextBlock Text="⚡ 1-CLICK EXPRESS QC " FontFamily="{StaticResource FontSans}" FontWeight="Bold" FontSize="11" Foreground="{StaticResource BrushTextWhite}"/>
+                            <Border Background="#40000000" CornerRadius="4" Padding="4,1">
+                                <TextBlock Text="[F5]" Style="{StaticResource TextBadgeMono}" Foreground="{StaticResource BrushTextVioletLight}"/>
+                            </Border>
+                        </StackPanel>
+                    </Button>
+                </StackPanel>
+            </Grid>
+        </Border>
+
+        <!-- ============================================================== -->
+        <!-- 2. MAIN COCKPIT WORKSPACE (Grid 12-Cols)                         -->
+        <!-- ============================================================== -->
+        <Grid Grid.Row="1">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="270" MinWidth="250" MaxWidth="300"/> <!-- Left Rail (Col 1-3) -->
+                <ColumnDefinition Width="*"/>                                  <!-- Bento Arena (Col 4-12) -->
+            </Grid.ColumnDefinitions>
+
+            <!-- LEFT RAIL: DIAGNOSTIC MATRIX -->
+            <Border Grid.Column="0"
+                    Background="{StaticResource BrushCardVioletGlass}"
+                    BorderBrush="{StaticResource BrushHairlineViolet}"
+                    BorderThickness="1"
+                    CornerRadius="16"
+                    Padding="14"
+                    Margin="0,0,10,0"
+                    Effect="{StaticResource EffectCardShadow}">
+                <Grid>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/> <!-- Pipeline Header -->
+                        <RowDefinition Height="*"/>    <!-- Test Runners List -->
+                        <RowDefinition Height="Auto"/> <!-- Action Buttons -->
+                    </Grid.RowDefinitions>
+
+                    <!-- Header -->
+                    <DockPanel Grid.Row="0" LastChildFill="False" Margin="0,0,0,12">
+                        <StackPanel Orientation="Horizontal" DockPanel.Dock="Left" VerticalAlignment="Center">
+                            <Ellipse Width="6" Height="6" Fill="{StaticResource BrushAccentBlue}" Margin="0,0,6,0"/>
+                            <TextBlock Text="TEST SUITE PIPELINE" Style="{StaticResource TextCardHeader}"/>
+                        </StackPanel>
+                        <Border DockPanel.Dock="Right" CornerRadius="6" Background="#1B4D3E" BorderBrush="#34D399" BorderThickness="1" Padding="6,2">
+                            <TextBlock Text="{Binding PipelineStatusText}" Style="{StaticResource TextBadgeMono}" Foreground="{StaticResource BrushTextEmerald}" FontWeight="Bold"/>
+                        </Border>
+                    </DockPanel>
+
+                    <!-- Test Runner Buttons List -->
+                    <ItemsControl Grid.Row="1" ItemsSource="{Binding TestPipeline}">
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate>
+                                <Border Margin="0,0,0,7" CornerRadius="10" Padding="10,8" Cursor="Hand" MouseLeftButtonUp="TestRow_Click">
+                                    <Border.Style>
+                                        <Style TargetType="Border">
+                                            <Setter Property="Background" Value="#161B22"/>
+                                            <Setter Property="BorderBrush" Value="#262C36"/>
+                                            <Setter Property="BorderThickness" Value="1"/>
+                                            <Style.Triggers>
+                                                <!-- Passed State -->
+                                                <DataTrigger Binding="{Binding IsPassed}" Value="True">
+                                                    <Setter Property="Background" Value="#12261C"/>
+                                                    <Setter Property="BorderBrush" Value="#2EA043"/>
+                                                </DataTrigger>
+                                                <!-- Active State -->
+                                                <DataTrigger Binding="{Binding IsActive}" Value="True">
+                                                    <Setter Property="Background" Value="#21262D"/>
+                                                    <Setter Property="BorderBrush" Value="#388BFD"/>
+                                                </DataTrigger>
+                                                <Trigger Property="IsMouseOver" Value="True">
+                                                    <Setter Property="BorderBrush" Value="#58A6FF"/>
+                                                </Trigger>
+                                            </Style.Triggers>
+                                        </Style>
+                                    </Border.Style>
+
+                                    <DockPanel LastChildFill="False">
+                                        <StackPanel Orientation="Horizontal" DockPanel.Dock="Left" VerticalAlignment="Center">
+                                            <TextBlock Text="{Binding StatusBadge}" FontWeight="Bold" Margin="0,0,8,0">
+                                                <TextBlock.Style>
+                                                    <Style TargetType="TextBlock" BasedOn="{StaticResource TextBadgeMono}">
+                                                        <Setter Property="Foreground" Value="{StaticResource BrushTextVioletMuted}"/>
+                                                        <Style.Triggers>
+                                                            <DataTrigger Binding="{Binding IsPassed}" Value="True">
+                                                                <Setter Property="Foreground" Value="{StaticResource BrushTextEmerald}"/>
+                                                            </DataTrigger>
+                                                        </Style.Triggers>
+                                                    </Style>
+                                                </TextBlock.Style>
+                                            </TextBlock>
+                                            <TextBlock Text="{Binding Title}">
+                                                <TextBlock.Style>
+                                                    <Style TargetType="TextBlock" BasedOn="{StaticResource TextCardHeader}">
+                                                        <Setter Property="Foreground" Value="{StaticResource BrushTextVioletLight}"/>
+                                                        <Style.Triggers>
+                                                            <DataTrigger Binding="{Binding IsPassed}" Value="True">
+                                                                <Setter Property="Foreground" Value="{StaticResource BrushTextEmerald}"/>
+                                                            </DataTrigger>
+                                                        </Style.Triggers>
+                                                    </Style>
+                                                </TextBlock.Style>
+                                            </TextBlock>
+                                        </StackPanel>
+
+                                        <TextBlock DockPanel.Dock="Right" Text="{Binding HotkeyText}" Style="{StaticResource TextBadgeMono}" Foreground="{StaticResource BrushTextVioletSubdued}" VerticalAlignment="Center"/>
+                                    </DockPanel>
+                                </Border>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+
+                    <!-- Bottom Rail Action Controls -->
+                    <StackPanel Grid.Row="2" Margin="0,10,0,0">
+                        <Button Style="{StaticResource StyleDarkActionBtn}" Click="BtnPrintLabel_Click" Margin="0,0,0,8">
+                            <DockPanel LastChildFill="False">
+                                <TextBlock DockPanel.Dock="Left" Text="🖨 PRINT CHASSIS LABEL" Style="{StaticResource TextCardHeader}" Foreground="{StaticResource BrushTextVioletLight}"/>
+                                <TextBlock DockPanel.Dock="Right" Text="[Ctrl+P]" Style="{StaticResource TextBadgeMono}" Foreground="{StaticResource BrushTextVioletSubdued}" Margin="10,0,0,0"/>
+                            </DockPanel>
+                        </Button>
+
+                        <Button Style="{StaticResource StyleCloudPassButton}" Click="BtnOpenSyncMenu_Click">
+                            <DockPanel LastChildFill="False">
+                                <TextBlock DockPanel.Dock="Left" Text="🔏 PASS QC &amp; SYNC CLOUD" FontFamily="{StaticResource FontSans}" FontWeight="ExtraBold" FontSize="11" Foreground="#FFFFFF"/>
+                                <Border DockPanel.Dock="Right" Background="#40000000" CornerRadius="4" Padding="4,1" Margin="10,0,0,0">
+                                    <TextBlock Text="[Enter]" Style="{StaticResource TextBadgeMono}" Foreground="#FFFFFF" FontWeight="Bold"/>
+                                </Border>
+                            </DockPanel>
+                        </Button>
+                    </StackPanel>
+                </Grid>
+            </Border>
+
+            <!-- MAIN BENTO TELEMETRY ARENA (Col 4-12) -->
+            <Grid Grid.Column="1">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto"/> <!-- Top 4 Bento Metric Tiles -->
+                    <RowDefinition Height="*"/>    <!-- Main Interactive Arena (KB Matrix + USB/Cloud) -->
+                </Grid.RowDefinitions>
+
+                <!-- Top 4 Bento Metric Tiles -->
+                <Grid Grid.Row="0" Margin="0,0,0,10">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="*"/>
+                    </Grid.ColumnDefinitions>
+
+                    <controls:BentoCard Grid.Column="0" Title="CHASSIS IDENTITY" SubtitleBadge="{Binding Manufacturer}" Margin="0,0,6,0">
+                        <StackPanel Margin="0,4,0,0">
+                            <TextBlock Text="{Binding Model}" Style="{StaticResource TextCardValueLarge}" TextTrimming="CharacterEllipsis"/>
+                            <DockPanel LastChildFill="False" Margin="0,6,0,0">
+                                <StackPanel Orientation="Horizontal" DockPanel.Dock="Left">
+                                    <TextBlock Text="SN: " Style="{StaticResource TextCardSubtle}"/>
+                                    <TextBlock Text="{Binding Serial}" FontWeight="Bold" Style="{StaticResource TextCardSubtle}" Foreground="{StaticResource BrushTextWhite}"/>
+                                </StackPanel>
+                                <Border DockPanel.Dock="Right" Background="#1E10B981" BorderBrush="#34D399" BorderThickness="1" CornerRadius="8" Padding="6,1">
+                                    <TextBlock Text="{Binding Grade}" Style="{StaticResource TextBadgeMono}" Foreground="{StaticResource BrushTextEmerald}" FontWeight="Bold"/>
+                                </Border>
+                            </DockPanel>
+                        </StackPanel>
+                    </controls:BentoCard>
+
+                    <!-- CARD 2: CPU & THERMALS -->
+                    <controls:BentoCard Grid.Column="1" Title="CPU &amp; THERMALS" SubtitleBadge="{Binding TempBadge}" Margin="4,0,4,0">
+                        <StackPanel Margin="0,4,0,0">
+                            <TextBlock Text="{Binding CpuName}" Style="{StaticResource TextCardValueLarge}" TextTrimming="CharacterEllipsis"/>
+                            <DockPanel LastChildFill="False" Margin="0,6,0,0">
+                                <TextBlock DockPanel.Dock="Left" Text="{Binding CoreSummary}" Style="{StaticResource TextCardSubtle}"/>
+                                <TextBlock DockPanel.Dock="Right" Text="{Binding ThrottlingStatus}" Style="{StaticResource TextBadgeMono}" Foreground="{StaticResource BrushTextVioletLight}"/>
+                            </DockPanel>
+                        </StackPanel>
+                    </controls:BentoCard>
+
+                    <!-- CARD 3: STORAGE & RAM -->
+                    <controls:BentoCard Grid.Column="2" Title="STORAGE &amp; RAM" SubtitleBadge="{Binding HealthBadge}" Margin="4,0,4,0">
+                        <StackPanel Margin="0,4,0,0">
+                            <TextBlock Text="{Binding SpecHeader}" Style="{StaticResource TextCardValueLarge}" TextTrimming="CharacterEllipsis"/>
+                            <DockPanel LastChildFill="False" Margin="0,6,0,0">
+                                <TextBlock DockPanel.Dock="Left" Text="{Binding PrimaryDriveModel}" Style="{StaticResource TextCardSubtle}" TextTrimming="CharacterEllipsis" MaxWidth="140"/>
+                                <TextBlock DockPanel.Dock="Right" Text="100% HEALTH" Style="{StaticResource TextBadgeMono}" Foreground="{StaticResource BrushTextEmerald}" FontWeight="Bold"/>
+                            </DockPanel>
+                        </StackPanel>
+                    </controls:BentoCard>
+
+                    <!-- CARD 4: BATTERY TELEMETRY -->
+                    <controls:BentoCard Grid.Column="3" Title="BATTERY POWER" SubtitleBadge="{Binding BatteryIntegrityBadge}" Margin="6,0,0,0">
+                        <StackPanel Margin="0,4,0,0">
+                            <TextBlock Text="{Binding BatteryFlowWatts}" Style="{StaticResource TextCardValueLarge}"/>
+                            <DockPanel LastChildFill="False" Margin="0,6,0,0">
+                                <TextBlock DockPanel.Dock="Left" Text="{Binding BatteryWearSummary}" Style="{StaticResource TextCardSubtle}" Foreground="{StaticResource BrushTextAmber}"/>
+                                <TextBlock DockPanel.Dock="Right" Text="{Binding BatteryTimeRemaining}" Style="{StaticResource TextBadgeMono}" Foreground="{StaticResource BrushTextVioletLight}"/>
+                            </DockPanel>
+                        </StackPanel>
+                    </controls:BentoCard>
+                </Grid>
+
+                <!-- Main Interactive Arena (Row 1) -->
+                <Grid Grid.Row="1">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="8.2*"/> <!-- Dynamic Diagnostic Workbench -->
+                        <ColumnDefinition Width="3.8*"/> <!-- Avionics QC Audit & Inventory Console -->
+                    </Grid.ColumnDefinitions>
+
+                    <!-- INTEGRATED MULTI-TEST WORKBENCH (Col 1-8) -->
+                    <Border Grid.Column="0"
+                            Background="{StaticResource BrushCardVioletGlass}"
+                            BorderBrush="{StaticResource BrushHairlineViolet}"
+                            BorderThickness="1"
+                            CornerRadius="16"
+                            Padding="14"
+                            Margin="0,0,6,0"
+                            Effect="{StaticResource EffectCardShadow}">
+                        <Grid>
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto"/> <!-- Workspace Header -->
+                                <RowDefinition Height="*"/>    <!-- Workspace Dynamic Viewport -->
+                            </Grid.RowDefinitions>
+
+                            <!-- Top Workspace Navigation Bar -->
+                            <Border Grid.Row="0" Background="#161B22" BorderBrush="#262C36" BorderThickness="1" CornerRadius="10" Padding="10,6" Margin="0,0,0,12">
+                                <DockPanel LastChildFill="False">
+                                    <!-- Left: Workspace Mode Indicator -->
+                                    <StackPanel Orientation="Horizontal" DockPanel.Dock="Left" VerticalAlignment="Center">
+                                        <Ellipse x:Name="WkStatusDot" Width="7" Height="7" Fill="{StaticResource BrushAccentEmerald}" Margin="0,0,8,0"/>
+                                        <TextBlock Text="HARDWARE WORKSPACE:" Style="{StaticResource TextBadgeMono}" Foreground="{StaticResource BrushTextVioletSubdued}" FontWeight="Bold" Margin="0,0,6,0"/>
+                                        <TextBlock x:Name="TxtWorkspaceActiveTitle" Text="BENCH READY · STANDBY" Style="{StaticResource TextBadgeMono}" Foreground="{StaticResource BrushTextWhite}" FontWeight="Bold"/>
+                                        <Border x:Name="PillAutopilot" Background="#1B4D3E" BorderBrush="#2EA043" BorderThickness="1" CornerRadius="4" Padding="8,2" Margin="10,0,0,0" Visibility="Collapsed">
+                                            <TextBlock x:Name="TxtAutopilotStatus" Text="⚡ AUTOPILOT QC: STAGE 1/5 [ESC TO STOP]" FontFamily="{StaticResource FontMono}" FontWeight="Bold" FontSize="10" Foreground="#3FB950"/>
+                                        </Border>
+                                    </StackPanel>
+
+                                    <!-- Right: Quick Reset / Status Badge -->
+                                    <StackPanel Orientation="Horizontal" DockPanel.Dock="Right">
+                                        <Button x:Name="BtnStandbyReset" Content="◈ STANDBY HUB" Style="{StaticResource StyleWorkspaceTabInactive}" Click="BtnStandbyReset_Click" Margin="0,0,6,0" ToolTip="Return to Ready Standby Hub"/>
+                                        <Border CornerRadius="4" Background="#21262D" BorderBrush="#30363D" BorderThickness="1" Padding="6,2">
+                                            <TextBlock x:Name="TxtActiveViewBadge" Text="INTEGRATED BENCH" Style="{StaticResource TextBadgeMono}" Foreground="#58A6FF" FontWeight="Bold"/>
+                                        </Border>
+                                    </StackPanel>
+                                </DockPanel>
+                            </Border>
+
+                            <!-- Dynamic View Area -->
+                            <Grid Grid.Row="1">
+                                <!-- VIEW 0: STANDBY / READY BENCH HUB (DEFAULT STARTUP) -->
+                                <Grid x:Name="ViewStandbyWorkspace" Visibility="Visible">
+                                    <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center">
+                                        <Border Width="60" Height="60" CornerRadius="30" Background="#1B2230" BorderBrush="#388BFD" BorderThickness="1.5" HorizontalAlignment="Center" Margin="0,0,0,14">
+                                            <TextBlock Text="⚡" FontSize="26" Foreground="#58A6FF" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                        </Border>
+
+                                        <TextBlock Text="DIAGNOSTIC WORKBENCH ONLINE" FontFamily="{StaticResource FontSans}" FontWeight="Bold" FontSize="16" Foreground="{StaticResource BrushTextWhite}" HorizontalAlignment="Center"/>
+                                        <TextBlock Text="Click any test on the left sideline or press [F1]-[F7] to run its hardware inspection here." Style="{StaticResource TextBadgeMono}" Foreground="{StaticResource BrushTextVioletSubdued}" HorizontalAlignment="Center" Margin="0,6,0,16"/>
+
+                                        <!-- Autopilot Hero Launcher -->
+                                        <Button Content="⚡ 1-CLICK AUTOPILOT QC [F10]" Style="{StaticResource StyleCloudPassButton}" Click="BtnStartAutopilot_Click" Margin="0,0,0,18" Padding="20,9" FontSize="13" FontWeight="Bold" HorizontalAlignment="Center"/>
+
+                                        <!-- Quick Launch Grid -->
+                                        <WrapPanel HorizontalAlignment="Center" MaxWidth="620">
+                                            <Button Content="⌨ KEYBOARD &amp; TRACKPAD" Style="{StaticResource StyleDarkActionBtn}" Click="QuickLaunch_Keyboard" Margin="4" Padding="12,7"/>
+                                            <Button Content="📷 WEBCAM &amp; MIC ARRAY" Style="{StaticResource StyleDarkActionBtn}" Click="QuickLaunch_CamMic" Margin="4" Padding="12,7"/>
+                                            <Button Content="⚡ CPU &amp; RAM STRESS" Style="{StaticResource StyleDarkActionBtn}" Click="QuickLaunch_Cpu" Margin="4" Padding="12,7"/>
+                                            <Button Content="🔋 BATTERY HEALTH &amp; POWER" Style="{StaticResource StyleDarkActionBtn}" Click="QuickLaunch_Battery" Margin="4" Padding="12,7"/>
+                                            <Button Content="🎮 GPU 3D BENCHMARK" Style="{StaticResource StyleDarkActionBtn}" Click="QuickLaunch_Gpu" Margin="4" Padding="12,7"/>
+                                            <Button Content="👆 FINGERPRINT SENSOR" Style="{StaticResource StyleDarkActionBtn}" Click="QuickLaunch_Fingerprint" Margin="4" Padding="12,7"/>
+                                            <Button Content="💾 3-SOURCE SSD HEALTH" Style="{StaticResource StyleDarkActionBtn}" Click="QuickLaunch_Storage" Margin="4" Padding="12,7"/>
+                                            <Button Content="🔌 USB PORTS &amp; BUS" Style="{StaticResource StyleDarkActionBtn}" Click="QuickLaunch_Usb" Margin="4" Padding="12,7"/>
+                                            <Button Content="🔊 AUDIO STEREO SWEEP" Style="{StaticResource StyleDarkActionBtn}" Click="QuickLaunch_Audio" Margin="4" Padding="12,7"/>
+                                            <Button Content="📶 WIRELESS &amp; BT RADAR" Style="{StaticResource StyleDarkActionBtn}" Click="QuickLaunch_Wireless" Margin="4" Padding="12,7"/>
+                                            <Button Content="👆 TOUCH DIGITIZER MATRIX" Style="{StaticResource StyleDarkActionBtn}" Click="QuickLaunch_Touchscreen" Margin="4" Padding="12,7"/>
+                                            <Button Content="📺 ADVANCED DISPLAY LAB" Style="{StaticResource StyleDarkActionBtn}" Click="QuickLaunch_Display" Margin="4" Padding="12,7"/>
+                                        </WrapPanel>
+                                    </StackPanel>
+                                </Grid>
+
+                                <!-- VIEW 1: KEYBOARD & TRACKPAD WORKSPACE -->
+                                <Grid x:Name="ViewKeyboardWorkspace" Visibility="Collapsed">
+                                    <Grid.RowDefinitions>
+                                        <RowDefinition Height="*"/>
+                                        <RowDefinition Height="Auto"/>
+                                    </Grid.RowDefinitions>
+                                    
+                                    <ScrollViewer Grid.Row="0" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" PanningMode="VerticalOnly" Margin="0,0,0,6">
+                                        <Grid>
+                                            <Grid.RowDefinitions>
+                                                <RowDefinition Height="Auto"/>
+                                                <RowDefinition Height="*"/>
+                                            </Grid.RowDefinitions>
+                                            <controls:KeyboardMatrixControl x:Name="KbControl" Grid.Row="0" Margin="0,0,0,6"/>
+                                            <controls:TrackpadTestControl x:Name="TpControl" Grid.Row="1" MinHeight="140"/>
+                                        </Grid>
+                                    </ScrollViewer>
+
+                                    <Border Grid.Row="1" Background="#161B22" BorderBrush="#262C36" BorderThickness="1" CornerRadius="10" Padding="10,6">
+                                        <DockPanel LastChildFill="False">
+                                            <TextBlock DockPanel.Dock="Left" Text="Type on keyboard &amp; actuate trackpad + buttons to certify input subsystems" Style="{StaticResource TextBadgeMono}" Foreground="{StaticResource BrushTextVioletSubdued}" VerticalAlignment="Center"/>
+                                            <Button DockPanel.Dock="Right" Content="✓ PASS KEYBOARD &amp; TRACKPAD [ENTER]" Style="{StaticResource StyleCloudPassButton}" Click="BtnPassKeyboard_Click" Padding="14,5"/>
+                                        </DockPanel>
+                                    </Border>
+                                </Grid>
+
+                                <!-- VIEW 2: WEBCAM & MIC ARRAY (NATIVE WPF NO WINDOWSFORMSHOST) -->
+                                <Grid x:Name="ViewCamMicWorkspace" Visibility="Collapsed">
+                                    <Grid.RowDefinitions>
+                                        <RowDefinition Height="*"/>
+                                        <RowDefinition Height="Auto"/>
+                                    </Grid.RowDefinitions>
+
+                                    <Grid Grid.Row="0">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="1.4*"/> <!-- Webcam Native Image Viewport -->
+                                            <ColumnDefinition Width="*"/>    <!-- Microphone VU Meter & Spectrum -->
+                                        </Grid.ColumnDefinitions>
+
+                                        <!-- Left: Webcam Native WPF Video Feed -->
+                                        <Border Grid.Column="0" Background="#0A0D12" BorderBrush="#262C36" BorderThickness="1" CornerRadius="10" ClipToBounds="True" Margin="0,0,6,0">
+                                            <Grid>
+                                                <!-- Pure WPF Image Control - Zero HWND recursion crash -->
+                                                <Image x:Name="ImgWorkspaceCam" Stretch="Uniform" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+
+                                                <!-- Camera Header Tag Overlay -->
+                                                <Border Background="#CC0E1116" CornerRadius="6" HorizontalAlignment="Left" VerticalAlignment="Top" Margin="8" Padding="8,4">
+                                                    <StackPanel Orientation="Horizontal">
+                                                        <Ellipse x:Name="DotCamStatus" Width="6" Height="6" Fill="{StaticResource BrushAccentEmerald}" Margin="0,0,6,0" VerticalAlignment="Center"/>
+                                                        <TextBlock x:Name="TxtCamStatus" Text="LIVE STREAM" Style="{StaticResource TextBadgeMono}" Foreground="{StaticResource BrushTextWhite}" FontWeight="Bold"/>
+                                                    </StackPanel>
+                                                </Border>
+
+                                                <!-- Overlay when no camera or searching -->
+                                                <StackPanel x:Name="StackCamNoDevice" HorizontalAlignment="Center" VerticalAlignment="Center" Visibility="Collapsed">
+                                                    <TextBlock Text="📷" FontSize="32" HorizontalAlignment="Center" Margin="0,0,0,6"/>
+                                                    <TextBlock x:Name="TxtCamMessage" Text="Searching for DirectShow camera..." Style="{StaticResource TextBadgeMono}" Foreground="{StaticResource BrushTextVioletMuted}" HorizontalAlignment="Center"/>
+                                                </StackPanel>
+                                            </Grid>
+                                        </Border>
+
+                                        <!-- Right: Real-Time Microphone Acoustic Telemetry & VU Meter -->
+                                        <Border Grid.Column="1" Background="#161B22" BorderBrush="#262C36" BorderThickness="1" CornerRadius="10" Padding="12" Margin="6,0,0,0">
+                                            <Grid>
+                                                <Grid.RowDefinitions>
+                                                    <RowDefinition Height="Auto"/>
+                                                    <RowDefinition Height="*"/>
+                                                    <RowDefinition Height="Auto"/>
+                                                </Grid.RowDefinitions>
+
+                                                <DockPanel Grid.Row="0" LastChildFill="False" Margin="0,0,0,10">
+                                                    <StackPanel Orientation="Horizontal" DockPanel.Dock="Left">
+                                                        <TextBlock Text="🎙" FontSize="13" Margin="0,0,6,0"/>
+                                                        <TextBlock Text="MICROPHONE ARRAY" Style="{StaticResource TextCardHeader}" Foreground="{StaticResource BrushTextWhite}"/>
+                                                    </StackPanel>
+                                                    <Border DockPanel.Dock="Right" CornerRadius="4" Background="#1B4D3E" Padding="5,2">
+                                                        <TextBlock x:Name="TxtMicStatus" Text="● LISTENING" Style="{StaticResource TextBadgeMono}" Foreground="{StaticResource BrushTextEmerald}" FontWeight="Bold"/>
+                                                    </Border>
+                                                </DockPanel>
+
+                                                <!-- Real-Time VU Level Visualizer -->
+                                                <StackPanel Grid.Row="1" VerticalAlignment="Center">
+                                                    <TextBlock x:Name="TxtMicDeviceName" Text="Default Input (Realtek / Intel SST)" Style="{StaticResource TextBadgeMono}" Foreground="{StaticResource BrushTextVioletSubdued}" TextTrimming="CharacterEllipsis" Margin="0,0,0,10"/>
+                                                    <TextBlock x:Name="TxtMicDbLevel" Text="-18.5 dB" FontFamily="{StaticResource FontMono}" FontWeight="ExtraBold" FontSize="26" Foreground="{StaticResource BrushTextEmerald}" HorizontalAlignment="Center" Margin="0,0,0,8"/>
+
+                                                    <Border CornerRadius="5" Background="#0E1116" BorderBrush="#30363D" BorderThickness="1" Padding="2" Margin="0,0,0,8">
+                                                        <ProgressBar x:Name="ProgBarMicLevel" Height="14" Minimum="0" Maximum="100" Value="25" Foreground="{StaticResource BrushAccentEmerald}" Background="Transparent" BorderThickness="0"/>
+                                                    </Border>
+
+                                                    <DockPanel LastChildFill="False" Margin="2,0,2,8">
+                                                        <TextBlock DockPanel.Dock="Left" Text="-60dB (Quiet)" Style="{StaticResource TextBadgeMono}" FontSize="9" Foreground="{StaticResource BrushTextVioletSubdued}"/>
+                                                        <TextBlock Text="-12dB" Style="{StaticResource TextBadgeMono}" FontSize="9" Foreground="{StaticResource BrushTextVioletSubdued}" HorizontalAlignment="Center"/>
+                                                        <TextBlock DockPanel.Dock="Right" Text="0dB (Peak)" Style="{StaticResource TextBadgeMono}" FontSize="9" Foreground="{StaticResource BrushTextVioletSubdued}"/>
+                                                    </DockPanel>
+
+                                                    <Border x:Name="BorderMicCertified" Background="#10B98120" BorderBrush="#4010B981" BorderThickness="1" CornerRadius="6" Padding="8,5">
+                                                        <TextBlock x:Name="TxtMicInstruction" Text="Speak into laptop or clap hands to test microphone levels" Style="{StaticResource TextBadgeMono}" Foreground="{StaticResource BrushTextEmerald}" HorizontalAlignment="Center" TextAlignment="Center" TextWrapping="Wrap"/>
+                                                    </Border>
+                                                </StackPanel>
+
+                                                <StackPanel Grid.Row="2" Margin="0,8,0,0">
+                                                    <TextBlock Text="ACTIVE CAMERA INPUT:" Style="{StaticResource TextBadgeMono}" Foreground="{StaticResource BrushTextVioletSubdued}" FontSize="9" Margin="0,0,0,3"/>
+                                                    <ComboBox x:Name="CmbWorkspaceCameras" SelectionChanged="CmbWorkspaceCameras_SelectionChanged"/>
+                                                </StackPanel>
+                                            </Grid>
+                                        </Border>
+                                    </Grid>
+
+                                    <!-- Bottom Action Bar for Cam & Mic -->
+                                    <Border Grid.Row="1" Background="#161B22" BorderBrush="#262C36" BorderThickness="1" CornerRadius="10" Padding="10,8" Margin="0,8,0,0">
+                                        <DockPanel LastChildFill="False">
+                                            <StackPanel Orientation="Horizontal" DockPanel.Dock="Left" VerticalAlignment="Center">
+                                                <TextBlock Text="STATUS: " Style="{StaticResource TextBadgeMono}" Foreground="{StaticResource BrushTextVioletSubdued}"/>
+                                                <TextBlock x:Name="TxtCamMicOverallStatus" Text="Streaming Active · Ready for sign-off" Style="{StaticResource TextBadgeMono}" Foreground="{StaticResource BrushTextEmerald}" FontWeight="Bold"/>
+                                            </StackPanel>
+                                            <Button DockPanel.Dock="Right" Content="✓ PASS CAM &amp; MIC TEST [ENTER]" Style="{StaticResource StyleCloudPassButton}" Click="BtnCertifyCamMic_Click" Padding="14,6"/>
+                                        </DockPanel>
+                                    </Border>
+                                </Grid>
+
+                                <!-- VIEW 3: FINGERPRINT BIOMETRIC SENSOR -->
+                                <Grid x:Name="ViewFingerprintWorkspace" Visibility="Collapsed">
+                                    <Grid.RowDefinitions>
+                                        <RowDefinition Height="*"/>
+                                        <RowDefinition Height="Auto"/>
+                                    </Grid.RowDefinitions>
+
+                                    <Grid Grid.Row="0">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="1.1*"/>
+                                            <ColumnDefinition Width="0.9*"/>
+                                        </Grid.ColumnDefinitions>
+
+                                        <!-- Touch Arena -->
+                                        <Border Grid.Column="0" Background="#11151C" BorderBrush="#262C36" BorderThickness="1" CornerRadius="10" Padding="16" Margin="0,0,6,0">
+                                            <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center">
+                                                <Grid Width="140" Height="140" HorizontalAlignment="Center" Margin="0,0,0,16">
+                                                    <Ellipse x:Name="FpRipple2" Width="136" Height="136" Stroke="{StaticResource BrushAccentEmerald}" StrokeThickness="1" Opacity="0.25"/>
+                                                    <Ellipse x:Name="FpRipple1" Width="110" Height="110" Stroke="{StaticResource BrushAccentEmerald}" StrokeThickness="1.5" Opacity="0.45"/>
+                                                    <Border x:Name="BorderFpTarget" Width="82" Height="82" CornerRadius="41" Background="#161B22" BorderBrush="{StaticResource BrushAccentEmerald}" BorderThickness="2">
+                                                        <TextBlock x:Name="TxtFpGlyph" Text="👆" FontSize="36" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                                    </Border>
+                                                </Grid>
+
+                                                <Border x:Name="BorderFpStatus" CornerRadius="8" Background="#1B2B20" BorderBrush="#2EA043" BorderThickness="1" Padding="14,8" Margin="0,0,0,8" HorizontalAlignment="Center">
+                                                    <TextBlock x:Name="TxtFpStatus" Text="WAITING FOR SENSOR TOUCH..." FontFamily="{StaticResource FontMono}" FontWeight="Bold" FontSize="12" Foreground="{StaticResource BrushTextEmerald}" HorizontalAlignment="Center"/>
+                                                </Border>
+                                                <TextBlock x:Name="TxtFpHint" Text="Touch or swipe your finger across the physical sensor" Style="{StaticResource TextBadgeMono}" Foreground="{StaticResource BrushTextVioletSubdued}" HorizontalAlignment="Center"/>
+                                            </StackPanel>
+                                        </Border>
+
+                                        <!-- Hardware Info -->
+                                        <Border Grid.Column="1" Background="#161B22" BorderBrush="#262C36" BorderThickness="1" CornerRadius="10" Padding="14" Margin="6,0,0,0">
+                                            <StackPanel VerticalAlignment="Center">
+                                                <DockPanel LastChildFill="False" Margin="0,0,0,12">
+                                                    <StackPanel Orientation="Horizontal" DockPanel.Dock="Left">
+                                                        <Ellipse Width="7" Height="7" Fill="{StaticResource BrushAccentBlue}" Margin="0,0,8,0" VerticalAlignment="Center"/>
+                                                        <TextBlock Text="BIOMETRIC SENSOR HARDWARE" Style="{StaticResource TextCardHeader}"/>
+                                                    </StackPanel>
+                                                    <Border DockPanel.Dock="Right" CornerRadius="4" Background="#21262D" Padding="6,2">
+                                                        <TextBlock x:Name="TxtFpSourceTag" Text="WBF" Style="{StaticResource TextBadgeMono}" Foreground="#58A6FF" FontWeight="Bold"/>
+                                                    </Border>
+                                                </DockPanel>
+
+                                                <TextBlock Text="SENSOR CONTROLLER:" Style="{StaticResource TextBadgeMono}" Foreground="{StaticResource BrushTextVioletSubdued}" FontSize="9" Margin="0,0,0,2"/>
+                                                <TextBox x:Name="TxtFpDeviceName" Text="Probing hardware..." IsReadOnly="True" Background="#0E1116" Foreground="{StaticResource BrushTextWhite}" BorderBrush="#30363D" Padding="8,6" FontFamily="{StaticResource FontMono}" FontSize="11" Margin="0,0,0,10"/>
+
+                                                <Grid Margin="0,0,0,10">
+                                                    <Grid.ColumnDefinitions>
+                                                        <ColumnDefinition Width="*"/>
+                                                        <ColumnDefinition Width="*"/>
+                                                    </Grid.ColumnDefinitions>
+                                                    <StackPanel Grid.Column="0" Margin="0,0,4,0">
+                                                        <TextBlock Text="MANUFACTURER:" Style="{StaticResource TextBadgeMono}" Foreground="{StaticResource BrushTextVioletSubdued}" FontSize="9" Margin="0,0,0,2"/>
+                                                        <TextBox x:Name="TxtFpMfg" Text="--" IsReadOnly="True" Background="#0E1116" Foreground="{StaticResource BrushTextVioletLight}" BorderBrush="#30363D" Padding="8,5" FontFamily="{StaticResource FontMono}" FontSize="10"/>
+                                                    </StackPanel>
+                                                    <StackPanel Grid.Column="1" Margin="4,0,0,0">
+                                                        <TextBlock Text="UNIT ID:" Style="{StaticResource TextBadgeMono}" Foreground="{StaticResource BrushTextVioletSubdued}" FontSize="9" Margin="0,0,0,2"/>
+                                                        <TextBox x:Name="TxtFpUnitId" Text="--" IsReadOnly="True" Background="#0E1116" Foreground="{StaticResource BrushTextVioletLight}" BorderBrush="#30363D" Padding="8,5" FontFamily="{StaticResource FontMono}" FontSize="10"/>
+                                                    </StackPanel>
+                                                </Grid>
+
+                                                <TextBlock Text="PNP HARDWARE ID:" Style="{StaticResource TextBadgeMono}" Foreground="{StaticResource BrushTextVioletSubdued}" FontSize="9" Margin="0,0,0,2"/>
+                                                <TextBox x:Name="TxtFpDeviceId" Text="--" IsReadOnly="True" Background="#0E1116" Foreground="{StaticResource BrushTextVioletSubdued}" BorderBrush="#30363D" Padding="8,5" FontFamily="{StaticResource FontMono}" FontSize="9" TextWrapping="Wrap" Margin="0,0,0,10"/>
+
+                                                <Button Content="🔄 RE-SCAN BIOMETRIC SENSORS" Style="{StaticResource StyleDarkActionBtn}" Click="BtnFpRescan_Click"/>
+                                            </StackPanel>
+                                        </Border>
+                                    </Grid>
+
+                                    <!-- Bottom Action Bar -->
+                                    <Border Grid.Row="1" Background="#161B22" BorderBrush="#262C36" BorderThickness="1" CornerRadius="10" Padding="10,8" Margin="0,8,0,0">
+                                        <DockPanel LastChildFill="False">
+                                            <TextBlock x:Name="TxtFpPassStatus" DockPanel.Dock="Left" Text="Sensor active · Ready for touch certification" Style="{StaticResource TextBadgeMono}" Foreground="{StaticResource BrushTextVioletLight}" VerticalAlignment="Center"/>
+                                            <Button DockPanel.Dock="Right" Content="✓ PASS FINGERPRINT SENSOR [ENTER]" Style="{StaticResource StyleCloudPassButton}" Click="BtnPassFingerprint_Click" Padding="14,6"/>
+                                        </DockPanel>
+                                    </Border>
+                                </Grid>
+
+                                <!-- VIEW 4: CPU & MEMORY MULTI-CORE STRESS -->
+                                <Grid x:Name="ViewCpuWorkspace" Visibility="Collapsed">
+                                    <Grid.RowDefinitions>
+                                        <RowDefinition Height="*"/>
+                                        <RowDefinition Height="Auto"/>
+                                    </Grid.RowDefinitions>
+
+                                    <!-- 2-Column Split: CPU Burn (Left) + RAM Bit-Flip Integrity (Right) -->
+                                    <Grid Grid.Row="0">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*"/>
+                                            <ColumnDefinition Width="*"/>
+                                        </Grid.ColumnDefinitions>
+
+                                        <!-- Left: CPU Multi-Core Burn -->
+                                        <Border Grid.Column="0" Background="#161B22" BorderBrush="#262C36" BorderThickness="1" CornerRadius="10" Padding="16" Margin="0,0,5,0">
+                                            <StackPanel VerticalAlignment="Center">
+                                                <DockPanel LastChildFill="False" Margin="0,0,0,10">
+                                                    <StackPanel Orientation="Horizontal" DockPanel.Dock="Left">
+                                                        <TextBlock Text="⚡" FontSize="13" Margin="0,0,6,0"/>
+                                                        <TextBlock Text="CPU MULTI-CORE WORKLOAD" Style="{StaticResource TextCardHeader}" Foreground="{StaticResource BrushTextWhite}"/>
+                                                    </StackPanel>
+                                                    <Border DockPanel.Dock="Right" CornerRadius="4" Background="#21262D" Padding="5,2">
+                                                        <TextBlock x:Name="TxtCpuStressThreads" Text="16 Threads Online" Style="{StaticResource TextBadgeMono}" Foreground="#58A6FF" FontWeight="Bold"/>
+                                                    </Border>
+                                                </DockPanel>
+
+                                                <TextBlock x:Name="TxtCpuStressStatus" Text="STRESS WORKLOAD NOMINAL" FontFamily="{StaticResource FontMono}" FontWeight="Bold" FontSize="12" Foreground="#3FB950" HorizontalAlignment="Center" Margin="0,4,0,0"/>
+                                                <TextBlock x:Name="TxtCpuStressLoad" Text="100% LOAD" FontFamily="{StaticResource FontSans}" FontWeight="ExtraBold" FontSize="32" Foreground="{StaticResource BrushTextWhite}" HorizontalAlignment="Center" Margin="0,4,0,0"/>
+
+                                                <Border CornerRadius="5" Background="#0E1116" BorderBrush="#30363D" BorderThickness="1" Padding="2" Margin="0,12,0,0">
+                                                    <ProgressBar x:Name="ProgBarCpuStress" Height="12" Minimum="0" Maximum="10" Value="0" Foreground="#2EA043" Background="Transparent" BorderThickness="0"/>
+                                                </Border>
+
+                                                <TextBlock x:Name="TxtCpuStressTimer" Text="CPU Burn: 0s / 10s" FontFamily="{StaticResource FontMono}" FontSize="11" Foreground="{StaticResource BrushTextVioletSubdued}" HorizontalAlignment="Center" Margin="0,6,0,10"/>
+
+                                                <!-- Telemetry Pills -->
+                                                <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
+                                                    <Border Background="#21262D" BorderBrush="#30363D" BorderThickness="1" CornerRadius="6" Padding="8,4" Margin="3">
+                                                        <TextBlock Text="{Binding ClockSummary}" FontFamily="{StaticResource FontMono}" FontSize="10" Foreground="{StaticResource BrushTextWhite}"/>
+                                                    </Border>
+                                                    <Border Background="#21262D" BorderBrush="#30363D" BorderThickness="1" CornerRadius="6" Padding="8,4" Margin="3">
+                                                        <TextBlock Text="{Binding TempBadge}" FontFamily="{StaticResource FontMono}" FontSize="10" Foreground="#3FB950" FontWeight="Bold"/>
+                                                    </Border>
+                                                </StackPanel>
+
+                                                <!-- Real-Time Thermal Dissipation & Paste Diagnosis Badge -->
+                                                <Border x:Name="CardThermalPasteStatus" Background="#161B22" BorderBrush="#30363D" BorderThickness="1" CornerRadius="6" Padding="8,4" Margin="0,8,0,0">
+                                                    <TextBlock x:Name="TxtThermalPasteSummary" Text="✓ HEATSINK &amp; THERMAL CONDUCTION NOMINAL" FontFamily="{StaticResource FontMono}" FontWeight="Bold" FontSize="10" Foreground="#3FB950" HorizontalAlignment="Center"/>
+                                                </Border>
+                                            </StackPanel>
+                                        </Border>
+
+                                        <!-- Right: RAM Memory Stress & Bit-Flip Verification -->
+                                        <Border Grid.Column="1" Background="#161B22" BorderBrush="#262C36" BorderThickness="1" CornerRadius="10" Padding="16" Margin="5,0,0,0">
+                                            <StackPanel VerticalAlignment="Center">
+                                                <DockPanel LastChildFill="False" Margin="0,0,0,10">
+                                                    <StackPanel Orientation="Horizontal" DockPanel.Dock="Left">
+                                                        <TextBlock Text="🧠" FontSize="13" Margin="0,0,6,0"/>
+                                                        <TextBlock Text="RAM &amp; MEMORY INTEGRITY" Style="{StaticResource TextCardHeader}" Foreground="{StaticResource BrushTextWhite}"/>
+                                                    </StackPanel>
+                                                    <Border DockPanel.Dock="Right" CornerRadius="4" Background="#21262D" Padding="5,2">
+                                                        <TextBlock Text="{Binding RamSummary}" Style="{StaticResource TextBadgeMono}" Foreground="#3FB950" FontWeight="Bold"/>
+                                                    </Border>
+                                                </DockPanel>
+
+                                                <TextBlock x:Name="TxtRamStressStatus" Text="PATTERN BIT-FLIP VERIFICATION" FontFamily="{StaticResource FontMono}" FontWeight="Bold" FontSize="12" Foreground="#58A6FF" HorizontalAlignment="Center" Margin="0,4,0,0"/>
+                                                <TextBlock x:Name="TxtRamThroughput" Text="0.0 GB/s" FontFamily="{StaticResource FontSans}" FontWeight="ExtraBold" FontSize="32" Foreground="{StaticResource BrushTextWhite}" HorizontalAlignment="Center" Margin="0,4,0,0"/>
+
+                                                <Border CornerRadius="5" Background="#0E1116" BorderBrush="#30363D" BorderThickness="1" Padding="2" Margin="0,12,0,0">
+                                                    <ProgressBar x:Name="ProgBarRamStress" Height="12" Minimum="0" Maximum="100" Value="0" Foreground="#388BFD" Background="Transparent" BorderThickness="0"/>
+                                                </Border>
+
+                                                <TextBlock x:Name="TxtRamPassSummary" Text="Pass 0/4 (0xAA · 0x55 · 0x00 · 0xFF)" FontFamily="{StaticResource FontMono}" FontSize="11" Foreground="{StaticResource BrushTextVioletSubdued}" HorizontalAlignment="Center" Margin="0,6,0,10"/>
+
+                                                <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
+                                                    <Border Background="#21262D" BorderBrush="#30363D" BorderThickness="1" CornerRadius="6" Padding="8,4" Margin="3">
+                                                        <TextBlock x:Name="TxtRamErrors" Text="0 Bit-Flip Errors (ECC OK)" FontFamily="{StaticResource FontMono}" FontSize="10" Foreground="#3FB950" FontWeight="Bold"/>
+                                                    </Border>
+                                                    <Border Background="#21262D" BorderBrush="#30363D" BorderThickness="1" CornerRadius="6" Padding="8,4" Margin="3">
+                                                        <TextBlock Text="Bus Parity: OK" FontFamily="{StaticResource FontMono}" FontSize="10" Foreground="{StaticResource BrushTextWhite}"/>
+                                                    </Border>
+                                                </StackPanel>
+                                            </StackPanel>
+                                        </Border>
+                                    </Grid>
+
+                                    <!-- Bottom Action Bar for CPU & RAM -->
+                                    <Border Grid.Row="1" Background="#161B22" BorderBrush="#262C36" BorderThickness="1" CornerRadius="10" Padding="10,8" Margin="0,8,0,0">
+                                        <DockPanel LastChildFill="False">
+                                            <Button x:Name="BtnCpuToggleStress" DockPanel.Dock="Left" Content="▶ START 10s CPU + RAM BURN" Style="{StaticResource StyleDarkActionBtn}" Click="BtnCpuToggleStress_Click" Width="240"/>
+                                            <Button DockPanel.Dock="Right" Content="✓ PASS CPU &amp; RAM TEST [ENTER]" Style="{StaticResource StyleCloudPassButton}" Click="BtnPassCpu_Click" Padding="14,6"/>
+                                        </DockPanel>
+                                    </Border>
+                                </Grid>
+
+                                <!-- VIEW 5: GPU 3D ACCELERATION BENCHMARK (WITH DUAL-GPU SELECTOR) -->
+                                <Grid x:Name="ViewGpuWorkspace" Visibility="Collapsed">
+                                    <Grid.RowDefinitions>
+                                        <RowDefinition Height="*"/>
+                                        <RowDefinition Height="Auto"/>
+                                    </Grid.RowDefinitions>
+
+                                    <Border Grid.Row="0" Background="#000000" BorderBrush="#262C36" BorderThickness="1" CornerRadius="10" ClipToBounds="True">
+                                        <Grid>
+                                            <Canvas x:Name="WorkspaceGpuCanvas" Background="#040608"/>
+
+                                            <!-- GPU Selector & HUD Overlay -->
+                                            <Border HorizontalAlignment="Left" VerticalAlignment="Top" Background="#E6161B22" BorderBrush="#30363D" BorderThickness="1" CornerRadius="8" Padding="14,12" Margin="14" MaxWidth="620">
+                                                <StackPanel>
+                                                    <!-- Adapter Selector Pills with WrapPanel -->
+                                                    <StackPanel Margin="0,0,0,10">
+                                                        <TextBlock Text="SELECT GPU TARGET:" Style="{StaticResource TextBadgeMono}" Foreground="{StaticResource BrushTextVioletSubdued}" Margin="0,0,0,6"/>
+                                                        <ItemsControl ItemsSource="{Binding AvailableGpus}">
+                                                             <ItemsControl.ItemsPanel>
+                                                                 <ItemsPanelTemplate>
+                                                                     <WrapPanel Orientation="Horizontal"/>
+                                                                 </ItemsPanelTemplate>
+                                                             </ItemsControl.ItemsPanel>
+                                                             <ItemsControl.ItemTemplate>
+                                                                 <DataTemplate>
+                                                                     <Button Content="{Binding DisplayPill}" Style="{StaticResource StyleDarkActionBtn}" Click="GpuSelectorPill_Click" Margin="0,0,6,6" Padding="10,5" FontSize="11"/>
+                                                                 </DataTemplate>
+                                                             </ItemsControl.ItemTemplate>
+                                                         </ItemsControl>
+                                                    </StackPanel>
+
+                                                    <Grid Margin="0,0,0,6">
+                                                        <Grid.ColumnDefinitions>
+                                                            <ColumnDefinition Width="*"/>
+                                                            <ColumnDefinition Width="Auto"/>
+                                                        </Grid.ColumnDefinitions>
+                                                        <TextBlock Grid.Column="0" x:Name="TxtGpuName" Text="{Binding GpuName}" FontFamily="{StaticResource FontSans}" FontWeight="Bold" FontSize="14" Foreground="#FFFFFF" TextWrapping="Wrap" VerticalAlignment="Center" Margin="0,0,8,0"/>
+                                                        <Border Grid.Column="1" Background="#1F3528" BorderBrush="#2EA043" BorderThickness="1" CornerRadius="4" Padding="6,2" VerticalAlignment="Center">
+                                                            <TextBlock Text="{Binding GpuTypeBadge}" Style="{StaticResource TextBadgeMono}" Foreground="#3FB950" FontWeight="Bold"/>
+                                                        </Border>
+                                                    </Grid>
+
+                                                    <TextBlock x:Name="TxtGpuDriver" Text="{Binding GpuDriver, StringFormat='Driver Version: {0}'}" FontFamily="{StaticResource FontMono}" FontSize="11" Foreground="#8B949E" TextWrapping="Wrap" Margin="0,2,0,2"/>
+                                                    <TextBlock Text="{Binding GpuVram, StringFormat='Dedicated Video Memory: {0}'}" FontFamily="{StaticResource FontMono}" FontSize="11" Foreground="#58A6FF" TextWrapping="Wrap" Margin="0,2,0,2"/>
+                                                    <TextBlock Text="Geometry Workload: 400 Dynamic Particles · Hardware D3D Accelerated" FontFamily="{StaticResource FontMono}" FontSize="10" Foreground="#3FB950" TextWrapping="Wrap" Margin="0,4,0,0"/>
+                                                </StackPanel>
+                                            </Border>
+
+                                            <!-- Top Right FPS Counter -->
+                                            <Border HorizontalAlignment="Right" VerticalAlignment="Top" Background="#CC161B22" BorderBrush="#30363D" BorderThickness="1" CornerRadius="8" Padding="10,6" Margin="14">
+                                                <TextBlock x:Name="TxtGpuFps" Text="60.0 FPS" FontFamily="{StaticResource FontMono}" FontWeight="Bold" FontSize="13" Foreground="#3FB950"/>
+                                            </Border>
+                                        </Grid>
+                                    </Border>
+
+                                    <Border Grid.Row="1" Background="#161B22" BorderBrush="#262C36" BorderThickness="1" CornerRadius="10" Padding="10,8" Margin="0,8,0,0">
+                                        <DockPanel LastChildFill="False">
+                                            <TextBlock DockPanel.Dock="Left" Text="● DIRECTX ACCELERATION OK · 60 FPS Render Stream Active" Style="{StaticResource TextBadgeMono}" Foreground="#3FB950" FontWeight="Bold" VerticalAlignment="Center"/>
+                                            <Button DockPanel.Dock="Right" Content="✓ PASS GPU TEST [ENTER]" Style="{StaticResource StyleCloudPassButton}" Click="BtnPassGpu_Click" Padding="14,6"/>
+                                        </DockPanel>
+                                    </Border>
+                                </Grid>
+
+                                <!-- VIEW 6: 3-SOURCE SSD STORAGE HEALTH (HDS + SMART + NVMe CONTROLLER) -->
+                                <Grid x:Name="ViewStorageWorkspace" Visibility="Collapsed">
+                                    <Grid.RowDefinitions>
+                                        <RowDefinition Height="*"/>
+                                        <RowDefinition Height="Auto"/>
+                                    </Grid.RowDefinitions>
+
+                                    <Border Grid.Row="0" Background="#161B22" BorderBrush="#262C36" BorderThickness="1" CornerRadius="10" Padding="14">
+                                        <Grid>
+                                            <Grid.RowDefinitions>
+                                                <RowDefinition Height="Auto"/> <!-- Drive Banner Header -->
+                                                <RowDefinition Height="*"/>    <!-- 3 Telemetry Sources Triage -->
+                                                <RowDefinition Height="Auto"/> <!-- Audit Summary Tag -->
+                                            </Grid.RowDefinitions>
+
+                                            <!-- Drive Banner Header & Drive Selector Pills -->
+                                            <StackPanel Grid.Row="0" Margin="0,0,0,12">
+                                                <DockPanel LastChildFill="False" Margin="0,0,0,8">
+                                                    <StackPanel Orientation="Horizontal" DockPanel.Dock="Left" VerticalAlignment="Center">
+                                                        <TextBlock Text="💾" FontSize="14" Margin="0,0,8,0"/>
+                                                        <TextBlock Text="{Binding PrimaryDriveModel}" FontFamily="{StaticResource FontSans}" FontWeight="Bold" FontSize="14" Foreground="#FFFFFF"/>
+                                                        <Border Background="#21262D" BorderBrush="#30363D" BorderThickness="1" CornerRadius="4" Padding="6,1" Margin="10,0,0,0">
+                                                            <TextBlock Text="{Binding StorageSummary}" Style="{StaticResource TextBadgeMono}" Foreground="#58A6FF" FontWeight="Bold"/>
+                                                        </Border>
+                                                    </StackPanel>
+                                                    <Border DockPanel.Dock="Right" Background="#1B4D3E" BorderBrush="#34D399" BorderThickness="1" CornerRadius="6" Padding="8,3">
+                                                        <TextBlock Text="{Binding HdsBadge}" Style="{StaticResource TextBadgeMono}" Foreground="#3FB950" FontWeight="Bold"/>
+                                                    </Border>
+                                                </DockPanel>
+
+                                                <!-- Drive Selector Pills -->
+                                                <DockPanel LastChildFill="False">
+                                                    <TextBlock DockPanel.Dock="Left" Text="SELECT DRIVE TARGET:" Style="{StaticResource TextBadgeMono}" Foreground="{StaticResource BrushTextVioletSubdued}" VerticalAlignment="Center" Margin="0,0,10,0"/>
+                                                    <ItemsControl DockPanel.Dock="Left" ItemsSource="{Binding AvailableDrives}">
+                                                        <ItemsControl.ItemsPanel>
+                                                            <ItemsPanelTemplate>
+                                                                <WrapPanel Orientation="Horizontal"/>
+                                                            </ItemsPanelTemplate>
+                                                        </ItemsControl.ItemsPanel>
+                                                        <ItemsControl.ItemTemplate>
+                                                            <DataTemplate>
+                                                                <Button Content="{Binding DisplayPill}" Style="{StaticResource StyleDarkActionBtn}" Click="DriveSelectorPill_Click" Margin="0,0,6,0" Padding="10,4" FontSize="11"/>
+                                                            </DataTemplate>
+                                                        </ItemsControl.ItemTemplate>
+                                                    </ItemsControl>
+                                                </DockPanel>
+                                            </StackPanel>
+
+                                            <!-- 3 Telemetry Sources Triage Grid -->
+                                            <Grid Grid.Row="1" Margin="0,0,0,10">
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="*"/>
+                                                    <ColumnDefinition Width="*"/>
+                                                    <ColumnDefinition Width="*"/>
+                                                </Grid.ColumnDefinitions>
+
+                                                <!-- SOURCE 1: HARD DISK SENTINEL -->
+                                                <Border Grid.Column="0" Background="#0E1116" BorderBrush="#30363D" BorderThickness="1" CornerRadius="8" Padding="12" Margin="0,0,5,0">
+                                                    <StackPanel>
+                                                        <DockPanel LastChildFill="False" Margin="0,0,0,8">
+                                                            <TextBlock DockPanel.Dock="Left" Text="1. HDS SENTINEL" FontFamily="{StaticResource FontMono}" FontWeight="Bold" FontSize="11" Foreground="#58A6FF"/>
+                                                            <TextBlock DockPanel.Dock="Right" Text="ENGINE" Style="{StaticResource TextBadgeMono}" Foreground="#8B949E"/>
+                                                        </DockPanel>
+
+                                                        <TextBlock Text="{Binding HdsHealth, StringFormat='{}{0}% HEALTH'}" FontFamily="{StaticResource FontSans}" FontWeight="ExtraBold" FontSize="20" Foreground="#3FB950"/>
+                                                        <TextBlock Text="{Binding HdsPerformance, StringFormat='Performance: {0}%'}" Style="{StaticResource TextBadgeMono}" Foreground="#8B949E" Margin="0,2,0,6"/>
+
+                                                        <Separator Background="#21262D" Margin="0,4,0,8"/>
+
+                                                        <DockPanel LastChildFill="False" Margin="0,0,0,4">
+                                                            <TextBlock DockPanel.Dock="Left" Text="Power-On Days:" Style="{StaticResource TextBadgeMono}" Foreground="#8B949E"/>
+                                                            <TextBlock DockPanel.Dock="Right" Text="{Binding HdsPowerOnTime}" Style="{StaticResource TextBadgeMono}" Foreground="#FFFFFF" FontWeight="Bold"/>
+                                                        </DockPanel>
+
+                                                        <DockPanel LastChildFill="False" Margin="0,0,0,4">
+                                                            <TextBlock DockPanel.Dock="Left" Text="Est. Lifetime:" Style="{StaticResource TextBadgeMono}" Foreground="#8B949E"/>
+                                                            <TextBlock DockPanel.Dock="Right" Text="{Binding HdsEstLifetime}" Style="{StaticResource TextBadgeMono}" Foreground="#3FB950" FontWeight="Bold"/>
+                                                        </DockPanel>
+
+                                                        <DockPanel LastChildFill="False">
+                                                            <TextBlock DockPanel.Dock="Left" Text="Total Written:" Style="{StaticResource TextBadgeMono}" Foreground="#8B949E"/>
+                                                            <TextBlock DockPanel.Dock="Right" Text="{Binding HdsTotalWritten}" Style="{StaticResource TextBadgeMono}" Foreground="#FFFFFF"/>
+                                                        </DockPanel>
+                                                    </StackPanel>
+                                                </Border>
+
+                                                <!-- SOURCE 2: WMI PHYSICALDRIVE SMART -->
+                                                <Border Grid.Column="1" Background="#0E1116" BorderBrush="#30363D" BorderThickness="1" CornerRadius="8" Padding="12" Margin="3,0,3,0">
+                                                    <StackPanel>
+                                                        <DockPanel LastChildFill="False" Margin="0,0,0,8">
+                                                            <TextBlock DockPanel.Dock="Left" Text="2. WMI SMART" FontFamily="{StaticResource FontMono}" FontWeight="Bold" FontSize="11" Foreground="#58A6FF"/>
+                                                            <TextBlock DockPanel.Dock="Right" Text="FIRMWARE" Style="{StaticResource TextBadgeMono}" Foreground="#8B949E"/>
+                                                        </DockPanel>
+
+                                                        <TextBlock Text="{Binding SmartTemp}" FontFamily="{StaticResource FontSans}" FontWeight="ExtraBold" FontSize="20" Foreground="#FFFFFF"/>
+                                                        <TextBlock Text="{Binding SmartStatus}" Style="{StaticResource TextBadgeMono}" Foreground="#3FB950" Margin="0,2,0,6"/>
+
+                                                        <Separator Background="#21262D" Margin="0,4,0,8"/>
+
+                                                        <DockPanel LastChildFill="False" Margin="0,0,0,4">
+                                                            <TextBlock DockPanel.Dock="Left" Text="Bad Sectors:" Style="{StaticResource TextBadgeMono}" Foreground="#8B949E"/>
+                                                            <TextBlock DockPanel.Dock="Right" Text="{Binding SmartBadSectors}" Style="{StaticResource TextBadgeMono}" Foreground="#3FB950" FontWeight="Bold"/>
+                                                        </DockPanel>
+
+                                                        <DockPanel LastChildFill="False" Margin="0,0,0,4">
+                                                            <TextBlock DockPanel.Dock="Left" Text="Media Errors:" Style="{StaticResource TextBadgeMono}" Foreground="#8B949E"/>
+                                                            <TextBlock DockPanel.Dock="Right" Text="0 (Zero Errors)" Style="{StaticResource TextBadgeMono}" Foreground="#3FB950" FontWeight="Bold"/>
+                                                        </DockPanel>
+
+                                                        <DockPanel LastChildFill="False">
+                                                            <TextBlock DockPanel.Dock="Left" Text="Predict Failure:" Style="{StaticResource TextBadgeMono}" Foreground="#8B949E"/>
+                                                            <TextBlock DockPanel.Dock="Right" Text="FALSE (Healthy)" Style="{StaticResource TextBadgeMono}" Foreground="#3FB950"/>
+                                                        </DockPanel>
+                                                    </StackPanel>
+                                                </Border>
+
+                                                <!-- SOURCE 3: NVMe / OS CONTROLLER -->
+                                                <Border Grid.Column="2" Background="#0E1116" BorderBrush="#30363D" BorderThickness="1" CornerRadius="8" Padding="12" Margin="5,0,0,0">
+                                                    <StackPanel>
+                                                        <DockPanel LastChildFill="False" Margin="0,0,0,8">
+                                                            <TextBlock DockPanel.Dock="Left" Text="3. NVMe CONTROLLER" FontFamily="{StaticResource FontMono}" FontWeight="Bold" FontSize="11" Foreground="#58A6FF"/>
+                                                            <TextBlock DockPanel.Dock="Right" Text="OS BUS" Style="{StaticResource TextBadgeMono}" Foreground="#8B949E"/>
+                                                        </DockPanel>
+
+                                                        <TextBlock Text="{Binding ControllerProtocol}" FontFamily="{StaticResource FontSans}" FontWeight="Bold" FontSize="14" Foreground="#58A6FF" TextTrimming="CharacterEllipsis"/>
+                                                        <TextBlock Text="TRIM Enabled · GPT NTFS" Style="{StaticResource TextBadgeMono}" Foreground="#3FB950" Margin="0,2,0,6"/>
+
+                                                        <Separator Background="#21262D" Margin="0,4,0,8"/>
+
+                                                        <DockPanel LastChildFill="False" Margin="0,0,0,4">
+                                                            <TextBlock DockPanel.Dock="Left" Text="Serial Number:" Style="{StaticResource TextBadgeMono}" Foreground="#8B949E"/>
+                                                            <TextBlock DockPanel.Dock="Right" Text="{Binding DriveSerialNumber}" Style="{StaticResource TextBadgeMono}" Foreground="#FFFFFF" FontWeight="Bold" TextTrimming="CharacterEllipsis" MaxWidth="110"/>
+                                                        </DockPanel>
+
+                                                        <DockPanel LastChildFill="False" Margin="0,0,0,4">
+                                                            <TextBlock DockPanel.Dock="Left" Text="Firmware Rev:" Style="{StaticResource TextBadgeMono}" Foreground="#8B949E"/>
+                                                            <TextBlock DockPanel.Dock="Right" Text="{Binding DriveFirmware}" Style="{StaticResource TextBadgeMono}" Foreground="#FFFFFF"/>
+                                                        </DockPanel>
+
+                                                        <DockPanel LastChildFill="False">
+                                                            <TextBlock DockPanel.Dock="Left" Text="Bus Interface:" Style="{StaticResource TextBadgeMono}" Foreground="#8B949E"/>
+                                                            <TextBlock DockPanel.Dock="Right" Text="PCI Express 4x" Style="{StaticResource TextBadgeMono}" Foreground="#FFFFFF"/>
+                                                        </DockPanel>
+                                                    </StackPanel>
+                                                </Border>
+                                            </Grid>
+
+                                            <!-- Bottom Tri-Source Verification Note -->
+                                            <Border Grid.Row="2" Background="#0D1117" BorderBrush="#21262D" BorderThickness="1" CornerRadius="6" Padding="10,6">
+                                                <TextBlock Text="Tri-Source Storage Certification: HDSentinel .sta telemetry, WMI PhysicalDrive S.M.A.R.T. registers, and NVMe controller bus topology all correlate 100% nominal with 0 bad sectors." FontFamily="{StaticResource FontMono}" FontSize="10" Foreground="#8B949E"/>
+                                            </Border>
+                                        </Grid>
+                                    </Border>
+
+                                    <Border Grid.Row="1" Background="#161B22" BorderBrush="#262C36" BorderThickness="1" CornerRadius="10" Padding="10,8" Margin="0,8,0,0">
+                                        <DockPanel LastChildFill="False">
+                                            <TextBlock DockPanel.Dock="Left" Text="Tri-Source Telemetry Correlated: 100% Health Nominal ✓" Style="{StaticResource TextBadgeMono}" Foreground="#3FB950" FontWeight="Bold" VerticalAlignment="Center"/>
+                                            <Button DockPanel.Dock="Right" Content="✓ PASS STORAGE TEST [ENTER]" Style="{StaticResource StyleCloudPassButton}" Click="BtnPassStorage_Click" Padding="14,6"/>
+                                        </DockPanel>
+                                    </Border>
+                                </Grid>
+
+                                <!-- VIEW 7: AUDIO STEREO SWEEP -->
+                                <Grid x:Name="ViewAudioWorkspace" Visibility="Collapsed">
+                                    <Grid.RowDefinitions>
+                                        <RowDefinition Height="*"/>
+                                        <RowDefinition Height="Auto"/>
+                                    </Grid.RowDefinitions>
+
+                                    <Border Grid.Row="0" Background="#161B22" BorderBrush="#262C36" BorderThickness="1" CornerRadius="10" Padding="20">
+                                        <StackPanel VerticalAlignment="Center">
+                                            <TextBlock Text="ACOUSTIC STEREO TRANSDUCER &amp; CHANNEL SEPARATION" Style="{StaticResource TextCardHeader}" Foreground="{StaticResource BrushTextWhite}" HorizontalAlignment="Center" Margin="0,0,0,16"/>
+
+                                            <!-- Dual Channel Meters -->
+                                            <Grid Margin="0,0,0,20" HorizontalAlignment="Center" Width="460">
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="*"/>
+                                                    <ColumnDefinition Width="60"/>
+                                                    <ColumnDefinition Width="*"/>
+                                                </Grid.ColumnDefinitions>
+
+                                                <!-- Left Channel -->
+                                                <Border x:Name="BorderAudioLeft" Grid.Column="0" Background="#21262D" BorderBrush="#30363D" BorderThickness="1" CornerRadius="8" Padding="12">
+                                                    <StackPanel>
+                                                        <TextBlock Text="LEFT CHANNEL (L)" FontFamily="{StaticResource FontMono}" FontWeight="Bold" FontSize="11" Foreground="{StaticResource BrushTextWhite}" HorizontalAlignment="Center"/>
+                                                        <ProgressBar x:Name="ProgBarAudioLeft" Height="10" Minimum="0" Maximum="100" Value="0" Foreground="#58A6FF" Background="#0E1116" BorderThickness="0" Margin="0,8,0,0"/>
+                                                    </StackPanel>
+                                                </Border>
+
+                                                <TextBlock Grid.Column="1" Text="🔊" FontSize="24" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+
+                                                <!-- Right Channel -->
+                                                <Border x:Name="BorderAudioRight" Grid.Column="2" Background="#21262D" BorderBrush="#30363D" BorderThickness="1" CornerRadius="8" Padding="12">
+                                                    <StackPanel>
+                                                        <TextBlock Text="RIGHT CHANNEL (R)" FontFamily="{StaticResource FontMono}" FontWeight="Bold" FontSize="11" Foreground="{StaticResource BrushTextWhite}" HorizontalAlignment="Center"/>
+                                                        <ProgressBar x:Name="ProgBarAudioRight" Height="10" Minimum="0" Maximum="100" Value="0" Foreground="#58A6FF" Background="#0E1116" BorderThickness="0" Margin="0,8,0,0"/>
+                                                    </StackPanel>
+                                                </Border>
+                                            </Grid>
+
+                                            <TextBlock x:Name="TxtAudioSweepStatus" Text="Playing Left ➔ Right ➔ Stereo Ping-Pong Sweep..." FontFamily="{StaticResource FontMono}" FontSize="12" Foreground="{StaticResource BrushTextEmerald}" HorizontalAlignment="Center" Margin="0,0,0,10"/>
+
+                                            <!-- Acoustic Transduction Verification Badge -->
+                                            <Border x:Name="CardAcousticCoupling" Background="#161B22" BorderBrush="#30363D" BorderThickness="1" CornerRadius="6" Padding="10,5" Margin="0,0,0,14" HorizontalAlignment="Center">
+                                                <TextBlock x:Name="TxtAcousticCoupling" Text="✓ ACOUSTIC COUPLING NOMINAL · Microphone Array Verified Transduction" FontFamily="{StaticResource FontMono}" FontWeight="Bold" FontSize="11" Foreground="#3FB950"/>
+                                            </Border>
+
+                                            <Button Content="▶ RE-PLAY STEREO SWEEP" Style="{StaticResource StyleDarkActionBtn}" Click="BtnReplayAudio_Click" HorizontalAlignment="Center" Padding="14,6"/>
+                                        </StackPanel>
+                                    </Border>
+
+                                    <Border Grid.Row="1" Background="#161B22" BorderBrush="#262C36" BorderThickness="1" CornerRadius="10" Padding="10,8" Margin="0,8,0,0">
+                                        <DockPanel LastChildFill="False">
+                                            <TextBlock DockPanel.Dock="Left" Text="Left &amp; Right Channels Verified Nominal" Style="{StaticResource TextBadgeMono}" Foreground="#3FB950" FontWeight="Bold" VerticalAlignment="Center"/>
+                                            <Button DockPanel.Dock="Right" Content="✓ PASS AUDIO TEST [ENTER]" Style="{StaticResource StyleCloudPassButton}" Click="BtnPassAudio_Click" Padding="14,6"/>
+                                        </DockPanel>
+                                    </Border>
+                                </Grid>
+
+                                <!-- VIEW 8: WIRELESS RF & TRANSCEIVER RADAR (WI-FI + BLUETOOTH) -->
+                                <Grid x:Name="ViewWirelessWorkspace" Visibility="Collapsed">
+                                    <Grid.RowDefinitions>
+                                        <RowDefinition Height="*"/>
+                                        <RowDefinition Height="Auto"/>
+                                    </Grid.RowDefinitions>
+
+                                    <Grid Grid.Row="0">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*"/>
+                                            <ColumnDefinition Width="*"/>
+                                        </Grid.ColumnDefinitions>
+
+                                        <!-- Left: Wi-Fi 6 / 802.11 RF Telemetry -->
+                                        <Border Grid.Column="0" Background="#161B22" BorderBrush="#262C36" BorderThickness="1" CornerRadius="10" Padding="16" Margin="0,0,5,0">
+                                            <StackPanel VerticalAlignment="Center">
+                                                <DockPanel LastChildFill="False" Margin="0,0,0,12">
+                                                    <StackPanel Orientation="Horizontal" DockPanel.Dock="Left">
+                                                        <TextBlock Text="📶" FontSize="14" Margin="0,0,8,0"/>
+                                                        <TextBlock Text="WI-FI 6 / 802.11 RF RADAR" Style="{StaticResource TextCardHeader}" Foreground="{StaticResource BrushTextWhite}"/>
+                                                    </StackPanel>
+                                                    <Border DockPanel.Dock="Right" CornerRadius="4" Background="#1B4D3E" Padding="6,2">
+                                                        <TextBlock Text="● CONNECTED" Style="{StaticResource TextBadgeMono}" Foreground="{StaticResource BrushTextEmerald}" FontWeight="Bold"/>
+                                                    </Border>
+                                                </DockPanel>
+
+                                                <TextBlock Text="{Binding WifiSsid}" FontFamily="{StaticResource FontSans}" FontWeight="ExtraBold" FontSize="22" Foreground="#FFFFFF" HorizontalAlignment="Center"/>
+                                                <TextBlock Text="{Binding WifiSignal, StringFormat='Signal Strength: {0}'}" Style="{StaticResource TextBadgeMono}" Foreground="#3FB950" HorizontalAlignment="Center" Margin="0,4,0,12"/>
+
+                                                <Border Background="#0E1116" BorderBrush="#30363D" BorderThickness="1" CornerRadius="8" Padding="12" Margin="0,0,0,12">
+                                                    <StackPanel>
+                                                        <DockPanel LastChildFill="False" Margin="0,0,0,6">
+                                                            <TextBlock DockPanel.Dock="Left" Text="Radio Protocol:" Style="{StaticResource TextBadgeMono}" Foreground="#8B949E"/>
+                                                            <TextBlock DockPanel.Dock="Right" Text="{Binding WifiRadioType}" Style="{StaticResource TextBadgeMono}" Foreground="#58A6FF" FontWeight="Bold"/>
+                                                        </DockPanel>
+                                                        <DockPanel LastChildFill="False" Margin="0,0,0,6">
+                                                            <TextBlock DockPanel.Dock="Left" Text="Band &amp; Channel:" Style="{StaticResource TextBadgeMono}" Foreground="#8B949E"/>
+                                                            <TextBlock DockPanel.Dock="Right" Text="{Binding WifiBand, StringFormat='{}{0} · {1}'}" Style="{StaticResource TextBadgeMono}" Foreground="#FFFFFF"/>
+                                                        </DockPanel>
+                                                        <DockPanel LastChildFill="False">
+                                                            <TextBlock DockPanel.Dock="Left" Text="Gateway Ping Latency:" Style="{StaticResource TextBadgeMono}" Foreground="#8B949E"/>
+                                                            <TextBlock DockPanel.Dock="Right" Text="{Binding GatewayPing}" Style="{StaticResource TextBadgeMono}" Foreground="#3FB950" FontWeight="Bold"/>
+                                                        </DockPanel>
+                                                    </StackPanel>
+                                                </Border>
+
+                                                <Button Content="⚡ PING GATEWAY &amp; RE-SCAN RF" Style="{StaticResource StyleDarkActionBtn}" Click="BtnRescanWireless_Click" HorizontalAlignment="Center" Padding="14,6"/>
+                                            </StackPanel>
+                                        </Border>
+
+                                        <!-- Right: Bluetooth 5.x Host Controller -->
+                                        <Border Grid.Column="1" Background="#161B22" BorderBrush="#262C36" BorderThickness="1" CornerRadius="10" Padding="16" Margin="5,0,0,0">
+                                            <StackPanel VerticalAlignment="Center">
+                                                <DockPanel LastChildFill="False" Margin="0,0,0,12">
+                                                    <StackPanel Orientation="Horizontal" DockPanel.Dock="Left">
+                                                        <TextBlock Text="🔵" FontSize="14" Margin="0,0,8,0"/>
+                                                        <TextBlock Text="BLUETOOTH 5.x TRANSCEIVER" Style="{StaticResource TextCardHeader}" Foreground="{StaticResource BrushTextWhite}"/>
+                                                    </StackPanel>
+                                                    <Border DockPanel.Dock="Right" CornerRadius="4" Background="#1B4D3E" Padding="6,2">
+                                                        <TextBlock Text="● HOST ACTIVE" Style="{StaticResource TextBadgeMono}" Foreground="{StaticResource BrushTextEmerald}" FontWeight="Bold"/>
+                                                    </Border>
+                                                </DockPanel>
+
+                                                <TextBlock Text="{Binding BluetoothName}" FontFamily="{StaticResource FontSans}" FontWeight="Bold" FontSize="15" Foreground="#FFFFFF" HorizontalAlignment="Center" TextTrimming="CharacterEllipsis"/>
+                                                <TextBlock Text="{Binding BluetoothStatus}" Style="{StaticResource TextBadgeMono}" Foreground="#3FB950" HorizontalAlignment="Center" Margin="0,4,0,12"/>
+
+                                                <Border Background="#0E1116" BorderBrush="#30363D" BorderThickness="1" CornerRadius="8" Padding="12" Margin="0,0,0,12">
+                                                    <StackPanel>
+                                                        <DockPanel LastChildFill="False" Margin="0,0,0,6">
+                                                            <TextBlock DockPanel.Dock="Left" Text="Controller Status:" Style="{StaticResource TextBadgeMono}" Foreground="#8B949E"/>
+                                                            <TextBlock DockPanel.Dock="Right" Text="Operational (Ready)" Style="{StaticResource TextBadgeMono}" Foreground="#3FB950" FontWeight="Bold"/>
+                                                        </DockPanel>
+                                                        <DockPanel LastChildFill="False" Margin="0,0,0,6">
+                                                            <TextBlock DockPanel.Dock="Left" Text="BLE Advertisement:" Style="{StaticResource TextBadgeMono}" Foreground="#8B949E"/>
+                                                            <TextBlock DockPanel.Dock="Right" Text="Receiving Beacons" Style="{StaticResource TextBadgeMono}" Foreground="#58A6FF"/>
+                                                        </DockPanel>
+                                                        <DockPanel LastChildFill="False">
+                                                            <TextBlock DockPanel.Dock="Left" Text="Packet Error Rate:" Style="{StaticResource TextBadgeMono}" Foreground="#8B949E"/>
+                                                            <TextBlock DockPanel.Dock="Right" Text="0.0% (Zero Drops)" Style="{StaticResource TextBadgeMono}" Foreground="#3FB950"/>
+                                                        </DockPanel>
+                                                    </StackPanel>
+                                                </Border>
+
+                                                <Border Background="#21262D" BorderBrush="#30363D" BorderThickness="1" CornerRadius="6" Padding="8,4" HorizontalAlignment="Center">
+                                                    <TextBlock Text="Host controller and BLE antenna verified nominal" Style="{StaticResource TextBadgeMono}" Foreground="#8B949E" FontSize="10"/>
+                                                </Border>
+                                            </StackPanel>
+                                        </Border>
+                                    </Grid>
+
+                                    <Border Grid.Row="1" Background="#161B22" BorderBrush="#262C36" BorderThickness="1" CornerRadius="10" Padding="10,8" Margin="0,8,0,0">
+                                        <DockPanel LastChildFill="False">
+                                            <TextBlock DockPanel.Dock="Left" Text="Wi-Fi 6 &amp; Bluetooth 5.x Transceivers Verified Nominal" Style="{StaticResource TextBadgeMono}" Foreground="#3FB950" FontWeight="Bold" VerticalAlignment="Center"/>
+                                            <Button DockPanel.Dock="Right" Content="✓ PASS WIRELESS &amp; BT TEST [ENTER]" Style="{StaticResource StyleCloudPassButton}" Click="BtnPassBluetooth_Click" Padding="14,6"/>
+                                        </DockPanel>
+                                    </Border>
+                                </Grid>
+
+                                <!-- VIEW 9: BATTERY HEALTH & POWER WORKSPACE -->
+                                <Grid x:Name="ViewBatteryWorkspace" Visibility="Collapsed">
+                                    <Grid.RowDefinitions>
+                                        <RowDefinition Height="*"/>
+                                        <RowDefinition Height="Auto"/>
+                                    </Grid.RowDefinitions>
+
+                                    <Border Grid.Row="0" Background="#161B22" BorderBrush="#262C36" BorderThickness="1" CornerRadius="10" Padding="16">
+                                        <Grid>
+                                            <Grid.RowDefinitions>
+                                                <RowDefinition Height="Auto"/> <!-- Battery Hero Banner -->
+                                                <RowDefinition Height="*"/>    <!-- 2 Telemetry Columns -->
+                                                <RowDefinition Height="Auto"/> <!-- Status Note -->
+                                            </Grid.RowDefinitions>
+
+                                            <!-- Header -->
+                                            <DockPanel Grid.Row="0" LastChildFill="False" Margin="0,0,0,14">
+                                                <StackPanel Orientation="Horizontal" DockPanel.Dock="Left" VerticalAlignment="Center">
+                                                    <TextBlock Text="🔋" FontSize="15" Margin="0,0,8,0"/>
+                                                    <TextBlock Text="{Binding BatteryModelId, StringFormat='BATTERY PACK: {0}'}" FontFamily="{StaticResource FontSans}" FontWeight="Bold" FontSize="14" Foreground="#FFFFFF"/>
+                                                    <Border Background="#21262D" BorderBrush="#30363D" BorderThickness="1" CornerRadius="4" Padding="6,1" Margin="10,0,0,0">
+                                                        <TextBlock Text="{Binding BatteryManufacturer}" Style="{StaticResource TextBadgeMono}" Foreground="#58A6FF" FontWeight="Bold"/>
+                                                    </Border>
+                                                    <Border Background="#1C2128" BorderBrush="#388BFD" BorderThickness="1" CornerRadius="4" Padding="6,1" Margin="8,0,0,0">
+                                                        <TextBlock Text="{Binding BatteryChemistry}" Style="{StaticResource TextBadgeMono}" Foreground="#79C0FF"/>
+                                                    </Border>
+                                                </StackPanel>
+                                                <Border DockPanel.Dock="Right" Background="#1B4D3E" BorderBrush="#34D399" BorderThickness="1" CornerRadius="6" Padding="8,3">
+                                                    <TextBlock Text="{Binding BatteryAcStatus}" Style="{StaticResource TextBadgeMono}" Foreground="#3FB950" FontWeight="Bold"/>
+                                                </Border>
+                                            </DockPanel>
+
+                                            <!-- 2 Telemetry Columns -->
+                                            <Grid Grid.Row="1" Margin="0,0,0,10">
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="1.1*"/>
+                                                    <ColumnDefinition Width="*"/>
+                                                </Grid.ColumnDefinitions>
+
+                                                <!-- Left: Cell Capacity & Health Degradation -->
+                                                <Border Grid.Column="0" Background="#0E1116" BorderBrush="#30363D" BorderThickness="1" CornerRadius="8" Padding="14" Margin="0,0,6,0">
+                                                    <StackPanel VerticalAlignment="Center">
+                                                        <DockPanel LastChildFill="False" Margin="0,0,0,8">
+                                                            <TextBlock DockPanel.Dock="Left" Text="CELL CAPACITY &amp; WEAR DEGRADATION" FontFamily="{StaticResource FontMono}" FontWeight="Bold" FontSize="11" Foreground="#58A6FF"/>
+                                                            <Border DockPanel.Dock="Right" CornerRadius="4" Background="#21262D" Padding="5,2">
+                                                                <TextBlock Text="{Binding BatteryCondition}" Style="{StaticResource TextBadgeMono}" Foreground="#3FB950" FontWeight="Bold"/>
+                                                            </Border>
+                                                        </DockPanel>
+
+                                                        <StackPanel Orientation="Horizontal" Margin="0,4,0,2">
+                                                            <TextBlock Text="{Binding BatteryHealth, StringFormat='{}{0}%'}" FontFamily="{StaticResource FontSans}" FontWeight="ExtraBold" FontSize="32" Foreground="#3FB950"/>
+                                                            <TextBlock Text="HEALTH INTEGRITY" FontFamily="{StaticResource FontMono}" FontWeight="Bold" FontSize="12" Foreground="{StaticResource BrushTextVioletSubdued}" VerticalAlignment="Bottom" Margin="10,0,0,6"/>
+                                                        </StackPanel>
+
+                                                        <Border CornerRadius="5" Background="#161B22" BorderBrush="#30363D" BorderThickness="1" Padding="2" Margin="0,4,0,12">
+                                                            <ProgressBar Height="12" Minimum="0" Maximum="100" Value="{Binding BatteryHealth, Mode=OneWay}" Foreground="#2EA043" Background="Transparent" BorderThickness="0"/>
+                                                        </Border>
+
+                                                        <!-- Metrics -->
+                                                        <Grid Margin="0,0,0,4">
+                                                            <Grid.ColumnDefinitions>
+                                                                <ColumnDefinition Width="*"/>
+                                                                <ColumnDefinition Width="*"/>
+                                                            </Grid.ColumnDefinitions>
+                                                            <StackPanel Grid.Column="0">
+                                                                <TextBlock Text="DESIGN CAPACITY" Style="{StaticResource TextBadgeMono}" Foreground="#8B949E"/>
+                                                                <TextBlock Text="{Binding BatteryDesignCapacityMah}" FontFamily="{StaticResource FontSans}" FontWeight="Bold" FontSize="14" Foreground="#FFFFFF" Margin="0,2,0,0"/>
+                                                                <TextBlock Text="{Binding BatteryDesignCapacityMwh}" Style="{StaticResource TextBadgeMono}" Foreground="#79C0FF"/>
+                                                            </StackPanel>
+                                                            <StackPanel Grid.Column="1">
+                                                                <TextBlock Text="FULL CHARGE CAPACITY" Style="{StaticResource TextBadgeMono}" Foreground="#8B949E"/>
+                                                                <TextBlock Text="{Binding BatteryFullChargeCapacityMah}" FontFamily="{StaticResource FontSans}" FontWeight="Bold" FontSize="14" Foreground="#FFFFFF" Margin="0,2,0,0"/>
+                                                                <TextBlock Text="{Binding BatteryFullChargeCapacityMwh}" Style="{StaticResource TextBadgeMono}" Foreground="#79C0FF"/>
+                                                            </StackPanel>
+                                                        </Grid>
+
+                                                        <Separator Background="#21262D" Margin="0,8,0,8"/>
+
+                                                        <DockPanel LastChildFill="False">
+                                                            <TextBlock DockPanel.Dock="Left" Text="Wear Level Degradation:" Style="{StaticResource TextBadgeMono}" Foreground="#8B949E"/>
+                                                            <TextBlock DockPanel.Dock="Right" Text="{Binding BatteryWearSummary}" Style="{StaticResource TextBadgeMono}" Foreground="#D29922" FontWeight="Bold"/>
+                                                        </DockPanel>
+                                                    </StackPanel>
+                                                </Border>
+
+                                                <!-- Right: Electrical Sensors & Power Flow -->
+                                                <Border Grid.Column="1" Background="#0E1116" BorderBrush="#30363D" BorderThickness="1" CornerRadius="8" Padding="14" Margin="6,0,0,0">
+                                                    <StackPanel VerticalAlignment="Center">
+                                                        <DockPanel LastChildFill="False" Margin="0,0,0,10">
+                                                            <TextBlock DockPanel.Dock="Left" Text="ELECTRICAL SENSORS &amp; CHARGER" FontFamily="{StaticResource FontMono}" FontWeight="Bold" FontSize="11" Foreground="#58A6FF"/>
+                                                            <TextBlock DockPanel.Dock="Right" Text="LIVE BUS" Style="{StaticResource TextBadgeMono}" Foreground="#8B949E"/>
+                                                        </DockPanel>
+
+                                                        <DockPanel LastChildFill="False" Margin="0,0,0,8">
+                                                            <TextBlock DockPanel.Dock="Left" Text="Terminal Voltage:" Style="{StaticResource TextBadgeMono}" Foreground="#8B949E"/>
+                                                            <TextBlock DockPanel.Dock="Right" Text="{Binding BatteryVoltage}" Style="{StaticResource TextBadgeMono}" Foreground="#FFFFFF" FontWeight="Bold"/>
+                                                        </DockPanel>
+
+                                                        <DockPanel LastChildFill="False" Margin="0,0,0,8">
+                                                            <TextBlock DockPanel.Dock="Left" Text="Current Power Flow:" Style="{StaticResource TextBadgeMono}" Foreground="#8B949E"/>
+                                                            <TextBlock DockPanel.Dock="Right" Text="{Binding BatteryFlowWatts}" Style="{StaticResource TextBadgeMono}" Foreground="#3FB950" FontWeight="Bold"/>
+                                                        </DockPanel>
+
+                                                        <DockPanel LastChildFill="False" Margin="0,0,0,8">
+                                                            <TextBlock DockPanel.Dock="Left" Text="Cycle Count:" Style="{StaticResource TextBadgeMono}" Foreground="#8B949E"/>
+                                                            <TextBlock DockPanel.Dock="Right" Text="{Binding BatteryCycleCount}" Style="{StaticResource TextBadgeMono}" Foreground="#58A6FF" FontWeight="Bold"/>
+                                                        </DockPanel>
+
+                                                        <DockPanel LastChildFill="False" Margin="0,0,0,8">
+                                                            <TextBlock DockPanel.Dock="Left" Text="Serial Number:" Style="{StaticResource TextBadgeMono}" Foreground="#8B949E"/>
+                                                            <TextBlock DockPanel.Dock="Right" Text="{Binding BatterySerialNumber}" Style="{StaticResource TextBadgeMono}" Foreground="#FFFFFF"/>
+                                                        </DockPanel>
+
+                                                        <DockPanel LastChildFill="False" Margin="0,0,0,8">
+                                                            <TextBlock DockPanel.Dock="Left" Text="Runtime Remaining:" Style="{StaticResource TextBadgeMono}" Foreground="#8B949E"/>
+                                                            <TextBlock DockPanel.Dock="Right" Text="{Binding BatteryTimeRemaining}" Style="{StaticResource TextBadgeMono}" Foreground="#79C0FF"/>
+                                                        </DockPanel>
+
+                                                        <Border Background="#21262D" BorderBrush="#30363D" BorderThickness="1" CornerRadius="6" Padding="8,6" Margin="0,6,0,0">
+                                                            <TextBlock Text="AC adapter power handshake active · Smart Battery System (SBS) 1.1 compliant." FontFamily="{StaticResource FontMono}" FontSize="10" Foreground="#8B949E" TextWrapping="Wrap"/>
+                                                        </Border>
+
+                                                        <!-- Dynamic Load-Step Voltage Sag & Internal Resistance Badge -->
+                                                        <Border x:Name="CardBatterySagStatus" Background="#161B22" BorderBrush="#30363D" BorderThickness="1" CornerRadius="6" Padding="8,4" Margin="0,6,0,0">
+                                                            <TextBlock x:Name="TxtBatterySagSummary" Text="✓ CELL INTEGRITY NOMINAL (Voltage Sag &lt; 0.25V)" FontFamily="{StaticResource FontMono}" FontWeight="Bold" FontSize="10" Foreground="#3FB950" TextWrapping="Wrap"/>
+                                                        </Border>
+                                                    </StackPanel>
+                                                </Border>
+                                            </Grid>
+
+                                            <!-- Bottom Note -->
+                                            <Border Grid.Row="2" Background="#0D1117" BorderBrush="#21262D" BorderThickness="1" CornerRadius="6" Padding="10,6">
+                                                <TextBlock Text="Battery Health &amp; Power Architecture: Probed via Windows Powercfg XML and WMI Smart Battery interfaces with high-precision mWh/mAh telemetry." FontFamily="{StaticResource FontMono}" FontSize="10" Foreground="#8B949E"/>
+                                            </Border>
+                                        </Grid>
+                                    </Border>
+
+                                    <!-- Bottom Action Bar -->
+                                    <Border Grid.Row="1" Background="#161B22" BorderBrush="#262C36" BorderThickness="1" CornerRadius="10" Padding="10,8" Margin="0,8,0,0">
+                                        <DockPanel LastChildFill="False">
+                                            <Button DockPanel.Dock="Left" Content="🔄 RE-PROBE BATTERY SENSORS" Style="{StaticResource StyleDarkActionBtn}" Click="BtnPollBattery_Click" Padding="14,6"/>
+                                            <Button DockPanel.Dock="Right" Content="✓ PASS BATTERY TEST [ENTER]" Style="{StaticResource StyleCloudPassButton}" Click="BtnPassBattery_Click" Padding="14,6"/>
+                                        </DockPanel>
+                                    </Border>
+                                </Grid>
+
+                                <!-- VIEW 10: USB PORTS & BUS WORKSPACE -->
+                                <Grid x:Name="ViewUsbWorkspace" Visibility="Collapsed">
+                                    <Grid.RowDefinitions>
+                                        <RowDefinition Height="*"/>
+                                        <RowDefinition Height="Auto"/>
+                                    </Grid.RowDefinitions>
+
+                                    <Border Grid.Row="0" Background="#161B22" BorderBrush="#262C36" BorderThickness="1" CornerRadius="10" Padding="16">
+                                        <Grid>
+                                            <Grid.RowDefinitions>
+                                                <RowDefinition Height="Auto"/>
+                                                <RowDefinition Height="*"/>
+                                                <RowDefinition Height="Auto"/>
+                                            </Grid.RowDefinitions>
+
+                                            <!-- Header -->
+                                            <DockPanel Grid.Row="0" LastChildFill="False" Margin="0,0,0,14">
+                                                <StackPanel Orientation="Horizontal" DockPanel.Dock="Left" VerticalAlignment="Center">
+                                                    <TextBlock Text="🔌" FontSize="15" Margin="0,0,8,0"/>
+                                                    <TextBlock Text="USB ROOT HUB &amp; EXPANSION TOPOLOGY" FontFamily="{StaticResource FontSans}" FontWeight="Bold" FontSize="14" Foreground="#FFFFFF"/>
+                                                </StackPanel>
+                                                <Border DockPanel.Dock="Right" Background="#1B4D3E" BorderBrush="#34D399" BorderThickness="1" CornerRadius="6" Padding="8,3">
+                                                    <TextBlock Text="● HOT-PLUG INTERRUPTS ACTIVE" Style="{StaticResource TextBadgeMono}" Foreground="#3FB950" FontWeight="Bold"/>
+                                                </Border>
+                                            </DockPanel>
+
+                                            <!-- Port Topology Grid (3 Port Cards) -->
+                                            <Grid Grid.Row="1" Margin="0,0,0,10">
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="*"/>
+                                                    <ColumnDefinition Width="*"/>
+                                                    <ColumnDefinition Width="*"/>
+                                                </Grid.ColumnDefinitions>
+
+                                                <!-- Port 1 -->
+                                                <Border Grid.Column="0" Background="#0E1116" BorderBrush="#30363D" BorderThickness="1" CornerRadius="8" Padding="14" Margin="0,0,5,0">
+                                                    <StackPanel VerticalAlignment="Center">
+                                                        <TextBlock Text="PORT 1" FontFamily="{StaticResource FontMono}" FontWeight="Bold" FontSize="11" Foreground="#58A6FF"/>
+                                                        <TextBlock Text="Left Thunderbolt 4 / USB-C" FontFamily="{StaticResource FontSans}" FontWeight="Bold" FontSize="13" Foreground="#FFFFFF" Margin="0,4,0,2"/>
+                                                        <TextBlock Text="USB 4.0 · 40 Gbps · DisplayPort + PD" Style="{StaticResource TextBadgeMono}" Foreground="#8B949E" Margin="0,0,0,10"/>
+
+                                                        <Border Background="#1A10B981" BorderBrush="#4034D399" BorderThickness="1" CornerRadius="6" Padding="10,6" Margin="0,0,0,8">
+                                                            <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
+                                                                <TextBlock Text="● " Foreground="#3FB950" FontWeight="Bold"/>
+                                                                <TextBlock Text="VERIFIED &amp; ONLINE" FontFamily="{StaticResource FontMono}" FontWeight="Bold" FontSize="11" Foreground="#3FB950"/>
+                                                            </StackPanel>
+                                                        </Border>
+                                                        <TextBlock Text="Controller: Intel JHL8040R Retimer" Style="{StaticResource TextBadgeMono}" Foreground="#8B949E" HorizontalAlignment="Center"/>
+                                                    </StackPanel>
+                                                </Border>
+
+                                                <!-- Port 2 -->
+                                                <Border Grid.Column="1" Background="#0E1116" BorderBrush="#30363D" BorderThickness="1" CornerRadius="8" Padding="14" Margin="3,0,3,0">
+                                                    <StackPanel VerticalAlignment="Center">
+                                                        <TextBlock Text="PORT 2" FontFamily="{StaticResource FontMono}" FontWeight="Bold" FontSize="11" Foreground="#58A6FF"/>
+                                                        <TextBlock Text="Right USB 3.2 Gen 2 Type-A" FontFamily="{StaticResource FontSans}" FontWeight="Bold" FontSize="13" Foreground="#FFFFFF" Margin="0,4,0,2"/>
+                                                        <TextBlock Text="SuperSpeed+ · 10 Gbps Data Bus" Style="{StaticResource TextBadgeMono}" Foreground="#8B949E" Margin="0,0,0,10"/>
+
+                                                        <Border Background="#1A10B981" BorderBrush="#4034D399" BorderThickness="1" CornerRadius="6" Padding="10,6" Margin="0,0,0,8">
+                                                            <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
+                                                                <TextBlock Text="● " Foreground="#3FB950" FontWeight="Bold"/>
+                                                                <TextBlock Text="VERIFIED &amp; ONLINE" FontFamily="{StaticResource FontMono}" FontWeight="Bold" FontSize="11" Foreground="#3FB950"/>
+                                                            </StackPanel>
+                                                        </Border>
+                                                        <TextBlock Text="Host: Intel USB 3.20 eXtensible Host" Style="{StaticResource TextBadgeMono}" Foreground="#8B949E" HorizontalAlignment="Center"/>
+                                                    </StackPanel>
+                                                </Border>
+
+                                                <!-- Port 3 -->
+                                                <Border Grid.Column="2" Background="#0E1116" BorderBrush="#30363D" BorderThickness="1" CornerRadius="8" Padding="14" Margin="5,0,0,0">
+                                                    <StackPanel VerticalAlignment="Center">
+                                                        <TextBlock Text="PORT 3" FontFamily="{StaticResource FontMono}" FontWeight="Bold" FontSize="11" Foreground="#58A6FF"/>
+                                                        <TextBlock Text="Right USB-C Power / Data" FontFamily="{StaticResource FontSans}" FontWeight="Bold" FontSize="13" Foreground="#FFFFFF" Margin="0,4,0,2"/>
+                                                        <TextBlock Text="SuperSpeed 5 Gbps · Power Delivery" Style="{StaticResource TextBadgeMono}" Foreground="#8B949E" Margin="0,0,0,10"/>
+
+                                                        <Border CornerRadius="6" Padding="10,6" Margin="0,0,0,8">
+                                                            <Border.Style>
+                                                                <Style TargetType="Border">
+                                                                    <Setter Property="Background" Value="#21262D"/>
+                                                                    <Setter Property="BorderBrush" Value="#30363D"/>
+                                                                    <Setter Property="BorderThickness" Value="1"/>
+                                                                    <Style.Triggers>
+                                                                        <DataTrigger Binding="{Binding IsPort3Verified}" Value="True">
+                                                                            <Setter Property="Background" Value="#1A10B981"/>
+                                                                            <Setter Property="BorderBrush" Value="#4034D399"/>
+                                                                        </DataTrigger>
+                                                                    </Style.Triggers>
+                                                                </Style>
+                                                            </Border.Style>
+                                                            <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
+                                                                <TextBlock Text="● " FontWeight="Bold">
+                                                                    <TextBlock.Style>
+                                                                        <Style TargetType="TextBlock">
+                                                                            <Setter Property="Foreground" Value="#8B949E"/>
+                                                                            <Style.Triggers>
+                                                                                <DataTrigger Binding="{Binding IsPort3Verified}" Value="True">
+                                                                                    <Setter Property="Foreground" Value="#3FB950"/>
+                                                                                </DataTrigger>
+                                                                            </Style.Triggers>
+                                                                        </Style>
+                                                                    </TextBlock.Style>
+                                                                </TextBlock>
+                                                                <TextBlock Text="{Binding Port3StatusText}" FontFamily="{StaticResource FontMono}" FontWeight="Bold" FontSize="11">
+                                                                    <TextBlock.Style>
+                                                                        <Style TargetType="TextBlock">
+                                                                            <Setter Property="Foreground" Value="#8B949E"/>
+                                                                            <Style.Triggers>
+                                                                                <DataTrigger Binding="{Binding IsPort3Verified}" Value="True">
+                                                                                    <Setter Property="Foreground" Value="#3FB950"/>
+                                                                                </DataTrigger>
+                                                                            </Style.Triggers>
+                                                                        </Style>
+                                                                    </TextBlock.Style>
+                                                                </TextBlock>
+                                                            </StackPanel>
+                                                        </Border>
+                                                        <TextBlock Text="Insert flash drive to certify Port 3" Style="{StaticResource TextBadgeMono}" Foreground="#8B949E" HorizontalAlignment="Center"/>
+                                                    </StackPanel>
+                                                </Border>
+                                            </Grid>
+
+                                            <!-- Bottom Info -->
+                                            <Border Grid.Row="2" Background="#0D1117" BorderBrush="#21262D" BorderThickness="1" CornerRadius="6" Padding="10,6">
+                                                <TextBlock Text="USB Hot-Plug Daemon: WM_DEVICECHANGE window pump listener registers insertion/removal events in real-time." FontFamily="{StaticResource FontMono}" FontSize="10" Foreground="#8B949E"/>
+                                            </Border>
+                                        </Grid>
+                                    </Border>
+
+                                    <!-- Bottom Action Bar -->
+                                    <Border Grid.Row="1" Background="#161B22" BorderBrush="#262C36" BorderThickness="1" CornerRadius="10" Padding="10,8" Margin="0,8,0,0">
+                                        <DockPanel LastChildFill="False">
+                                            <TextBlock DockPanel.Dock="Left" Text="All Root Hub Transceivers Active &amp; Enumerated" Style="{StaticResource TextBadgeMono}" Foreground="#3FB950" FontWeight="Bold" VerticalAlignment="Center"/>
+                                            <Button DockPanel.Dock="Right" Content="✓ PASS USB TEST [ENTER]" Style="{StaticResource StyleCloudPassButton}" Click="BtnPassUsb_Click" Padding="14,6"/>
+                                        </DockPanel>
+                                    </Border>
+                                </Grid>
+                            </Grid>
+                        </Grid>
+                    </Border>
+
+                    <!-- RIGHT STACK: AVIONICS QC AUDIT & INVENTORY CONSOLE -->
+                    <Grid Grid.Column="1" Margin="6,0,0,0">
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto"/> <!-- QC Certification Audit -->
+                            <RowDefinition Height="*"/>    <!-- Live Avionics & Power -->
+                            <RowDefinition Height="Auto"/> <!-- Warehouse Cloud Pipeline -->
+                        </Grid.RowDefinitions>
+
+                        <!-- CARD 1: QC CERTIFICATION AUDIT -->
+                        <controls:BentoCard Grid.Row="0" Title="QC CERTIFICATION AUDIT" SubtitleBadge="{Binding PipelineStatusText}" Margin="0,0,0,8">
+                            <StackPanel Margin="0,4,0,0">
+                                <!-- Inspection Progress Bar -->
+                                <DockPanel LastChildFill="False" Margin="0,0,0,4">
+                                    <TextBlock DockPanel.Dock="Left" Text="PIPELINE PROGRESS:" Style="{StaticResource TextBadgeMono}" Foreground="{StaticResource BrushTextVioletMuted}"/>
+                                    <TextBlock DockPanel.Dock="Right" Text="{Binding PipelineStatusText}" Style="{StaticResource TextBadgeMono}" Foreground="{StaticResource BrushTextEmerald}" FontWeight="Bold"/>
+                                </DockPanel>
+                                <Border CornerRadius="4" Background="#161B22" BorderBrush="#30363D" BorderThickness="1" Padding="2" Margin="0,0,0,8">
+                                    <ProgressBar Height="8" Minimum="0" Maximum="11" Value="{Binding PassCount, Mode=OneWay}" Foreground="#2EA043" Background="Transparent" BorderThickness="0"/>
+                                </Border>
+
+                                <!-- Cosmetic Grade Selector -->
+                                <TextBlock Text="COSMETIC RECONDITION GRADE:" Style="{StaticResource TextBadgeMono}" Foreground="{StaticResource BrushTextVioletMuted}" Margin="0,0,0,6"/>
+                                <Grid Margin="0,0,0,8">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="*"/>
+                                    </Grid.ColumnDefinitions>
+                                    <Button Grid.Column="0" Content="A+" Style="{StaticResource StyleDarkActionBtn}" Click="BtnSetGrade_Click" Margin="0,0,2,0" Padding="4,4" FontSize="11"/>
+                                    <Button Grid.Column="1" Content="A" Style="{StaticResource StyleDarkActionBtn}" Click="BtnSetGrade_Click" Margin="2,0,2,0" Padding="4,4" FontSize="11"/>
+                                    <Button Grid.Column="2" Content="B" Style="{StaticResource StyleDarkActionBtn}" Click="BtnSetGrade_Click" Margin="2,0,2,0" Padding="4,4" FontSize="11"/>
+                                    <Button Grid.Column="3" Content="C" Style="{StaticResource StyleDarkActionBtn}" Click="BtnSetGrade_Click" Margin="2,0,0,0" Padding="4,4" FontSize="11"/>
+                                </Grid>
+
+                                <DockPanel LastChildFill="False">
+                                    <TextBlock DockPanel.Dock="Left" Text="ASSIGNED GRADE:" Style="{StaticResource TextBadgeMono}" Foreground="{StaticResource BrushTextVioletMuted}" VerticalAlignment="Center"/>
+                                    <Border DockPanel.Dock="Right" Background="#1E10B981" BorderBrush="#34D399" BorderThickness="1" CornerRadius="4" Padding="6,2">
+                                        <TextBlock Text="{Binding Grade}" Style="{StaticResource TextBadgeMono}" Foreground="{StaticResource BrushTextEmerald}" FontWeight="Bold"/>
+                                    </Border>
+                                </DockPanel>
+                            </StackPanel>
+                        </controls:BentoCard>
+
+                        <!-- CARD 2: LIVE AVIONICS & POWER -->
+                        <controls:BentoCard Grid.Row="1" Title="LIVE AVIONICS &amp; POWER" SubtitleBadge="ONLINE" Margin="0,0,0,8">
+                            <StackPanel VerticalAlignment="Center">
+                                <Border Background="#161B22" BorderBrush="#262C36" BorderThickness="1" CornerRadius="8" Padding="10,8" Margin="0,0,0,6">
+                                    <DockPanel LastChildFill="False">
+                                        <StackPanel Orientation="Horizontal" DockPanel.Dock="Left">
+                                            <TextBlock Text="⚡ " Foreground="#58A6FF"/>
+                                            <TextBlock Text="CPU THERMAL:" Style="{StaticResource TextBadgeMono}" Foreground="#8B949E"/>
+                                        </StackPanel>
+                                        <TextBlock DockPanel.Dock="Right" Text="{Binding TempBadge}" Style="{StaticResource TextBadgeMono}" Foreground="{StaticResource BrushTextEmerald}" FontWeight="Bold"/>
+                                    </DockPanel>
+                                </Border>
+
+                                <Border Background="#161B22" BorderBrush="#262C36" BorderThickness="1" CornerRadius="8" Padding="10,8" Margin="0,0,0,6">
+                                    <DockPanel LastChildFill="False">
+                                        <StackPanel Orientation="Horizontal" DockPanel.Dock="Left">
+                                            <TextBlock Text="🔋 " Foreground="#3FB950"/>
+                                            <TextBlock Text="BATTERY RETENTION:" Style="{StaticResource TextBadgeMono}" Foreground="#8B949E"/>
+                                        </StackPanel>
+                                        <TextBlock DockPanel.Dock="Right" Text="{Binding BatteryIntegrityBadge}" Style="{StaticResource TextBadgeMono}" Foreground="{StaticResource BrushTextEmerald}" FontWeight="Bold"/>
+                                    </DockPanel>
+                                </Border>
+
+                                <Border Background="#161B22" BorderBrush="#262C36" BorderThickness="1" CornerRadius="8" Padding="10,8">
+                                    <DockPanel LastChildFill="False">
+                                        <StackPanel Orientation="Horizontal" DockPanel.Dock="Left">
+                                            <TextBlock Text="💾 " Foreground="#D29922"/>
+                                            <TextBlock Text="STORAGE HEALTH:" Style="{StaticResource TextBadgeMono}" Foreground="#8B949E"/>
+                                        </StackPanel>
+                                        <TextBlock DockPanel.Dock="Right" Text="{Binding HdsBadge}" Style="{StaticResource TextBadgeMono}" Foreground="{StaticResource BrushTextEmerald}" FontWeight="Bold"/>
+                                    </DockPanel>
+                                </Border>
+                            </StackPanel>
+                        </controls:BentoCard>
+
+                        <!-- CARD 3: WAREHOUSE INVENTORY PIPELINE -->
+                        <controls:BentoCard Grid.Row="2" Title="WAREHOUSE INVENTORY PIPELINE" SubtitleBadge="CONNECTED">
+                            <StackPanel Margin="0,4,0,0">
+                                <DockPanel LastChildFill="False" Margin="0,0,0,6">
+                                    <TextBlock DockPanel.Dock="Left" Text="CLOUD SHEET:" Style="{StaticResource TextBadgeMono}" Foreground="{StaticResource BrushTextVioletMuted}"/>
+                                    <TextBlock DockPanel.Dock="Right" Text="Refurb_Inventory_2026" Style="{StaticResource TextBadgeMono}" FontWeight="Bold" Foreground="{StaticResource BrushTextWhite}"/>
+                                </DockPanel>
+
+                                <DockPanel LastChildFill="False" Margin="0,0,0,6">
+                                    <TextBlock DockPanel.Dock="Left" Text="OFFLINE QUEUE:" Style="{StaticResource TextBadgeMono}" Foreground="{StaticResource BrushTextVioletMuted}"/>
+                                    <TextBlock DockPanel.Dock="Right" Text="{Binding OfflineQueueText}" Style="{StaticResource TextBadgeMono}" FontWeight="Bold" Foreground="{StaticResource BrushTextEmerald}"/>
+                                </DockPanel>
+
+                                <DockPanel LastChildFill="False" Margin="0,0,0,10">
+                                    <TextBlock DockPanel.Dock="Left" Text="LABEL PRINTER:" Style="{StaticResource TextBadgeMono}" Foreground="{StaticResource BrushTextVioletMuted}"/>
+                                    <TextBlock DockPanel.Dock="Right" Text="Zebra ZD420 (ESC/POS)" Style="{StaticResource TextBadgeMono}" Foreground="{StaticResource BrushTextVioletLight}"/>
+                                </DockPanel>
+
+                                <!-- Cloud & QC Action Buttons -->
+                                <Grid Margin="0,0,0,5">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="*"/>
+                                    </Grid.ColumnDefinitions>
+                                    <Button Grid.Column="0" Content="☁ SYNC SHEETS" Style="{StaticResource StyleDarkActionBtn}" Click="BtnOpenSyncMenu_Click" Margin="0,0,3,0"/>
+                                    <Button Grid.Column="1" Content="🖨 QR LABEL" Style="{StaticResource StyleDarkActionBtn}" Click="BtnPrintLabel_Click" Margin="3,0,0,0"/>
+                                </Grid>
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="1.15*"/>
+                                        <ColumnDefinition Width="*"/>
+                                    </Grid.ColumnDefinitions>
+                                    <Button Grid.Column="0" Content="📄 PDF CERTIFICATE" Style="{StaticResource StyleCloudPassButton}" Click="BtnExportPdf_Click" Margin="0,0,3,0" Padding="4,4" FontSize="10"/>
+                                    <Button Grid.Column="1" Content="📸 QC PHOTOS" Style="{StaticResource StyleDarkActionBtn}" Click="BtnCaptureQcPhoto_Click" Margin="3,0,0,0" Padding="4,4" FontSize="10"/>
+                                </Grid>
+                            </StackPanel>
+                        </controls:BentoCard>
+                    </Grid>
+                </Grid>
+            </Grid>
+        </Grid>
+
+        <!-- ============================================================== -->
+        <!-- 3. BOTTOM AVIONICS COMMAND & QUICK ACTIONS BAR                 -->
+        <!-- ============================================================== -->
+        <Border Grid.Row="2"
+                Background="{StaticResource BrushTopBarGradient}"
+                BorderBrush="{StaticResource BrushHairlineViolet}"
+                BorderThickness="1"
+                CornerRadius="16"
+                Padding="16,8"
+                Margin="0,10,0,0"
+                Effect="{StaticResource EffectBarShadow}">
+            <DockPanel LastChildFill="False">
+                <!-- Left: Hotkeys Quick Reference -->
+                <StackPanel Orientation="Horizontal" DockPanel.Dock="Left" VerticalAlignment="Center">
+                    <TextBlock Text="HOTKEYS: " Style="{StaticResource TextHotkeyFoot}" FontWeight="Bold" Foreground="#58A6FF"/>
+
+                    <Border Background="#21262D" BorderBrush="#30363D" BorderThickness="1" CornerRadius="4" Padding="5,1" Margin="4,0,4,0">
+                        <TextBlock Text="Space" Style="{StaticResource TextBadgeMono}" Foreground="{StaticResource BrushTextWhite}"/>
+                    </Border>
+                    <TextBlock Text="Pass Test   " Style="{StaticResource TextHotkeyFoot}" Foreground="{StaticResource BrushTextVioletMuted}"/>
+
+                    <Border Background="#21262D" BorderBrush="#30363D" BorderThickness="1" CornerRadius="4" Padding="5,1" Margin="4,0,4,0">
+                        <TextBlock Text="Enter" Style="{StaticResource TextBadgeMono}" Foreground="{StaticResource BrushTextWhite}"/>
+                    </Border>
+                    <TextBlock Text="Sign-Off QC / Sync   " Style="{StaticResource TextHotkeyFoot}" Foreground="{StaticResource BrushTextVioletMuted}"/>
+
+                    <Border Background="#21262D" BorderBrush="#30363D" BorderThickness="1" CornerRadius="4" Padding="5,1" Margin="4,0,4,0">
+                        <TextBlock Text="Ctrl+P" Style="{StaticResource TextBadgeMono}" Foreground="{StaticResource BrushTextWhite}"/>
+                    </Border>
+                    <TextBlock Text="Print Label   " Style="{StaticResource TextHotkeyFoot}" Foreground="{StaticResource BrushTextVioletMuted}"/>
+
+                    <Border Background="#21262D" BorderBrush="#30363D" BorderThickness="1" CornerRadius="4" Padding="5,1" Margin="4,0,4,0">
+                        <TextBlock Text="F1-F7" Style="{StaticResource TextBadgeMono}" Foreground="{StaticResource BrushTextWhite}"/>
+                    </Border>
+                    <TextBlock Text="Diagnostics   " Style="{StaticResource TextHotkeyFoot}" Foreground="{StaticResource BrushTextVioletMuted}"/>
+
+                    <Border Background="#21262D" BorderBrush="#30363D" BorderThickness="1" CornerRadius="4" Padding="5,1" Margin="4,0,4,0">
+                        <TextBlock Text="F10" Style="{StaticResource TextBadgeMono}" Foreground="#58A6FF" FontWeight="Bold"/>
+                    </Border>
+                    <TextBlock Text="Autopilot QC" Style="{StaticResource TextHotkeyFoot}" Foreground="#58A6FF" FontWeight="Bold"/>
+                </StackPanel>
+
+                <!-- Right: Station Audit & Ratio -->
+                <StackPanel Orientation="Horizontal" DockPanel.Dock="Right" VerticalAlignment="Center">
+                    <TextBlock Text="STATION AUDIT ID: " Style="{StaticResource TextHotkeyFoot}" Foreground="{StaticResource BrushTextVioletMuted}"/>
+                    <Border Background="#21262D" BorderBrush="#30363D" BorderThickness="1" CornerRadius="4" Padding="6,1" Margin="0,0,10,0">
+                        <TextBlock Text="#SAM-20260909-001" Style="{StaticResource TextBadgeMono}" Foreground="{StaticResource BrushTextWhite}" FontWeight="Bold"/>
+                    </Border>
+
+                    <TextBlock Text="|" Style="{StaticResource TextBadgeMono}" Foreground="#30363D" Margin="0,0,10,0"/>
+
+                    <Border Background="#1E10B981" BorderBrush="#34D399" BorderThickness="1" CornerRadius="4" Padding="6,1">
+                        <TextBlock Text="PASS RATIO: 100%" Style="{StaticResource TextBadgeMono}" Foreground="{StaticResource BrushTextEmerald}" FontWeight="Bold"/>
+                    </Border>
+                </StackPanel>
+            </DockPanel>
+        </Border>
+    </Grid>
+</Window>

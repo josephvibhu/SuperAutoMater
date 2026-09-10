@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Net.Http;
@@ -20,6 +20,8 @@ namespace SuperAutoMater
             new Lazy<OfflineSyncQueue>(() => new OfflineSyncQueue());
 
         public static OfflineSyncQueue Instance => _instance.Value;
+
+        public const string DefaultSheetsUrl = "https://script.google.com/macros/s/AKfycbyx4LIL1xbzTypuYKTUK2XuMVnLq8TRbdVsupEQlSjI0CxGQ3mG92yR7rY3bjq1EH4t/exec";
 
         private readonly string _queueFilePath;
         private readonly object _fileLock = new object();
