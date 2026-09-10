@@ -1,0 +1,76 @@
+<Window x:Class="SuperAutoMater.Wpf.Views.ThermalLabelPreviewWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Thermal Chassis Sticker Preview &amp; Direct Print"
+        Height="560" Width="740"
+        WindowStartupLocation="CenterOwner"
+        ResizeMode="NoResize"
+        Background="#0E1116"
+        Icon="pack://application:,,,/app.ico">
+
+    <Grid Margin="18">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/> <!-- Header -->
+            <RowDefinition Height="Auto"/> <!-- Format & Size Controls -->
+            <RowDefinition Height="*"/>    <!-- Live Label Canvas Preview -->
+            <RowDefinition Height="Auto"/> <!-- Action Footer -->
+        </Grid.RowDefinitions>
+
+        <!-- Header -->
+        <Border Grid.Row="0" Background="#161B22" BorderBrush="#2D333B" BorderThickness="1" CornerRadius="8" Padding="14,10" Margin="0,0,0,12">
+            <DockPanel LastChildFill="False">
+                <StackPanel Orientation="Horizontal" DockPanel.Dock="Left" VerticalAlignment="Center">
+                    <Ellipse Width="10" Height="10" Fill="{StaticResource BrushAccentEmerald}" Margin="0,0,10,0"/>
+                    <TextBlock Text="LIVE THERMAL CHASSIS STICKER PREVIEW" FontFamily="{StaticResource FontMono}" FontWeight="Bold" FontSize="12" Foreground="{StaticResource BrushTextWhite}"/>
+                </StackPanel>
+                <Border DockPanel.Dock="Right" Background="#1C2128" BorderBrush="#388BFD" BorderThickness="1" CornerRadius="4" Padding="6,2">
+                    <TextBlock x:Name="TxtLabelDpiInfo" Text="203 / 300 DPI MONOCHROME THERMAL" FontFamily="{StaticResource FontMono}" FontSize="10" Foreground="#58A6FF" FontWeight="Bold"/>
+                </Border>
+            </DockPanel>
+        </Border>
+
+        <!-- Size & Format Selector Controls -->
+        <Border Grid.Row="1" Background="#161B22" BorderBrush="#2D333B" BorderThickness="1" CornerRadius="8" Padding="12,8" Margin="0,0,0,12">
+            <DockPanel LastChildFill="False">
+                <!-- Size Preset -->
+                <StackPanel Orientation="Horizontal" DockPanel.Dock="Left" VerticalAlignment="Center">
+                    <TextBlock Text="LABEL SIZE:" Style="{StaticResource TextBadgeMono}" Foreground="{StaticResource BrushTextVioletSubdued}" VerticalAlignment="Center" Margin="0,0,10,0"/>
+                    <RadioButton x:Name="RadioSize3x2" Content="3&quot;×2&quot; Chassis" IsChecked="True" Foreground="#C9D1D9" FontFamily="{StaticResource FontMono}" FontSize="11" Margin="0,0,12,0" VerticalAlignment="Center" Checked="Option_Changed"/>
+                    <RadioButton x:Name="RadioSize2x1" Content="2&quot;×1&quot; Compact" Foreground="#C9D1D9" FontFamily="{StaticResource FontMono}" FontSize="11" Margin="0,0,12,0" VerticalAlignment="Center" Checked="Option_Changed"/>
+                    <RadioButton x:Name="RadioSize4x2" Content="4&quot;×2&quot; Pallet" Foreground="#C9D1D9" FontFamily="{StaticResource FontMono}" FontSize="11" Margin="0,0,12,0" VerticalAlignment="Center" Checked="Option_Changed"/>
+                </StackPanel>
+
+                <!-- Barcode Type -->
+                <StackPanel Orientation="Horizontal" DockPanel.Dock="Right" VerticalAlignment="Center">
+                    <TextBlock Text="CODE:" Style="{StaticResource TextBadgeMono}" Foreground="{StaticResource BrushTextVioletSubdued}" VerticalAlignment="Center" Margin="0,0,8,0"/>
+                    <RadioButton x:Name="RadioQrCode" Content="2D QR" IsChecked="True" Foreground="#C9D1D9" FontFamily="{StaticResource FontMono}" FontSize="11" Margin="0,0,10,0" VerticalAlignment="Center" Checked="Option_Changed"/>
+                    <RadioButton x:Name="RadioCode128" Content="1D Code-128" Foreground="#C9D1D9" FontFamily="{StaticResource FontMono}" FontSize="11" VerticalAlignment="Center" Checked="Option_Changed"/>
+                </StackPanel>
+            </DockPanel>
+        </Border>
+
+        <!-- Live Label Canvas Preview -->
+        <Border Grid.Row="2" Background="#0A0C10" BorderBrush="#21262D" BorderThickness="1" CornerRadius="8" Padding="16">
+            <Grid>
+                <!-- Centered Thermal Label Shadow Card -->
+                <Border Background="#FFFFFF" CornerRadius="4" HorizontalAlignment="Center" VerticalAlignment="Center" Effect="{StaticResource NeonGlowEmerald}">
+                    <Image x:Name="ImgLabelPreview" Stretch="None" RenderOptions.BitmapScalingMode="HighQuality"/>
+                </Border>
+            </Grid>
+        </Border>
+
+        <!-- Action Footer -->
+        <Border Grid.Row="3" Background="#161B22" BorderBrush="#2D333B" BorderThickness="1" CornerRadius="8" Padding="12,8" Margin="0,12,0,0">
+            <DockPanel LastChildFill="False">
+                <TextBlock x:Name="TxtStatusMessage" Text="Ready to print." FontFamily="{StaticResource FontMono}" FontSize="11" Foreground="#3FB950" VerticalAlignment="Center" DockPanel.Dock="Left"/>
+
+                <StackPanel Orientation="Horizontal" DockPanel.Dock="Right">
+                    <Button Content="📋 COPY IMAGE" Background="#21262D" Foreground="#C9D1D9" BorderBrush="#30363D" BorderThickness="1" Padding="12,6" Margin="0,0,8,0" FontFamily="{StaticResource FontMono}" FontSize="11" FontWeight="SemiBold" Cursor="Hand" Click="BtnCopyImage_Click"/>
+                    <Button Content="💾 SAVE PNG" Background="#21262D" Foreground="#C9D1D9" BorderBrush="#30363D" BorderThickness="1" Padding="12,6" Margin="0,0,8,0" FontFamily="{StaticResource FontMono}" FontSize="11" FontWeight="SemiBold" Cursor="Hand" Click="BtnSavePng_Click"/>
+                    <Button Content="✕ CLOSE [ESC]" Background="#21262D" Foreground="#8B949E" BorderBrush="#30363D" BorderThickness="1" Padding="12,6" Margin="0,0,8,0" FontFamily="{StaticResource FontMono}" FontSize="11" FontWeight="SemiBold" Cursor="Hand" Click="BtnClose_Click"/>
+                    <Button Content="🖨️ PRINT LABEL [CTRL+P]" Background="#238636" Foreground="#FFFFFF" BorderBrush="#2EA043" BorderThickness="1" Padding="16,6" FontFamily="{StaticResource FontMono}" FontSize="11" FontWeight="Bold" Cursor="Hand" Click="BtnPrint_Click"/>
+                </StackPanel>
+            </DockPanel>
+        </Border>
+    </Grid>
+</Window>

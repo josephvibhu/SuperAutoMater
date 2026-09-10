@@ -200,6 +200,7 @@ namespace SuperAutoMater
         public string Physical_Grade { get; set; } = "A+";
         public string Remarks { get; set; } = "";
         public string Shelf_Location { get; set; } = "";
+        public string Technician { get; set; } = "TECH-01";
         public string Timestamp { get; set; } = "";
         public DateTime QueuedAt { get; set; } = DateTime.Now;
     }

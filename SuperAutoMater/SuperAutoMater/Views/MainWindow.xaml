@@ -81,7 +81,7 @@
                     </StackPanel>
 
                     <Border Background="#21262D" BorderBrush="#30363D" BorderThickness="1" CornerRadius="6" Padding="6,2" Margin="10,0,14,0" VerticalAlignment="Center">
-                        <TextBlock Text="v1.3.0" Style="{StaticResource TextBadgeMono}" Foreground="{StaticResource BrushTextVioletMuted}"/>
+                        <TextBlock Text="v1.4.0" Style="{StaticResource TextBadgeMono}" Foreground="{StaticResource BrushTextVioletMuted}"/>
                     </Border>
 
                     <Rectangle Width="1" Height="16" Fill="#30363D" Margin="0,0,14,0" VerticalAlignment="Center"/>
@@ -91,6 +91,15 @@
                         <TextBlock Text="|" Style="{StaticResource TextBadgeMono}" Foreground="#30363D" Margin="0,0,8,0"/>
                         <TextBlock Text="QC-01" Style="{StaticResource TextBadgeMono}" FontWeight="Bold" Foreground="{StaticResource BrushTextWhite}"/>
                     </StackPanel>
+
+                    <!-- Technician Operator Badge Pill [Alt+T] -->
+                    <Border x:Name="BtnTechnicianPill" Background="#161B22" BorderBrush="#30363D" BorderThickness="1" CornerRadius="6" Padding="8,3" Cursor="Hand" MouseLeftButtonUp="BtnTechnicianPill_Click" ToolTip="Click to change Technician or scan QR/Barcode badge [Alt+T]" Margin="10,0,0,0" VerticalAlignment="Center">
+                        <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                            <TextBlock Text="👤 " FontSize="11" VerticalAlignment="Center"/>
+                            <TextBlock Text="{Binding TechnicianDisplayBadge}" Style="{StaticResource TextBadgeMono}" FontWeight="Bold" Foreground="#58A6FF"/>
+                            <TextBlock Text=" 📷" FontSize="9" Foreground="#8B949E" Margin="4,0,0,0"/>
+                        </StackPanel>
+                    </Border>
                 </StackPanel>
 
                 <!-- Right Zone: Telemetry Chips & Action Button -->
@@ -114,6 +123,14 @@
                             </Border>
                         </StackPanel>
                     </Button>
+
+                    <!-- Missing Drivers Chip -->
+                    <Border DockPanel.Dock="Right" Style="{StaticResource StyleTelemetryChip}" Margin="6,0,0,0" ToolTip="{Binding MissingDriversSummary}">
+                        <StackPanel Orientation="Horizontal">
+                            <TextBlock Text="DRIVERS " Style="{StaticResource TextAvionicsChip}" Foreground="{StaticResource BrushTextVioletMuted}"/>
+                            <TextBlock Text="{Binding MissingDriversBadge}" Style="{StaticResource TextAvionicsChip}" FontWeight="Bold" Foreground="{Binding MissingDriversAccentHex}"/>
+                        </StackPanel>
+                    </Border>
 
                     <!-- Wi-Fi Chip -->
                     <Border DockPanel.Dock="Right" Style="{StaticResource StyleTelemetryChip}" Margin="6,0,0,0">
@@ -795,6 +812,7 @@
                                             <Grid.RowDefinitions>
                                                 <RowDefinition Height="Auto"/> <!-- Drive Banner Header -->
                                                 <RowDefinition Height="*"/>    <!-- 3 Telemetry Sources Triage -->
+                                                <RowDefinition Height="Auto"/> <!-- SSD TBW Host Writes Endurance Gauge -->
                                                 <RowDefinition Height="Auto"/> <!-- Audit Summary Tag -->
                                             </Grid.RowDefinitions>
 
@@ -930,8 +948,28 @@
                                                 </Border>
                                             </Grid>
 
+                                            <!-- SSD TBW WRITE ENDURANCE & LIFESPAN GAUGE -->
+                                            <Border Grid.Row="2" Background="#0E1116" BorderBrush="#30363D" BorderThickness="1" CornerRadius="8" Padding="12" Margin="0,0,0,10">
+                                                <StackPanel>
+                                                    <DockPanel LastChildFill="False" Margin="0,0,0,6">
+                                                        <StackPanel Orientation="Horizontal" DockPanel.Dock="Left">
+                                                            <TextBlock Text="⚡ SSD TBW WRITE ENDURANCE &amp; LIFESPAN GAUGE" FontFamily="{StaticResource FontMono}" FontWeight="Bold" FontSize="11" Foreground="#58A6FF"/>
+                                                            <TextBlock Text=" · JEDEC OEM RATED" Style="{StaticResource TextBadgeMono}" Foreground="#8B949E" Margin="6,0,0,0"/>
+                                                        </StackPanel>
+                                                        <Border DockPanel.Dock="Right" Background="#161B22" BorderBrush="{Binding TbwAccentHex}" BorderThickness="1" CornerRadius="4" Padding="6,2">
+                                                            <TextBlock Text="{Binding TbwStatusBadge}" FontFamily="{StaticResource FontMono}" FontSize="10" FontWeight="Bold" Foreground="{Binding TbwAccentHex}"/>
+                                                        </Border>
+                                                    </DockPanel>
+                                                    <ProgressBar Value="{Binding TbwWearPercent}" Maximum="100" Height="8" Foreground="#3FB950" Background="#21262D" BorderThickness="0" Margin="0,4,0,6"/>
+                                                    <DockPanel LastChildFill="False">
+                                                        <TextBlock DockPanel.Dock="Left" Text="{Binding TbwDisplaySummary}" Style="{StaticResource TextBadgeMono}" Foreground="#C9D1D9"/>
+                                                        <TextBlock DockPanel.Dock="Right" Text="{Binding TbwLifespanRemainingPercent, StringFormat='{}{0:F1}% Lifespan Remaining'}" Style="{StaticResource TextBadgeMono}" Foreground="{Binding TbwAccentHex}" FontWeight="Bold"/>
+                                                    </DockPanel>
+                                                </StackPanel>
+                                            </Border>
+
                                             <!-- Bottom Tri-Source Verification Note -->
-                                            <Border Grid.Row="2" Background="#0D1117" BorderBrush="#21262D" BorderThickness="1" CornerRadius="6" Padding="10,6">
+                                            <Border Grid.Row="3" Background="#0D1117" BorderBrush="#21262D" BorderThickness="1" CornerRadius="6" Padding="10,6">
                                                 <TextBlock Text="Tri-Source Storage Certification: HDSentinel .sta telemetry, WMI PhysicalDrive S.M.A.R.T. registers, and NVMe controller bus topology all correlate 100% nominal with 0 bad sectors." FontFamily="{StaticResource FontMono}" FontSize="10" Foreground="#8B949E"/>
                                             </Border>
                                         </Grid>
@@ -1814,7 +1852,7 @@
                                             <ColumnDefinition Width="*"/>
                                         </Grid.ColumnDefinitions>
                                         <Button Grid.Column="0" Content="☁ SYNC SHEETS" Style="{StaticResource StyleDarkActionBtn}" Click="BtnOpenSyncMenu_Click" Margin="0,0,3,0"/>
-                                        <Button Grid.Column="1" Content="🖨 QR LABEL" Style="{StaticResource StyleDarkActionBtn}" Click="BtnPrintLabel_Click" Margin="3,0,0,0"/>
+                                        <Button Grid.Column="1" Content="🏷️ LABEL PREVIEW" Style="{StaticResource StyleDarkActionBtn}" Click="BtnOpenThermalPreview_Click" Margin="3,0,0,0" ToolTip="Live Thermal Sticker Visual Preview &amp; Direct Print [Ctrl+P]"/>
                                     </Grid>
                                     <Grid>
                                         <Grid.ColumnDefinitions>
@@ -1856,12 +1894,17 @@
                     <Border Background="#21262D" BorderBrush="#30363D" BorderThickness="1" CornerRadius="4" Padding="5,1" Margin="4,0,4,0">
                         <TextBlock Text="Enter" Style="{StaticResource TextBadgeMono}" Foreground="{StaticResource BrushTextWhite}"/>
                     </Border>
-                    <TextBlock Text="Sign-Off QC / Sync   " Style="{StaticResource TextHotkeyFoot}" Foreground="{StaticResource BrushTextVioletMuted}"/>
+                    <TextBlock Text="Sign-Off QC   " Style="{StaticResource TextHotkeyFoot}" Foreground="{StaticResource BrushTextVioletMuted}"/>
 
                     <Border Background="#21262D" BorderBrush="#30363D" BorderThickness="1" CornerRadius="4" Padding="5,1" Margin="4,0,4,0">
                         <TextBlock Text="Ctrl+P" Style="{StaticResource TextBadgeMono}" Foreground="{StaticResource BrushTextWhite}"/>
                     </Border>
-                    <TextBlock Text="Print Label   " Style="{StaticResource TextHotkeyFoot}" Foreground="{StaticResource BrushTextVioletMuted}"/>
+                    <TextBlock Text="Thermal Sticker   " Style="{StaticResource TextHotkeyFoot}" Foreground="{StaticResource BrushTextVioletMuted}"/>
+
+                    <Border Background="#21262D" BorderBrush="#30363D" BorderThickness="1" CornerRadius="4" Padding="5,1" Margin="4,0,4,0">
+                        <TextBlock Text="Alt+T" Style="{StaticResource TextBadgeMono}" Foreground="#58A6FF"/>
+                    </Border>
+                    <TextBlock Text="Tech Badge   " Style="{StaticResource TextHotkeyFoot}" Foreground="{StaticResource BrushTextVioletMuted}"/>
 
                     <Border Background="#21262D" BorderBrush="#30363D" BorderThickness="1" CornerRadius="4" Padding="5,1" Margin="4,0,4,0">
                         <TextBlock Text="F1-F7" Style="{StaticResource TextBadgeMono}" Foreground="{StaticResource BrushTextWhite}"/>

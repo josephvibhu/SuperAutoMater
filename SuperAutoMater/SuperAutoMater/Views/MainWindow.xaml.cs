@@ -51,6 +51,8 @@ namespace SuperAutoMater.Wpf.Views
         private DispatcherTimer _cpuStressTimer;
         private CancellationTokenSource _cpuStressCts;
         private int _cpuStressSeconds = 0;
+        private bool _isCoolDownPhase = false;
+        private int _coolDownSeconds = 0;
         private bool _isCpuStressing = false;
         private Thread _ramStressThread;
         private volatile bool _ramStressRunning = false;
@@ -618,7 +620,12 @@ namespace SuperAutoMater.Wpf.Views
             }
             else if (e.Key == Key.P && (Keyboard.Modifiers & ModifierKeys.Control) == ModifierKeys.Control)
             {
-                BtnPrintLabel_Click(this, new RoutedEventArgs());
+                BtnOpenThermalPreview_Click(this, new RoutedEventArgs());
+                e.Handled = true;
+            }
+            else if (e.Key == Key.T && (Keyboard.Modifiers & ModifierKeys.Alt) == ModifierKeys.Alt)
+            {
+                BtnTechnicianPill_Click(this, new RoutedEventArgs());
                 e.Handled = true;
             }
         }
@@ -702,7 +709,10 @@ namespace SuperAutoMater.Wpf.Views
                     GpuModel = ViewModel.GpuName,
                     PhysicalGrade = ViewModel.Grade,
                     CosmeticDefectsSummary = ViewModel.CosmeticDefectsSummary,
-                    TechnicianName = "QC Workstation #1",
+                    TechnicianName = ViewModel.TechnicianDisplayBadge,
+                    StorageTbwSummary = ViewModel.TbwDisplaySummary,
+                    DriverIntegritySummary = ViewModel.MissingDriversSummary,
+                    ThermalDissipationVerdict = ThermalProfilerService.Instance.GetCurrentResult().ConditionSummary,
                     CloudAuditUrl = GoogleSheetsDispatcher.DefaultSheetsUrl
                 };
 
@@ -725,6 +735,23 @@ namespace SuperAutoMater.Wpf.Views
             {
                 ShowFeedback($"PDF Export Error: {ex.Message}", "⚠", "#D29922");
             }
+        }
+
+        private void BtnTechnicianPill_Click(object sender, RoutedEventArgs e)
+        {
+            var dlg = new TechnicianModalWindow { Owner = this };
+            if (dlg.ShowDialog() == true)
+            {
+                ShowFeedback($"Technician Profile updated: {ViewModel?.TechnicianDisplayBadge}", "👤", "#58A6FF");
+            }
+        }
+
+        private void BtnOpenThermalPreview_Click(object sender, RoutedEventArgs e)
+        {
+            if (ViewModel == null) return;
+            var record = ViewModel.CreateCurrentAssetRecord();
+            var dlg = new ThermalLabelPreviewWindow(record) { Owner = this };
+            dlg.ShowDialog();
         }
 
         private void BtnCaptureQcPhoto_Click(object sender, RoutedEventArgs e)
@@ -1850,42 +1877,79 @@ namespace SuperAutoMater.Wpf.Views
             _cpuStressTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(1) };
             _cpuStressTimer.Tick += (s, e) =>
             {
-                _cpuStressSeconds++;
-                ProgBarCpuStress.Value = _cpuStressSeconds;
-                TxtCpuStressTimer.Text = $"Elapsed: {_cpuStressSeconds}s / 10s";
-
-                // Update real-time thermal paste rise rate & battery load sag
                 int curTemp = ViewModel?.CpuTempC ?? 45;
                 int curMv = ViewModel?.BatteryVoltageMv ?? 11800;
-                ThermalProfilerService.Instance.UpdateSample(curTemp, 0);
-                BatteryLoadMeterService.Instance.UpdateLoadVoltage(curMv);
 
-                var thmRes = ThermalProfilerService.Instance.GetCurrentResult();
-                TxtThermalPasteSummary.Text = thmRes.ConditionSummary;
-                TxtThermalPasteSummary.Foreground = new SolidColorBrush((Color)ColorConverter.ConvertFromString(thmRes.AccentHex));
-
-                var batRes = BatteryLoadMeterService.Instance.GetCurrentResult();
-                TxtBatterySagSummary.Text = batRes.StatusSummary;
-                TxtBatterySagSummary.Foreground = new SolidColorBrush((Color)ColorConverter.ConvertFromString(batRes.AccentHex));
-
-                if (_cpuStressSeconds >= 10)
+                if (!_isCoolDownPhase)
                 {
-                    StopCpuStress();
-                    TxtCpuStressStatus.Text = "✓ 10s STRESS WORKLOAD COMPLETED NOMINAL";
-                    TxtCpuStressStatus.Foreground = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#3FB950"));
-                    TxtCpuStressLoad.Text = "NOMINAL";
+                    _cpuStressSeconds++;
+                    ProgBarCpuStress.Value = _cpuStressSeconds;
+                    TxtCpuStressTimer.Text = $"CPU Burn: {_cpuStressSeconds}s / 10s";
 
-                    TxtRamStressStatus.Text = _ramErrors == 0
-                        ? "✓ 4-PASS BIT-FLIP INTEGRITY VERIFIED (0 ERRORS)"
-                        : $"⚠ BIT-FLIP INTEGRITY COMPLETED ({_ramErrors} ERRORS)";
-                    TxtRamStressStatus.Foreground = _ramErrors == 0
-                        ? (Brush)FindResource("BrushTextEmerald")
-                        : new SolidColorBrush((Color)ColorConverter.ConvertFromString("#FF7B72"));
-                    ProgBarRamStress.Value = 100;
-                    TxtRamPassSummary.Text = "4/4 Passes Complete (0xAA · 0x55 · 0x00 · 0xFF)";
+                    // Update real-time thermal paste rise rate & battery load sag
+                    ThermalProfilerService.Instance.UpdateSample(curTemp, 0);
+                    BatteryLoadMeterService.Instance.UpdateLoadVoltage(curMv);
 
-                    ViewModel?.MarkTestPassed("Cpu");
-                    ShowFeedback("CPU Multi-Core & RAM Bit-Flip Stress Completed 100% Nominal ✓", "⚡", "#3FB950");
+                    var thmRes = ThermalProfilerService.Instance.GetCurrentResult();
+                    TxtThermalPasteSummary.Text = thmRes.ConditionSummary;
+                    TxtThermalPasteSummary.Foreground = new SolidColorBrush((Color)ColorConverter.ConvertFromString(thmRes.AccentHex));
+
+                    var batRes = BatteryLoadMeterService.Instance.GetCurrentResult();
+                    TxtBatterySagSummary.Text = batRes.StatusSummary;
+                    TxtBatterySagSummary.Foreground = new SolidColorBrush((Color)ColorConverter.ConvertFromString(batRes.AccentHex));
+
+                    if (_cpuStressSeconds >= 10)
+                    {
+                        // Stop CPU/RAM stress load immediately, but transition into 5s Heatsink Cool-Down Profiling
+                        try
+                        {
+                            _cpuStressCts?.Cancel();
+                            _cpuStressCts?.Dispose();
+                            _cpuStressCts = null;
+                        }
+                        catch { }
+                        _ramStressRunning = false;
+
+                        _isCoolDownPhase = true;
+                        _coolDownSeconds = 0;
+                        ThermalProfilerService.Instance.StartCoolDown(curTemp);
+
+                        TxtCpuStressStatus.Text = "⚡ 10s BURN COMPLETE · COOL-DOWN DISSIPATION TEST...";
+                        TxtCpuStressStatus.Foreground = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#58A6FF"));
+                        TxtCpuStressLoad.Text = "COOLING";
+                        TxtCpuStressTimer.Text = "Dissipation Recovery: 0s / 5s";
+                    }
+                }
+                else
+                {
+                    // Cool-down recovery phase (5 seconds)
+                    _coolDownSeconds++;
+                    ThermalProfilerService.Instance.UpdateCoolDownSample(curTemp);
+                    TxtCpuStressTimer.Text = $"Dissipation Recovery: {_coolDownSeconds}s / 5s";
+
+                    var thmRes = ThermalProfilerService.Instance.GetCurrentResult();
+                    TxtThermalPasteSummary.Text = thmRes.ConditionSummary;
+                    TxtThermalPasteSummary.Foreground = new SolidColorBrush((Color)ColorConverter.ConvertFromString(thmRes.AccentHex));
+
+                    if (_coolDownSeconds >= 5)
+                    {
+                        StopCpuStress();
+                        TxtCpuStressStatus.Text = "✓ 10s WORKLOAD & THERMAL DISSIPATION PROFILED";
+                        TxtCpuStressStatus.Foreground = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#3FB950"));
+                        TxtCpuStressLoad.Text = "CERTIFIED";
+
+                        TxtRamStressStatus.Text = _ramErrors == 0
+                            ? "✓ 4-PASS BIT-FLIP INTEGRITY VERIFIED (0 ERRORS)"
+                            : $"⚠ BIT-FLIP INTEGRITY COMPLETED ({_ramErrors} ERRORS)";
+                        TxtRamStressStatus.Foreground = _ramErrors == 0
+                            ? (Brush)FindResource("BrushTextEmerald")
+                            : new SolidColorBrush((Color)ColorConverter.ConvertFromString("#FF7B72"));
+                        ProgBarRamStress.Value = 100;
+                        TxtRamPassSummary.Text = "4/4 Passes Complete (0xAA · 0x55 · 0x00 · 0xFF)";
+
+                        ViewModel?.MarkTestPassed("Cpu");
+                        ShowFeedback("CPU Multi-Core Burn & Thermal Dissipation Profile 100% Nominal ✓", "⚡", "#3FB950");
+                    }
                 }
             };
             _cpuStressTimer.Start();
@@ -1895,6 +1959,8 @@ namespace SuperAutoMater.Wpf.Views
         {
             _isCpuStressing = false;
             _ramStressRunning = false;
+            _isCoolDownPhase = false;
+            _coolDownSeconds = 0;
             try
             {
                 _cpuStressCts?.Cancel();

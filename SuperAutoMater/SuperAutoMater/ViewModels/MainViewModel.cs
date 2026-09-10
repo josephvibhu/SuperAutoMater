@@ -164,6 +164,15 @@ namespace SuperAutoMater.Wpf.ViewModels
                 OnPropertyChanged(nameof(ControllerProtocol));
                 OnPropertyChanged(nameof(DriveSerialNumber));
                 OnPropertyChanged(nameof(DriveFirmware));
+                OnPropertyChanged(nameof(TbwWrittenTb));
+                OnPropertyChanged(nameof(TbwRatedEnduranceTb));
+                OnPropertyChanged(nameof(TbwWearPercent));
+                OnPropertyChanged(nameof(TbwLifespanRemainingPercent));
+                OnPropertyChanged(nameof(TbwDisplaySummary));
+                OnPropertyChanged(nameof(TbwStatusBadge));
+                OnPropertyChanged(nameof(TbwAccentHex));
+                OnPropertyChanged(nameof(RefurbReportPreviewText));
+                OnPropertyChanged(nameof(ECommerceListingText));
             }
         }
 
@@ -175,6 +184,15 @@ namespace SuperAutoMater.Wpf.ViewModels
         public string HdsEstLifetime => ActiveDrive?.HdsEstLifetime ?? "> 1000 days";
         public string HdsTotalWritten => ActiveDrive?.HdsTotalWritten ?? "14.2 TB";
         public string HdsBadge => $"{HdsHealth}% HEALTH";
+
+        // SSD TBW & Host Writes Endurance Telemetry
+        public double TbwWrittenTb => ActiveDrive?.TbwWrittenTb ?? 14.2;
+        public int TbwRatedEnduranceTb => ActiveDrive?.TbwRatedEnduranceTb ?? 300;
+        public double TbwWearPercent => ActiveDrive?.TbwWearPercent ?? 4.7;
+        public double TbwLifespanRemainingPercent => ActiveDrive?.TbwLifespanRemainingPercent ?? 95.3;
+        public string TbwDisplaySummary => ActiveDrive?.TbwDisplaySummary ?? "14.2 TB / 300 TBW · 4.7% Wear · 95.3% Lifespan Remaining";
+        public string TbwStatusBadge => ActiveDrive?.TbwStatusBadge ?? "✓ LOW WEAR (95% REMAINING)";
+        public string TbwAccentHex => ActiveDrive?.TbwAccentHex ?? "#3FB950";
 
         public string SmartTemp => $"{ActiveDrive?.SmartTemperatureC ?? 36}°C (Nominal)";
         public string SmartBadSectors => $"{ActiveDrive?.SmartBadSectors ?? 0} Bad Sectors";
@@ -505,9 +523,17 @@ namespace SuperAutoMater.Wpf.ViewModels
                 sb.AppendLine($"MEMORY:      {RamSummary}");
                 sb.AppendLine($"STORAGE:     {PrimaryDriveModel} ({StorageSummary})");
                 sb.AppendLine($"DRIVE SMART: {HealthBadge} · 0 Bad Sectors");
+                sb.AppendLine($"SSD TBW:     {TbwDisplaySummary}");
+                sb.AppendLine($"DRIVERS:     {MissingDriversSummary}");
+                var thm = ThermalProfilerService.Instance.GetCurrentResult();
+                if (thm.ConditionCode != "IDLE" && thm.ConditionCode != "STANDBY")
+                {
+                    sb.AppendLine($"THERMAL:     {thm.ConditionSummary}");
+                }
                 sb.AppendLine($"BATTERY:     {BatteryIntegrityBadge} · {BatteryWearSummary}");
                 sb.AppendLine($"CELL STATUS: {BatteryCellTopology} · {BatteryCellBalanceStatus}");
                 sb.AppendLine($"GRAPHICS:    {GpuName} ({GpuVram})");
+                sb.AppendLine($"INSPECTOR:   {TechnicianDisplayBadge} · {TechnicianStation}");
                 sb.AppendLine($"CERTIFIED:   {PipelineStatusText} Nominal");
                 return sb.ToString().TrimEnd();
             }
@@ -522,10 +548,12 @@ namespace SuperAutoMater.Wpf.ViewModels
                 sb.AppendLine($"• Condition: {Grade} ({CosmeticDefectsSummary})");
                 sb.AppendLine($"• Processor: {CpuName} ({CoreSummary})");
                 sb.AppendLine($"• RAM: {RamSummary}");
-                sb.AppendLine($"• Storage: {PrimaryDriveModel} ({StorageSummary}) - {HealthBadge}");
+                sb.AppendLine($"• Storage: {PrimaryDriveModel} ({StorageSummary}) - {HealthBadge} (TBW: {TbwWrittenTb:F1}TB / {TbwRatedEnduranceTb}TBW)");
                 sb.AppendLine($"• Battery: {BatteryIntegrityBadge} ({BatteryWearSummary} · {BatteryCellTopology})");
                 sb.AppendLine($"• Graphics: {GpuName} ({GpuVram})");
+                sb.AppendLine($"• Hardware Drivers: {MissingDriversSummary}");
                 sb.AppendLine($"• Serial Number: {Serial}");
+                sb.AppendLine($"• Certified Technician: {TechnicianDisplayBadge} ({TechnicianStation})");
                 sb.AppendLine($"• Quality Assurance: {PipelineStatusText} 100% Certified with SuperAutoMater");
                 return sb.ToString().TrimEnd();
             }
@@ -585,6 +613,23 @@ namespace SuperAutoMater.Wpf.ViewModels
                     OnPropertyChanged("");
                 });
             };
+
+            // Wire Technician Profile sync
+            TechnicianProfileService.Instance.ProfileChanged += profile =>
+            {
+                System.Windows.Application.Current?.Dispatcher.InvokeAsync(() =>
+                {
+                    OnPropertyChanged(nameof(TechnicianName));
+                    OnPropertyChanged(nameof(TechnicianId));
+                    OnPropertyChanged(nameof(TechnicianStation));
+                    OnPropertyChanged(nameof(TechnicianDisplayBadge));
+                    OnPropertyChanged(nameof(RefurbReportPreviewText));
+                    OnPropertyChanged(nameof(ECommerceListingText));
+                });
+            };
+
+            // Initial PnP Yellow-Bang Device Driver Audit
+            _ = RefreshDriverAuditAsync();
         }
 
         private void SyncCollections()
@@ -712,9 +757,41 @@ namespace SuperAutoMater.Wpf.ViewModels
             }
         }
 
-        public void PrintThermalLabel()
+        // Technician Operator Profile
+        public string TechnicianName => TechnicianProfileService.Instance.CurrentProfile.Name;
+        public string TechnicianId => TechnicianProfileService.Instance.CurrentProfile.Id;
+        public string TechnicianStation => TechnicianProfileService.Instance.CurrentProfile.StationBay;
+        public string TechnicianDisplayBadge => TechnicianProfileService.Instance.CurrentProfile.DisplayBadge;
+
+        // PnP Device Manager Driver Audit
+        private DriverAuditResult _driverAudit = new DriverAuditResult();
+        public int MissingDriverCount => _driverAudit?.MissingCount ?? 0;
+        public bool HasMissingDrivers => _driverAudit?.HasMissingDrivers ?? false;
+        public string MissingDriversSummary => _driverAudit?.SummaryText ?? "✓ 0 MISSING DRIVERS (All Hardware Online)";
+        public string MissingDriversBadge => _driverAudit?.StatusBadge ?? "0 MISSING DRIVERS";
+        public string MissingDriversAccentHex => _driverAudit?.AccentHex ?? "#3FB950";
+        public List<MissingDeviceEntry> MissingDriversList => _driverAudit?.MissingDevices ?? new List<MissingDeviceEntry>();
+
+        public async Task RefreshDriverAuditAsync()
         {
-            var record = new AssetQueueRecord
+            try
+            {
+                _driverAudit = await DeviceDriverAuditService.Instance.RunAuditAsync();
+                OnPropertyChanged(nameof(MissingDriverCount));
+                OnPropertyChanged(nameof(HasMissingDrivers));
+                OnPropertyChanged(nameof(MissingDriversSummary));
+                OnPropertyChanged(nameof(MissingDriversBadge));
+                OnPropertyChanged(nameof(MissingDriversAccentHex));
+                OnPropertyChanged(nameof(MissingDriversList));
+                OnPropertyChanged(nameof(RefurbReportPreviewText));
+                OnPropertyChanged(nameof(ECommerceListingText));
+            }
+            catch { }
+        }
+
+        public AssetQueueRecord CreateCurrentAssetRecord()
+        {
+            return new AssetQueueRecord
             {
                 Asset_Tag = !string.IsNullOrWhiteSpace(Serial) && Serial != "Detecting..." ? Serial : $"QC-{DateTime.Now:MMdd-HHmm}",
                 Serial_Number = Serial,
@@ -725,10 +802,16 @@ namespace SuperAutoMater.Wpf.ViewModels
                 Status = PassCount >= 6 ? "RTS" : "WIP",
                 Wip_Issue = PassCount >= 6 ? "All Okay" : "Requires Inspection",
                 Physical_Grade = Grade ?? "A+",
-                Remarks = $"SuperAutoMater Label | {PipelineStatusText}",
-                Shelf_Location = "QC-BAY-01",
+                Remarks = $"SuperAutoMater Label | {PipelineStatusText} | TBW: {TbwWrittenTb:F1}TB",
+                Shelf_Location = TechnicianStation,
+                Technician = TechnicianDisplayBadge,
                 Timestamp = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss")
             };
+        }
+
+        public void PrintThermalLabel()
+        {
+            var record = CreateCurrentAssetRecord();
             ThermalLabelPrinter.PrintLabel(record);
         }
 

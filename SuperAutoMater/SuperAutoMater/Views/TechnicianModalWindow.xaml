@@ -1,0 +1,124 @@
+<Window x:Class="SuperAutoMater.Wpf.Views.TechnicianModalWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Technician Profile &amp; QR Badge Scanner"
+        Height="490" Width="720"
+        WindowStartupLocation="CenterOwner"
+        ResizeMode="NoResize"
+        Background="#0E1116"
+        Icon="pack://application:,,,/app.ico">
+
+    <Grid Margin="18">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/> <!-- Header -->
+            <RowDefinition Height="*"/>    <!-- Body (2-Col) -->
+            <RowDefinition Height="Auto"/> <!-- Footer Actions -->
+        </Grid.RowDefinitions>
+
+        <!-- Header -->
+        <Border Grid.Row="0" Background="#161B22" BorderBrush="#2D333B" BorderThickness="1" CornerRadius="8" Padding="14,10" Margin="0,0,0,14">
+            <DockPanel LastChildFill="False">
+                <StackPanel Orientation="Horizontal" DockPanel.Dock="Left" VerticalAlignment="Center">
+                    <Ellipse Width="10" Height="10" Fill="#58A6FF" Margin="0,0,10,0"/>
+                    <TextBlock Text="TECHNICIAN OPERATOR BADGE &amp; QC AUDIT PROFILE" FontFamily="{StaticResource FontMono}" FontWeight="Bold" FontSize="12" Foreground="{StaticResource BrushTextWhite}"/>
+                </StackPanel>
+                <Border DockPanel.Dock="Right" Background="#1C2128" BorderBrush="#388BFD" BorderThickness="1" CornerRadius="4" Padding="6,2">
+                    <TextBlock x:Name="TxtCurrentBadgePill" Text="TECH-01" FontFamily="{StaticResource FontMono}" FontSize="10" Foreground="#58A6FF" FontWeight="Bold"/>
+                </Border>
+            </DockPanel>
+        </Border>
+
+        <!-- Main Body: 2 Columns -->
+        <Grid Grid.Row="1">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="1.1*"/> <!-- Webcam Scanner Viewport -->
+                <ColumnDefinition Width="0.9*"/> <!-- Profile Details & Input -->
+            </Grid.ColumnDefinitions>
+
+            <!-- Column 1: Webcam Viewport with Optical Scan Crosshair -->
+            <Border Grid.Column="0" Background="#161B22" BorderBrush="#2D333B" BorderThickness="1" CornerRadius="8" Margin="0,0,10,0" Padding="10">
+                <Grid>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="*"/>
+                        <RowDefinition Height="Auto"/>
+                    </Grid.RowDefinitions>
+
+                    <!-- Camera Viewport Container -->
+                    <Border Grid.Row="0" Background="#0A0C10" CornerRadius="6" ClipToBounds="True" BorderBrush="#21262D" BorderThickness="1">
+                        <Grid>
+                            <Image x:Name="ImgCamPreview" Stretch="Uniform" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+
+                            <!-- Standby placeholder if no camera -->
+                            <StackPanel x:Name="PanelCamPlaceholder" HorizontalAlignment="Center" VerticalAlignment="Center" Visibility="Collapsed">
+                                <TextBlock Text="📷" FontSize="36" HorizontalAlignment="Center" Foreground="#484F58"/>
+                                <TextBlock Text="Camera Initializing..." FontFamily="{StaticResource FontMono}" FontSize="11" Foreground="#8B949E" HorizontalAlignment="Center" Margin="0,6,0,0"/>
+                            </StackPanel>
+
+                            <!-- Optical Reticle / Scan Box Overlay -->
+                            <Grid Margin="30" IsHitTestVisible="False">
+                                <Border BorderBrush="#388BFD" BorderThickness="2" CornerRadius="8" Opacity="0.85">
+                                    <Grid>
+                                        <!-- Corner brackets -->
+                                        <Line X1="0" Y1="0" X2="24" Y2="0" Stroke="#58A6FF" StrokeThickness="3" HorizontalAlignment="Left" VerticalAlignment="Top"/>
+                                        <Line X1="0" Y1="0" X2="0" Y2="24" Stroke="#58A6FF" StrokeThickness="3" HorizontalAlignment="Left" VerticalAlignment="Top"/>
+                                        <Line X1="0" Y1="0" X2="24" Y2="0" Stroke="#58A6FF" StrokeThickness="3" HorizontalAlignment="Right" VerticalAlignment="Top"/>
+                                        <Line X1="24" Y1="0" X2="24" Y2="24" Stroke="#58A6FF" StrokeThickness="3" HorizontalAlignment="Right" VerticalAlignment="Top"/>
+                                        <Line X1="0" Y1="24" X2="24" Y2="24" Stroke="#58A6FF" StrokeThickness="3" HorizontalAlignment="Left" VerticalAlignment="Bottom"/>
+                                        <Line X1="0" Y1="0" X2="0" Y2="24" Stroke="#58A6FF" StrokeThickness="3" HorizontalAlignment="Left" VerticalAlignment="Bottom"/>
+                                        <Line X1="0" Y1="24" X2="24" Y2="24" Stroke="#58A6FF" StrokeThickness="3" HorizontalAlignment="Right" VerticalAlignment="Bottom"/>
+                                        <Line X1="24" Y1="0" X2="24" Y2="24" Stroke="#58A6FF" StrokeThickness="3" HorizontalAlignment="Right" VerticalAlignment="Bottom"/>
+                                    </Grid>
+                                </Border>
+                            </Grid>
+                        </Grid>
+                    </Border>
+
+                    <!-- Optical Scan Status Readout -->
+                    <Border Grid.Row="1" Background="#0D1117" BorderBrush="#21262D" BorderThickness="1" CornerRadius="4" Margin="0,8,0,0" Padding="8,5">
+                        <DockPanel LastChildFill="True">
+                            <TextBlock x:Name="TxtScanStatus" Text="📷 Hold QR / Barcode badge to webcam" FontFamily="{StaticResource FontMono}" FontSize="10" Foreground="#58A6FF" VerticalAlignment="Center"/>
+                        </DockPanel>
+                    </Border>
+                </Grid>
+            </Border>
+
+            <!-- Column 2: Profile Fields & Manual Entry -->
+            <Border Grid.Column="1" Background="#161B22" BorderBrush="#2D333B" BorderThickness="1" CornerRadius="8" Margin="0,0,0,0" Padding="14,10">
+                <StackPanel>
+                    <!-- Technician ID -->
+                    <TextBlock Text="TECHNICIAN ID / BADGE #" Style="{StaticResource TextBadgeMono}" Foreground="{StaticResource BrushTextVioletSubdued}" Margin="0,0,0,4"/>
+                    <TextBox x:Name="TxtTechId" Background="#0D1117" Foreground="#FFFFFF" BorderBrush="#30363D" Padding="8,6" FontFamily="{StaticResource FontMono}" FontSize="12" Margin="0,0,0,10" FontWeight="Bold"/>
+
+                    <!-- Technician Full Name -->
+                    <TextBlock Text="TECHNICIAN FULL NAME" Style="{StaticResource TextBadgeMono}" Foreground="{StaticResource BrushTextVioletSubdued}" Margin="0,0,0,4"/>
+                    <TextBox x:Name="TxtTechName" Background="#0D1117" Foreground="#FFFFFF" BorderBrush="#30363D" Padding="8,6" FontFamily="{StaticResource FontMono}" FontSize="12" Margin="0,0,0,10"/>
+
+                    <!-- Station / Bay -->
+                    <TextBlock Text="BENCH / QC STATION BAY" Style="{StaticResource TextBadgeMono}" Foreground="{StaticResource BrushTextVioletSubdued}" Margin="0,0,0,4"/>
+                    <TextBox x:Name="TxtTechStation" Background="#0D1117" Foreground="#FFFFFF" BorderBrush="#30363D" Padding="8,6" FontFamily="{StaticResource FontMono}" FontSize="12" Margin="0,0,12"/>
+
+                    <!-- Audit Trail Notice -->
+                    <Border Background="#1C2128" BorderBrush="#21262D" BorderThickness="1" CornerRadius="6" Padding="10,8" Margin="0,0,0,0">
+                        <StackPanel>
+                            <TextBlock Text="⚡ AUDIT TRAIL SYNCHRONIZATION" FontFamily="{StaticResource FontMono}" FontSize="9" FontWeight="Bold" Foreground="#8B949E" Margin="0,0,0,4"/>
+                            <TextBlock Text="Saved profile persists to USB drives. Technician identity is automatically stamped onto:" FontFamily="{StaticResource FontMono}" FontSize="9" Foreground="#8B949E" TextWrapping="Wrap" Margin="0,0,0,4"/>
+                            <TextBlock Text="• PDF Inspection Certificates&#x0a;• Google Sheets Cloud Dispatch&#x0a;• Thermal Chassis Labels &amp; Dossiers" FontFamily="{StaticResource FontMono}" FontSize="9" Foreground="#58A6FF" TextWrapping="Wrap"/>
+                        </StackPanel>
+                    </Border>
+                </StackPanel>
+            </Border>
+        </Grid>
+
+        <!-- Footer Actions -->
+        <Border Grid.Row="2" Background="#161B22" BorderBrush="#2D333B" BorderThickness="1" CornerRadius="8" Padding="12,8" Margin="0,12,0,0">
+            <DockPanel LastChildFill="False">
+                <TextBlock x:Name="TxtFooterFeedback" Text="Ready." FontFamily="{StaticResource FontMono}" FontSize="11" Foreground="#3FB950" VerticalAlignment="Center" DockPanel.Dock="Left"/>
+
+                <StackPanel Orientation="Horizontal" DockPanel.Dock="Right">
+                    <Button x:Name="BtnCancel" Content="✕ CANCEL [ESC]" Background="#21262D" Foreground="#C9D1D9" BorderBrush="#30363D" BorderThickness="1" Padding="14,6" Margin="0,0,8,0" FontFamily="{StaticResource FontMono}" FontSize="11" FontWeight="SemiBold" Cursor="Hand" Click="BtnCancel_Click"/>
+                    <Button x:Name="BtnSave" Content="💾 SAVE PROFILE [ENTER]" Background="#238636" Foreground="#FFFFFF" BorderBrush="#2EA043" BorderThickness="1" Padding="16,6" FontFamily="{StaticResource FontMono}" FontSize="11" FontWeight="Bold" Cursor="Hand" Click="BtnSave_Click"/>
+                </StackPanel>
+            </DockPanel>
+        </Border>
+    </Grid>
+</Window>

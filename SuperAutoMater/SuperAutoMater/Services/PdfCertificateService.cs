@@ -26,6 +26,9 @@ namespace SuperAutoMater.Wpf.Services
         public string PhysicalGrade { get; set; } = "A+";
         public string CosmeticDefectsSummary { get; set; } = "Pristine (No Defects)";
         public string BatteryCellTopology { get; set; } = "3S1P (3 Cells) · Balanced";
+        public string StorageTbwSummary { get; set; } = "14.2 TB / 300 TBW (Low Wear)";
+        public string DriverIntegritySummary { get; set; } = "0 Missing Drivers";
+        public string ThermalDissipationVerdict { get; set; } = "Thermal Conduction Nominal";
         public string TechnicianName { get; set; } = "QC Station #1";
         public string CloudAuditUrl { get; set; } = "https://docs.google.com/spreadsheets";
         public List<string> PassedTests { get; set; } = new List<string>();
@@ -157,7 +160,7 @@ namespace SuperAutoMater.Wpf.Services
                 contentSb.Append("BT /F2 11 Tf 0.25 0.73 0.38 rg 40 524 Td (STORAGE INTEGRITY & BATTERY HEALTH) Tj ET\n");
 
                 DrawKeyValue(contentSb, 40, 504, "NVMe SSD STORAGE:", $"{d.StorageModel} [{d.StorageHealthPercent}% SMART Health]");
-                DrawKeyValue(contentSb, 40, 486, "DRIVE LIFETIME:", $"{d.StoragePowerOn} · Written: Nominal");
+                DrawKeyValue(contentSb, 40, 486, "SSD TBW & WEAR:", $"{d.StorageTbwSummary} · {d.StoragePowerOn}");
                 DrawKeyValue(contentSb, 40, 468, "BATTERY HEALTH:", $"{d.BatteryHealthSummary} ({d.BatteryCellTopology})");
                 DrawKeyValue(contentSb, 40, 450, "BATTERY CAPACITY:", d.BatteryCapacities);
                 DrawKeyValue(contentSb, 40, 432, "GRAPHICS ACCEL:", d.GpuModel);

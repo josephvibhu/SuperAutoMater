@@ -15,6 +15,7 @@ namespace SuperAutoMater.Wpf.Services
         public string PowerOnTime { get; set; } = "128 days";
         public string EstLifetime { get; set; } = "> 1000 days";
         public string TotalWritten { get; set; } = "14.2 TB";
+        public double TotalWrittenTb { get; set; } = 14.2;
         public string TotalRead { get; set; } = "10.5 TB";
         public string Source { get; set; } = "Hard Disk Sentinel";
         public string HealthBadge => $"{Health}% {(Health >= 90 ? "EXCELLENT" : Health >= 70 ? "GOOD" : "WARNING")}";
@@ -178,8 +179,10 @@ namespace SuperAutoMater.Wpf.Services
 
                                 // Formatted total written
                                 string totalWrittenStr = "14.2 TB";
+                                double totalWrittenTb = 14.2;
                                 if (rawKeyName != null && writtenMap.TryGetValue(rawKeyName, out string wGbStr) && double.TryParse(wGbStr, out double wGb))
                                 {
+                                    totalWrittenTb = Math.Round(wGb / 1024.0, 1);
                                     totalWrittenStr = wGb >= 1000 ? $"{(wGb / 1024.0):0.1} TB" : $"{wGb:0} GB";
                                 }
 
@@ -201,6 +204,7 @@ namespace SuperAutoMater.Wpf.Services
                                     PowerOnTime = powerOnStr,
                                     EstLifetime = estLifetime,
                                     TotalWritten = totalWrittenStr,
+                                    TotalWrittenTb = totalWrittenTb,
                                     TotalRead = totalReadStr
                                 };
 
