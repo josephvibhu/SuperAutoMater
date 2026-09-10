@@ -21,9 +21,12 @@
 
         <!-- Top Right Live Refresh / Stage Indicator -->
         <Border x:Name="TopBadge" HorizontalAlignment="Right" VerticalAlignment="Top" Background="#CC161B22" BorderBrush="#30363D" BorderThickness="1" CornerRadius="8" Padding="12,6" Margin="20">
-            <StackPanel Orientation="Horizontal">
-                <TextBlock x:Name="TxtStageIndex" Text="STAGE 1/14" FontFamily="Consolas" FontWeight="Bold" FontSize="11" Foreground="#58A6FF" Margin="0,0,10,0"/>
-                <TextBlock x:Name="TxtRefreshRate" Text="60 Hz PANEL" FontFamily="Consolas" FontWeight="Bold" FontSize="11" Foreground="#3FB950"/>
+            <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                <TextBlock x:Name="TxtStageIndex" Text="STAGE 1/14" FontFamily="Consolas" FontWeight="Bold" FontSize="11" Foreground="#58A6FF" Margin="0,0,12,0" VerticalAlignment="Center"/>
+                <Border Background="#21262D" BorderBrush="#30363D" BorderThickness="1" CornerRadius="4" Padding="6,2" Margin="0,0,8,0">
+                    <TextBlock x:Name="TxtRefreshRate" Text="60.0 Hz PANEL" FontFamily="Consolas" FontWeight="Bold" FontSize="11" Foreground="#3FB950" VerticalAlignment="Center"/>
+                </Border>
+                <TextBlock x:Name="TxtTimingDetails" Text="VSYNC NOMINAL (0.0ms Jitter · 0 Drops)" FontFamily="Consolas" FontSize="10" Foreground="#8B949E" VerticalAlignment="Center"/>
             </StackPanel>
         </Border>
 

@@ -196,16 +196,21 @@ namespace SuperAutoMater.Wpf.Services
 
         public async Task InitializeAsync()
         {
-            var t1 = Task.Run(ProbeSystemIdentity);
-            var t2 = Task.Run(ProbeCpu);
-            var t3 = Task.Run(ProbeGpu);
-            var t4 = Task.Run(ProbeMemory);
-            var t5 = Task.Run(ProbeStorage);
-            var t6 = Task.Run(ProbeBattery);
-            var t7 = Task.Run(ProbeNetwork);
-            var t8 = Task.Run(ProbeTouchscreen);
+            var tasks = new Task[]
+            {
+                Task.Run(ProbeSystemIdentity),
+                Task.Run(ProbeCpu),
+                Task.Run(ProbeGpu),
+                Task.Run(ProbeMemory),
+                Task.Run(ProbeStorage),
+                Task.Run(ProbeBattery),
+                Task.Run(ProbeNetwork),
+                Task.Run(ProbeTouchscreen)
+            };
 
-            await Task.WhenAll(t1, t2, t3, t4, t5, t6, t7, t8);
+            // Strict 1.8-second safety guard: startup will never hang even on damaged hardware with frozen WMI drivers
+            var allTasks = Task.WhenAll(tasks);
+            await Task.WhenAny(allTasks, Task.Delay(1800));
             TelemetryUpdated?.Invoke();
         }
 

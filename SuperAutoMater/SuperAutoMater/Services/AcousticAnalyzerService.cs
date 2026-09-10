@@ -9,6 +9,8 @@ namespace SuperAutoMater.Wpf.Services
     {
         public bool IsCouplingVerified { get; set; } = false;
         public float MaxInputLevel { get; set; } = 0f;
+        public float TotalHarmonicDistortionPercent { get; set; } = 1.0f;
+        public bool IsBlownSpeakerDetected { get; set; } = false;
         public string StatusSummary { get; set; } = "Awaiting Acoustic Sweep";
         public string AccentHex { get; set; } = "#8B949E";
     }
@@ -23,6 +25,15 @@ namespace SuperAutoMater.Wpf.Services
         private float _currentPeak = 0f;
         private bool _isRecording = false;
 
+        private const int FFT_SAMPLE_WINDOW = 1024;
+        private readonly float[] _fftBuffer = new float[FFT_SAMPLE_WINDOW];
+        private int _fftBufferIndex = 0;
+        private float _peakThd = 0f;
+        private FftAnalysisResult _lastFftResult = new FftAnalysisResult();
+
+        public event Action<float[]> SpectrumUpdated;
+        public float[] LatestSpectrum { get; private set; } = new float[16];
+
         private AcousticAnalyzerService() { }
 
         public void StartListening()
@@ -34,22 +45,46 @@ namespace SuperAutoMater.Wpf.Services
                 if (WaveInEvent.DeviceCount > 0)
                 {
                     _currentPeak = 0f;
+                    _peakThd = 0f;
+                    _fftBufferIndex = 0;
+                    Array.Clear(_fftBuffer, 0, _fftBuffer.Length);
+                    LatestSpectrum = new float[16];
+
                     _waveIn = new WaveInEvent
                     {
                         DeviceNumber = 0,
                         WaveFormat = new WaveFormat(44100, 1),
-                        BufferMilliseconds = 50
+                        BufferMilliseconds = 40
                     };
 
                     _waveIn.DataAvailable += (s, e) =>
                     {
                         float max = 0;
+                        int sampleCount = e.BytesRecorded / 2;
+
                         for (int index = 0; index < e.BytesRecorded; index += 2)
                         {
-                            short sample = (short)((e.Buffer[index + 1] << 8) | e.Buffer[index]);
-                            var sample32 = sample / 32768f;
-                            if (sample32 < 0) sample32 = -sample32;
-                            if (sample32 > max) max = sample32;
+                            short rawSample = (short)((e.Buffer[index + 1] << 8) | e.Buffer[index]);
+                            float sample32 = rawSample / 32768f;
+
+                            float abs = Math.Abs(sample32);
+                            if (abs > max) max = abs;
+
+                            _fftBuffer[_fftBufferIndex++] = sample32;
+                            if (_fftBufferIndex >= FFT_SAMPLE_WINDOW)
+                            {
+                                _fftBufferIndex = 0;
+                                var fftRes = AcousticFftAnalyzer.Analyze(_fftBuffer, 44100);
+                                _lastFftResult = fftRes;
+
+                                if (fftRes.TotalHarmonicDistortionPercent > _peakThd)
+                                {
+                                    _peakThd = fftRes.TotalHarmonicDistortionPercent;
+                                }
+
+                                LatestSpectrum = fftRes.BandEnergies;
+                                SpectrumUpdated?.Invoke(LatestSpectrum);
+                            }
                         }
 
                         if (max > _currentPeak)
@@ -66,24 +101,34 @@ namespace SuperAutoMater.Wpf.Services
         public AcousticTestResult StopAndAnalyze()
         {
             float peak = _currentPeak;
+            float thd = _peakThd > 0 ? _peakThd : _lastFftResult.TotalHarmonicDistortionPercent;
+            bool isBlown = thd >= 8.5f;
+
             StopListening();
 
             var res = new AcousticTestResult
             {
-                MaxInputLevel = peak
+                MaxInputLevel = peak,
+                TotalHarmonicDistortionPercent = thd,
+                IsBlownSpeakerDetected = isBlown
             };
 
-            // If microphone picked up speaker sweep audio (> 4% amplitude threshold)
-            if (peak >= 0.04f)
+            if (isBlown)
             {
                 res.IsCouplingVerified = true;
-                res.StatusSummary = $"✓ ACOUSTIC COUPLING NOMINAL · Transduction Level: {(int)(peak * 100)}% Verified";
+                res.StatusSummary = $"⚠ SPEAKER DISTORTION DETECTED (THD: {thd:F1}% · Chassis / Voice Coil Rattle)";
+                res.AccentHex = "#F85149";
+            }
+            else if (peak >= 0.04f)
+            {
+                res.IsCouplingVerified = true;
+                res.StatusSummary = $"✓ ACOUSTIC COUPLING & HARMONICS NOMINAL (THD: {thd:F1}% · Transduction: {(int)(peak * 100)}%)";
                 res.AccentHex = "#3FB950";
             }
             else
             {
                 res.IsCouplingVerified = false;
-                res.StatusSummary = "Audio sweep completed · Transduction below threshold (Check Mic / Volume)";
+                res.StatusSummary = "Audio sweep complete · Transduction below threshold (Check Mic / Volume)";
                 res.AccentHex = "#D29922";
             }
 

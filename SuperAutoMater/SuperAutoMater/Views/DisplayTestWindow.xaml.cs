@@ -37,9 +37,6 @@ namespace SuperAutoMater.Wpf.Views
         private DispatcherTimer _motionTimer;
         private double _motionBarX = 0;
         private Rectangle _motionRect;
-        private int _frameCount = 0;
-        private DateTime _lastFpsTime = DateTime.Now;
-
         public bool TestPassed { get; private set; } = false;
 
         public DisplayTestWindow()
@@ -74,14 +71,29 @@ namespace SuperAutoMater.Wpf.Views
                 BtnLaunchTouch.Visibility = Visibility.Visible; // Technician can still launch touch test
             }
 
+            DisplayTimingService.Instance.StartMeasurement();
+            DisplayTimingService.Instance.TimingUpdated += OnDisplayTimingUpdated;
+
             RenderStage(_currentStage);
             ShowHud();
         }
 
         private void DisplayTestWindow_Closed(object sender, EventArgs e)
         {
+            DisplayTimingService.Instance.TimingUpdated -= OnDisplayTimingUpdated;
+            DisplayTimingService.Instance.StopMeasurement();
             _hudTimer?.Stop();
             _motionTimer?.Stop();
+        }
+
+        private void OnDisplayTimingUpdated(DisplayTimingStats stats)
+        {
+            Dispatcher.InvokeAsync(() =>
+            {
+                TxtRefreshRate.Text = $"{stats.MeasuredHz:F1} Hz PANEL";
+                TxtRefreshRate.Foreground = new SolidColorBrush((Color)ColorConverter.ConvertFromString(stats.AccentHex));
+                TxtTimingDetails.Text = $"{stats.ResolutionWidth}x{stats.ResolutionHeight} · {stats.JitterMs:F2}ms Jitter · {stats.DroppedFrames} Drops";
+            }, DispatcherPriority.Render);
         }
 
         private void ShowHud()
@@ -433,8 +445,6 @@ namespace SuperAutoMater.Wpf.Views
         private void StartMotionGhosting(double w, double h)
         {
             _motionBarX = 0;
-            _frameCount = 0;
-            _lastFpsTime = DateTime.Now;
 
             _motionRect = new Rectangle
             {
@@ -461,15 +471,7 @@ namespace SuperAutoMater.Wpf.Views
 
             Canvas.SetLeft(_motionRect, _motionBarX);
 
-            _frameCount++;
-            var now = DateTime.Now;
-            if ((now - _lastFpsTime).TotalMilliseconds >= 500)
-            {
-                double fps = _frameCount / (now - _lastFpsTime).TotalSeconds;
-                TxtRefreshRate.Text = $"{fps:0.0} FPS PANEL";
-                _frameCount = 0;
-                _lastFpsTime = now;
-            }
+            // Measured frame rate is maintained with microsecond precision via DisplayTimingService
         }
 
         private void NextStage()

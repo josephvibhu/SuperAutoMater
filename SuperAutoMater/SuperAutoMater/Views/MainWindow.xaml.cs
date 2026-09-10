@@ -116,10 +116,22 @@ namespace SuperAutoMater.Wpf.Views
                 await ViewModel.RefreshTelemetryAsync();
                 ShowFeedback("Diagnostic Bench Online: All hardware telemetry loaded ✓", "⚡", "#3FB950");
             }
+
+            // 5. Register Real-Time FFT Acoustic Spectrum Analyzer
+            AcousticAnalyzerService.Instance.SpectrumUpdated += OnAcousticSpectrumUpdated;
+
+            // 6. Start Warehouse Fleet LAN HUD & Mesh
+            WarehouseFleetService.Instance.StartService(ViewModel);
+            if (TxtFleetSummaryBanner != null)
+            {
+                TxtFleetSummaryBanner.Text = $"{WarehouseFleetService.Instance.LocalDashboardUrl} · UDP 9876 Active";
+            }
         }
 
         private void MainWindow_Closed(object sender, EventArgs e)
         {
+            WarehouseFleetService.Instance.StopService();
+            AcousticAnalyzerService.Instance.SpectrumUpdated -= OnAcousticSpectrumUpdated;
             StopWorkspaceCamera();
             StopWorkspaceMic();
             StopFingerprintListener();
@@ -280,13 +292,29 @@ namespace SuperAutoMater.Wpf.Views
             }
         }
 
+        private void OnAcousticSpectrumUpdated(float[] bands)
+        {
+            Dispatcher.InvokeAsync(() =>
+            {
+                if (ViewAudioWorkspace.Visibility != Visibility.Visible) return;
+                for (int i = 0; i < 16 && i < bands.Length; i++)
+                {
+                    if (FindName($"FftBar{i}") is Border bar)
+                    {
+                        double h = Math.Clamp(bands[i] * 46.0 + 3.0, 3.0, 48.0);
+                        bar.Height = h;
+                    }
+                }
+            }, DispatcherPriority.Render);
+        }
+
         private async Task PlayStereoSweepAsync()
         {
             try
             {
                 AcousticAnalyzerService.Instance.StartListening();
 
-                TxtAudioSweepStatus.Text = "Left Channel (L): Playing 440Hz-1000Hz sweep...";
+                TxtAudioSweepStatus.Text = "Left Channel (L): 200 Hz – 2,500 Hz Log Chirp Sweep...";
                 ProgBarAudioLeft.Value = 85;
                 ProgBarAudioRight.Value = 0;
                 BorderAudioLeft.BorderBrush = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#3FB950"));
@@ -295,7 +323,7 @@ namespace SuperAutoMater.Wpf.Views
                 // Left channel sweep
                 await Task.Run(() =>
                 {
-                    using var s = GenerateMelodicChimeStream(true, false);
+                    using var s = GenerateLogarithmicChirpStream(true, false);
                     using var sp = new SoundPlayer(s);
                     sp.PlaySync();
                 });
@@ -303,7 +331,7 @@ namespace SuperAutoMater.Wpf.Views
                 ProgBarAudioLeft.Value = 0;
                 await Task.Delay(150);
 
-                TxtAudioSweepStatus.Text = "Right Channel (R): Playing 440Hz-1000Hz sweep...";
+                TxtAudioSweepStatus.Text = "Right Channel (R): 200 Hz – 2,500 Hz Log Chirp Sweep...";
                 ProgBarAudioLeft.Value = 0;
                 ProgBarAudioRight.Value = 85;
                 BorderAudioLeft.BorderBrush = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#30363D"));
@@ -312,7 +340,7 @@ namespace SuperAutoMater.Wpf.Views
                 // Right channel sweep
                 await Task.Run(() =>
                 {
-                    using var s = GenerateMelodicChimeStream(false, true);
+                    using var s = GenerateLogarithmicChirpStream(false, true);
                     using var sp = new SoundPlayer(s);
                     sp.PlaySync();
                 });
@@ -320,7 +348,7 @@ namespace SuperAutoMater.Wpf.Views
                 ProgBarAudioRight.Value = 0;
                 await Task.Delay(150);
 
-                TxtAudioSweepStatus.Text = "Stereo Channels (L+R): Playing harmonic chord...";
+                TxtAudioSweepStatus.Text = "Stereo Full Spectrum (L+R): 200 Hz – 2,500 Hz Harmonic Sweep...";
                 ProgBarAudioLeft.Value = 90;
                 ProgBarAudioRight.Value = 90;
                 BorderAudioLeft.BorderBrush = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#3FB950"));
@@ -329,19 +357,31 @@ namespace SuperAutoMater.Wpf.Views
                 // Stereo both channels sweep
                 await Task.Run(() =>
                 {
-                    using var s = GenerateMelodicChimeStream(true, true);
+                    using var s = GenerateLogarithmicChirpStream(true, true);
                     using var sp = new SoundPlayer(s);
                     sp.PlaySync();
                 });
 
                 ProgBarAudioLeft.Value = 0;
                 ProgBarAudioRight.Value = 0;
-                TxtAudioSweepStatus.Text = "✓ Stereo Sweep Complete · Both transducers nominal";
+                TxtAudioSweepStatus.Text = "✓ Acoustic Sweep Complete · Both transducers profiled";
 
-                // Analyze acoustic transducer coupling
+                // Analyze acoustic transducer coupling & harmonic distortion
                 var acResult = AcousticAnalyzerService.Instance.StopAndAnalyze();
                 TxtAcousticCoupling.Text = acResult.StatusSummary;
                 TxtAcousticCoupling.Foreground = new SolidColorBrush((Color)ColorConverter.ConvertFromString(acResult.AccentHex));
+
+                if (TxtDistortionStatus != null)
+                {
+                    TxtDistortionStatus.Text = acResult.IsBlownSpeakerDetected
+                        ? $"⚠ BLOWN SPEAKER / COIL RATTLE (THD: {acResult.TotalHarmonicDistortionPercent:F1}%)"
+                        : $"✓ HARMONIC DISTORTION NOMINAL (THD: {acResult.TotalHarmonicDistortionPercent:F1}% · No Rattle)";
+                    TxtDistortionStatus.Foreground = new SolidColorBrush((Color)ColorConverter.ConvertFromString(acResult.IsBlownSpeakerDetected ? "#F85149" : "#3FB950"));
+                }
+                if (CardDistortionStatus != null)
+                {
+                    CardDistortionStatus.BorderBrush = new SolidColorBrush((Color)ColorConverter.ConvertFromString(acResult.IsBlownSpeakerDetected ? "#F85149" : "#30363D"));
+                }
 
                 ViewModel?.MarkTestPassed("Audio");
             }
@@ -352,13 +392,10 @@ namespace SuperAutoMater.Wpf.Views
             }
         }
 
-        private static MemoryStream GenerateMelodicChimeStream(bool leftChannel, bool rightChannel)
+        private static MemoryStream GenerateLogarithmicChirpStream(bool leftChannel, bool rightChannel, double f0 = 200.0, double f1 = 2500.0, double duration = 0.80)
         {
             int sr = 44100;
-            double[] noteFreqs = { 523.25, 659.25, 783.99, 1046.50 };
-            double noteDuration = 0.14;
-            double totalDuration = (noteFreqs.Length * noteDuration) + 0.12;
-            int totalSamples = (int)(sr * totalDuration);
+            int totalSamples = (int)(sr * duration);
             int dataBytes = totalSamples * 2 * 2;
 
             var ms = new MemoryStream(44 + dataBytes);
@@ -377,33 +414,21 @@ namespace SuperAutoMater.Wpf.Views
                 bw.Write("data".ToCharArray());
                 bw.Write(dataBytes);
 
+                double logRatio = Math.Log(f1 / f0);
+
                 for (int i = 0; i < totalSamples; i++)
                 {
                     double t = (double)i / sr;
-                    double sample = 0.0;
+                    double relT = t / duration;
 
-                    for (int n = 0; n < noteFreqs.Length; n++)
-                    {
-                        double noteStart = n * noteDuration;
-                        if (t >= noteStart)
-                        {
-                            double noteT = t - noteStart;
-                            double freq = noteFreqs[n];
+                    double phase = 2.0 * Math.PI * f0 * ((Math.Pow(f1 / f0, relT) - 1.0) / logRatio) * duration;
 
-                            double attack = Math.Min(1.0, noteT / 0.005);
-                            double decay = Math.Exp(-noteT * 6.0);
-                            double env = attack * decay;
+                    double env = 1.0;
+                    if (t < 0.020) env = t / 0.020;
+                    else if (t > duration - 0.040) env = (duration - t) / 0.040;
 
-                            if (env > 0.0005)
-                            {
-                                double tone = Math.Sin(2 * Math.PI * freq * noteT) * 0.75
-                                            + Math.Sin(2 * Math.PI * (freq * 2.0) * noteT) * 0.25;
-                                sample += tone * env;
-                            }
-                        }
-                    }
-
-                    sample = Math.Max(-1.0, Math.Min(1.0, sample * 0.90));
+                    double tone = Math.Sin(phase);
+                    double sample = tone * env * 0.85;
                     short val = (short)(sample * 28000);
 
                     bw.Write(leftChannel ? val : (short)0);
@@ -533,6 +558,11 @@ namespace SuperAutoMater.Wpf.Views
                 BtnStartAutopilot_Click(this, new RoutedEventArgs());
                 e.Handled = true;
             }
+            else if (e.Key == Key.F11)
+            {
+                BtnFleetHud_Click(this, new RoutedEventArgs());
+                e.Handled = true;
+            }
             else if (e.Key == Key.Escape)
             {
                 if (AutopilotQcService.Instance.IsRunning)
@@ -548,6 +578,12 @@ namespace SuperAutoMater.Wpf.Views
                 BtnPrintLabel_Click(this, new RoutedEventArgs());
                 e.Handled = true;
             }
+        }
+
+        private void BtnFleetHud_Click(object sender, RoutedEventArgs e)
+        {
+            var fleetWin = new FleetDashboardWindow(ViewModel) { Owner = this };
+            fleetWin.ShowDialog();
         }
 
         private async void BtnStartAutopilot_Click(object sender, RoutedEventArgs e)
