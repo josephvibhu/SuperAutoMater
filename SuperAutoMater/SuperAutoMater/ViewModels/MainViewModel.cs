@@ -188,8 +188,16 @@ namespace SuperAutoMater.Wpf.ViewModels
         // SSD TBW & Host Writes Endurance Telemetry
         public double TbwWrittenTb => ActiveDrive?.TbwWrittenTb ?? 14.2;
         public int TbwRatedEnduranceTb => ActiveDrive?.TbwRatedEnduranceTb ?? 300;
-        public double TbwWearPercent => ActiveDrive?.TbwWearPercent ?? 4.7;
-        public double TbwLifespanRemainingPercent => ActiveDrive?.TbwLifespanRemainingPercent ?? 95.3;
+        public double TbwWearPercent
+        {
+            get => ActiveDrive?.TbwWearPercent ?? 4.7;
+            set { }
+        }
+        public double TbwLifespanRemainingPercent
+        {
+            get => ActiveDrive?.TbwLifespanRemainingPercent ?? 95.3;
+            set { }
+        }
         public string TbwDisplaySummary => ActiveDrive?.TbwDisplaySummary ?? "14.2 TB / 300 TBW · 4.7% Wear · 95.3% Lifespan Remaining";
         public string TbwStatusBadge => ActiveDrive?.TbwStatusBadge ?? "✓ LOW WEAR (95% REMAINING)";
         public string TbwAccentHex => ActiveDrive?.TbwAccentHex ?? "#3FB950";

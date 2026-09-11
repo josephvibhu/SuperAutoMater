@@ -963,7 +963,7 @@
                                                             <TextBlock Text="{Binding TbwStatusBadge}" FontFamily="{StaticResource FontMono}" FontSize="10" FontWeight="Bold" Foreground="{Binding TbwAccentHex}"/>
                                                         </Border>
                                                     </DockPanel>
-                                                    <ProgressBar Value="{Binding TbwWearPercent}" Maximum="100" Height="8" Foreground="#3FB950" Background="#21262D" BorderThickness="0" Margin="0,4,0,6"/>
+                                                    <ProgressBar Value="{Binding TbwWearPercent, Mode=OneWay}" Maximum="100" Height="8" Foreground="{Binding TbwAccentHex, FallbackValue='#3FB950'}" Background="#21262D" BorderThickness="0" Margin="0,4,0,6"/>
                                                     <DockPanel LastChildFill="False">
                                                         <TextBlock DockPanel.Dock="Left" Text="{Binding TbwDisplaySummary}" Style="{StaticResource TextBadgeMono}" Foreground="#C9D1D9"/>
                                                         <TextBlock DockPanel.Dock="Right" Text="{Binding TbwLifespanRemainingPercent, StringFormat='{}{0:F1}% Lifespan Remaining'}" Style="{StaticResource TextBadgeMono}" Foreground="{Binding TbwAccentHex}" FontWeight="Bold"/>
