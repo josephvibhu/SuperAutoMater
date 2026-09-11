@@ -483,6 +483,22 @@ namespace SuperAutoMater.Wpf.Views
         {
             if (ViewModel == null) return;
 
+            // When in Keyboard Test mode: Suppress ALL application hotkeys, navigation, and menu shortcuts
+            // so every single key (F1-F12, Space, Enter, Esc, etc.) tests the physical keyboard matrix
+            // without triggering other test menus or premature pass/exit actions.
+            if (string.Equals(_activeWorkspace, "keyboard", StringComparison.OrdinalIgnoreCase))
+            {
+                // Allow standard Alt+F4 to exit application if pressed
+                if (e.Key == Key.System && (Keyboard.Modifiers & ModifierKeys.Alt) == ModifierKeys.Alt && e.SystemKey == Key.F4)
+                {
+                    return;
+                }
+
+                // Mark handled so WPF shortcuts and button invocations are suppressed
+                e.Handled = true;
+                return;
+            }
+
             if (e.Key == Key.F1)
             {
                 RunDiagnosticTest("Display");
@@ -537,12 +553,7 @@ namespace SuperAutoMater.Wpf.Views
             }
             else if (e.Key == Key.Enter)
             {
-                if (_activeWorkspace == "keyboard")
-                {
-                    BtnPassKeyboard_Click(this, new RoutedEventArgs());
-                    e.Handled = true;
-                }
-                else if (_activeWorkspace == "cammic" || _activeWorkspace == "camera")
+                if (_activeWorkspace == "cammic" || _activeWorkspace == "camera")
                 {
                     BtnCertifyCamMic_Click(this, new RoutedEventArgs());
                     e.Handled = true;
@@ -1331,6 +1342,12 @@ namespace SuperAutoMater.Wpf.Views
         {
             ViewModel?.MarkTestPassed("Keyboard");
             ShowFeedback("Keyboard Matrix & Trackpad Certified Nominal & Passed ✓", "✓", "#3FB950");
+        }
+
+        private void BtnExitKeyboard_Click(object sender, RoutedEventArgs e)
+        {
+            SwitchWorkspace("standby");
+            ShowFeedback("Keyboard & Trackpad test closed [Standby Hub]", "⌨", "#8B949E");
         }
 
         private void BtnPassCpu_Click(object sender, RoutedEventArgs e)

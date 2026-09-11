@@ -463,7 +463,10 @@
                                     <Border Grid.Row="1" Background="#161B22" BorderBrush="#262C36" BorderThickness="1" CornerRadius="10" Padding="10,6">
                                         <DockPanel LastChildFill="False">
                                             <TextBlock DockPanel.Dock="Left" Text="Type on keyboard &amp; actuate trackpad + buttons to certify input subsystems" Style="{StaticResource TextBadgeMono}" Foreground="{StaticResource BrushTextVioletSubdued}" VerticalAlignment="Center"/>
-                                            <Button DockPanel.Dock="Right" Content="✓ PASS KEYBOARD &amp; TRACKPAD [ENTER]" Style="{StaticResource StyleCloudPassButton}" Click="BtnPassKeyboard_Click" Padding="14,5"/>
+                                            <StackPanel Orientation="Horizontal" DockPanel.Dock="Right">
+                                                <Button Content="✕ EXIT TO STANDBY" Style="{StaticResource StyleDarkActionBtn}" Click="BtnExitKeyboard_Click" Padding="12,5" Margin="0,0,8,0"/>
+                                                <Button Content="✓ PASS KEYBOARD &amp; TRACKPAD" Style="{StaticResource StyleCloudPassButton}" Click="BtnPassKeyboard_Click" Padding="14,5"/>
+                                            </StackPanel>
                                         </DockPanel>
                                     </Border>
                                 </Grid>

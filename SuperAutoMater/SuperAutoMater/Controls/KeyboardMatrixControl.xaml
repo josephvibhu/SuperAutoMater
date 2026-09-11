@@ -17,10 +17,13 @@
             </StackPanel>
 
             <StackPanel Orientation="Horizontal" DockPanel.Dock="Right" VerticalAlignment="Center">
+                <Border x:Name="PillLastKey" CornerRadius="4" Background="#21262D" BorderBrush="#30363D" BorderThickness="1" Padding="6,2" Margin="0,0,8,0">
+                    <TextBlock x:Name="TxtLastKey" Text="LAST KEY: READY" Style="{DynamicResource TextAvionicsChip}" Foreground="{DynamicResource BrushAccentBlue}" FontWeight="Bold"/>
+                </Border>
                 <Button x:Name="BtnToggleNumpad" Content="[+ EXPAND NUMPAD]" Style="{DynamicResource StyleDarkActionBtn}" Click="BtnToggleNumpad_Click" Padding="8,2" Margin="0,0,8,0" ToolTip="Toggle dynamic Numpad block (also auto-expands on numpad keypress)"/>
                 <TextBlock Text="KEYS LOGGED: " Style="{DynamicResource TextAvionicsChip}" Foreground="{DynamicResource BrushTextVioletMuted}"/>
                 <TextBlock x:Name="TxtLoggedCount" Text="0/84" Style="{DynamicResource TextAvionicsChip}" FontWeight="Bold" Foreground="{DynamicResource BrushTextWhite}" Margin="0,0,12,0"/>
-                <Button x:Name="BtnReset" Content="RESET [ESC]" Style="{DynamicResource StyleDarkActionBtn}" Click="BtnReset_Click" Padding="8,2"/>
+                <Button x:Name="BtnReset" Content="RESET MATRIX" Style="{DynamicResource StyleDarkActionBtn}" Click="BtnReset_Click" Padding="8,2"/>
             </StackPanel>
         </DockPanel>
 
@@ -46,9 +49,9 @@
         <DockPanel Grid.Row="2" LastChildFill="False" Margin="0,4,0,0">
             <StackPanel Orientation="Horizontal" DockPanel.Dock="Left">
                 <Ellipse Width="6" Height="6" Fill="{DynamicResource BrushAccentEmerald}" Margin="0,0,6,0"/>
-                <TextBlock Text="Raw Windows Low-Level Input Hook Active" Style="{DynamicResource TextBadgeMono}" Foreground="{DynamicResource BrushTextEmerald}"/>
+                <TextBlock Text="Raw Windows Low-Level Input Hook Active · All application shortcuts suppressed" Style="{DynamicResource TextBadgeMono}" Foreground="{DynamicResource BrushTextEmerald}"/>
             </StackPanel>
-            <TextBlock DockPanel.Dock="Right" Text="Actuating any NumPad key automatically expands the layout" Style="{DynamicResource TextBadgeMono}" Foreground="{DynamicResource BrushTextVioletSubdued}"/>
+            <TextBlock DockPanel.Dock="Right" Text="Tip: If top row sends Volume/Mute, toggle laptop Fn-Lock ([Fn + Esc])" Style="{DynamicResource TextBadgeMono}" Foreground="{DynamicResource BrushTextVioletSubdued}"/>
         </DockPanel>
     </Grid>
 </UserControl>

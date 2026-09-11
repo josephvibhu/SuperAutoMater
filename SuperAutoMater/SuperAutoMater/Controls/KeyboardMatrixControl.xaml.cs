@@ -222,8 +222,15 @@ namespace SuperAutoMater.Wpf.Controls
 
         private void OnGlobalKeyDown(int vkCode)
         {
+            if (!IsVisible) return;
+
             Dispatcher.InvokeAsync(() =>
             {
+                if (TxtLastKey != null)
+                {
+                    TxtLastKey.Text = $"LAST KEY: {GetKeyLabel(vkCode)}";
+                }
+
                 // Remap general modifiers to Left versions
                 if (vkCode == 0x10) vkCode = 0xA0; // VK_LSHIFT
                 if (vkCode == 0x11) vkCode = 0xA2; // VK_LCONTROL
@@ -239,15 +246,29 @@ namespace SuperAutoMater.Wpf.Controls
 
                 // Check in main keymap or numpad keymap
                 KeyVisual key = null;
-                if (!_keyMap.TryGetValue(vkCode, out key))
+                if (!_keyMap.TryGetValue(vkCode, out key) && !_numpadKeyMap.TryGetValue(vkCode, out key))
                 {
-                    _numpadKeyMap.TryGetValue(vkCode, out key);
+                    // Fallback alias for laptops where top row sends media codes instead of F1-F12
+                    int mediaAlias = vkCode switch
+                    {
+                        0xAD => 0x70, // Mute -> F1
+                        0xAE => 0x71, // Vol Down -> F2
+                        0xAF => 0x72, // Vol Up -> F3
+                        0xB3 => 0x73, // Play/Pause -> F4
+                        0xB1 => 0x75, // Prev Track -> F6
+                        0xB0 => 0x76, // Next Track -> F7
+                        _ => 0
+                    };
+                    if (mediaAlias != 0)
+                    {
+                        _keyMap.TryGetValue(mediaAlias, out key);
+                    }
                 }
 
                 if (key != null)
                 {
                     key.IsPressed = true;
-                    _loggedKeys.Add(vkCode);
+                    _loggedKeys.Add(key.VkCode);
                     key.IsTested = true;
                     ApplyKeyVisual(key);
                     UpdateCountDisplay();
@@ -257,6 +278,8 @@ namespace SuperAutoMater.Wpf.Controls
 
         private void OnGlobalKeyUp(int vkCode)
         {
+            if (!IsVisible) return;
+
             Dispatcher.InvokeAsync(() =>
             {
                 if (vkCode == 0x10) vkCode = 0xA0;
@@ -264,9 +287,22 @@ namespace SuperAutoMater.Wpf.Controls
                 if (vkCode == 0x12) vkCode = 0xA4;
 
                 KeyVisual key = null;
-                if (!_keyMap.TryGetValue(vkCode, out key))
+                if (!_keyMap.TryGetValue(vkCode, out key) && !_numpadKeyMap.TryGetValue(vkCode, out key))
                 {
-                    _numpadKeyMap.TryGetValue(vkCode, out key);
+                    int mediaAlias = vkCode switch
+                    {
+                        0xAD => 0x70,
+                        0xAE => 0x71,
+                        0xAF => 0x72,
+                        0xB3 => 0x73,
+                        0xB1 => 0x75,
+                        0xB0 => 0x76,
+                        _ => 0
+                    };
+                    if (mediaAlias != 0)
+                    {
+                        _keyMap.TryGetValue(mediaAlias, out key);
+                    }
                 }
 
                 if (key != null)
@@ -275,6 +311,42 @@ namespace SuperAutoMater.Wpf.Controls
                     ApplyKeyVisual(key);
                 }
             });
+        }
+
+        private static string GetKeyLabel(int vkCode)
+        {
+            return vkCode switch
+            {
+                0x1B => "ESC",
+                >= 0x70 and <= 0x7B => $"F{vkCode - 0x70 + 1}",
+                0x20 => "SPACE",
+                0x0D => "ENTER",
+                0x08 => "BKSP",
+                0x09 => "TAB",
+                0x14 => "CAPS",
+                0xA0 or 0x10 => "L-SHIFT",
+                0xA1 => "R-SHIFT",
+                0xA2 or 0x11 => "L-CTRL",
+                0xA3 => "R-CTRL",
+                0xA4 or 0x12 => "L-ALT",
+                0xA5 => "R-ALT",
+                0x5B or 0x5C => "WIN",
+                0x2E => "DEL",
+                0xAD => "MUTE (F1)",
+                0xAE => "VOL- (F2)",
+                0xAF => "VOL+ (F3)",
+                0xB3 => "PLAY/PAUSE",
+                0xB0 => "NEXT TRACK",
+                0xB1 => "PREV TRACK",
+                0x25 => "LEFT [◀]",
+                0x26 => "UP [▲]",
+                0x27 => "RIGHT [▶]",
+                0x28 => "DOWN [▼]",
+                >= 0x30 and <= 0x39 => ((char)vkCode).ToString(),
+                >= 0x41 and <= 0x5A => ((char)vkCode).ToString(),
+                >= 0x60 and <= 0x69 => $"NUM {vkCode - 0x60}",
+                _ => $"0x{vkCode:X2}"
+            };
         }
 
         private void ApplyKeyVisual(KeyVisual key)
@@ -325,6 +397,10 @@ namespace SuperAutoMater.Wpf.Controls
                 kv.IsTested = false;
                 kv.IsPressed = false;
                 ApplyKeyVisual(kv);
+            }
+            if (TxtLastKey != null)
+            {
+                TxtLastKey.Text = "LAST KEY: READY";
             }
             UpdateCountDisplay();
         }
