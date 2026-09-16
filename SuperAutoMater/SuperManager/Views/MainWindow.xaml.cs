@@ -2,6 +2,8 @@ using System;
 using System.Diagnostics;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Input;
+using SuperAutoMater.Wpf.Core;
 using SuperManager.Models;
 using SuperManager.Services;
 using SuperManager.ViewModels;
@@ -236,5 +238,140 @@ namespace SuperManager.Views
                 }
             }
         }
+
+        #region Warehouse WIP Drag-and-Drop & Context Menu
+
+        private Point _dragStartPoint;
+        private AssetWipRecord _draggedAsset;
+
+        private void Card_PreviewMouseLeftButtonDown(object sender, MouseButtonEventArgs e)
+        {
+            _dragStartPoint = e.GetPosition(null);
+            if (sender is FrameworkElement element && element.DataContext is AssetWipRecord asset)
+            {
+                _draggedAsset = asset;
+            }
+            else
+            {
+                _draggedAsset = null;
+            }
+        }
+
+        private void Card_PreviewMouseMove(object sender, MouseEventArgs e)
+        {
+            if (e.LeftButton != MouseButtonState.Pressed || _draggedAsset == null)
+                return;
+
+            Point currentPoint = e.GetPosition(null);
+            Vector diff = _dragStartPoint - currentPoint;
+
+            if (Math.Abs(diff.X) > SystemParameters.MinimumHorizontalDragDistance ||
+                Math.Abs(diff.Y) > SystemParameters.MinimumVerticalDragDistance)
+            {
+                if (sender is FrameworkElement element)
+                {
+                    var data = new DataObject();
+                    data.SetData(typeof(AssetWipRecord), _draggedAsset);
+                    data.SetData(typeof(AssetWipRecord).FullName, _draggedAsset);
+
+                    try
+                    {
+                        DragDrop.DoDragDrop(element, data, DragDropEffects.Move);
+                    }
+                    catch (Exception ex)
+                    {
+                        Debug.WriteLine($"[DragDrop] Error during DoDragDrop: {ex.Message}");
+                    }
+                    finally
+                    {
+                        _draggedAsset = null;
+                    }
+                }
+            }
+        }
+
+        private void Lane_DragOver(object sender, DragEventArgs e)
+        {
+            if (e.Data.GetDataPresent(typeof(AssetWipRecord)) ||
+                e.Data.GetDataPresent(typeof(AssetWipRecord).FullName))
+            {
+                e.Effects = DragDropEffects.Move;
+                e.Handled = true;
+            }
+            else
+            {
+                e.Effects = DragDropEffects.None;
+            }
+        }
+
+        private void Lane_DragEnter(object sender, DragEventArgs e)
+        {
+            if (sender is Border border &&
+                (e.Data.GetDataPresent(typeof(AssetWipRecord)) ||
+                 e.Data.GetDataPresent(typeof(AssetWipRecord).FullName)))
+            {
+                border.BorderThickness = new Thickness(2.5);
+                e.Effects = DragDropEffects.Move;
+                e.Handled = true;
+            }
+        }
+
+        private void Lane_DragLeave(object sender, DragEventArgs e)
+        {
+            if (sender is Border border)
+            {
+                border.BorderThickness = new Thickness(1.5);
+            }
+        }
+
+        private void Lane_Drop(object sender, DragEventArgs e)
+        {
+            if (sender is Border border)
+            {
+                border.BorderThickness = new Thickness(1.5);
+
+                AssetWipRecord asset = null;
+                if (e.Data.GetDataPresent(typeof(AssetWipRecord)))
+                {
+                    asset = e.Data.GetData(typeof(AssetWipRecord)) as AssetWipRecord;
+                }
+                else if (e.Data.GetDataPresent(typeof(AssetWipRecord).FullName))
+                {
+                    asset = e.Data.GetData(typeof(AssetWipRecord).FullName) as AssetWipRecord;
+                }
+
+                if (asset != null && border.Tag is string targetQueueStr)
+                {
+                    if (Enum.TryParse<AssetQueueStatus>(targetQueueStr, out var targetQueue))
+                    {
+                        ViewModel.WipBoard.TransitionAsset(asset, targetQueue);
+                        e.Handled = true;
+                    }
+                }
+            }
+        }
+
+        private void MenuItemMoveQueue_Click(object sender, RoutedEventArgs e)
+        {
+            if (sender is MenuItem item && item.Tag is string targetQueueStr)
+            {
+                AssetWipRecord asset = null;
+                if (item.DataContext is AssetWipRecord directAsset)
+                {
+                    asset = directAsset;
+                }
+                else if (item.Parent is ContextMenu cm && cm.PlacementTarget is FrameworkElement fe && fe.DataContext is AssetWipRecord contextAsset)
+                {
+                    asset = contextAsset;
+                }
+
+                if (asset != null && Enum.TryParse<AssetQueueStatus>(targetQueueStr, out var targetQueue))
+                {
+                    ViewModel.WipBoard.TransitionAsset(asset, targetQueue);
+                }
+            }
+        }
+
+        #endregion
     }
 }

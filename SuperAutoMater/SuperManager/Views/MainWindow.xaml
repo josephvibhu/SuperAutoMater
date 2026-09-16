@@ -301,21 +301,100 @@
             <!-- Tab 2: Warehouse WIP Board (7 Lanes) -->
             <TabItem Header="📋 WAREHOUSE WIP BOARD (7 QUEUES)">
                 <Grid DataContext="{Binding WipBoard}" Margin="0,8,0,0">
+                    <Grid.Resources>
+                        <!-- ListBox Item Container Style (removes default selection rectangle) -->
+                        <Style TargetType="ListBoxItem">
+                            <Setter Property="Background" Value="Transparent"/>
+                            <Setter Property="BorderThickness" Value="0"/>
+                            <Setter Property="Padding" Value="0"/>
+                            <Setter Property="Margin" Value="0"/>
+                            <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+                            <Setter Property="FocusVisualStyle" Value="{x:Null}"/>
+                            <Setter Property="Template">
+                                <Setter.Value>
+                                    <ControlTemplate TargetType="ListBoxItem">
+                                        <ContentPresenter/>
+                                    </ControlTemplate>
+                                </Setter.Value>
+                            </Setter>
+                        </Style>
+
+                        <!-- Common High-Visibility Drag-and-Drop WipCard DataTemplate -->
+                        <DataTemplate x:Key="WipCardTemplate">
+                            <Border x:Name="CardBorder" Background="#1F242D" BorderBrush="#384252" BorderThickness="1.5" CornerRadius="8" Padding="10,8" Margin="0,0,0,8"
+                                    Cursor="Hand"
+                                    PreviewMouseLeftButtonDown="Card_PreviewMouseLeftButtonDown"
+                                    PreviewMouseMove="Card_PreviewMouseMove"
+                                    ToolTip="💡 Drag to move between queues, or right-click to quick-move">
+                                <Border.ContextMenu>
+                                    <ContextMenu Background="#161B22" BorderBrush="#388BFD" BorderThickness="1">
+                                        <MenuItem Header="📥 Move to READY FOR TEST" Click="MenuItemMoveQueue_Click" Tag="ReadyForTest" Foreground="#58A6FF" FontWeight="Bold"/>
+                                        <MenuItem Header="⚡ Move to IN TEST" Click="MenuItemMoveQueue_Click" Tag="InTest" Foreground="#79B8FF" FontWeight="Bold"/>
+                                        <MenuItem Header="⏸️ Move to HOLD" Click="MenuItemMoveQueue_Click" Tag="Hold" Foreground="#F2CC60" FontWeight="Bold"/>
+                                        <MenuItem Header="🔧 Move to REPAIR" Click="MenuItemMoveQueue_Click" Tag="Repair" Foreground="#FF7B72" FontWeight="Bold"/>
+                                        <MenuItem Header="🔁 Move to RETEST" Click="MenuItemMoveQueue_Click" Tag="Retest" Foreground="#D2A8FF" FontWeight="Bold"/>
+                                        <MenuItem Header="🚀 Move to READY RELEASE" Click="MenuItemMoveQueue_Click" Tag="ReadyForRelease" Foreground="#56D364" FontWeight="Bold"/>
+                                        <Separator Background="#30363D"/>
+                                        <MenuItem Header="🗑️ Move to DISPOSED" Click="MenuItemMoveQueue_Click" Tag="Disposed" Foreground="#8B949E"/>
+                                    </ContextMenu>
+                                </Border.ContextMenu>
+                                <StackPanel>
+                                    <!-- Header Row: Drag Handle + Asset Tag + Grade Badge -->
+                                    <DockPanel LastChildFill="False" Margin="0,0,0,4">
+                                        <StackPanel Orientation="Horizontal" DockPanel.Dock="Left" VerticalAlignment="Center">
+                                            <TextBlock Text="⠿" Foreground="#6E7681" FontSize="13" Margin="0,0,5,0" VerticalAlignment="Center"/>
+                                            <TextBlock Text="{Binding AssetTag}" Foreground="#FFFFFF" FontFamily="{StaticResource FontSans}" FontWeight="ExtraBold" FontSize="12" VerticalAlignment="Center"/>
+                                        </StackPanel>
+                                        <Border DockPanel.Dock="Right" Background="#12161E" BorderBrush="#388BFD" BorderThickness="1" CornerRadius="4" Padding="5,1" VerticalAlignment="Center">
+                                            <TextBlock Text="{Binding LatestRunGrade, TargetNullValue='INSPECT'}" Foreground="#58A6FF" FontFamily="{StaticResource FontMono}" FontWeight="Bold" FontSize="9"/>
+                                        </Border>
+                                    </DockPanel>
+
+                                    <!-- Model Row -->
+                                    <TextBlock Text="{Binding Model}" Foreground="#E6EDF3" FontFamily="{StaticResource FontSans}" FontWeight="SemiBold" FontSize="11" TextTrimming="CharacterEllipsis" Margin="0,0,0,2"/>
+
+                                    <!-- Serial Number -->
+                                    <TextBlock Text="{Binding SerialNumber}" Foreground="#8B949E" FontFamily="{StaticResource FontMono}" FontSize="10" TextTrimming="CharacterEllipsis" Margin="0,0,0,6"/>
+
+                                    <!-- Footer: Location & WorkInProgress / Health -->
+                                    <DockPanel LastChildFill="False">
+                                        <Border DockPanel.Dock="Left" Background="#261E0A" BorderBrush="#D29922" BorderThickness="1" CornerRadius="4" Padding="4,1" VerticalAlignment="Center">
+                                            <StackPanel Orientation="Horizontal">
+                                                <TextBlock Text="📍 " FontSize="8" VerticalAlignment="Center"/>
+                                                <TextBlock Text="{Binding CurrentLocation}" Foreground="#F2CC60" FontFamily="{StaticResource FontMono}" FontWeight="Bold" FontSize="9" VerticalAlignment="Center"/>
+                                            </StackPanel>
+                                        </Border>
+                                        <TextBlock DockPanel.Dock="Right" Text="{Binding WorkInProgress}" Foreground="#8B949E" FontFamily="{StaticResource FontMono}" FontSize="9" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" MaxWidth="105"/>
+                                    </DockPanel>
+                                </StackPanel>
+                            </Border>
+                            <DataTemplate.Triggers>
+                                <Trigger Property="IsMouseOver" Value="True">
+                                    <Setter TargetName="CardBorder" Property="Background" Value="#28303C"/>
+                                    <Setter TargetName="CardBorder" Property="BorderBrush" Value="#58A6FF"/>
+                                </Trigger>
+                            </DataTemplate.Triggers>
+                        </DataTemplate>
+                    </Grid.Resources>
+
                     <Grid.RowDefinitions>
                         <RowDefinition Height="Auto"/>
                         <RowDefinition Height="*"/>
                     </Grid.RowDefinitions>
 
                     <!-- WIP Action Bar -->
-                    <Border Grid.Row="0" Background="{StaticResource BrushCardBg}" BorderBrush="{StaticResource BrushBorderDark}" BorderThickness="1" CornerRadius="8" Padding="10,6" Margin="0,0,0,8">
+                    <Border Grid.Row="0" Background="{StaticResource BrushCardBg}" BorderBrush="{StaticResource BrushBorderDark}" BorderThickness="1" CornerRadius="8" Padding="12,8" Margin="0,0,0,8">
                         <DockPanel LastChildFill="False">
                             <StackPanel Orientation="Horizontal" DockPanel.Dock="Left" VerticalAlignment="Center">
                                 <TextBlock Text="Total Active WIP: " Foreground="{StaticResource BrushTextSubdued}" FontFamily="{StaticResource FontMono}" FontSize="11" VerticalAlignment="Center"/>
                                 <TextBlock Text="{Binding TotalAssets}" Foreground="#58A6FF" FontFamily="{StaticResource FontMono}" FontWeight="Bold" FontSize="12" VerticalAlignment="Center" Margin="4,0,16,0"/>
-                                <TextBlock Text="{Binding ActionMessage}" Foreground="#3FB950" FontFamily="{StaticResource FontMono}" FontSize="11" VerticalAlignment="Center"/>
+                                <Border Background="#161B22" BorderBrush="#30363D" BorderThickness="1" CornerRadius="4" Padding="8,2" Margin="0,0,16,0">
+                                    <TextBlock Text="🖐 Drag cards between lanes or right-click to move" Foreground="#8B949E" FontFamily="{StaticResource FontMono}" FontSize="10"/>
+                                </Border>
+                                <TextBlock Text="{Binding ActionMessage}" Foreground="#3FB950" FontFamily="{StaticResource FontMono}" FontWeight="Bold" FontSize="11" VerticalAlignment="Center"/>
                             </StackPanel>
                             <StackPanel Orientation="Horizontal" DockPanel.Dock="Right" VerticalAlignment="Center">
-                                <Button Content="🔄 REFRESH WIP" Style="{StaticResource StyleDarkActionBtn}" Click="BtnRefreshWip_Click" Padding="10,4" FontSize="10"/>
+                                <Button Content="🔄 REFRESH WIP" Style="{StaticResource StyleDarkActionBtn}" Click="BtnRefreshWip_Click" Padding="12,5" FontSize="10"/>
                             </StackPanel>
                         </DockPanel>
                     </Border>
@@ -324,194 +403,319 @@
                     <ScrollViewer Grid.Row="1" HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Disabled">
                         <Grid>
                             <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="200"/>
+                                <ColumnDefinition Width="230"/>
                                 <ColumnDefinition Width="6"/>
-                                <ColumnDefinition Width="200"/>
+                                <ColumnDefinition Width="230"/>
                                 <ColumnDefinition Width="6"/>
-                                <ColumnDefinition Width="200"/>
+                                <ColumnDefinition Width="230"/>
                                 <ColumnDefinition Width="6"/>
-                                <ColumnDefinition Width="200"/>
+                                <ColumnDefinition Width="230"/>
                                 <ColumnDefinition Width="6"/>
-                                <ColumnDefinition Width="200"/>
+                                <ColumnDefinition Width="230"/>
                                 <ColumnDefinition Width="6"/>
-                                <ColumnDefinition Width="200"/>
+                                <ColumnDefinition Width="230"/>
                                 <ColumnDefinition Width="6"/>
-                                <ColumnDefinition Width="200"/>
+                                <ColumnDefinition Width="230"/>
                             </Grid.ColumnDefinitions>
 
                             <!-- Column 0: ReadyForTest -->
-                            <Border Grid.Column="0" Background="#161B22" BorderBrush="#30363D" BorderThickness="1" CornerRadius="8" Padding="8">
+                            <Border x:Name="LaneReadyForTest" Grid.Column="0" Tag="ReadyForTest"
+                                    Background="#12151B" BorderBrush="#263750" BorderThickness="1.5" CornerRadius="10" Padding="8"
+                                    AllowDrop="True"
+                                    DragOver="Lane_DragOver"
+                                    DragEnter="Lane_DragEnter"
+                                    DragLeave="Lane_DragLeave"
+                                    Drop="Lane_Drop">
                                 <DockPanel>
-                                    <Border DockPanel.Dock="Top" Background="#21262D" CornerRadius="6" Padding="8,4" Margin="0,0,0,8">
+                                    <Border DockPanel.Dock="Top" Background="#1F324D" BorderBrush="#388BFD" BorderThickness="1" CornerRadius="6" Padding="8,5" Margin="0,0,0,8">
                                         <DockPanel>
-                                            <TextBlock Text="READY FOR TEST" Foreground="#8B949E" FontWeight="Bold" FontSize="11"/>
-                                            <TextBlock Text="{Binding ReadyForTestLane.Count}" DockPanel.Dock="Right" Foreground="#FFFFFF" FontWeight="Bold" FontSize="11" HorizontalAlignment="Right"/>
+                                            <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                                <TextBlock Text="📥 " FontSize="11" VerticalAlignment="Center"/>
+                                                <TextBlock Text="READY FOR TEST" Foreground="#58A6FF" FontFamily="{StaticResource FontSans}" FontWeight="Bold" FontSize="11" VerticalAlignment="Center"/>
+                                            </StackPanel>
+                                            <Border DockPanel.Dock="Right" Background="#0D1117" BorderBrush="#388BFD" BorderThickness="1" CornerRadius="10" Padding="6,1" HorizontalAlignment="Right">
+                                                <TextBlock Text="{Binding ReadyForTestLane.Count}" Foreground="#58A6FF" FontFamily="{StaticResource FontMono}" FontWeight="Bold" FontSize="11"/>
+                                            </Border>
                                         </DockPanel>
                                     </Border>
-                                    <ListBox ItemsSource="{Binding ReadyForTestLane}" Background="Transparent" BorderThickness="0" SelectedItem="{Binding SelectedAsset}">
-                                        <ListBox.ItemTemplate>
-                                            <DataTemplate>
-                                                <Border Background="#0D1117" BorderBrush="#30363D" BorderThickness="1" CornerRadius="6" Padding="8" Margin="0,0,0,6">
-                                                    <StackPanel>
-                                                        <TextBlock Text="{Binding AssetTag}" Foreground="#58A6FF" FontWeight="Bold" FontSize="12"/>
-                                                        <TextBlock Text="{Binding SerialNumber}" Foreground="#C9D1D9" FontSize="10" FontFamily="{StaticResource FontMono}"/>
-                                                        <TextBlock Text="{Binding Model}" Foreground="#8B949E" FontSize="10"/>
-                                                        <TextBlock Text="{Binding CurrentLocation}" Foreground="#D29922" FontSize="9" Margin="0,2,0,0"/>
-                                                    </StackPanel>
-                                                </Border>
-                                            </DataTemplate>
-                                        </ListBox.ItemTemplate>
-                                    </ListBox>
+                                    <Grid>
+                                        <Border BorderBrush="#30363D" BorderThickness="1.5" CornerRadius="8" Margin="2" Padding="12,20" Background="#101318" IsHitTestVisible="False" VerticalAlignment="Top">
+                                            <Border.Style>
+                                                <Style TargetType="Border">
+                                                    <Setter Property="Visibility" Value="Collapsed"/>
+                                                    <Style.Triggers>
+                                                        <DataTrigger Binding="{Binding ReadyForTestLane.Count}" Value="0">
+                                                            <Setter Property="Visibility" Value="Visible"/>
+                                                        </DataTrigger>
+                                                    </Style.Triggers>
+                                                </Style>
+                                            </Border.Style>
+                                            <StackPanel HorizontalAlignment="Center">
+                                                <TextBlock Text="⮯" FontSize="20" Foreground="#484F58" HorizontalAlignment="Center"/>
+                                                <TextBlock Text="DROP ASSET HERE" FontFamily="{StaticResource FontMono}" FontSize="10" FontWeight="Bold" Foreground="#484F58" HorizontalAlignment="Center" Margin="0,4,0,0"/>
+                                            </StackPanel>
+                                        </Border>
+                                        <ListBox ItemsSource="{Binding ReadyForTestLane}" ItemTemplate="{StaticResource WipCardTemplate}" Background="Transparent" BorderThickness="0" SelectedItem="{Binding SelectedAsset}"
+                                                 ScrollViewer.HorizontalScrollBarVisibility="Disabled" ScrollViewer.VerticalScrollBarVisibility="Auto"/>
+                                    </Grid>
                                 </DockPanel>
                             </Border>
 
                             <!-- Column 2: InTest -->
-                            <Border Grid.Column="2" Background="#161B22" BorderBrush="#1F6FEB" BorderThickness="1" CornerRadius="8" Padding="8">
+                            <Border x:Name="LaneInTest" Grid.Column="2" Tag="InTest"
+                                    Background="#111622" BorderBrush="#1B3B66" BorderThickness="1.5" CornerRadius="10" Padding="8"
+                                    AllowDrop="True"
+                                    DragOver="Lane_DragOver"
+                                    DragEnter="Lane_DragEnter"
+                                    DragLeave="Lane_DragLeave"
+                                    Drop="Lane_Drop">
                                 <DockPanel>
-                                    <Border DockPanel.Dock="Top" Background="#1F6FEB22" CornerRadius="6" Padding="8,4" Margin="0,0,0,8">
+                                    <Border DockPanel.Dock="Top" Background="#15325B" BorderBrush="#58A6FF" BorderThickness="1" CornerRadius="6" Padding="8,5" Margin="0,0,0,8">
                                         <DockPanel>
-                                            <TextBlock Text="IN TEST" Foreground="#58A6FF" FontWeight="Bold" FontSize="11"/>
-                                            <TextBlock Text="{Binding InTestLane.Count}" DockPanel.Dock="Right" Foreground="#58A6FF" FontWeight="Bold" FontSize="11" HorizontalAlignment="Right"/>
+                                            <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                                <TextBlock Text="⚡ " FontSize="11" VerticalAlignment="Center"/>
+                                                <TextBlock Text="IN TEST" Foreground="#79B8FF" FontFamily="{StaticResource FontSans}" FontWeight="Bold" FontSize="11" VerticalAlignment="Center"/>
+                                            </StackPanel>
+                                            <Border DockPanel.Dock="Right" Background="#0D1117" BorderBrush="#58A6FF" BorderThickness="1" CornerRadius="10" Padding="6,1" HorizontalAlignment="Right">
+                                                <TextBlock Text="{Binding InTestLane.Count}" Foreground="#79B8FF" FontFamily="{StaticResource FontMono}" FontWeight="Bold" FontSize="11"/>
+                                            </Border>
                                         </DockPanel>
                                     </Border>
-                                    <ListBox ItemsSource="{Binding InTestLane}" Background="Transparent" BorderThickness="0" SelectedItem="{Binding SelectedAsset}">
-                                        <ListBox.ItemTemplate>
-                                            <DataTemplate>
-                                                <Border Background="#0D1117" BorderBrush="#1F6FEB" BorderThickness="1" CornerRadius="6" Padding="8" Margin="0,0,0,6">
-                                                    <StackPanel>
-                                                        <TextBlock Text="{Binding AssetTag}" Foreground="#58A6FF" FontWeight="Bold" FontSize="12"/>
-                                                        <TextBlock Text="{Binding SerialNumber}" Foreground="#C9D1D9" FontSize="10" FontFamily="{StaticResource FontMono}"/>
-                                                        <TextBlock Text="{Binding Model}" Foreground="#8B949E" FontSize="10"/>
-                                                        <TextBlock Text="{Binding CurrentLocation}" Foreground="#D29922" FontSize="9" Margin="0,2,0,0"/>
-                                                    </StackPanel>
-                                                </Border>
-                                            </DataTemplate>
-                                        </ListBox.ItemTemplate>
-                                    </ListBox>
+                                    <Grid>
+                                        <Border BorderBrush="#30363D" BorderThickness="1.5" CornerRadius="8" Margin="2" Padding="12,20" Background="#101318" IsHitTestVisible="False" VerticalAlignment="Top">
+                                            <Border.Style>
+                                                <Style TargetType="Border">
+                                                    <Setter Property="Visibility" Value="Collapsed"/>
+                                                    <Style.Triggers>
+                                                        <DataTrigger Binding="{Binding InTestLane.Count}" Value="0">
+                                                            <Setter Property="Visibility" Value="Visible"/>
+                                                        </DataTrigger>
+                                                    </Style.Triggers>
+                                                </Style>
+                                            </Border.Style>
+                                            <StackPanel HorizontalAlignment="Center">
+                                                <TextBlock Text="⮯" FontSize="20" Foreground="#484F58" HorizontalAlignment="Center"/>
+                                                <TextBlock Text="DROP ASSET HERE" FontFamily="{StaticResource FontMono}" FontSize="10" FontWeight="Bold" Foreground="#484F58" HorizontalAlignment="Center" Margin="0,4,0,0"/>
+                                            </StackPanel>
+                                        </Border>
+                                        <ListBox ItemsSource="{Binding InTestLane}" ItemTemplate="{StaticResource WipCardTemplate}" Background="Transparent" BorderThickness="0" SelectedItem="{Binding SelectedAsset}"
+                                                 ScrollViewer.HorizontalScrollBarVisibility="Disabled" ScrollViewer.VerticalScrollBarVisibility="Auto"/>
+                                    </Grid>
                                 </DockPanel>
                             </Border>
 
                             <!-- Column 4: Hold -->
-                            <Border Grid.Column="4" Background="#161B22" BorderBrush="#D29922" BorderThickness="1" CornerRadius="8" Padding="8">
+                            <Border x:Name="LaneHold" Grid.Column="4" Tag="Hold"
+                                    Background="#181510" BorderBrush="#423414" BorderThickness="1.5" CornerRadius="10" Padding="8"
+                                    AllowDrop="True"
+                                    DragOver="Lane_DragOver"
+                                    DragEnter="Lane_DragEnter"
+                                    DragLeave="Lane_DragLeave"
+                                    Drop="Lane_Drop">
                                 <DockPanel>
-                                    <Border DockPanel.Dock="Top" Background="#D2992222" CornerRadius="6" Padding="8,4" Margin="0,0,0,8">
+                                    <Border DockPanel.Dock="Top" Background="#382B12" BorderBrush="#D29922" BorderThickness="1" CornerRadius="6" Padding="8,5" Margin="0,0,0,8">
                                         <DockPanel>
-                                            <TextBlock Text="HOLD" Foreground="#D29922" FontWeight="Bold" FontSize="11"/>
-                                            <TextBlock Text="{Binding HoldLane.Count}" DockPanel.Dock="Right" Foreground="#D29922" FontWeight="Bold" FontSize="11" HorizontalAlignment="Right"/>
+                                            <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                                <TextBlock Text="⏸️ " FontSize="11" VerticalAlignment="Center"/>
+                                                <TextBlock Text="HOLD" Foreground="#F2CC60" FontFamily="{StaticResource FontSans}" FontWeight="Bold" FontSize="11" VerticalAlignment="Center"/>
+                                            </StackPanel>
+                                            <Border DockPanel.Dock="Right" Background="#0D1117" BorderBrush="#D29922" BorderThickness="1" CornerRadius="10" Padding="6,1" HorizontalAlignment="Right">
+                                                <TextBlock Text="{Binding HoldLane.Count}" Foreground="#F2CC60" FontFamily="{StaticResource FontMono}" FontWeight="Bold" FontSize="11"/>
+                                            </Border>
                                         </DockPanel>
                                     </Border>
-                                    <ListBox ItemsSource="{Binding HoldLane}" Background="Transparent" BorderThickness="0" SelectedItem="{Binding SelectedAsset}">
-                                        <ListBox.ItemTemplate>
-                                            <DataTemplate>
-                                                <Border Background="#0D1117" BorderBrush="#D29922" BorderThickness="1" CornerRadius="6" Padding="8" Margin="0,0,0,6">
-                                                    <StackPanel>
-                                                        <TextBlock Text="{Binding AssetTag}" Foreground="#D29922" FontWeight="Bold" FontSize="12"/>
-                                                        <TextBlock Text="{Binding SerialNumber}" Foreground="#C9D1D9" FontSize="10" FontFamily="{StaticResource FontMono}"/>
-                                                        <TextBlock Text="{Binding CurrentLocation}" Foreground="#8B949E" FontSize="9"/>
-                                                    </StackPanel>
-                                                </Border>
-                                            </DataTemplate>
-                                        </ListBox.ItemTemplate>
-                                    </ListBox>
+                                    <Grid>
+                                        <Border BorderBrush="#30363D" BorderThickness="1.5" CornerRadius="8" Margin="2" Padding="12,20" Background="#101318" IsHitTestVisible="False" VerticalAlignment="Top">
+                                            <Border.Style>
+                                                <Style TargetType="Border">
+                                                    <Setter Property="Visibility" Value="Collapsed"/>
+                                                    <Style.Triggers>
+                                                        <DataTrigger Binding="{Binding HoldLane.Count}" Value="0">
+                                                            <Setter Property="Visibility" Value="Visible"/>
+                                                        </DataTrigger>
+                                                    </Style.Triggers>
+                                                </Style>
+                                            </Border.Style>
+                                            <StackPanel HorizontalAlignment="Center">
+                                                <TextBlock Text="⮯" FontSize="20" Foreground="#484F58" HorizontalAlignment="Center"/>
+                                                <TextBlock Text="DROP ASSET HERE" FontFamily="{StaticResource FontMono}" FontSize="10" FontWeight="Bold" Foreground="#484F58" HorizontalAlignment="Center" Margin="0,4,0,0"/>
+                                            </StackPanel>
+                                        </Border>
+                                        <ListBox ItemsSource="{Binding HoldLane}" ItemTemplate="{StaticResource WipCardTemplate}" Background="Transparent" BorderThickness="0" SelectedItem="{Binding SelectedAsset}"
+                                                 ScrollViewer.HorizontalScrollBarVisibility="Disabled" ScrollViewer.VerticalScrollBarVisibility="Auto"/>
+                                    </Grid>
                                 </DockPanel>
                             </Border>
 
                             <!-- Column 6: Repair -->
-                            <Border Grid.Column="6" Background="#161B22" BorderBrush="#F85149" BorderThickness="1" CornerRadius="8" Padding="8">
+                            <Border x:Name="LaneRepair" Grid.Column="6" Tag="Repair"
+                                    Background="#1A1214" BorderBrush="#481B1F" BorderThickness="1.5" CornerRadius="10" Padding="8"
+                                    AllowDrop="True"
+                                    DragOver="Lane_DragOver"
+                                    DragEnter="Lane_DragEnter"
+                                    DragLeave="Lane_DragLeave"
+                                    Drop="Lane_Drop">
                                 <DockPanel>
-                                    <Border DockPanel.Dock="Top" Background="#F8514922" CornerRadius="6" Padding="8,4" Margin="0,0,0,8">
+                                    <Border DockPanel.Dock="Top" Background="#3D161B" BorderBrush="#F85149" BorderThickness="1" CornerRadius="6" Padding="8,5" Margin="0,0,0,8">
                                         <DockPanel>
-                                            <TextBlock Text="REPAIR" Foreground="#F85149" FontWeight="Bold" FontSize="11"/>
-                                            <TextBlock Text="{Binding RepairLane.Count}" DockPanel.Dock="Right" Foreground="#F85149" FontWeight="Bold" FontSize="11" HorizontalAlignment="Right"/>
+                                            <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                                <TextBlock Text="🔧 " FontSize="11" VerticalAlignment="Center"/>
+                                                <TextBlock Text="REPAIR" Foreground="#FF7B72" FontFamily="{StaticResource FontSans}" FontWeight="Bold" FontSize="11" VerticalAlignment="Center"/>
+                                            </StackPanel>
+                                            <Border DockPanel.Dock="Right" Background="#0D1117" BorderBrush="#F85149" BorderThickness="1" CornerRadius="10" Padding="6,1" HorizontalAlignment="Right">
+                                                <TextBlock Text="{Binding RepairLane.Count}" Foreground="#FF7B72" FontFamily="{StaticResource FontMono}" FontWeight="Bold" FontSize="11"/>
+                                            </Border>
                                         </DockPanel>
                                     </Border>
-                                    <ListBox ItemsSource="{Binding RepairLane}" Background="Transparent" BorderThickness="0" SelectedItem="{Binding SelectedAsset}">
-                                        <ListBox.ItemTemplate>
-                                            <DataTemplate>
-                                                <Border Background="#0D1117" BorderBrush="#F85149" BorderThickness="1" CornerRadius="6" Padding="8" Margin="0,0,0,6">
-                                                    <StackPanel>
-                                                        <TextBlock Text="{Binding AssetTag}" Foreground="#F85149" FontWeight="Bold" FontSize="12"/>
-                                                        <TextBlock Text="{Binding SerialNumber}" Foreground="#C9D1D9" FontSize="10" FontFamily="{StaticResource FontMono}"/>
-                                                        <TextBlock Text="{Binding Model}" Foreground="#8B949E" FontSize="10"/>
-                                                    </StackPanel>
-                                                </Border>
-                                            </DataTemplate>
-                                        </ListBox.ItemTemplate>
-                                    </ListBox>
+                                    <Grid>
+                                        <Border BorderBrush="#30363D" BorderThickness="1.5" CornerRadius="8" Margin="2" Padding="12,20" Background="#101318" IsHitTestVisible="False" VerticalAlignment="Top">
+                                            <Border.Style>
+                                                <Style TargetType="Border">
+                                                    <Setter Property="Visibility" Value="Collapsed"/>
+                                                    <Style.Triggers>
+                                                        <DataTrigger Binding="{Binding RepairLane.Count}" Value="0">
+                                                            <Setter Property="Visibility" Value="Visible"/>
+                                                        </DataTrigger>
+                                                    </Style.Triggers>
+                                                </Style>
+                                            </Border.Style>
+                                            <StackPanel HorizontalAlignment="Center">
+                                                <TextBlock Text="⮯" FontSize="20" Foreground="#484F58" HorizontalAlignment="Center"/>
+                                                <TextBlock Text="DROP ASSET HERE" FontFamily="{StaticResource FontMono}" FontSize="10" FontWeight="Bold" Foreground="#484F58" HorizontalAlignment="Center" Margin="0,4,0,0"/>
+                                            </StackPanel>
+                                        </Border>
+                                        <ListBox ItemsSource="{Binding RepairLane}" ItemTemplate="{StaticResource WipCardTemplate}" Background="Transparent" BorderThickness="0" SelectedItem="{Binding SelectedAsset}"
+                                                 ScrollViewer.HorizontalScrollBarVisibility="Disabled" ScrollViewer.VerticalScrollBarVisibility="Auto"/>
+                                    </Grid>
                                 </DockPanel>
                             </Border>
 
                             <!-- Column 8: Retest -->
-                            <Border Grid.Column="8" Background="#161B22" BorderBrush="#A371F7" BorderThickness="1" CornerRadius="8" Padding="8">
+                            <Border x:Name="LaneRetest" Grid.Column="8" Tag="Retest"
+                                    Background="#16121D" BorderBrush="#392054" BorderThickness="1.5" CornerRadius="10" Padding="8"
+                                    AllowDrop="True"
+                                    DragOver="Lane_DragOver"
+                                    DragEnter="Lane_DragEnter"
+                                    DragLeave="Lane_DragLeave"
+                                    Drop="Lane_Drop">
                                 <DockPanel>
-                                    <Border DockPanel.Dock="Top" Background="#A371F722" CornerRadius="6" Padding="8,4" Margin="0,0,0,8">
+                                    <Border DockPanel.Dock="Top" Background="#2D1845" BorderBrush="#A371F7" BorderThickness="1" CornerRadius="6" Padding="8,5" Margin="0,0,0,8">
                                         <DockPanel>
-                                            <TextBlock Text="RETEST" Foreground="#A371F7" FontWeight="Bold" FontSize="11"/>
-                                            <TextBlock Text="{Binding RetestLane.Count}" DockPanel.Dock="Right" Foreground="#A371F7" FontWeight="Bold" FontSize="11" HorizontalAlignment="Right"/>
+                                            <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                                <TextBlock Text="🔁 " FontSize="11" VerticalAlignment="Center"/>
+                                                <TextBlock Text="RETEST" Foreground="#D2A8FF" FontFamily="{StaticResource FontSans}" FontWeight="Bold" FontSize="11" VerticalAlignment="Center"/>
+                                            </StackPanel>
+                                            <Border DockPanel.Dock="Right" Background="#0D1117" BorderBrush="#A371F7" BorderThickness="1" CornerRadius="10" Padding="6,1" HorizontalAlignment="Right">
+                                                <TextBlock Text="{Binding RetestLane.Count}" Foreground="#D2A8FF" FontFamily="{StaticResource FontMono}" FontWeight="Bold" FontSize="11"/>
+                                            </Border>
                                         </DockPanel>
                                     </Border>
-                                    <ListBox ItemsSource="{Binding RetestLane}" Background="Transparent" BorderThickness="0" SelectedItem="{Binding SelectedAsset}">
-                                        <ListBox.ItemTemplate>
-                                            <DataTemplate>
-                                                <Border Background="#0D1117" BorderBrush="#A371F7" BorderThickness="1" CornerRadius="6" Padding="8" Margin="0,0,0,6">
-                                                    <StackPanel>
-                                                        <TextBlock Text="{Binding AssetTag}" Foreground="#A371F7" FontWeight="Bold" FontSize="12"/>
-                                                        <TextBlock Text="{Binding SerialNumber}" Foreground="#C9D1D9" FontSize="10" FontFamily="{StaticResource FontMono}"/>
-                                                        <TextBlock Text="{Binding CurrentLocation}" Foreground="#8B949E" FontSize="9"/>
-                                                    </StackPanel>
-                                                </Border>
-                                            </DataTemplate>
-                                        </ListBox.ItemTemplate>
-                                    </ListBox>
+                                    <Grid>
+                                        <Border BorderBrush="#30363D" BorderThickness="1.5" CornerRadius="8" Margin="2" Padding="12,20" Background="#101318" IsHitTestVisible="False" VerticalAlignment="Top">
+                                            <Border.Style>
+                                                <Style TargetType="Border">
+                                                    <Setter Property="Visibility" Value="Collapsed"/>
+                                                    <Style.Triggers>
+                                                        <DataTrigger Binding="{Binding RetestLane.Count}" Value="0">
+                                                            <Setter Property="Visibility" Value="Visible"/>
+                                                        </DataTrigger>
+                                                    </Style.Triggers>
+                                                </Style>
+                                            </Border.Style>
+                                            <StackPanel HorizontalAlignment="Center">
+                                                <TextBlock Text="⮯" FontSize="20" Foreground="#484F58" HorizontalAlignment="Center"/>
+                                                <TextBlock Text="DROP ASSET HERE" FontFamily="{StaticResource FontMono}" FontSize="10" FontWeight="Bold" Foreground="#484F58" HorizontalAlignment="Center" Margin="0,4,0,0"/>
+                                            </StackPanel>
+                                        </Border>
+                                        <ListBox ItemsSource="{Binding RetestLane}" ItemTemplate="{StaticResource WipCardTemplate}" Background="Transparent" BorderThickness="0" SelectedItem="{Binding SelectedAsset}"
+                                                 ScrollViewer.HorizontalScrollBarVisibility="Disabled" ScrollViewer.VerticalScrollBarVisibility="Auto"/>
+                                    </Grid>
                                 </DockPanel>
                             </Border>
 
                             <!-- Column 10: ReadyForRelease -->
-                            <Border Grid.Column="10" Background="#161B22" BorderBrush="#238636" BorderThickness="1" CornerRadius="8" Padding="8">
+                            <Border x:Name="LaneReadyForRelease" Grid.Column="10" Tag="ReadyForRelease"
+                                    Background="#101813" BorderBrush="#183D21" BorderThickness="1.5" CornerRadius="10" Padding="8"
+                                    AllowDrop="True"
+                                    DragOver="Lane_DragOver"
+                                    DragEnter="Lane_DragEnter"
+                                    DragLeave="Lane_DragLeave"
+                                    Drop="Lane_Drop">
                                 <DockPanel>
-                                    <Border DockPanel.Dock="Top" Background="#23863622" CornerRadius="6" Padding="8,4" Margin="0,0,0,8">
+                                    <Border DockPanel.Dock="Top" Background="#163A1F" BorderBrush="#2EA043" BorderThickness="1" CornerRadius="6" Padding="8,5" Margin="0,0,0,8">
                                         <DockPanel>
-                                            <TextBlock Text="READY RELEASE" Foreground="#3FB950" FontWeight="Bold" FontSize="11"/>
-                                            <TextBlock Text="{Binding ReadyForReleaseLane.Count}" DockPanel.Dock="Right" Foreground="#3FB950" FontWeight="Bold" FontSize="11" HorizontalAlignment="Right"/>
+                                            <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                                <TextBlock Text="🚀 " FontSize="11" VerticalAlignment="Center"/>
+                                                <TextBlock Text="READY RELEASE" Foreground="#56D364" FontFamily="{StaticResource FontSans}" FontWeight="Bold" FontSize="11" VerticalAlignment="Center"/>
+                                            </StackPanel>
+                                            <Border DockPanel.Dock="Right" Background="#0D1117" BorderBrush="#2EA043" BorderThickness="1" CornerRadius="10" Padding="6,1" HorizontalAlignment="Right">
+                                                <TextBlock Text="{Binding ReadyForReleaseLane.Count}" Foreground="#56D364" FontFamily="{StaticResource FontMono}" FontWeight="Bold" FontSize="11"/>
+                                            </Border>
                                         </DockPanel>
                                     </Border>
-                                    <ListBox ItemsSource="{Binding ReadyForReleaseLane}" Background="Transparent" BorderThickness="0" SelectedItem="{Binding SelectedAsset}">
-                                        <ListBox.ItemTemplate>
-                                            <DataTemplate>
-                                                <Border Background="#0D1117" BorderBrush="#238636" BorderThickness="1" CornerRadius="6" Padding="8" Margin="0,0,0,6">
-                                                    <StackPanel>
-                                                        <TextBlock Text="{Binding AssetTag}" Foreground="#3FB950" FontWeight="Bold" FontSize="12"/>
-                                                        <TextBlock Text="{Binding SerialNumber}" Foreground="#C9D1D9" FontSize="10" FontFamily="{StaticResource FontMono}"/>
-                                                        <TextBlock Text="{Binding LatestRunGrade}" Foreground="#58A6FF" FontWeight="Bold" FontSize="10"/>
-                                                    </StackPanel>
-                                                </Border>
-                                            </DataTemplate>
-                                        </ListBox.ItemTemplate>
-                                    </ListBox>
+                                    <Grid>
+                                        <Border BorderBrush="#30363D" BorderThickness="1.5" CornerRadius="8" Margin="2" Padding="12,20" Background="#101318" IsHitTestVisible="False" VerticalAlignment="Top">
+                                            <Border.Style>
+                                                <Style TargetType="Border">
+                                                    <Setter Property="Visibility" Value="Collapsed"/>
+                                                    <Style.Triggers>
+                                                        <DataTrigger Binding="{Binding ReadyForReleaseLane.Count}" Value="0">
+                                                            <Setter Property="Visibility" Value="Visible"/>
+                                                        </DataTrigger>
+                                                    </Style.Triggers>
+                                                </Style>
+                                            </Border.Style>
+                                            <StackPanel HorizontalAlignment="Center">
+                                                <TextBlock Text="⮯" FontSize="20" Foreground="#484F58" HorizontalAlignment="Center"/>
+                                                <TextBlock Text="DROP ASSET HERE" FontFamily="{StaticResource FontMono}" FontSize="10" FontWeight="Bold" Foreground="#484F58" HorizontalAlignment="Center" Margin="0,4,0,0"/>
+                                            </StackPanel>
+                                        </Border>
+                                        <ListBox ItemsSource="{Binding ReadyForReleaseLane}" ItemTemplate="{StaticResource WipCardTemplate}" Background="Transparent" BorderThickness="0" SelectedItem="{Binding SelectedAsset}"
+                                                 ScrollViewer.HorizontalScrollBarVisibility="Disabled" ScrollViewer.VerticalScrollBarVisibility="Auto"/>
+                                    </Grid>
                                 </DockPanel>
                             </Border>
 
                             <!-- Column 12: Disposed -->
-                            <Border Grid.Column="12" Background="#161B22" BorderBrush="#30363D" BorderThickness="1" CornerRadius="8" Padding="8">
+                            <Border x:Name="LaneDisposed" Grid.Column="12" Tag="Disposed"
+                                    Background="#14161A" BorderBrush="#30363D" BorderThickness="1.5" CornerRadius="10" Padding="8"
+                                    AllowDrop="True"
+                                    DragOver="Lane_DragOver"
+                                    DragEnter="Lane_DragEnter"
+                                    DragLeave="Lane_DragLeave"
+                                    Drop="Lane_Drop">
                                 <DockPanel>
-                                    <Border DockPanel.Dock="Top" Background="#30363D22" CornerRadius="6" Padding="8,4" Margin="0,0,0,8">
+                                    <Border DockPanel.Dock="Top" Background="#21262D" BorderBrush="#484F58" BorderThickness="1" CornerRadius="6" Padding="8,5" Margin="0,0,0,8">
                                         <DockPanel>
-                                            <TextBlock Text="DISPOSED" Foreground="#8B949E" FontWeight="Bold" FontSize="11"/>
-                                            <TextBlock Text="{Binding DisposedLane.Count}" DockPanel.Dock="Right" Foreground="#8B949E" FontWeight="Bold" FontSize="11" HorizontalAlignment="Right"/>
+                                            <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                                <TextBlock Text="🗑️ " FontSize="11" VerticalAlignment="Center"/>
+                                                <TextBlock Text="DISPOSED" Foreground="#C9D1D9" FontFamily="{StaticResource FontSans}" FontWeight="Bold" FontSize="11" VerticalAlignment="Center"/>
+                                            </StackPanel>
+                                            <Border DockPanel.Dock="Right" Background="#0D1117" BorderBrush="#484F58" BorderThickness="1" CornerRadius="10" Padding="6,1" HorizontalAlignment="Right">
+                                                <TextBlock Text="{Binding DisposedLane.Count}" Foreground="#C9D1D9" FontFamily="{StaticResource FontMono}" FontWeight="Bold" FontSize="11"/>
+                                            </Border>
                                         </DockPanel>
                                     </Border>
-                                    <ListBox ItemsSource="{Binding DisposedLane}" Background="Transparent" BorderThickness="0" SelectedItem="{Binding SelectedAsset}">
-                                        <ListBox.ItemTemplate>
-                                            <DataTemplate>
-                                                <Border Background="#0D1117" BorderBrush="#30363D" BorderThickness="1" CornerRadius="6" Padding="8" Margin="0,0,0,6">
-                                                    <StackPanel>
-                                                        <TextBlock Text="{Binding AssetTag}" Foreground="#8B949E" FontWeight="Bold" FontSize="12"/>
-                                                        <TextBlock Text="{Binding SerialNumber}" Foreground="#8B949E" FontSize="10" FontFamily="{StaticResource FontMono}"/>
-                                                    </StackPanel>
-                                                </Border>
-                                            </DataTemplate>
-                                        </ListBox.ItemTemplate>
-                                    </ListBox>
+                                    <Grid>
+                                        <Border BorderBrush="#30363D" BorderThickness="1.5" CornerRadius="8" Margin="2" Padding="12,20" Background="#101318" IsHitTestVisible="False" VerticalAlignment="Top">
+                                            <Border.Style>
+                                                <Style TargetType="Border">
+                                                    <Setter Property="Visibility" Value="Collapsed"/>
+                                                    <Style.Triggers>
+                                                        <DataTrigger Binding="{Binding DisposedLane.Count}" Value="0">
+                                                            <Setter Property="Visibility" Value="Visible"/>
+                                                        </DataTrigger>
+                                                    </Style.Triggers>
+                                                </Style>
+                                            </Border.Style>
+                                            <StackPanel HorizontalAlignment="Center">
+                                                <TextBlock Text="⮯" FontSize="20" Foreground="#484F58" HorizontalAlignment="Center"/>
+                                                <TextBlock Text="DROP ASSET HERE" FontFamily="{StaticResource FontMono}" FontSize="10" FontWeight="Bold" Foreground="#484F58" HorizontalAlignment="Center" Margin="0,4,0,0"/>
+                                            </StackPanel>
+                                        </Border>
+                                        <ListBox ItemsSource="{Binding DisposedLane}" ItemTemplate="{StaticResource WipCardTemplate}" Background="Transparent" BorderThickness="0" SelectedItem="{Binding SelectedAsset}"
+                                                 ScrollViewer.HorizontalScrollBarVisibility="Disabled" ScrollViewer.VerticalScrollBarVisibility="Auto"/>
+                                    </Grid>
                                 </DockPanel>
                             </Border>
                         </Grid>

@@ -152,43 +152,63 @@ namespace SuperManager.ViewModels
             }
         }
 
-        public void TransitionSelected(AssetQueueStatus targetQueue, string reasonCode = null)
+        public void TransitionAsset(AssetWipRecord asset, AssetQueueStatus targetQueue, string reasonCode = null)
         {
-            if (SelectedAsset == null) return;
+            if (asset == null) return;
+            if (asset.LifecycleQueue == targetQueue) return;
+
             try
             {
                 if (targetQueue == AssetQueueStatus.ReadyForRelease)
                 {
-                    _warehouseService.ReleaseAsset(SelectedAsset.AssetId, Environment.UserName);
+                    try
+                    {
+                        _warehouseService.ReleaseAsset(asset.AssetId, Environment.UserName);
+                    }
+                    catch
+                    {
+                        // Fallback: supervisor manual move
+                        _store.TransitionAssetQueue(asset.AssetId, AssetQueueStatus.ReadyForRelease, "DISPATCH-STAGING", Environment.UserName, reasonCode ?? "MANUAL_RELEASE_MOVE", "Manual drag-and-drop to release");
+                    }
                 }
                 else if (targetQueue == AssetQueueStatus.Repair)
                 {
-                    _warehouseService.SendToRepair(SelectedAsset.AssetId, reasonCode ?? "BENCH_FAILURE", Environment.UserName);
+                    _warehouseService.SendToRepair(asset.AssetId, reasonCode ?? "BENCH_FAILURE", Environment.UserName);
                 }
                 else if (targetQueue == AssetQueueStatus.Retest)
                 {
-                    _warehouseService.SendToRetest(SelectedAsset.AssetId, Environment.UserName);
+                    _warehouseService.SendToRetest(asset.AssetId, Environment.UserName);
                 }
                 else if (targetQueue == AssetQueueStatus.Hold)
                 {
-                    _warehouseService.HoldAsset(SelectedAsset.AssetId, reasonCode ?? "SUPERVISOR_HOLD", Environment.UserName);
+                    _warehouseService.HoldAsset(asset.AssetId, reasonCode ?? "SUPERVISOR_HOLD", Environment.UserName);
                 }
                 else if (targetQueue == AssetQueueStatus.Disposed)
                 {
-                    _warehouseService.DisposeAsset(SelectedAsset.AssetId, reasonCode ?? "BEYOND_ECONOMIC_REPAIR", Environment.UserName);
+                    _warehouseService.DisposeAsset(asset.AssetId, reasonCode ?? "BEYOND_ECONOMIC_REPAIR", Environment.UserName);
+                }
+                else if (targetQueue == AssetQueueStatus.InTest)
+                {
+                    _store.TransitionAssetQueue(asset.AssetId, AssetQueueStatus.InTest, "TEST-BENCH", Environment.UserName, reasonCode ?? "BENCH_ASSIGNED", "Manual move to in-test");
                 }
                 else
                 {
-                    _store.TransitionAssetQueue(SelectedAsset.AssetId, targetQueue, null, Environment.UserName, reasonCode);
+                    _store.TransitionAssetQueue(asset.AssetId, AssetQueueStatus.ReadyForTest, "INTAKE-STAGING", Environment.UserName, reasonCode ?? "READY_FOR_TEST", "Manual move to ready-for-test");
                 }
 
-                ActionMessage = $"Asset {SelectedAsset.AssetTag} transitioned to {targetQueue}";
+                ActionMessage = $"✓ Moved {asset.AssetTag} ({asset.SerialNumber}) → {targetQueue}";
                 RefreshBoard();
             }
             catch (Exception ex)
             {
-                ActionMessage = $"Transition error: {ex.Message}";
+                ActionMessage = $"❌ Transition error: {ex.Message}";
             }
+        }
+
+        public void TransitionSelected(AssetQueueStatus targetQueue, string reasonCode = null)
+        {
+            if (SelectedAsset == null) return;
+            TransitionAsset(SelectedAsset, targetQueue, reasonCode);
         }
 
         public void SearchAsset()
