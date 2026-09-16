@@ -118,7 +118,7 @@ namespace SuperManager.ViewModels
             if (bench == null) return false;
             StatusMessage = $"Pinging {bench.MachineName} ({bench.IpAddress})...";
             bool ok = await FleetCommandService.Instance.SendPingAsync(bench);
-            StatusMessage = ok ? $"✓ Ping sent to {bench.MachineName}!" : $"❌ Failed to reach {bench.MachineName}";
+            StatusMessage = ok ? $"✓ Ping sent to {bench.MachineName}!" : $"❌ Failed to reach {bench.MachineName} at {bench.IpAddress}:{bench.Port}";
             return ok;
         }
 

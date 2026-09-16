@@ -26,8 +26,12 @@ namespace SuperManager.Views
             {
                 Clipboard.SetText(ViewModel.ManagerWebUrl);
                 ViewModel.StatusMessage = $"✓ Copied {ViewModel.ManagerWebUrl} to clipboard!";
+                Process.Start(new ProcessStartInfo(ViewModel.ManagerWebUrl) { UseShellExecute = true });
             }
-            catch { }
+            catch (Exception ex)
+            {
+                ViewModel.StatusMessage = $"Web HUD: {ViewModel.ManagerWebUrl} ({ex.Message})";
+            }
         }
 
         private void BtnFilter_Click(object sender, RoutedEventArgs e)

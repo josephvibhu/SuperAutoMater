@@ -84,14 +84,29 @@ namespace SuperManager.Services
                     string id = root.GetProperty("id").GetString();
                     string ip = root.GetProperty("ip").GetString();
 
-                    // If the bench payload reports a loopback/APIPA/blank IP (multi-NIC issue),
-                    // fall back to the actual UDP socket remote endpoint — the real LAN address.
-                    string senderIp = result.RemoteEndPoint?.Address?.ToString() ?? ip;
-                    bool payloadIpIsUsable = !string.IsNullOrWhiteSpace(ip)
-                        && !ip.StartsWith("127.")
-                        && !ip.StartsWith("169.254.")
-                        && ip != "::1";
-                    string resolvedIp = payloadIpIsUsable ? ip : senderIp;
+                    // Determine the best IP for HTTP communication (Ping, Web HUD, Cert).
+                    // The socket's RemoteEndPoint is the physical IP that actually delivered the UDP beacon packet across the LAN.
+                    var remoteAddr = result.RemoteEndPoint?.Address;
+                    if (remoteAddr != null && remoteAddr.IsIPv4MappedToIPv6)
+                    {
+                        remoteAddr = remoteAddr.MapToIPv4();
+                    }
+                    string senderIp = remoteAddr?.ToString() ?? "";
+
+                    // Always prefer the actual LAN socket sender address, which avoids picking virtual NICs (e.g. VirtualBox/WSL).
+                    string resolvedIp;
+                    if (!string.IsNullOrWhiteSpace(senderIp) && !senderIp.StartsWith("127.") && !senderIp.StartsWith("169.254.") && senderIp != "::1" && senderIp != "0.0.0.0")
+                    {
+                        resolvedIp = senderIp;
+                    }
+                    else if (!string.IsNullOrWhiteSpace(ip) && !ip.StartsWith("127.") && !ip.StartsWith("169.254.") && ip != "::1")
+                    {
+                        resolvedIp = ip;
+                    }
+                    else
+                    {
+                        resolvedIp = !string.IsNullOrWhiteSpace(senderIp) ? senderIp : "127.0.0.1";
+                    }
 
                     bool isNew = !_devices.TryGetValue(id, out var dev);
                     if (isNew)

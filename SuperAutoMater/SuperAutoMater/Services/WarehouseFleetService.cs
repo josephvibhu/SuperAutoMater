@@ -224,6 +224,32 @@ namespace SuperAutoMater.Wpf.Services
             catch { }
         }
 
+        private static List<string> GetAllActiveIpV4Addresses()
+        {
+            var result = new List<string>();
+            try
+            {
+                foreach (var iface in NetworkInterface.GetAllNetworkInterfaces()
+                             .Where(n => n.OperationalStatus == OperationalStatus.Up &&
+                                         n.NetworkInterfaceType != NetworkInterfaceType.Loopback))
+                {
+                    foreach (var addr in iface.GetIPProperties().UnicastAddresses)
+                    {
+                        if (addr.Address.AddressFamily == AddressFamily.InterNetwork)
+                        {
+                            string s = addr.Address.ToString();
+                            if (!s.StartsWith("127.") && !s.StartsWith("169.254.") && !result.Contains(s))
+                            {
+                                result.Add(s);
+                            }
+                        }
+                    }
+                }
+            }
+            catch { }
+            return result;
+        }
+
         private void StartHttpServer()
         {
             Task.Run(async () =>
@@ -245,9 +271,18 @@ namespace SuperAutoMater.Wpf.Services
                         {
                             _httpListener = new HttpListener();
                             _httpListener.Prefixes.Add($"http://localhost:{port}/");
+                            _httpListener.Prefixes.Add($"http://127.0.0.1:{port}/");
                             if (LocalIpAddress != "127.0.0.1")
                             {
                                 _httpListener.Prefixes.Add($"http://{LocalIpAddress}:{port}/");
+                            }
+                            foreach (var ip in GetAllActiveIpV4Addresses())
+                            {
+                                string pfx = $"http://{ip}:{port}/";
+                                if (!_httpListener.Prefixes.Contains(pfx))
+                                {
+                                    _httpListener.Prefixes.Add(pfx);
+                                }
                             }
                             _httpListener.Start();
                             HttpPort = port;
@@ -289,6 +324,37 @@ namespace SuperAutoMater.Wpf.Services
                 if (path.StartsWith("/verify/"))
                 {
                     await HandleScanToVerifyAsync(context, path);
+                    return;
+                }
+
+                // /api/ping is a harmless acoustic locate chime — allow without session token
+                if (path == "/api/ping")
+                {
+                    _ = Task.Run(() =>
+                    {
+                        try
+                        {
+                            Console.Beep(1200, 250);
+                            Thread.Sleep(80);
+                            Console.Beep(1600, 350);
+                        }
+                        catch { }
+                    });
+                    var pingPayload = new
+                    {
+                        success = true,
+                        machineName = Environment.MachineName,
+                        message = "📍 Bench successfully located via acoustic alert.",
+                        timestamp = DateTime.UtcNow.ToString("o")
+                    };
+                    string pingJson = JsonSerializer.Serialize(pingPayload);
+                    byte[] pingBytes = Encoding.UTF8.GetBytes(pingJson);
+                    context.Response.ContentType = "application/json; charset=utf-8";
+                    context.Response.ContentLength64 = pingBytes.Length;
+                    context.Response.StatusCode = (int)HttpStatusCode.OK;
+                    context.Response.Headers.Add("Access-Control-Allow-Origin", "*");
+                    await context.Response.OutputStream.WriteAsync(pingBytes, 0, pingBytes.Length);
+                    context.Response.Close();
                     return;
                 }
 
