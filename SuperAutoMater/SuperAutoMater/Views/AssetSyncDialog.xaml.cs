@@ -417,6 +417,35 @@ namespace SuperAutoMater.Wpf.Views
             };
         }
 
+        private void BtnSheetsSetup_Click(object sender, RoutedEventArgs e)
+        {
+            try
+            {
+                StartupServices.EnsureSheetsSetupFiles();
+                Clipboard.SetText(StartupServices.CodeGsContent);
+                var res = MessageBox.Show(
+                    "The updated Google Apps Script (code.gs) for 15-column ITAM synchronization has been copied to your Windows Clipboard!\n\n" +
+                    "To update your Google Sheet:\n" +
+                    "1. Open your Google Sheet.\n" +
+                    "2. Click Extensions → Apps Script.\n" +
+                    "3. Select all existing code (Ctrl+A), delete, and paste (Ctrl+V).\n" +
+                    "4. Click Deploy → Manage Deployments → Edit (pencil icon) → Version: New Version → Deploy.\n\n" +
+                    "Would you like to open the Sheets_Setup folder with the code.gs file?",
+                    "Google Apps Script (code.gs) Copied",
+                    MessageBoxButton.YesNo,
+                    MessageBoxImage.Information);
+
+                if (res == MessageBoxResult.Yes)
+                {
+                    StartupServices.OpenSheetsSetupFolder();
+                }
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show("Failed to copy code.gs: " + ex.Message, "Error", MessageBoxButton.OK, MessageBoxImage.Error);
+            }
+        }
+
         private void BtnCancel_Click(object sender, RoutedEventArgs e)
         {
             DialogResult = false;

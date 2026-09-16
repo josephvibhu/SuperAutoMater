@@ -149,27 +149,42 @@ function doPost(e) {
       }
     }
 
-    // Setup headers and format on first run
-    if (sheet.getLastRow() === 0) {
-      var headers = [
-        'Tag',
-        'Serial Number',
-        'Processor',
-        'Memory [ram/storage]',
-        'Battery health',
-        'Storage Health',
-        'Status',
-        'Work in Progress',
-        'Physical Grade',
-        'Remarks',
-        'Technician Name or ID',
-        'In Date',
-        'Supplier',
-        'Out Date',
-        'Customer'
-      ];
-      sheet.appendRow(headers);
+    // Setup headers and format on first run or auto-upgrade existing v6.3 sheet headers
+    var headers = [
+      'Tag',
+      'Serial Number',
+      'Processor',
+      'Memory [ram/storage]',
+      'Battery health',
+      'Storage Health',
+      'Status',
+      'Work in Progress',
+      'Physical Grade',
+      'Remarks',
+      'Technician Name or ID',
+      'In Date',
+      'Supplier',
+      'Out Date',
+      'Customer'
+    ];
 
+    var needsHeaderFormat = false;
+    if (sheet.getLastRow() === 0) {
+      sheet.appendRow(headers);
+      needsHeaderFormat = true;
+    } else {
+      var firstCell = (sheet.getRange(1, 1).getValue() || '').toString().trim().toUpperCase();
+      var thirdCell = (sheet.getRange(1, 3).getValue() || '').toString().trim().toUpperCase();
+      var totalCols = sheet.getLastColumn();
+
+      // If sheet has old v6.3 headers ('Asset Tag', 'Model' in col 3, or fewer than 15 columns)
+      if (firstCell === 'ASSET TAG' || thirdCell === 'MODEL' || totalCols < 15) {
+        sheet.getRange(1, 1, 1, headers.length).setValues([headers]);
+        needsHeaderFormat = true;
+      }
+    }
+
+    if (needsHeaderFormat) {
       var headerRange = sheet.getRange(1, 1, 1, headers.length);
       headerRange.setBackground('#0F172A');
       headerRange.setFontColor('#38BDF8');
@@ -306,7 +321,7 @@ function doPost(e) {
         status: 'OK',
         action: updated ? 'UPDATED' : 'APPENDED',
         row: targetRow,
-        asset: assetTag + ' / ' + serialNo,
+        asset: (tag || '') + ' / ' + serialNo,
         message: updated ? ('Updated record at Row ' + targetRow) : ('Added new record at Row ' + targetRow)
       }))
       .setMimeType(ContentService.MimeType.JSON);
@@ -468,11 +483,10 @@ HOW IT WORKS:
         {
             try
             {
-                if (File.Exists(CodeGsPath) && File.Exists(ReadmePath)) return;
                 string dir = Path.GetDirectoryName(CodeGsPath);
                 if (!Directory.Exists(dir)) Directory.CreateDirectory(dir);
-                if (!File.Exists(CodeGsPath)) File.WriteAllText(CodeGsPath, CodeGsContent);
-                if (!File.Exists(ReadmePath)) File.WriteAllText(ReadmePath, SetupGuideContent);
+                File.WriteAllText(CodeGsPath, CodeGsContent);
+                File.WriteAllText(ReadmePath, SetupGuideContent);
             }
             catch { }
         }
