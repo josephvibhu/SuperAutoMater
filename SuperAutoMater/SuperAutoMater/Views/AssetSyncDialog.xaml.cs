@@ -15,6 +15,7 @@ namespace SuperAutoMater.Wpf.Views
     public partial class AssetSyncDialog : Window
     {
         public AssetQueueRecord GeneratedRecord { get; private set; }
+        private AssetQueueRecord _priorRecord = null;
 
         public AssetSyncDialog(MainViewModel vm)
         {
@@ -79,12 +80,200 @@ namespace SuperAutoMater.Wpf.Views
                 TxtTechnician.Text = "TECH-01";
             }
 
-            Loaded += (s, e) => RefreshQrCode();
+            Loaded += (s, e) =>
+            {
+                RefreshQrCode();
+                CheckAssetHistoryAsync(TxtSerial.Text, TxtAssetTag.Text);
+            };
         }
 
         private void Field_TextChanged(object sender, TextChangedEventArgs e)
         {
             RefreshQrCode();
+            CheckAssetHistoryAsync(TxtSerial?.Text, TxtAssetTag?.Text);
+        }
+
+        private void BtnApplyPriorMetadata_Click(object sender, RoutedEventArgs e)
+        {
+            if (_priorRecord == null) return;
+
+            if (!string.IsNullOrWhiteSpace(_priorRecord.Supplier))
+                TxtSupplier.Text = _priorRecord.Supplier;
+
+            if (!string.IsNullOrWhiteSpace(_priorRecord.Customer))
+                TxtCustomer.Text = _priorRecord.Customer;
+
+            if (!string.IsNullOrWhiteSpace(_priorRecord.Shelf_Location))
+                TxtShelf.Text = _priorRecord.Shelf_Location;
+
+            if (!string.IsNullOrWhiteSpace(_priorRecord.Model) && (string.IsNullOrWhiteSpace(TxtModel.Text) || TxtModel.Text.Contains("Detecting")))
+                TxtModel.Text = _priorRecord.Model;
+
+            MessageBox.Show("Prior provenance metadata (Supplier, Customer, Shelf Bay, Model) applied successfully!", "Historical Metadata Recall", MessageBoxButton.OK, MessageBoxImage.Information);
+        }
+
+        private async void CheckAssetHistoryAsync(string serial, string tag)
+        {
+            string q = !string.IsNullOrWhiteSpace(serial) && serial != "Unidentified" && !serial.StartsWith("QC-SN-")
+                ? serial.Trim()
+                : (!string.IsNullOrWhiteSpace(tag) && !tag.StartsWith("QC-SN-") ? tag.Trim() : "");
+
+            if (string.IsNullOrWhiteSpace(q))
+            {
+                if (PnlHistoryComparison != null) PnlHistoryComparison.Visibility = Visibility.Collapsed;
+                return;
+            }
+
+            try
+            {
+                AssetQueueRecord prior = null;
+                string source = "";
+
+                // 1. Check local SQLite store (system of record)
+                var store = new QcRunStore();
+                var localAsset = store.FindAssetBySerialOrTag(q);
+                if (localAsset != null && !string.IsNullOrEmpty(localAsset.AssetId))
+                {
+                    prior = new AssetQueueRecord
+                    {
+                        Tag = localAsset.AssetTag,
+                        Serial_Number = localAsset.SerialNumber,
+                        Model = localAsset.Model,
+                        Storage_Health = localAsset.StorageHealth,
+                        Status = localAsset.LatestRunStatus ?? "RTS",
+                        Work_In_Progress = localAsset.WorkInProgress,
+                        Physical_Grade = localAsset.LatestRunGrade ?? "A+",
+                        Remarks = localAsset.Remarks,
+                        In_Date = localAsset.InDate,
+                        Supplier = localAsset.Supplier,
+                        Out_Date = localAsset.OutDate,
+                        Customer = localAsset.Customer,
+                        Shelf_Location = localAsset.CurrentLocation,
+                        Timestamp = localAsset.UpdatedAtUtc.ToString("yyyy-MM-dd HH:mm")
+                    };
+                    source = "Local SQLite Store";
+                }
+
+                // 2. Check local ledger if not found or to supplement battery health
+                var audit = OfflineLedgerService.Instance.FindLatestRecord(q);
+                if (audit != null)
+                {
+                    int.TryParse((audit.Battery_Health ?? "").Replace("%", "").Trim(), out int bh);
+                    if (prior == null)
+                    {
+                        prior = new AssetQueueRecord
+                        {
+                            Tag = audit.Tag,
+                            Serial_Number = audit.Serial_Number,
+                            Model = audit.Model,
+                            Processor = audit.CPU_Model,
+                            Memory = audit.RAM_GB,
+                            Battery_Health = bh > 0 ? bh : 100,
+                            Storage_Health = audit.Storage_Health,
+                            Status = audit.Status,
+                            Work_In_Progress = audit.Work_In_Progress,
+                            Physical_Grade = audit.Physical_Grade,
+                            Remarks = audit.Technician_Notes,
+                            Technician = audit.Technician,
+                            In_Date = audit.In_Date,
+                            Supplier = audit.Supplier,
+                            Out_Date = audit.Out_Date,
+                            Customer = audit.Customer,
+                            Timestamp = audit.Timestamp.ToString("yyyy-MM-dd HH:mm")
+                        };
+                        source = "Local ITAM Ledger";
+                    }
+                    else if (bh > 0 && prior.Battery_Health == 100)
+                    {
+                        prior.Battery_Health = bh;
+                    }
+                }
+
+                // 3. If still not found, check Google Sheets remote query
+                if (prior == null)
+                {
+                    var remote = await OfflineSyncQueue.Instance.QueryRemoteSheetAsync(q);
+                    if (remote != null)
+                    {
+                        prior = remote;
+                        source = "Google Sheets Cloud";
+                    }
+                }
+
+                if (prior != null)
+                {
+                    _priorRecord = prior;
+                    RenderComparison(prior, source);
+                }
+                else
+                {
+                    if (PnlHistoryComparison != null) PnlHistoryComparison.Visibility = Visibility.Collapsed;
+                }
+            }
+            catch (Exception ex)
+            {
+                AppLogger.Warn($"History check error: {ex.Message}");
+            }
+        }
+
+        private void RenderComparison(AssetQueueRecord prior, string source)
+        {
+            if (PnlHistoryComparison == null) return;
+            PnlHistoryComparison.Visibility = Visibility.Visible;
+            TxtHistorySource.Text = $"{source.ToUpper()} MATCH";
+
+            string dateStr = !string.IsNullOrWhiteSpace(prior.In_Date) ? prior.In_Date : prior.Timestamp;
+            string techStr = !string.IsNullOrWhiteSpace(prior.Technician) ? $" by {prior.Technician}" : "";
+            TxtHistorySummary.Text = $"Prior record from {dateStr}{techStr} · Model: {prior.Model}";
+
+            // Battery Delta
+            int curB = 100;
+            int.TryParse(TxtBatteryHealth.Text, out curB);
+            int prevB = prior.Battery_Health;
+            int bDiff = curB - prevB;
+            string bSign = bDiff > 0 ? "+" : "";
+            TxtBatteryDelta.Text = prevB > 0 ? $"{prevB}% ➔ {curB}% ({bSign}{bDiff}%)" : $"{curB}% (Prev N/A)";
+            TxtBatteryDelta.Foreground = bDiff < -5
+                ? new System.Windows.Media.SolidColorBrush(System.Windows.Media.Color.FromRgb(245, 158, 11))
+                : new System.Windows.Media.SolidColorBrush(System.Windows.Media.Color.FromRgb(56, 189, 248));
+
+            // Storage Delta
+            int curS = 100;
+            int.TryParse(TxtStorageHealth.Text, out curS);
+            int prevS = prior.Storage_Health;
+            int sDiff = curS - prevS;
+            string sSign = sDiff > 0 ? "+" : "";
+            TxtStorageDelta.Text = prevS > 0 ? $"{prevS}% ➔ {curS}% ({sSign}{sDiff}%)" : $"{curS}%";
+
+            // Status / WIP Delta
+            string curStatus = (CmbStatus.SelectedItem as ComboBoxItem)?.Content?.ToString() ?? "RTS";
+            string prevStatus = prior.Status ?? "RTS";
+            TxtStatusDelta.Text = $"{prevStatus} ➔ {curStatus}";
+
+            // Grade Delta
+            string curGrade = (CmbGrade.SelectedItem as ComboBoxItem)?.Content?.ToString() ?? "A+";
+            string prevGrade = prior.Physical_Grade ?? "A+";
+            TxtGradeDelta.Text = $"{prevGrade} ➔ {curGrade}";
+
+            // Prior Defect Note
+            if (!string.IsNullOrWhiteSpace(prior.Work_In_Progress) && prior.Work_In_Progress != "All Okay")
+            {
+                TxtPriorDefectNote.Visibility = Visibility.Visible;
+                if (curStatus == "RTS")
+                {
+                    TxtPriorDefectNote.Text = $"✓ Prior defect was '{prior.Work_In_Progress}' — Marked RESOLVED in current test!";
+                    TxtPriorDefectNote.Foreground = new System.Windows.Media.SolidColorBrush(System.Windows.Media.Color.FromRgb(52, 211, 153));
+                }
+                else
+                {
+                    TxtPriorDefectNote.Text = $"⚠ Prior defect was '{prior.Work_In_Progress}' — Currently in status '{curStatus}'.";
+                    TxtPriorDefectNote.Foreground = new System.Windows.Media.SolidColorBrush(System.Windows.Media.Color.FromRgb(251, 191, 36));
+                }
+            }
+            else
+            {
+                TxtPriorDefectNote.Visibility = Visibility.Collapsed;
+            }
         }
 
         private void RefreshQrCode()

@@ -327,6 +327,52 @@ function doPost(e) {
  * Health check endpoint for browser inspection
  */
 function doGet(e) {
+  var query = (e && e.parameter && (e.parameter.q || e.parameter.serial || e.parameter.tag)) || '';
+  if (query) {
+    query = query.toString().trim().toUpperCase();
+    try {
+      var ss = SpreadsheetApp.getActiveSpreadsheet();
+      var sheet = ss.getSheetByName('AutoMater_Inventory');
+      if (!sheet) sheet = ss.getActiveSheet();
+
+      var lastRow = sheet.getLastRow();
+      if (lastRow > 1) {
+        var values = sheet.getRange(2, 1, lastRow - 1, 15).getValues();
+        for (var i = values.length - 1; i >= 0; i--) {
+          var rowTag = (values[i][0] || '').toString().trim().toUpperCase();
+          var rowSerial = (values[i][1] || '').toString().trim().toUpperCase();
+
+          if ((rowSerial && rowSerial === query) || (rowTag && rowTag === query)) {
+            return ContentService.createTextOutput(JSON.stringify({
+              found: true,
+              row: i + 2,
+              Tag: values[i][0],
+              Serial_Number: values[i][1],
+              Processor: values[i][2],
+              Memory: values[i][3],
+              Battery_Health: values[i][4],
+              Storage_Health: values[i][5],
+              Status: values[i][6],
+              Work_In_Progress: values[i][7],
+              Physical_Grade: values[i][8],
+              Remarks: values[i][9],
+              Technician: values[i][10],
+              In_Date: values[i][11] instanceof Date ? Utilities.formatDate(values[i][11], Session.getScriptTimeZone(), 'yyyy-MM-dd') : values[i][11],
+              Supplier: values[i][12],
+              Out_Date: values[i][13] instanceof Date ? Utilities.formatDate(values[i][13], Session.getScriptTimeZone(), 'yyyy-MM-dd') : values[i][13],
+              Customer: values[i][14]
+            })).setMimeType(ContentService.MimeType.JSON);
+          }
+        }
+      }
+      return ContentService.createTextOutput(JSON.stringify({ found: false }))
+        .setMimeType(ContentService.MimeType.JSON);
+    } catch (err) {
+      return ContentService.createTextOutput(JSON.stringify({ found: false, error: err.toString() }))
+        .setMimeType(ContentService.MimeType.JSON);
+    }
+  }
+
   var html = '<!DOCTYPE html><html><head><title>SuperAutoMater Sync Online</title>' +
     '<style>body{font-family:sans-serif;background:#0f172a;color:#f8fafc;padding:40px;text-align:center;}' +
     '.card{background:#1e293b;border-radius:12px;padding:30px;display:inline-block;border:1px solid #38bdf8;max-width:520px;}' +

@@ -111,6 +111,23 @@ namespace SuperAutoMater.Wpf.Services
             return list;
         }
 
+        public QcAuditRecord FindLatestRecord(string serialOrTag)
+        {
+            if (string.IsNullOrWhiteSpace(serialOrTag)) return null;
+            string q = serialOrTag.Trim();
+            var all = GetAllRecords();
+            for (int i = all.Count - 1; i >= 0; i--)
+            {
+                var r = all[i];
+                if (string.Equals(r.Serial_Number, q, StringComparison.OrdinalIgnoreCase) ||
+                    string.Equals(r.Tag, q, StringComparison.OrdinalIgnoreCase))
+                {
+                    return r;
+                }
+            }
+            return null;
+        }
+
         public void MarkRecordSynced(string recordId)
         {
             if (string.IsNullOrEmpty(recordId)) return;

@@ -42,6 +42,70 @@
             <ScrollViewer Grid.Column="0" VerticalScrollBarVisibility="Auto" Margin="0,0,12,0">
                 <StackPanel Margin="0,0,8,0">
 
+                    <!-- Group 0: Historical Telemetry Delta & Prior Record Comparison -->
+                    <Border x:Name="PnlHistoryComparison" Background="#131B2A" BorderBrush="#1D4ED8" BorderThickness="1.5" CornerRadius="8" Padding="12" Margin="0,0,0,12" Visibility="Collapsed">
+                        <StackPanel>
+                            <DockPanel LastChildFill="False" Margin="0,0,0,8">
+                                <StackPanel Orientation="Horizontal" DockPanel.Dock="Left" VerticalAlignment="Center">
+                                    <TextBlock Text="🔄" FontSize="13" Margin="0,0,6,0" VerticalAlignment="Center"/>
+                                    <TextBlock Text="PRIOR BENCH VISIT DETECTED" FontFamily="{StaticResource FontMono}" FontWeight="Bold" FontSize="11" Foreground="#60A5FA"/>
+                                    <Border Background="#1E3A8A" CornerRadius="4" Padding="6,2" Margin="8,0,0,0">
+                                        <TextBlock x:Name="TxtHistorySource" Text="MATCH FOUND" FontFamily="{StaticResource FontMono}" FontSize="9" Foreground="#93C5FD"/>
+                                    </Border>
+                                </StackPanel>
+                                <Button DockPanel.Dock="Right" Content="Apply Prior Metadata" Style="{StaticResource StyleDarkActionBtn}" Height="22" Padding="8,2" FontSize="10" Click="BtnApplyPriorMetadata_Click" ToolTip="Fills Supplier, Customer, and Shelf from prior record"/>
+                            </DockPanel>
+
+                            <!-- Prior Record Summary Line -->
+                            <TextBlock x:Name="TxtHistorySummary" Text="Last recorded on 2026-08-15 by TECH-02" FontFamily="{StaticResource FontMono}" FontSize="10" Foreground="#94A3B8" Margin="0,0,0,8"/>
+
+                            <!-- Comparison Cards / Deltas -->
+                            <Grid Margin="0,0,0,4">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="*"/>
+                                </Grid.ColumnDefinitions>
+
+                                <!-- Battery Delta -->
+                                <Border Grid.Column="0" Background="#0F172A" BorderBrush="#1E293B" BorderThickness="1" CornerRadius="6" Padding="8,6" Margin="0,0,4,0">
+                                    <StackPanel>
+                                        <TextBlock Text="BATTERY DELTA" FontFamily="{StaticResource FontMono}" FontSize="9" Foreground="#64748B"/>
+                                        <TextBlock x:Name="TxtBatteryDelta" Text="55% ➔ 49% (-6%)" FontFamily="{StaticResource FontMono}" FontWeight="Bold" FontSize="11" Foreground="#38BDF8" Margin="0,2,0,0"/>
+                                    </StackPanel>
+                                </Border>
+
+                                <!-- Storage Delta -->
+                                <Border Grid.Column="1" Background="#0F172A" BorderBrush="#1E293B" BorderThickness="1" CornerRadius="6" Padding="8,6" Margin="4,0,4,0">
+                                    <StackPanel>
+                                        <TextBlock Text="STORAGE DELTA" FontFamily="{StaticResource FontMono}" FontSize="9" Foreground="#64748B"/>
+                                        <TextBlock x:Name="TxtStorageDelta" Text="97% ➔ 97% (0%)" FontFamily="{StaticResource FontMono}" FontWeight="Bold" FontSize="11" Foreground="#38BDF8" Margin="0,2,0,0"/>
+                                    </StackPanel>
+                                </Border>
+
+                                <!-- Status / Defect Delta -->
+                                <Border Grid.Column="2" Background="#0F172A" BorderBrush="#1E293B" BorderThickness="1" CornerRadius="6" Padding="8,6" Margin="4,0,4,0">
+                                    <StackPanel>
+                                        <TextBlock Text="STATUS / WIP" FontFamily="{StaticResource FontMono}" FontSize="9" Foreground="#64748B"/>
+                                        <TextBlock x:Name="TxtStatusDelta" Text="WIP ➔ RTS" FontFamily="{StaticResource FontMono}" FontWeight="Bold" FontSize="11" Foreground="#4ADE80" Margin="0,2,0,0"/>
+                                    </StackPanel>
+                                </Border>
+
+                                <!-- Grade Delta -->
+                                <Border Grid.Column="3" Background="#0F172A" BorderBrush="#1E293B" BorderThickness="1" CornerRadius="6" Padding="8,6" Margin="4,0,0,0">
+                                    <StackPanel>
+                                        <TextBlock Text="GRADE DELTA" FontFamily="{StaticResource FontMono}" FontSize="9" Foreground="#64748B"/>
+                                        <TextBlock x:Name="TxtGradeDelta" Text="B ➔ A+" FontFamily="{StaticResource FontMono}" FontWeight="Bold" FontSize="11" Foreground="#FBBF24" Margin="0,2,0,0"/>
+                                    </StackPanel>
+                                </Border>
+                            </Grid>
+
+                            <!-- Prior Defect Note if any -->
+                            <TextBlock x:Name="TxtPriorDefectNote" Text="Prior Defect: 'keyboard issue' — Resolved in current test" FontFamily="{StaticResource FontMono}" FontSize="10" Foreground="#34D399" Margin="0,4,0,0"/>
+                        </StackPanel>
+                    </Border>
+
                     <!-- Group 1: Hardware Identification -->
                     <Border Background="#12161E" BorderBrush="#232936" BorderThickness="1" CornerRadius="8" Padding="12" Margin="0,0,0,12">
                         <StackPanel>

@@ -6,6 +6,7 @@ using System.Text;
 using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
+using SuperAutoMater.Wpf.Core;
 
 namespace SuperAutoMater
 {
@@ -105,37 +106,20 @@ namespace SuperAutoMater
                         string json = JsonSerializer.Serialize(new
                         {
                             Tag              = string.IsNullOrWhiteSpace(record.Tag) ? record.Asset_Tag : record.Tag,
-                            tag              = string.IsNullOrWhiteSpace(record.Tag) ? record.Asset_Tag : record.Tag,
-                            Asset_Tag        = string.IsNullOrWhiteSpace(record.Tag) ? record.Asset_Tag : record.Tag,
                             Serial_Number    = record.Serial_Number,
-                            serial_number    = record.Serial_Number,
                             Processor        = record.Processor,
-                            processor        = record.Processor,
                             Memory           = record.Memory,
-                            memory           = record.Memory,
                             Battery_Health   = record.Battery_Health,
-                            battery_health   = record.Battery_Health,
                             Storage_Health   = record.Storage_Health,
-                            storage_health   = record.Storage_Health,
                             Status           = record.Status,
-                            status           = record.Status,
                             Work_In_Progress = record.Work_In_Progress,
-                            work_in_progress = record.Work_In_Progress,
-                            Wip_Issue        = record.Work_In_Progress,
                             Physical_Grade   = record.Physical_Grade,
-                            physical_grade   = record.Physical_Grade,
                             Remarks          = record.Remarks,
-                            remarks          = record.Remarks,
                             Technician       = record.Technician,
-                            technician       = record.Technician,
                             In_Date          = record.In_Date,
-                            in_date          = record.In_Date,
                             Supplier         = record.Supplier,
-                            supplier         = record.Supplier,
                             Out_Date         = record.Out_Date,
-                            out_date         = record.Out_Date,
                             Customer         = record.Customer,
-                            customer         = record.Customer,
                             Model            = record.Model,
                             Shelf_Location   = record.Shelf_Location,
                             Timestamp        = record.Timestamp
@@ -152,12 +136,14 @@ namespace SuperAutoMater
                         else
                         {
                             remaining.Add(record);
+                            AppLogger.Warn($"Google Sheets webhook responded with status {response.StatusCode}: {body}");
                         }
                     }
-                    catch
+                    catch (Exception ex)
                     {
-                        // Network error, retain in queue
+                        // Network error or timeout, retain in queue
                         remaining.Add(record);
+                        AppLogger.Warn($"OfflineSyncQueue flush failed for asset {record.Serial_Number}: {ex.Message}");
                     }
                 }
 
@@ -207,6 +193,82 @@ namespace SuperAutoMater
                 File.WriteAllText(_queueFilePath, json);
             }
             catch { }
+        }
+
+        public async Task<AssetQueueRecord> QueryRemoteSheetAsync(string serialOrTag, string webhookUrl = DefaultSheetsUrl)
+        {
+            if (string.IsNullOrWhiteSpace(serialOrTag) || string.IsNullOrWhiteSpace(webhookUrl))
+                return null;
+
+            try
+            {
+                string queryUrl = $"{webhookUrl}?q={Uri.EscapeDataString(serialOrTag.Trim())}";
+                var response = await _httpClient.GetAsync(queryUrl);
+                if (!response.IsSuccessStatusCode) return null;
+
+                string body = await response.Content.ReadAsStringAsync();
+                using var doc = JsonDocument.Parse(body);
+                var root = doc.RootElement;
+                if (!root.TryGetProperty("found", out var propFound) || !propFound.GetBoolean())
+                    return null;
+
+                int bHealth = 100;
+                if (root.TryGetProperty("Battery_Health", out var bProp))
+                {
+                    if (bProp.ValueKind == JsonValueKind.Number) bHealth = bProp.GetInt32();
+                    else int.TryParse(bProp.GetString(), out bHealth);
+                }
+
+                int sHealth = 100;
+                if (root.TryGetProperty("Storage_Health", out var sProp))
+                {
+                    if (sProp.ValueKind == JsonValueKind.Number) sHealth = sProp.GetInt32();
+                    else int.TryParse(sProp.GetString(), out sHealth);
+                }
+
+                return new AssetQueueRecord
+                {
+                    Tag = root.TryGetProperty("Tag", out var pTag) ? pTag.GetString() ?? "" : "",
+                    Serial_Number = root.TryGetProperty("Serial_Number", out var pSn) ? pSn.GetString() ?? "" : "",
+                    Processor = root.TryGetProperty("Processor", out var pCpu) ? pCpu.GetString() ?? "" : "",
+                    Memory = root.TryGetProperty("Memory", out var pMem) ? pMem.GetString() ?? "" : "",
+                    Battery_Health = bHealth,
+                    Storage_Health = sHealth,
+                    Status = root.TryGetProperty("Status", out var pStat) ? pStat.GetString() ?? "RTS" : "RTS",
+                    Work_In_Progress = root.TryGetProperty("Work_In_Progress", out var pWip) ? pWip.GetString() ?? "All Okay" : "All Okay",
+                    Physical_Grade = root.TryGetProperty("Physical_Grade", out var pGrd) ? pGrd.GetString() ?? "A+" : "A+",
+                    Remarks = root.TryGetProperty("Remarks", out var pRem) ? pRem.GetString() ?? "" : "",
+                    Technician = root.TryGetProperty("Technician", out var pTech) ? pTech.GetString() ?? "" : "",
+                    In_Date = root.TryGetProperty("In_Date", out var pIn) ? pIn.GetString() ?? "" : "",
+                    Supplier = root.TryGetProperty("Supplier", out var pSup) ? pSup.GetString() ?? "" : "",
+                    Out_Date = root.TryGetProperty("Out_Date", out var pOut) ? pOut.GetString() ?? "" : "",
+                    Customer = root.TryGetProperty("Customer", out var pCust) ? pCust.GetString() ?? "" : ""
+                };
+            }
+            catch (Exception ex)
+            {
+                AppLogger.Warn($"Failed to query Google Sheet for '{serialOrTag}': {ex.Message}");
+                return null;
+            }
+        }
+
+        public AssetQueueRecord FindLocalQueuedRecord(string serialOrTag)
+        {
+            if (string.IsNullOrWhiteSpace(serialOrTag)) return null;
+            string q = serialOrTag.Trim();
+            lock (_fileLock)
+            {
+                for (int i = _items.Count - 1; i >= 0; i--)
+                {
+                    var item = _items[i];
+                    if (string.Equals(item.Serial_Number, q, StringComparison.OrdinalIgnoreCase) ||
+                        string.Equals(item.Tag, q, StringComparison.OrdinalIgnoreCase))
+                    {
+                        return item;
+                    }
+                }
+            }
+            return null;
         }
     }
 
