@@ -1,0 +1,86 @@
+<Window x:Class="SuperAutoMater.Wpf.Views.OverrideModalDialog"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Diagnostic Test Manual Override Audit"
+        Height="420" Width="560"
+        WindowStartupLocation="CenterOwner"
+        ResizeMode="NoResize"
+        Background="#0E1116"
+        Icon="pack://application:,,,/app.ico">
+
+    <Grid Margin="18">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/> <!-- Header -->
+            <RowDefinition Height="*"/>    <!-- Form Fields -->
+            <RowDefinition Height="Auto"/> <!-- Actions -->
+        </Grid.RowDefinitions>
+
+        <!-- Header -->
+        <Border Grid.Row="0" Background="#161B22" BorderBrush="#2D333B" BorderThickness="1" CornerRadius="8" Padding="14,10" Margin="0,0,0,14">
+            <DockPanel LastChildFill="False">
+                <StackPanel Orientation="Horizontal" DockPanel.Dock="Left" VerticalAlignment="Center">
+                    <Ellipse Width="10" Height="10" Fill="#D29922" Margin="0,0,10,0"/>
+                    <TextBlock Text="AUDIT GATE: MANUAL TEST OVERRIDE" FontFamily="{StaticResource FontMono}" FontWeight="Bold" FontSize="12" Foreground="{StaticResource BrushTextWhite}"/>
+                </StackPanel>
+                <Border DockPanel.Dock="Right" Background="#261C0E" BorderBrush="#D29922" BorderThickness="1" CornerRadius="4" Padding="6,2">
+                    <TextBlock x:Name="TxtTestKeyBadge" Text="TEST-KEY" FontFamily="{StaticResource FontMono}" FontSize="10" Foreground="#E3B341" FontWeight="Bold"/>
+                </Border>
+            </DockPanel>
+        </Border>
+
+        <!-- Form Fields -->
+        <StackPanel Grid.Row="1" Margin="4,0,4,10">
+            <TextBlock Text="Overriding diagnostic tests is permanently recorded in the immutable audit log."
+                       FontFamily="{StaticResource FontMono}" FontSize="11" Foreground="#8B949E" Margin="0,0,0,12"/>
+
+            <!-- Technician -->
+            <TextBlock Text="TECHNICIAN ID / ACTOR:" FontFamily="{StaticResource FontMono}" FontSize="10" Foreground="#8B949E" Margin="0,0,0,4"/>
+            <TextBox x:Name="TxtActor" Background="#161B22" Foreground="#E6EDF3" BorderBrush="#30363D" Padding="8,6" FontFamily="{StaticResource FontMono}" FontSize="12" Margin="0,0,0,10"/>
+
+            <!-- Predefined Reason -->
+            <TextBlock Text="JUSTIFICATION CATEGORY:" FontFamily="{StaticResource FontMono}" FontSize="10" Foreground="#8B949E" Margin="0,0,0,4"/>
+            <ComboBox x:Name="CmbReasonPreset" Background="#161B22" Foreground="#E6EDF3" BorderBrush="#30363D" Padding="6,4" FontFamily="{StaticResource FontMono}" FontSize="11" Margin="0,0,0,10" SelectionChanged="CmbReasonPreset_SelectionChanged">
+                <ComboBoxItem Content="Customer waiver / Known cosmetic exemption" IsSelected="True"/>
+                <ComboBoxItem Content="Ambient environment prevented acoustic/optical sweep"/>
+                <ComboBoxItem Content="Hardware component absent / Non-standard chassis"/>
+                <ComboBoxItem Content="Component repaired / Verified via external bench tool"/>
+                <ComboBoxItem Content="Custom justification (specify below)"/>
+            </ComboBox>
+
+            <!-- Custom Explanation -->
+            <TextBlock Text="AUDIT REASON &amp; WAIVER DETAILS (REQUIRED):" FontFamily="{StaticResource FontMono}" FontSize="10" Foreground="#8B949E" Margin="0,0,0,4"/>
+            <TextBox x:Name="TxtReasonDetail" Background="#161B22" Foreground="#E6EDF3" BorderBrush="#30363D" Padding="8,6" FontFamily="{StaticResource FontMono}" FontSize="11" Height="50" TextWrapping="Wrap" AcceptsReturn="True" Margin="0,0,0,12"/>
+
+            <!-- Supervisor Section (Conditional) -->
+            <Border x:Name="PanelSupervisor" Background="#1C1814" BorderBrush="#D29922" BorderThickness="1" CornerRadius="6" Padding="10,8" Margin="0,0,0,8" Visibility="Collapsed">
+                <StackPanel>
+                    <TextBlock Text="⚠ SUPERVISOR APPROVAL REQUIRED BY POLICY FOR THIS TEST" FontFamily="{StaticResource FontMono}" FontWeight="Bold" FontSize="10" Foreground="#E3B341" Margin="0,0,0,6"/>
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="*"/>
+                        </Grid.ColumnDefinitions>
+                        <StackPanel Grid.Column="0" Margin="0,0,6,0">
+                            <TextBlock Text="SUPERVISOR NAME / LEAD:" FontFamily="{StaticResource FontMono}" FontSize="9" Foreground="#8B949E" Margin="0,0,0,2"/>
+                            <TextBox x:Name="TxtSupervisorName" Background="#161B22" Foreground="#E6EDF3" BorderBrush="#30363D" Padding="6,4" FontFamily="{StaticResource FontMono}" FontSize="11"/>
+                        </StackPanel>
+                        <StackPanel Grid.Column="1" Margin="6,0,0,0">
+                            <TextBlock Text="SUPERVISOR PIN / PASSCODE:" FontFamily="{StaticResource FontMono}" FontSize="9" Foreground="#8B949E" Margin="0,0,0,2"/>
+                            <PasswordBox x:Name="TxtSupervisorPin" Background="#161B22" Foreground="#E6EDF3" BorderBrush="#30363D" Padding="6,4" FontFamily="{StaticResource FontMono}" FontSize="11"/>
+                        </StackPanel>
+                    </Grid>
+                </StackPanel>
+            </Border>
+        </StackPanel>
+
+        <!-- Actions -->
+        <DockPanel Grid.Row="2" LastChildFill="False" Margin="0,4,0,0">
+            <Button Content="CANCEL" Click="BtnCancel_Click" DockPanel.Dock="Left"
+                    Background="#21262D" Foreground="#C9D1D9" BorderBrush="#30363D" Padding="16,8"
+                    FontFamily="{StaticResource FontMono}" FontSize="11" FontWeight="Bold" Cursor="Hand"/>
+            <Button Content="SUBMIT AUDITED OVERRIDE" Click="BtnSubmit_Click" DockPanel.Dock="Right"
+                    Background="#D29922" Foreground="#0E1116" BorderBrush="#E3B341" Padding="18,8"
+                    FontFamily="{StaticResource FontMono}" FontSize="11" FontWeight="Bold" Cursor="Hand"/>
+        </DockPanel>
+    </Grid>
+</Window>

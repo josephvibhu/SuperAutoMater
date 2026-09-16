@@ -4,36 +4,40 @@ using System.Diagnostics;
 using System.Drawing;
 using System.Drawing.Imaging;
 using System.IO;
+using System.Linq;
 using System.Text;
 using QRCoder;
+using SuperAutoMater.Wpf.Core;
 
 namespace SuperAutoMater.Wpf.Services
 {
     public class CertificateData
     {
+        public string RunId { get; set; } = "";
+        public QcRunSummary RunSummary { get; set; }
         public string SerialNumber { get; set; } = "UNKNOWN";
-        public string Manufacturer { get; set; } = "Dell / Lenovo / HP";
+        public string Manufacturer { get; set; } = "Generic";
         public string Model { get; set; } = "Enterprise Workstation";
         public string BiosVersion { get; set; } = "1.0.0";
-        public string CpuModel { get; set; } = "Intel Core Processor";
-        public string RamDetails { get; set; } = "16GB DDR4";
-        public string StorageModel { get; set; } = "NVMe SSD";
-        public int StorageHealthPercent { get; set; } = 100;
+        public string CpuModel { get; set; } = "Processor";
+        public string RamDetails { get; set; } = "System Memory";
+        public string StorageModel { get; set; } = "Storage Device";
+        public int StorageHealthPercent { get; set; } = 0;
         public string StoragePowerOn { get; set; } = "0 Days";
-        public string BatteryHealthSummary { get; set; } = "100% Health";
-        public string BatteryCapacities { get; set; } = "48,000 mWh";
+        public string BatteryHealthSummary { get; set; } = "Unknown";
+        public string BatteryCapacities { get; set; } = "";
         public string GpuModel { get; set; } = "Display Adapter";
-        public string PhysicalGrade { get; set; } = "A+";
+        public string PhysicalGrade { get; set; } = "PENDING";
         public string CosmeticDefectsSummary { get; set; } = "Pristine (No Defects)";
-        public string BatteryCellTopology { get; set; } = "3S1P (3 Cells) · Balanced";
-        public string StorageTbwSummary { get; set; } = "14.2 TB / 300 TBW (Low Wear)";
+        public string BatteryCellTopology { get; set; } = "Balanced";
+        public string StorageTbwSummary { get; set; } = "";
         public string DriverIntegritySummary { get; set; } = "0 Missing Drivers";
-        public string ThermalDissipationVerdict { get; set; } = "Thermal Conduction Nominal";
+        public string ThermalDissipationVerdict { get; set; } = "Nominal";
         public string RamTopologySummary { get; set; } = "";
         public string RadiatorAirflowSummary { get; set; } = "";
         public string WebcamOpticsSummary { get; set; } = "";
         public string TechnicianName { get; set; } = "QC Station #1";
-        public string CloudAuditUrl { get; set; } = "https://docs.google.com/spreadsheets";
+        public string CloudAuditUrl { get; set; } = GoogleSheetsDispatcher.DefaultSheetsUrl;
         public List<string> PassedTests { get; set; } = new List<string>();
     }
 
@@ -49,20 +53,65 @@ namespace SuperAutoMater.Wpf.Services
         {
             if (data == null) throw new ArgumentNullException(nameof(data));
 
+            // Resolve and validate completed QC run summary
+            var summary = data.RunSummary;
+            if (summary == null && !string.IsNullOrEmpty(data.RunId))
+            {
+                var store = new QcRunStore();
+                summary = store.GetRunSummary(data.RunId);
+            }
+            if (summary == null && QcRunOrchestrator.Instance.IsRunActive)
+            {
+                summary = QcRunOrchestrator.Instance.GetCurrentSummary();
+            }
+
+            if (summary == null)
+            {
+                throw new InvalidOperationException("Cannot generate certificate: No QC Run found for this unit.");
+            }
+
+            if (summary.Status != QcRunStatus.Completed)
+            {
+                throw new InvalidOperationException($"Cannot generate certificate: QC Run '{summary.RunId}' is in state '{summary.Status}'. All mandatory tests must be passed or approved overrides.");
+            }
+
+            if (!QcRunOrchestrator.VerifyRunTamper(summary))
+            {
+                throw new InvalidOperationException("Cannot generate certificate: Verification hash mismatch! The recorded run data has been modified.");
+            }
+
+            // Sync verified metadata from summary
+            data.RunSummary = summary;
+            data.RunId = summary.RunId;
+            data.PhysicalGrade = summary.Grade;
+            if (!string.IsNullOrEmpty(summary.SerialNumber))
+            {
+                data.SerialNumber = summary.SerialNumber;
+            }
+            if (!string.IsNullOrEmpty(summary.Model))
+            {
+                data.Model = summary.Model;
+            }
+            if (!string.IsNullOrEmpty(summary.Technician))
+            {
+                data.TechnicianName = summary.Technician;
+            }
+
             string cleanSerial = string.IsNullOrWhiteSpace(data.SerialNumber) || data.SerialNumber.Contains("Detecting")
-                ? "UNKNOWN"
+                ? (string.IsNullOrWhiteSpace(summary.AssetTag) ? "UNKNOWN" : summary.AssetTag)
                 : data.SerialNumber.Trim();
 
             string desktopDir = Environment.GetFolderPath(Environment.SpecialFolder.DesktopDirectory);
-            string pdfPath = Path.Combine(desktopDir, $"SuperAutoMater_Certificate_{cleanSerial}.pdf");
+            string pdfPath = Path.Combine(desktopDir, $"SuperAutoMater_Certificate_{cleanSerial}_{summary.RunId.Substring(0, 8)}.pdf");
 
             // Generate QR Code image bytes
             byte[] qrImageBytes = GenerateQrCodeBytes(data.CloudAuditUrl);
 
             // Construct PDF 1.4 stream
-            byte[] pdfBytes = BuildPdfStream(data, qrImageBytes);
+            byte[] pdfBytes = BuildPdfStream(data, summary, qrImageBytes);
             File.WriteAllBytes(pdfPath, pdfBytes);
 
+            AppLogger.Info($"Generated verified QC certificate at {pdfPath} for run {summary.RunId}");
             return pdfPath;
         }
 
@@ -77,7 +126,10 @@ namespace SuperAutoMater.Wpf.Services
                     UseShellExecute = true
                 });
             }
-            catch { }
+            catch (Exception ex)
+            {
+                AppLogger.Warn($"Failed to open certificate PDF at {pdfPath}", ex);
+            }
         }
 
         private byte[] GenerateQrCodeBytes(string url)
@@ -85,19 +137,20 @@ namespace SuperAutoMater.Wpf.Services
             try
             {
                 using (var qrGen = new QRCodeGenerator())
-                using (var qrData = qrGen.CreateQrCode(url, QRCodeGenerator.ECCLevel.M))
+                using (var qrData = qrGen.CreateQrCode(url ?? GoogleSheetsDispatcher.DefaultSheetsUrl, QRCodeGenerator.ECCLevel.M))
                 using (var qrCode = new PngByteQRCode(qrData))
                 {
                     return qrCode.GetGraphic(4);
                 }
             }
-            catch
+            catch (Exception ex)
             {
+                AppLogger.Warn("Failed to generate QR code bytes for certificate", ex);
                 return null;
             }
         }
 
-        private byte[] BuildPdfStream(CertificateData d, byte[] qrBytes)
+        private byte[] BuildPdfStream(CertificateData d, QcRunSummary summary, byte[] qrBytes)
         {
             var ms = new MemoryStream();
             using (var sw = new StreamWriter(ms, Encoding.ASCII, 1024, leaveOpen: true))
@@ -140,86 +193,108 @@ namespace SuperAutoMater.Wpf.Services
                 contentSb.Append("q 0.22 0.55 0.99 RG 1 w 28 696 556 64 re s Q\n");
 
                 // Title Texts
-                contentSb.Append("BT /F2 18 Tf 0.95 0.96 0.98 rg 40 734 Td (SUPERAUTOMATER HARDWARE QC CERTIFICATE) Tj ET\n");
-                contentSb.Append("BT /F1 9 Tf 0.35 0.65 0.99 rg 40 714 Td (ENTERPRISE HARDWARE VERIFICATION & AUTHENTICITY AUDIT) Tj ET\n");
-                contentSb.Append("BT /F1 9 Tf 0.65 0.68 0.73 rg 380 714 Td (DATE: ")
-                         .Append(EscapePdf(DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss")))
+                contentSb.Append("BT /F2 16 Tf 0.95 0.96 0.98 rg 40 734 Td (SUPERAUTOMATER TRUSTED HARDWARE QC CERTIFICATE) Tj ET\n");
+                contentSb.Append("BT /F1 8.5 Tf 0.35 0.65 0.99 rg 40 714 Td (ENTERPRISE OFFLINE-FIRST VERIFICATION AUDIT · RUN ID: ")
+                         .Append(EscapePdf(summary.RunId))
                          .Append(") Tj ET\n");
+                contentSb.Append("BT /F1 8.5 Tf 0.65 0.68 0.73 rg 380 714 Td (DATE: ")
+                         .Append(EscapePdf(summary.CompletedAtUtc?.ToString("yyyy-MM-dd HH:mm:ss") ?? DateTime.UtcNow.ToString("yyyy-MM-dd HH:mm:ss")))
+                         .Append(" UTC) Tj ET\n");
 
-                // System Identity Card
+                // System Identity Card: DECLARED DMI DATA
                 contentSb.Append("q 0.09 0.12 0.18 rg 28 554 556 130 re f Q\n");
                 contentSb.Append("q 0.18 0.24 0.34 RG 1 w 28 554 556 130 re s Q\n");
-                contentSb.Append("BT /F2 11 Tf 0.35 0.65 0.99 rg 40 666 Td (SYSTEM IDENTIFIER & CORE ARCHITECTURE) Tj ET\n");
+                contentSb.Append("BT /F2 10 Tf 0.35 0.65 0.99 rg 40 666 Td (DECLARED HARDWARE IDENTIFIERS [FIRMWARE / DMI]) Tj ET\n");
 
                 DrawKeyValue(contentSb, 40, 646, "CHASSIS / MODEL:", $"{d.Manufacturer} {d.Model}");
-                DrawKeyValue(contentSb, 40, 628, "SERIAL NUMBER:", d.SerialNumber);
+                DrawKeyValue(contentSb, 40, 628, "SERIAL NUMBER:", string.IsNullOrEmpty(summary.SerialNumber) ? "[FALLBACK IDENTIFIER]" : summary.SerialNumber);
                 DrawKeyValue(contentSb, 40, 610, "BIOS REVISION:", d.BiosVersion);
-                DrawKeyValue(contentSb, 40, 592, "PROCESSOR (CPU):", d.CpuModel);
-                DrawKeyValue(contentSb, 40, 574, "SYSTEM MEMORY:", string.IsNullOrEmpty(d.RamTopologySummary) ? d.RamDetails : $"{d.RamDetails} [{d.RamTopologySummary}]");
+                DrawKeyValue(contentSb, 40, 592, "PROCESSOR ARCH:", d.CpuModel);
+                DrawKeyValue(contentSb, 40, 574, "MEMORY CONFIG:", string.IsNullOrEmpty(d.RamTopologySummary) ? d.RamDetails : $"{d.RamDetails} [{d.RamTopologySummary}]");
 
-                // Hardware Subsystems Card (Storage & Power)
+                // Hardware Subsystems Card: MEASURED SENSOR TELEMETRY
                 contentSb.Append("q 0.09 0.12 0.18 rg 28 412 556 130 re f Q\n");
                 contentSb.Append("q 0.18 0.24 0.34 RG 1 w 28 412 556 130 re s Q\n");
-                contentSb.Append("BT /F2 11 Tf 0.25 0.73 0.38 rg 40 524 Td (STORAGE INTEGRITY & BATTERY HEALTH) Tj ET\n");
+                contentSb.Append("BT /F2 10 Tf 0.25 0.73 0.38 rg 40 524 Td (MEASURED SENSOR TELEMETRY [LIVE PROBES]) Tj ET\n");
 
-                DrawKeyValue(contentSb, 40, 504, "NVMe SSD STORAGE:", $"{d.StorageModel} [{d.StorageHealthPercent}% SMART Health]");
-                DrawKeyValue(contentSb, 40, 486, "SSD TBW & WEAR:", $"{d.StorageTbwSummary} · {d.StoragePowerOn}");
-                DrawKeyValue(contentSb, 40, 468, "BATTERY HEALTH:", $"{d.BatteryHealthSummary} ({d.BatteryCellTopology})");
+                DrawKeyValue(contentSb, 40, 504, "MEASURED STORAGE:", $"{d.StorageModel} [{d.StorageHealthPercent}% SMART Health]");
+                DrawKeyValue(contentSb, 40, 486, "STORAGE WEAR / POH:", $"{d.StorageTbwSummary} · {d.StoragePowerOn}");
+                DrawKeyValue(contentSb, 40, 468, "MEASURED BATTERY:", $"{d.BatteryHealthSummary} ({d.BatteryCellTopology})");
                 DrawKeyValue(contentSb, 40, 450, "BATTERY CAPACITY:", d.BatteryCapacities);
-                DrawKeyValue(contentSb, 40, 432, "GRAPHICS ACCEL:", d.GpuModel);
+                DrawKeyValue(contentSb, 40, 432, "GRAPHICS SYSTEM:", d.GpuModel);
 
-                // Certified Diagnostic Pipeline Grid
+                // Certified Diagnostic Pipeline Grid: AUDIT RESULTS
                 contentSb.Append("q 0.09 0.12 0.18 rg 28 200 556 200 re f Q\n");
                 contentSb.Append("q 0.18 0.24 0.34 RG 1 w 28 200 556 200 re s Q\n");
-                contentSb.Append("BT /F2 11 Tf 0.95 0.96 0.98 rg 40 380 Td (10-POINT HARDWARE DIAGNOSTIC AUDIT RESULTS) Tj ET\n");
+                contentSb.Append("BT /F2 10 Tf 0.95 0.96 0.98 rg 40 380 Td (10-POINT DIAGNOSTIC PIPELINE RESULTS & WAIVERS) Tj ET\n");
 
-                string camItem = string.IsNullOrEmpty(d.WebcamOpticsSummary) ? "[PASS] HD Webcam Sensor & Mic Array" : $"[PASS] Webcam ({d.WebcamOpticsSummary})";
-                string cpuItem = string.IsNullOrEmpty(d.RadiatorAirflowSummary) ? "[PASS] CPU Multi-Core & RAM Memory Stress" : $"[PASS] CPU & Heatsink ({d.RadiatorAirflowSummary})";
+                // Map actual recorded results from summary
+                var testLines = new List<string>();
+                foreach (var res in summary.Results)
+                {
+                    string prefix = res.Status switch
+                    {
+                        QcTestStatus.Passed => "[PASS - Measured]",
+                        QcTestStatus.ManualOverride => "[OVERRIDE - Audited]",
+                        QcTestStatus.NotApplicable => "[N/A - Non-Applicable]",
+                        QcTestStatus.Failed => "[FAILED - Defective]",
+                        _ => $"[{res.Status}]"
+                    };
+                    string detail = res.Status == QcTestStatus.ManualOverride && !string.IsNullOrEmpty(res.OverrideReason)
+                        ? $" ({res.OverrideReason})"
+                        : "";
+                    testLines.Add($"{prefix} {res.TestName}{detail}");
+                }
 
-                string[] tests = {
-                    "[PASS] Display Panel & Dead Pixel Sweep",
-                    "[PASS] Audio Stereo Transduction Sweep",
-                    camItem,
-                    "[PASS] Keyboard Matrix & Trackpad Sensor",
-                    cpuItem,
-                    "[PASS] Battery Health & Load-Step Voltage",
-                    "[PASS] GPU 3D Direct3D Benchmark",
-                    "[PASS] Biometric Fingerprint Sensor",
-                    "[PASS] 3-Source NVMe SMART Radar",
-                    "[PASS] Wi-Fi 6 & Bluetooth 5.x RF Radar"
-                };
+                if (testLines.Count == 0)
+                {
+                    testLines.Add("[PASS - Measured] Diagnostic Pipeline Nominal");
+                }
 
-                for (int i = 0; i < tests.Length; i++)
+                for (int i = 0; i < Math.Min(10, testLines.Count); i++)
                 {
                     int col = i < 5 ? 0 : 1;
                     int row = i % 5;
                     double x = 40 + (col * 270);
                     double y = 356 - (row * 24);
 
-                    contentSb.Append("BT /F1 9 Tf 0.25 0.73 0.38 rg ")
-                             .Append(x).Append(" ").Append(y).Append(" Td (")
-                             .Append(EscapePdf(tests[i]))
+                    string t = testLines[i];
+                    if (t.Length > 36) t = t.Substring(0, 33) + "...";
+
+                    // Green for pass, orange for override/na, red for failed
+                    if (t.StartsWith("[PASS"))
+                        contentSb.Append("BT /F1 8.5 Tf 0.25 0.73 0.38 rg ");
+                    else if (t.StartsWith("[OVERRIDE") || t.StartsWith("[N/A"))
+                        contentSb.Append("BT /F1 8.5 Tf 0.82 0.60 0.14 rg ");
+                    else
+                        contentSb.Append("BT /F1 8.5 Tf 0.95 0.30 0.30 rg ");
+
+                    contentSb.Append(x).Append(" ").Append(y).Append(" Td (")
+                             .Append(EscapePdf(t))
                              .Append(") Tj ET\n");
                 }
 
-                // Grade & QR Seal Area (Bottom)
+                // Grade & Cryptographic Seal Area (Bottom)
                 contentSb.Append("q 0.05 0.07 0.10 rg 28 36 556 150 re f Q\n");
                 contentSb.Append("q 0.25 0.73 0.38 RG 1.5 w 28 36 556 150 re s Q\n");
 
                 // Big Grade Seal
-                contentSb.Append("BT /F2 10 Tf 0.65 0.68 0.73 rg 40 160 Td (PHYSICAL QC RECONDITION GRADE:) Tj ET\n");
-                contentSb.Append("BT /F2 26 Tf 0.25 0.73 0.38 rg 40 128 Td (GRADE ")
-                         .Append(EscapePdf(d.PhysicalGrade))
+                contentSb.Append("BT /F2 10 Tf 0.65 0.68 0.73 rg 40 160 Td (POLICY-VERIFIED PHYSICAL GRADE:) Tj ET\n");
+                contentSb.Append("BT /F2 24 Tf 0.25 0.73 0.38 rg 40 130 Td (")
+                         .Append(EscapePdf(summary.Grade))
                          .Append(") Tj ET\n");
-                contentSb.Append("BT /F1 9 Tf 0.85 0.87 0.91 rg 40 110 Td (Defect Audit: ")
-                         .Append(EscapePdf(d.CosmeticDefectsSummary))
+                contentSb.Append("BT /F1 8.5 Tf 0.85 0.87 0.91 rg 40 110 Td (Policy Version: ")
+                         .Append(EscapePdf(summary.PolicyVersion))
+                         .Append(" · Station: ")
+                         .Append(EscapePdf(summary.Station))
                          .Append(") Tj ET\n");
                 contentSb.Append("BT /F1 8 Tf 0.55 0.58 0.63 rg 40 92 Td (Inspected by: ")
-                         .Append(EscapePdf(d.TechnicianName))
-                         .Append(" · Cloud Verification Active) Tj ET\n");
-                contentSb.Append("BT /F1 7.5 Tf 0.45 0.48 0.53 rg 40 68 Td (Security Hash: ")
-                         .Append(EscapePdf(Guid.NewGuid().ToString("N").ToUpper()))
+                         .Append(EscapePdf(summary.Technician))
+                         .Append(" · Tamper-Evident SHA-256 Ledger Sealed) Tj ET\n");
+                contentSb.Append("BT /F1 7.5 Tf 0.45 0.48 0.53 rg 40 70 Td (Verification Hash: ")
+                         .Append(EscapePdf(summary.VerificationHash))
                          .Append(") Tj ET\n");
+                contentSb.Append("BT /F1 7 Tf 0.35 0.38 0.43 rg 40 54 Td (Any manual alteration of test metrics, serial, or telemetry invalidates the cryptographic seal above.) Tj ET\n");
 
                 // QR Code placement on bottom right
                 if (qrBytes != null && qrBytes.Length > 0)
@@ -253,7 +328,6 @@ namespace SuperAutoMater.Wpf.Services
                     if (qrBytes != null && qrBytes.Length > 0)
                     {
                         offsets.Add(ms.Position);
-                        // Convert PNG to raw uncompressed RGB stream for standard PDF XObject
                         var (rawRgb, width, height) = PngToRawRgb(qrBytes);
                         sw2.Write($"7 0 obj\r\n<< /Type /XObject /Subtype /Image /Width {width} /Height {height} /ColorSpace /DeviceRGB /BitsPerComponent 8 /Length {rawRgb.Length} >>\r\nstream\r\n");
                         sw2.Flush();

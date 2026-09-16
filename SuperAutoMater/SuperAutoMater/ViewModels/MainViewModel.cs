@@ -10,6 +10,7 @@ using System.Windows;
 using System.Windows.Input;
 using System.Windows.Media;
 using SuperAutoMater.Wpf.Services;
+using SuperAutoMater.Wpf.Core;
 
 namespace SuperAutoMater.Wpf.ViewModels
 {
@@ -92,7 +93,7 @@ namespace SuperAutoMater.Wpf.ViewModels
         public string Serial => _hw.SystemIdentity?.Serial ?? "Detecting...";
         public string Grade
         {
-            get => _hw.SystemIdentity?.Grade ?? "GRADE A+";
+            get => _hw.SystemIdentity?.Grade ?? "GRADE PENDING";
             set
             {
                 if (_hw.SystemIdentity != null) _hw.SystemIdentity.Grade = value;
@@ -793,6 +794,23 @@ namespace SuperAutoMater.Wpf.ViewModels
             await _hw.InitializeAsync();
             UpdateTestApplicability();
             SyncCollections();
+
+            try
+            {
+                QcRunOrchestrator.Instance.InitializeRun(new QcRunIdentity
+                {
+                    AssetTag = !string.IsNullOrWhiteSpace(Serial) && Serial != "Detecting..." ? Serial : "",
+                    SerialNumber = Serial,
+                    Model = Model,
+                    Technician = TechnicianDisplayBadge,
+                    Station = TechnicianStation
+                });
+            }
+            catch (Exception ex)
+            {
+                AppLogger.Warn("Failed to initialize QcRunOrchestrator run", ex);
+            }
+
             OnPropertyChanged("");
         }
 
@@ -808,6 +826,14 @@ namespace SuperAutoMater.Wpf.ViewModels
                 touchscreenTest.IsActive = false;
                 touchscreenTest.Status = "NOT APPLICABLE";
                 touchscreenTest.StatusBadge = "—";
+                try
+                {
+                    QcRunOrchestrator.Instance.RecordTestNotApplicable("Touchscreen", "TOUCHSCREEN / DIGITIZER", "Non-touch display hardware");
+                }
+                catch (Exception ex)
+                {
+                    AppLogger.Warn("Failed to record Touchscreen N/A in orchestrator", ex);
+                }
             }
             else if (touchscreenTest.IsApplicable && touchscreenTest.Status == "NOT APPLICABLE")
             {
@@ -831,10 +857,67 @@ namespace SuperAutoMater.Wpf.ViewModels
                         test.Status = "PASSED";
                         test.StatusBadge = "✓";
                         PassCount++;
+
+                        try
+                        {
+                            QcRunOrchestrator.Instance.RecordTestPassed(test.Key, test.Title, isAutomated: true);
+                        }
+                        catch (Exception ex)
+                        {
+                            AppLogger.Warn($"Failed to record {key} passed in orchestrator", ex);
+                        }
                     }
                     break;
                 }
             }
+        }
+
+        public void MarkTestFailed(string key, string reason)
+        {
+            foreach (var test in TestPipeline)
+            {
+                if (test.Key.Equals(key, StringComparison.OrdinalIgnoreCase))
+                {
+                    test.IsPassed = false;
+                    test.IsActive = false;
+                    test.Status = "FAILED";
+                    test.StatusBadge = "✗";
+
+                    try
+                    {
+                        QcRunOrchestrator.Instance.RecordTestFailed(test.Key, test.Title, reason);
+                    }
+                    catch (Exception ex)
+                    {
+                        AppLogger.Warn($"Failed to record {key} failed in orchestrator", ex);
+                    }
+                    break;
+                }
+            }
+        }
+
+        public bool RecordTestOverride(string key, string reason, string approver, out string error)
+        {
+            error = "";
+            foreach (var test in TestPipeline)
+            {
+                if (test.Key.Equals(key, StringComparison.OrdinalIgnoreCase))
+                {
+                    bool ok = QcRunOrchestrator.Instance.RecordTestOverride(key, reason, TechnicianDisplayBadge, approver, out error);
+                    if (ok)
+                    {
+                        test.IsPassed = true;
+                        test.IsActive = false;
+                        test.Status = "OVERRIDDEN";
+                        test.StatusBadge = "⚠";
+                        PassCount++;
+                        return true;
+                    }
+                    return false;
+                }
+            }
+            error = "Test item not found in pipeline.";
+            return false;
         }
 
         public void MarkNextTestPassed()
@@ -843,11 +926,7 @@ namespace SuperAutoMater.Wpf.ViewModels
             {
                 if (test.IsApplicable && !test.IsPassed)
                 {
-                    test.IsPassed = true;
-                    test.IsActive = false;
-                    test.Status = "PASSED";
-                    test.StatusBadge = "✓";
-                    PassCount++;
+                    MarkTestPassed(test.Key);
                     break;
                 }
             }
@@ -857,28 +936,12 @@ namespace SuperAutoMater.Wpf.ViewModels
         {
             try
             {
-                var record = new AssetQueueRecord
-                {
-                    Asset_Tag = !string.IsNullOrWhiteSpace(Serial) && Serial != "Detecting..." ? Serial : $"QC-{DateTime.Now:MMdd-HHmm}",
-                    Serial_Number = Serial,
-                    Model = Model,
-                    Processor = CpuName,
-                    Memory = $"{RamSummary} / {StorageSummary}",
-                    Battery_Health = BatteryHealth,
-                    Status = PassCount >= 6 ? "RTS" : "WIP",
-                    Wip_Issue = PassCount >= 6 ? "All Okay" : "Requires Inspection",
-                    Physical_Grade = Grade ?? "A+",
-                    Remarks = $"SuperAutoMater WPF v1.0 Sync | Tests: {PipelineStatusText}",
-                    Shelf_Location = "QC-BAY-01",
-                    Timestamp = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss")
-                };
-
-                OfflineSyncQueue.Instance.Enqueue(record);
-                int flushed = await OfflineSyncQueue.Instance.FlushQueueAsync(OfflineSyncQueue.DefaultSheetsUrl);
-                System.Windows.MessageBox.Show($"Inventory record for {Model} ({Serial}) queued and synced ({flushed} dispatched to Google Sheets)!", "Google Sheets Cloud Sync", MessageBoxButton.OK, MessageBoxImage.Information);
+                int flushed = await SyncOutboxDispatcher.Instance.FlushPendingAsync();
+                System.Windows.MessageBox.Show($"Durable cloud sync complete ({flushed} events dispatched)!", "Google Sheets Cloud Sync", MessageBoxButton.OK, MessageBoxImage.Information);
             }
             catch (Exception ex)
             {
+                AppLogger.Warn("SyncToSheetsAsync failed", ex);
                 System.Windows.MessageBox.Show("Sync Error: " + ex.Message, "Sheets Sync Failed", MessageBoxButton.OK, MessageBoxImage.Warning);
             }
         }
@@ -917,6 +980,12 @@ namespace SuperAutoMater.Wpf.ViewModels
 
         public AssetQueueRecord CreateCurrentAssetRecord()
         {
+            var summary = QcRunOrchestrator.Instance.GetCurrentSummary();
+            if (summary != null && summary.Status == QcRunStatus.Completed)
+            {
+                return ThermalLabelPrinter.FromRunSummary(summary);
+            }
+
             return new AssetQueueRecord
             {
                 Asset_Tag = !string.IsNullOrWhiteSpace(Serial) && Serial != "Detecting..." ? Serial : $"QC-{DateTime.Now:MMdd-HHmm}",
@@ -925,9 +994,9 @@ namespace SuperAutoMater.Wpf.ViewModels
                 Processor = CpuName,
                 Memory = $"{RamSummary} / {StorageSummary}",
                 Battery_Health = BatteryHealth,
-                Status = PassCount >= 6 ? "RTS" : "WIP",
-                Wip_Issue = PassCount >= 6 ? "All Okay" : "Requires Inspection",
-                Physical_Grade = Grade ?? "A+",
+                Status = PassCount >= RequiredTestCount && RequiredTestCount > 0 ? "RTS" : "WIP",
+                Wip_Issue = PassCount >= RequiredTestCount && RequiredTestCount > 0 ? "All Okay" : "Diagnostics Incomplete",
+                Physical_Grade = Grade ?? "PENDING",
                 Remarks = $"SuperAutoMater Label | {PipelineStatusText} | TBW: {TbwWrittenTb:F1}TB",
                 Shelf_Location = TechnicianStation,
                 Technician = TechnicianDisplayBadge,

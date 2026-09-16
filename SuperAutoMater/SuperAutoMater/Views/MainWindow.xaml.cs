@@ -20,6 +20,7 @@ using AForge.Video.DirectShow;
 using NAudio.Wave;
 using SuperAutoMater.Wpf.Services;
 using SuperAutoMater.Wpf.ViewModels;
+using SuperAutoMater.Wpf.Core;
 
 namespace SuperAutoMater.Wpf.Views
 {
@@ -777,12 +778,37 @@ namespace SuperAutoMater.Wpf.Views
 
         private void BtnExportPdf_Click(object sender, RoutedEventArgs e)
         {
+            BtnQuickCertificate_Click(sender, e);
+        }
+
+        private void BtnQuickCertificate_Click(object sender, RoutedEventArgs e)
+        {
             if (ViewModel == null) return;
             try
             {
+                // Gate certificate generation behind completed QC run
+                bool completed = QcRunOrchestrator.Instance.TryCompleteRun(
+                    ViewModel.BatteryHealth,
+                    ViewModel.HdsHealth,
+                    out string failReason,
+                    out var summary);
+
+                if (!completed)
+                {
+                    ShowFeedback($"Audit Gate Incomplete: {failReason}", "⚠", "#F85149");
+                    MessageBox.Show(
+                        $"Cannot generate QC Certificate:\n\n{failReason}\n\nAll mandatory tests must pass or be approved manual overrides before generating a certificate.",
+                        "QC Audit Gate",
+                        MessageBoxButton.OK,
+                        MessageBoxImage.Warning);
+                    return;
+                }
+
                 var certData = new CertificateData
                 {
-                    SerialNumber = ViewModel.Serial,
+                    RunSummary = summary,
+                    RunId = summary.RunId,
+                    SerialNumber = summary.SerialNumber,
                     Manufacturer = ViewModel.Manufacturer,
                     Model = ViewModel.Model,
                     BiosVersion = "UEFI Compliant",
@@ -795,9 +821,9 @@ namespace SuperAutoMater.Wpf.Views
                     BatteryCapacities = $"{ViewModel.BatteryFullChargeCapacityMwh} / {ViewModel.BatteryDesignCapacityMwh} mWh",
                     BatteryCellTopology = $"{ViewModel.BatteryCellTopology} · {ViewModel.BatteryCellBalanceBadge}",
                     GpuModel = ViewModel.GpuName,
-                    PhysicalGrade = ViewModel.Grade,
+                    PhysicalGrade = summary.Grade,
                     CosmeticDefectsSummary = ViewModel.CosmeticDefectsSummary,
-                    TechnicianName = ViewModel.TechnicianDisplayBadge,
+                    TechnicianName = summary.Technician,
                     StorageTbwSummary = ViewModel.TbwDisplaySummary,
                     DriverIntegritySummary = ViewModel.MissingDriversSummary,
                     ThermalDissipationVerdict = ThermalProfilerService.Instance.GetCurrentResult().ConditionSummary,
@@ -811,7 +837,7 @@ namespace SuperAutoMater.Wpf.Views
                 {
                     foreach (var test in ViewModel.TestPipeline)
                     {
-                        if (test.StatusBadge == "✓")
+                        if (test.StatusBadge == "✓" || test.StatusBadge == "⚠")
                         {
                             certData.PassedTests.Add(test.Title);
                         }
@@ -820,10 +846,11 @@ namespace SuperAutoMater.Wpf.Views
 
                 string pdfPath = PdfCertificateService.Instance.GenerateCertificate(certData);
                 PdfCertificateService.Instance.OpenCertificate(pdfPath);
-                ShowFeedback("1-Click PDF Certificate Dispatched to Desktop ✓", "📄", "#3FB950");
+                ShowFeedback("Verified PDF Certificate Dispatched to Desktop ✓", "📄", "#3FB950");
             }
             catch (Exception ex)
             {
+                AppLogger.Error("Failed to generate PDF Certificate", ex);
                 ShowFeedback($"PDF Export Error: {ex.Message}", "⚠", "#D29922");
             }
         }
@@ -991,6 +1018,47 @@ namespace SuperAutoMater.Wpf.Views
             if (sender is FrameworkElement elem && elem.DataContext is DiagnosticTestItem test)
             {
                 RunDiagnosticTest(test.Key);
+            }
+        }
+
+        private void MenuItemRunTest_Click(object sender, RoutedEventArgs e)
+        {
+            if (sender is FrameworkElement elem && elem.DataContext is DiagnosticTestItem test)
+            {
+                RunDiagnosticTest(test.Key);
+            }
+        }
+
+        private void MenuItemManualOverride_Click(object sender, RoutedEventArgs e)
+        {
+            if (sender is FrameworkElement elem && elem.DataContext is DiagnosticTestItem test)
+            {
+                bool reqSupervisor = QcRunOrchestrator.Instance.Policy.RequiresSupervisorApproval(test.Key);
+                var dlg = new OverrideModalDialog(test.Key, test.Title, ViewModel?.TechnicianName, reqSupervisor) { Owner = this };
+                if (dlg.ShowDialog() == true)
+                {
+                    bool ok = ViewModel.RecordTestOverride(test.Key, dlg.Reason, dlg.Approver, out string err);
+                    if (ok)
+                    {
+                        ShowFeedback($"Test '{test.Title}' Overridden (Audited) ✓", "⚠", "#D29922");
+                    }
+                    else
+                    {
+                        MessageBox.Show($"Override rejected: {err}", "Audit Restriction", MessageBoxButton.OK, MessageBoxImage.Warning);
+                    }
+                }
+            }
+        }
+
+        private void MenuItemMarkNa_Click(object sender, RoutedEventArgs e)
+        {
+            if (sender is FrameworkElement elem && elem.DataContext is DiagnosticTestItem test)
+            {
+                test.IsApplicable = false;
+                test.Status = "NOT APPLICABLE";
+                test.StatusBadge = "—";
+                QcRunOrchestrator.Instance.RecordTestNotApplicable(test.Key, test.Title, "Marked Not Applicable by operator");
+                ShowFeedback($"Test '{test.Title}' set to Not Applicable", "—", "#8B949E");
             }
         }
 

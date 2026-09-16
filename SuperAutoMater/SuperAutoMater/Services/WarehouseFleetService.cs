@@ -372,17 +372,43 @@ namespace SuperAutoMater.Wpf.Services
                             }
                         }
 
-                        string pdfPath = PdfCertificateService.Instance.GenerateCertificate(certData);
-                        if (File.Exists(pdfPath))
+                        try
                         {
-                            responseBytes = File.ReadAllBytes(pdfPath);
-                            contentType = "application/pdf";
-                            context.Response.Headers.Add("Content-Disposition", $"attachment; filename=\"SuperAutoMater_Certificate_{vm.Serial}.pdf\"");
+                            bool completed = SuperAutoMater.Wpf.Core.QcRunOrchestrator.Instance.TryCompleteRun(
+                                vm.BatteryHealth,
+                                vm.HdsHealth,
+                                out string failReason,
+                                out var summary);
+
+                            if (!completed)
+                            {
+                                responseBytes = Encoding.UTF8.GetBytes($"{{\"error\":\"Cannot generate certificate: {failReason}\"}}");
+                                contentType = "application/json";
+                                context.Response.StatusCode = 400;
+                            }
+                            else
+                            {
+                                certData.RunSummary = summary;
+                                certData.RunId = summary.RunId;
+                                string pdfPath = PdfCertificateService.Instance.GenerateCertificate(certData);
+                                if (File.Exists(pdfPath))
+                                {
+                                    responseBytes = File.ReadAllBytes(pdfPath);
+                                    contentType = "application/pdf";
+                                    context.Response.Headers.Add("Content-Disposition", $"attachment; filename=\"SuperAutoMater_Certificate_{vm.Serial}.pdf\"");
+                                }
+                                else
+                                {
+                                    responseBytes = Encoding.UTF8.GetBytes("{\"error\":\"PDF generation failed\"}");
+                                    contentType = "application/json";
+                                }
+                            }
                         }
-                        else
+                        catch (Exception ex)
                         {
-                            responseBytes = Encoding.UTF8.GetBytes("{\"error\":\"PDF generation failed\"}");
+                            responseBytes = Encoding.UTF8.GetBytes($"{{\"error\":\"{ex.Message}\"}}");
                             contentType = "application/json";
+                            context.Response.StatusCode = 400;
                         }
                     }
                     else

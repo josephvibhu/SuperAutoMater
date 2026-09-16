@@ -211,6 +211,13 @@
                             <ItemsControl.ItemTemplate>
                                 <DataTemplate>
                                     <Border Margin="0,0,0,7" CornerRadius="10" Padding="10,8" Cursor="Hand" MouseLeftButtonUp="TestRow_Click">
+                                        <Border.ContextMenu>
+                                            <ContextMenu Background="#161B22" Foreground="#E6EDF3" BorderBrush="#30363D">
+                                                <MenuItem Header="▶ Run Diagnostic Test" Click="MenuItemRunTest_Click"/>
+                                                <MenuItem Header="⚠ Record Manual Override..." Click="MenuItemManualOverride_Click"/>
+                                                <MenuItem Header="— Mark Not Applicable" Click="MenuItemMarkNa_Click"/>
+                                            </ContextMenu>
+                                        </Border.ContextMenu>
                                         <Border.Style>
                                             <Style TargetType="Border">
                                                 <Setter Property="Background" Value="#161B22"/>

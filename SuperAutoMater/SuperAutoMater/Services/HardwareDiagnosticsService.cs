@@ -18,7 +18,7 @@ namespace SuperAutoMater.Wpf.Services
         public string Model { get; set; } = "Detecting Chassis...";
         public string Serial { get; set; } = "Detecting...";
         public string BiosVersion { get; set; } = "";
-        public string Grade { get; set; } = "GRADE A+";
+        public string Grade { get; set; } = "GRADE PENDING";
     }
 
     public class CpuTelemetryModel

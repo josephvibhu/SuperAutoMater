@@ -10,6 +10,7 @@ using QRCoder;
 using ZXing;
 using ZXing.Common;
 using ZXing.Windows.Compatibility;
+using SuperAutoMater.Wpf.Core;
 
 namespace SuperAutoMater
 {
@@ -40,6 +41,50 @@ namespace SuperAutoMater
                 LabelSizePreset.Compact2x1 => (500, 250, 200, 100, 144, 72),
                 LabelSizePreset.Pallet4x2  => (800, 400, 400, 200, 288, 144),
                 _                          => (600, 400, 300, 200, 216, 144) // Default Chassis 3"x2"
+            };
+        }
+
+        public static void PrintLabel(
+            QcRunSummary summary,
+            LabelSizePreset preset = LabelSizePreset.Chassis3x2,
+            BarcodeMode barcodeMode = BarcodeMode.QrCode,
+            IWin32Window owner = null)
+        {
+            PrintLabel(FromRunSummary(summary), preset, barcodeMode, owner);
+        }
+
+        public static bool ExportPdfLabel(
+            QcRunSummary summary,
+            LabelSizePreset preset,
+            BarcodeMode barcodeMode,
+            string targetPath)
+        {
+            return ExportPdfLabel(FromRunSummary(summary), preset, barcodeMode, targetPath);
+        }
+
+        public static Bitmap RenderLabelBitmap(
+            QcRunSummary summary,
+            LabelSizePreset preset = LabelSizePreset.Chassis3x2,
+            BarcodeMode barcodeMode = BarcodeMode.QrCode)
+        {
+            return RenderLabelBitmap(FromRunSummary(summary), preset, barcodeMode);
+        }
+
+        public static AssetQueueRecord FromRunSummary(QcRunSummary summary)
+        {
+            if (summary == null) return new AssetQueueRecord { Physical_Grade = "PENDING", Status = "WIP" };
+            string shortRunId = string.IsNullOrEmpty(summary.RunId) ? "" : (summary.RunId.Length > 8 ? summary.RunId.Substring(0, 8) : summary.RunId);
+            string shortHash = string.IsNullOrEmpty(summary.VerificationHash) ? "" : (summary.VerificationHash.Length > 8 ? summary.VerificationHash.Substring(0, 8) : summary.VerificationHash);
+            return new AssetQueueRecord
+            {
+                Asset_Tag = string.IsNullOrWhiteSpace(summary.AssetTag) ? summary.SerialNumber : summary.AssetTag,
+                Serial_Number = summary.SerialNumber,
+                Model = summary.Model,
+                Physical_Grade = summary.Grade ?? "PENDING",
+                Status = summary.Status == QcRunStatus.Completed ? "RTS" : "WIP",
+                Technician = summary.Technician,
+                Remarks = $"RUN:{shortRunId}|HASH:{shortHash}",
+                Timestamp = summary.CompletedAtUtc?.ToString("yyyy-MM-dd HH:mm:ss") ?? DateTime.UtcNow.ToString("yyyy-MM-dd HH:mm:ss")
             };
         }
 
@@ -144,8 +189,9 @@ namespace SuperAutoMater
                     return true;
                 }
             }
-            catch
+            catch (Exception ex)
             {
+                AppLogger.Warn($"ExportPdfLabel failed for target {targetPath}", ex);
                 return false;
             }
         }
@@ -458,9 +504,11 @@ namespace SuperAutoMater
                 using (Font fontPill = new Font("Arial", pillFontSize, FontStyle.Bold))
                 using (SolidBrush whiteBrush = new SolidBrush(Color.White))
                 {
-                    string grade = string.IsNullOrWhiteSpace(r.Physical_Grade) ? "A+" : r.Physical_Grade.Trim();
-                    string status = string.IsNullOrWhiteSpace(r.Status) ? "RTS" : r.Status.Trim();
-                    string pillText = $"★ GRADE {grade} · PASSED {status} ★";
+                    string grade = string.IsNullOrWhiteSpace(r.Physical_Grade) ? "PENDING" : r.Physical_Grade.Trim();
+                    string status = string.IsNullOrWhiteSpace(r.Status) ? "WIP" : r.Status.Trim();
+                    string pillText = status == "RTS"
+                        ? $"★ GRADE {grade} · PASSED RTS ★"
+                        : $"★ GRADE {grade} · {status} ★";
                     g.DrawString(pillText, fontPill, whiteBrush, pillRect, sfCenter);
                 }
             }
@@ -486,7 +534,10 @@ namespace SuperAutoMater
                     g.DrawImage(qrBmp, rect);
                 }
             }
-            catch { }
+            catch (Exception ex)
+            {
+                AppLogger.Warn("DrawFallbackQr failed", ex);
+            }
         }
     }
 }

@@ -72,11 +72,20 @@ namespace SuperAutoMater.Wpf.Core
         public static void Debug(string component, string message, object context = null) =>
             Enqueue(LogLevel.Debug, component, message, null, context);
 
+        public static void Info(string message) =>
+            Enqueue(LogLevel.Info, "General", message, null, null);
+
         public static void Info(string component, string message, object context = null) =>
             Enqueue(LogLevel.Info, component, message, null, context);
 
+        public static void Warn(string message, Exception ex = null) =>
+            Enqueue(LogLevel.Warning, "General", message, ex, null);
+
         public static void Warn(string component, string message, Exception ex = null, object context = null) =>
             Enqueue(LogLevel.Warning, component, message, ex, context);
+
+        public static void Error(string message, Exception ex = null) =>
+            Enqueue(LogLevel.Error, "General", message, ex, null);
 
         public static void Error(string component, string message, Exception ex = null, object context = null) =>
             Enqueue(LogLevel.Error, component, message, ex, context);
