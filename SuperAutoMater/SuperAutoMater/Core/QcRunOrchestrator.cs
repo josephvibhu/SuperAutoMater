@@ -45,17 +45,26 @@ namespace SuperAutoMater.Wpf.Core
                 // Check for interrupted run recovery unless forced fresh
                 if (!forceFreshRun)
                 {
-                    string existingRunId = _store.FindActiveRunForAsset(identity.SerialNumber);
-                    if (string.IsNullOrEmpty(existingRunId) && !string.IsNullOrEmpty(identity.AssetTag))
+                    var asset = _store.FindAssetBySerialOrTag(identity.SerialNumber);
+                    if (asset == null && !string.IsNullOrEmpty(identity.AssetTag))
                     {
-                        existingRunId = _store.FindActiveRunForAsset(identity.AssetTag);
+                        asset = _store.FindAssetBySerialOrTag(identity.AssetTag);
                     }
 
-                    if (!string.IsNullOrEmpty(existingRunId))
+                    if (asset == null || asset.LifecycleQueue != AssetQueueStatus.Retest)
                     {
-                        CurrentRunId = existingRunId;
-                        AppLogger.Info($"Resumed active QC run '{existingRunId}' for asset '{identity.SerialNumber}'");
-                        return existingRunId;
+                        string existingRunId = _store.FindActiveRunForAsset(identity.SerialNumber);
+                        if (string.IsNullOrEmpty(existingRunId) && !string.IsNullOrEmpty(identity.AssetTag))
+                        {
+                            existingRunId = _store.FindActiveRunForAsset(identity.AssetTag);
+                        }
+
+                        if (!string.IsNullOrEmpty(existingRunId))
+                        {
+                            CurrentRunId = existingRunId;
+                            AppLogger.Info($"Resumed active QC run '{existingRunId}' for asset '{identity.SerialNumber}'");
+                            return existingRunId;
+                        }
                     }
                 }
 

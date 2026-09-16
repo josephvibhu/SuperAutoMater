@@ -5,12 +5,14 @@ using System.Linq;
 using System.Net;
 using System.Net.NetworkInformation;
 using System.Net.Sockets;
+using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Windows.Media.Imaging;
 using QRCoder;
+using SuperAutoMater.Wpf.Core;
 using SuperManager.Models;
 
 namespace SuperManager.Services
@@ -25,10 +27,13 @@ namespace SuperManager.Services
         private TcpListener _tcpListener;
         private CancellationTokenSource _cts;
         private byte[] _qrPngBytes;
+        private readonly string _adminSessionToken = Convert.ToHexString(RandomNumberGenerator.GetBytes(32));
 
         public int Port { get; private set; } = DEFAULT_PORT;
         public string LocalIpAddress { get; private set; } = "127.0.0.1";
-        public string DashboardUrl => $"http://{LocalIpAddress}:{Port}";
+        public string BindHost { get; set; } = "127.0.0.1";
+        public string AdminToken => _adminSessionToken;
+        public string DashboardUrl => $"http://{LocalIpAddress}:{Port}/?token={_adminSessionToken}";
         public BitmapSource QrCodeBitmap { get; private set; }
 
         private ManagerWebServer() { }
@@ -47,12 +52,12 @@ namespace SuperManager.Services
                 {
                     try
                     {
-                        // Bind to IPAddress.Any (0.0.0.0) so ALL network interfaces (Wi-Fi, Ethernet) accept connections
-                        // Standard sockets do NOT require Windows Administrator or URL ACL permissions!
-                        _tcpListener = new TcpListener(IPAddress.Any, p);
+                        // Secure Binding: bind to configured host (default 127.0.0.1) without automatic firewall alterations
+                        IPAddress bindAddress = IPAddress.TryParse(BindHost, out var parsed) ? parsed : IPAddress.Loopback;
+                        _tcpListener = new TcpListener(bindAddress, p);
                         _tcpListener.Start();
                         Port = p;
-                        EnsureFirewallRule(p);
+                        AppLogger.Info($"[ManagerWebServer] Securely bound to {bindAddress}:{p} without automatic firewall modifications.");
                         break;
                     }
                     catch
@@ -125,21 +130,58 @@ namespace SuperManager.Services
 
                     if (method == "OPTIONS")
                     {
-                        string corsHeader = "HTTP/1.1 204 No Content\r\n" +
-                                            "Access-Control-Allow-Origin: *\r\n" +
-                                            "Access-Control-Allow-Methods: GET, POST, OPTIONS\r\n" +
-                                            "Access-Control-Allow-Headers: *\r\n" +
-                                            "Content-Length: 0\r\n" +
-                                            "Connection: close\r\n\r\n";
+                        string corsHeader = $"HTTP/1.1 204 No Content\r\n" +
+                                            $"Access-Control-Allow-Origin: http://127.0.0.1:{Port}\r\n" +
+                                            $"Access-Control-Allow-Methods: GET, POST, OPTIONS\r\n" +
+                                            $"Access-Control-Allow-Headers: Authorization, Content-Type\r\n" +
+                                            $"Content-Length: 0\r\n" +
+                                            $"Connection: close\r\n\r\n";
                         byte[] corsBytes = Encoding.UTF8.GetBytes(corsHeader);
                         await stream.WriteAsync(corsBytes, 0, corsBytes.Length);
                         return;
                     }
 
+                    if (path.StartsWith("/api/"))
+                    {
+                        bool isAuthorized = IsAuthorized(requestText, rawUrl);
+                        if (!isAuthorized)
+                        {
+                            AppLogger.Warn($"[Security] Unauthorized access attempt to {path} from {client.Client?.RemoteEndPoint}");
+                            byte[] unauthBody = Encoding.UTF8.GetBytes("{\"error\":\"Valid admin authorization token is required.\"}");
+                            string unauthHeader = $"HTTP/1.1 401 Unauthorized\r\n" +
+                                                  $"Content-Type: application/json; charset=utf-8\r\n" +
+                                                  $"Content-Length: {unauthBody.Length}\r\n" +
+                                                  $"Access-Control-Allow-Origin: http://127.0.0.1:{Port}\r\n" +
+                                                  $"Connection: close\r\n\r\n";
+                            byte[] unauthHeaderBytes = Encoding.UTF8.GetBytes(unauthHeader);
+                            await stream.WriteAsync(unauthHeaderBytes, 0, unauthHeaderBytes.Length);
+                            await stream.WriteAsync(unauthBody, 0, unauthBody.Length);
+                            await stream.FlushAsync();
+                            return;
+                        }
+                    }
+
                     byte[] body;
                     string contentType;
 
-                    if (path == "/api/fleet")
+                    if (path == "/api/wip")
+                    {
+                        var journeyService = new WarehouseJourneyService();
+                        var board = journeyService.GetWipBoard();
+                        string json = JsonSerializer.Serialize(board, new JsonSerializerOptions { WriteIndented = true });
+                        body = Encoding.UTF8.GetBytes(json);
+                        contentType = "application/json; charset=utf-8";
+                    }
+                    else if (path == "/api/wip/asset")
+                    {
+                        string assetId = ExtractQueryParam(rawUrl, "id");
+                        var journeyService = new WarehouseJourneyService();
+                        var journey = journeyService.GetAssetJourney(assetId);
+                        string json = JsonSerializer.Serialize(journey, new JsonSerializerOptions { WriteIndented = true });
+                        body = Encoding.UTF8.GetBytes(json);
+                        contentType = "application/json; charset=utf-8";
+                    }
+                    else if (path == "/api/fleet")
                     {
                         var benches = FleetDiscoveryService.Instance.Devices.ToList();
                         var kpis = InventoryStorageService.Instance.ComputeKpiSummary(benches);
@@ -196,7 +238,7 @@ namespace SuperManager.Services
                                             $"Content-Type: {contentType}\r\n" +
                                             $"Content-Length: {body.Length}\r\n" +
                                             $"Connection: close\r\n" +
-                                            $"Access-Control-Allow-Origin: *\r\n\r\n";
+                                            $"Access-Control-Allow-Origin: http://127.0.0.1:{Port}\r\n\r\n";
                     byte[] headerBytes = Encoding.UTF8.GetBytes(responseHeader);
                     await stream.WriteAsync(headerBytes, 0, headerBytes.Length);
                     await stream.WriteAsync(body, 0, body.Length);
@@ -204,6 +246,29 @@ namespace SuperManager.Services
                 }
             }
             catch { }
+        }
+
+        private bool IsAuthorized(string requestText, string rawUrl)
+        {
+            if (rawUrl.Contains($"token={_adminSessionToken}")) return true;
+            if (requestText.Contains($"Authorization: Bearer {_adminSessionToken}", StringComparison.OrdinalIgnoreCase)) return true;
+            return false;
+        }
+
+        private static string ExtractQueryParam(string rawUrl, string key)
+        {
+            var parts = rawUrl.Split('?');
+            if (parts.Length < 2) return "";
+            var pairs = parts[1].Split('&');
+            foreach (var pair in pairs)
+            {
+                var kv = pair.Split('=');
+                if (kv.Length == 2 && string.Equals(kv[0], key, StringComparison.OrdinalIgnoreCase))
+                {
+                    return Uri.UnescapeDataString(kv[1]);
+                }
+            }
+            return "";
         }
 
         private string DetectLanIp()
@@ -266,20 +331,6 @@ namespace SuperManager.Services
             catch { }
 
             return "127.0.0.1";
-        }
-
-        private void EnsureFirewallRule(int port)
-        {
-            try
-            {
-                var psi = new ProcessStartInfo("netsh", $"advfirewall firewall add rule name=\"SuperManager Web HUD (Port {port})\" dir=in action=allow protocol=TCP localport={port}")
-                {
-                    CreateNoWindow = true,
-                    UseShellExecute = false
-                };
-                Process.Start(psi)?.WaitForExit(1000);
-            }
-            catch { }
         }
 
         private void GenerateQrCode()

@@ -187,6 +187,24 @@ CREATE INDEX IF NOT EXISTS ix_custody_asset ON custody_events(asset_id);
                 AddColumnIfNotExists(connection, "qc_runs", "grade", "TEXT NULL");
 
                 Execute(connection, "INSERT OR IGNORE INTO schema_migrations(version, applied_at_utc) VALUES(2, CURRENT_TIMESTAMP);");
+
+                // Migration 3: Warehouse Lifecycle Queues, Intake Batching & Custody Tracking
+                AddColumnIfNotExists(connection, "assets", "lifecycle_queue", "TEXT NOT NULL DEFAULT 'ReadyForTest'");
+                AddColumnIfNotExists(connection, "assets", "intake_batch_id", "TEXT NULL");
+                AddColumnIfNotExists(connection, "assets", "source_stream", "TEXT NULL");
+                AddColumnIfNotExists(connection, "assets", "current_location", "TEXT NULL DEFAULT 'INTAKE-STAGING'");
+                AddColumnIfNotExists(connection, "assets", "charger_status", "TEXT NULL DEFAULT 'NoChargerMissing'");
+                AddColumnIfNotExists(connection, "assets", "test_profile_id", "TEXT NULL DEFAULT 'standard-refurb-v1'");
+
+                AddColumnIfNotExists(connection, "custody_events", "reason_code", "TEXT NULL");
+                AddColumnIfNotExists(connection, "custody_events", "batch_id", "TEXT NULL");
+                AddColumnIfNotExists(connection, "custody_events", "scan_confirmed", "INTEGER NOT NULL DEFAULT 1");
+
+                Execute(connection, "CREATE INDEX IF NOT EXISTS ix_assets_queue ON assets(lifecycle_queue);");
+                Execute(connection, "CREATE INDEX IF NOT EXISTS ix_assets_tag_nonempty ON assets(asset_tag) WHERE asset_tag IS NOT NULL AND asset_tag <> '';");
+                Execute(connection, "CREATE INDEX IF NOT EXISTS ix_custody_recorded ON custody_events(recorded_at_utc DESC);");
+
+                Execute(connection, "INSERT OR IGNORE INTO schema_migrations(version, applied_at_utc) VALUES(3, CURRENT_TIMESTAMP);");
             }
         }
 
@@ -239,6 +257,16 @@ VALUES($id, $assetId, $technician, $station, $policy, 'InProgress', $started);";
                     command.Parameters.AddWithValue("$started", now);
                     command.ExecuteNonQuery();
                 }
+
+                using (var updateQueue = connection.CreateCommand())
+                {
+                    updateQueue.Transaction = transaction;
+                    updateQueue.CommandText = "UPDATE assets SET lifecycle_queue='InTest', updated_at_utc=$now WHERE id=$assetId;";
+                    updateQueue.Parameters.AddWithValue("$now", now);
+                    updateQueue.Parameters.AddWithValue("$assetId", assetId);
+                    updateQueue.ExecuteNonQuery();
+                }
+
                 AddOutboxEvent(connection, transaction, "QcRunStarted", runId, "{\"runId\":\"" + runId + "\",\"assetId\":\"" + assetId + "\"}", now);
                 transaction.Commit();
                 AppLogger.Info($"Started new QC run {runId} for asset {assetId}");
@@ -360,7 +388,7 @@ status='ManualOverride', override_reason=excluded.override_reason, approved_by=e
             {
                 using var connection = Open();
                 using var transaction = connection.BeginTransaction();
-                EnsureActiveRun(connection, transaction, runId);
+                EnsureRunExists(connection, transaction, runId);
 
                 using (var cmd = connection.CreateCommand())
                 {
@@ -421,6 +449,55 @@ VALUES($id, $runId, $key, $type, $path, $hash, $meta, $recorded);";
                 transaction.Commit();
                 AppLogger.Info($"Completed QC run '{runId}' with verification hash '{verificationHash}' and grade '{grade}'");
                 return true;
+            }
+        }
+
+        public void AbortRun(string runId, string reason = "Run aborted")
+        {
+            if (string.IsNullOrWhiteSpace(runId)) return;
+            lock (_gate)
+            {
+                using var connection = Open();
+                using var transaction = connection.BeginTransaction();
+                string now = UtcNow();
+                using var command = connection.CreateCommand();
+                command.Transaction = transaction;
+                command.CommandText = "UPDATE qc_runs SET status='Aborted', completed_at_utc=$completed WHERE id=$id AND status='InProgress';";
+                command.Parameters.AddWithValue("$id", runId);
+                command.Parameters.AddWithValue("$completed", now);
+                int count = command.ExecuteNonQuery();
+                if (count > 0)
+                {
+                    AddOutboxEvent(connection, transaction, "QcRunAborted", runId,
+                        "{\"runId\":\"" + runId + "\",\"reason\":\"" + EscapeJson(reason) + "\"}", now);
+                    AppLogger.Info($"Aborted QC run '{runId}'. Reason: {reason}");
+                }
+                transaction.Commit();
+            }
+        }
+
+        public void AbortActiveRunForAsset(string assetId, string reason = "Asset moved out of testing")
+        {
+            if (string.IsNullOrWhiteSpace(assetId)) return;
+            lock (_gate)
+            {
+                using var connection = Open();
+                using var transaction = connection.BeginTransaction();
+                string now = UtcNow();
+                using var command = connection.CreateCommand();
+                command.Transaction = transaction;
+                command.CommandText = "UPDATE qc_runs SET status='Aborted', completed_at_utc=$completed WHERE asset_id=$assetId AND status='InProgress';";
+                command.Parameters.AddWithValue("$assetId", assetId);
+                command.Parameters.AddWithValue("$completed", now);
+                int affected = command.ExecuteNonQuery();
+
+                if (affected > 0)
+                {
+                    AddOutboxEvent(connection, transaction, "QcRunAborted", assetId,
+                        "{\"assetId\":\"" + assetId + "\",\"reason\":\"" + EscapeJson(reason) + "\"}", now);
+                    AppLogger.Info($"Aborted {affected} in-progress QC run(s) for asset '{assetId}'. Reason: {reason}");
+                }
+                transaction.Commit();
             }
         }
 
@@ -618,6 +695,382 @@ VALUES($id, $type, $agg, $key, $payload, $now);";
             }
         }
 
+        #region Warehouse Journey & WIP Management
+
+        public string IntakeAsset(AssetIntakeRequest req)
+        {
+            if (req == null) throw new ArgumentNullException(nameof(req));
+            lock (_gate)
+            {
+                using var connection = Open();
+                using var transaction = connection.BeginTransaction();
+                string now = UtcNow();
+
+                var identity = new QcRunIdentity
+                {
+                    AssetTag = req.AssetTag,
+                    SerialNumber = req.SerialNumber,
+                    AssetUuid = req.AssetUuid,
+                    Model = req.Model,
+                    Technician = req.Technician
+                };
+                string assetId = FindOrCreateAsset(connection, transaction, identity, now);
+
+                // Update asset with intake metadata
+                using (var cmd = connection.CreateCommand())
+                {
+                    cmd.Transaction = transaction;
+                    cmd.CommandText = @"UPDATE assets SET 
+                        lifecycle_queue = 'ReadyForTest',
+                        intake_batch_id = $batch,
+                        source_stream = $source,
+                        current_location = $loc,
+                        charger_status = $charger,
+                        test_profile_id = $profile,
+                        updated_at_utc = $updated
+                        WHERE id = $id;";
+                    cmd.Parameters.AddWithValue("$batch", req.IntakeBatchId ?? "");
+                    cmd.Parameters.AddWithValue("$source", req.SourceStream.ToString());
+                    cmd.Parameters.AddWithValue("$loc", string.IsNullOrWhiteSpace(req.InitialLocation) ? "INTAKE-STAGING" : req.InitialLocation);
+                    cmd.Parameters.AddWithValue("$charger", req.ChargerStatus.ToString());
+                    cmd.Parameters.AddWithValue("$profile", string.IsNullOrWhiteSpace(req.TestProfileId) ? "standard-refurb-v1" : req.TestProfileId);
+                    cmd.Parameters.AddWithValue("$updated", now);
+                    cmd.Parameters.AddWithValue("$id", assetId);
+                    cmd.ExecuteNonQuery();
+                }
+
+                // Record initial Receive custody event
+                string eventId = Guid.NewGuid().ToString("N");
+                using (var cmdCustody = connection.CreateCommand())
+                {
+                    cmdCustody.Transaction = transaction;
+                    cmdCustody.CommandText = @"INSERT INTO custody_events(id, asset_id, event_type, location, actor, reason_code, batch_id, notes, scan_confirmed, recorded_at_utc)
+VALUES($id, $assetId, 'Receive', $loc, $actor, 'INITIAL_INTAKE', $batch, $notes, 1, $recorded);";
+                    cmdCustody.Parameters.AddWithValue("$id", eventId);
+                    cmdCustody.Parameters.AddWithValue("$assetId", assetId);
+                    cmdCustody.Parameters.AddWithValue("$loc", string.IsNullOrWhiteSpace(req.InitialLocation) ? "INTAKE-STAGING" : req.InitialLocation);
+                    cmdCustody.Parameters.AddWithValue("$actor", string.IsNullOrWhiteSpace(req.Technician) ? "OPERATOR" : req.Technician);
+                    cmdCustody.Parameters.AddWithValue("$batch", req.IntakeBatchId ?? "");
+                    cmdCustody.Parameters.AddWithValue("$notes", req.Notes ?? "");
+                    cmdCustody.Parameters.AddWithValue("$recorded", now);
+                    cmdCustody.ExecuteNonQuery();
+                }
+
+                AddOutboxEvent(connection, transaction, "AssetIntakeRecorded", assetId,
+                    "{\"assetId\":\"" + assetId + "\",\"batchId\":\"" + EscapeJson(req.IntakeBatchId) + "\",\"tag\":\"" + EscapeJson(req.AssetTag) + "\",\"serial\":\"" + EscapeJson(req.SerialNumber) + "\"}", now);
+
+                transaction.Commit();
+                AppLogger.Info($"Intake recorded for asset {assetId} (Tag: {req.AssetTag}, Serial: {req.SerialNumber}, Batch: {req.IntakeBatchId})");
+                return assetId;
+            }
+        }
+
+        public void RecordCustodyEvent(string assetId, CustodyEventType eventType, string location, string actor, string reasonCode = null, string batchId = null, string notes = null, bool scanConfirmed = true)
+        {
+            if (string.IsNullOrWhiteSpace(assetId)) throw new ArgumentException("Asset ID is required.", nameof(assetId));
+            lock (_gate)
+            {
+                using var connection = Open();
+                using var transaction = connection.BeginTransaction();
+                string now = UtcNow();
+
+                string eventId = Guid.NewGuid().ToString("N");
+                using (var cmd = connection.CreateCommand())
+                {
+                    cmd.Transaction = transaction;
+                    cmd.CommandText = @"INSERT INTO custody_events(id, asset_id, event_type, location, actor, reason_code, batch_id, notes, scan_confirmed, recorded_at_utc)
+VALUES($id, $assetId, $type, $loc, $actor, $reason, $batch, $notes, $scan, $recorded);";
+                    cmd.Parameters.AddWithValue("$id", eventId);
+                    cmd.Parameters.AddWithValue("$assetId", assetId);
+                    cmd.Parameters.AddWithValue("$type", eventType.ToString());
+                    cmd.Parameters.AddWithValue("$loc", location ?? "");
+                    cmd.Parameters.AddWithValue("$actor", string.IsNullOrWhiteSpace(actor) ? "OPERATOR" : actor);
+                    cmd.Parameters.AddWithValue("$reason", reasonCode ?? "");
+                    cmd.Parameters.AddWithValue("$batch", batchId ?? "");
+                    cmd.Parameters.AddWithValue("$notes", notes ?? "");
+                    cmd.Parameters.AddWithValue("$scan", scanConfirmed ? 1 : 0);
+                    cmd.Parameters.AddWithValue("$recorded", now);
+                    cmd.ExecuteNonQuery();
+                }
+
+                if (!string.IsNullOrWhiteSpace(location))
+                {
+                    using var cmdLoc = connection.CreateCommand();
+                    cmdLoc.Transaction = transaction;
+                    cmdLoc.CommandText = "UPDATE assets SET current_location=$loc, updated_at_utc=$now WHERE id=$id;";
+                    cmdLoc.Parameters.AddWithValue("$loc", location);
+                    cmdLoc.Parameters.AddWithValue("$now", now);
+                    cmdLoc.Parameters.AddWithValue("$id", assetId);
+                    cmdLoc.ExecuteNonQuery();
+                }
+
+                AddOutboxEvent(connection, transaction, "CustodyEventRecorded", assetId,
+                    "{\"assetId\":\"" + assetId + "\",\"eventType\":\"" + eventType + "\",\"location\":\"" + EscapeJson(location) + "\",\"actor\":\"" + EscapeJson(actor) + "\"}", now);
+
+                transaction.Commit();
+                AppLogger.Info($"Custody event {eventType} recorded for asset {assetId} at '{location}' by '{actor}'");
+            }
+        }
+
+        public void TransitionAssetQueue(string assetId, AssetQueueStatus targetQueue, string location, string actor, string reasonCode = null, string notes = null, bool scanConfirmed = true)
+        {
+            if (string.IsNullOrWhiteSpace(assetId)) throw new ArgumentException("Asset ID is required.", nameof(assetId));
+            lock (_gate)
+            {
+                using var connection = Open();
+                using var transaction = connection.BeginTransaction();
+                string now = UtcNow();
+
+                // Update asset queue and optional location
+                using (var cmd = connection.CreateCommand())
+                {
+                    cmd.Transaction = transaction;
+                    cmd.CommandText = @"UPDATE assets SET 
+                        lifecycle_queue=$queue,
+                        current_location=COALESCE(NULLIF($loc, ''), current_location),
+                        updated_at_utc=$now
+                        WHERE id=$id;";
+                    cmd.Parameters.AddWithValue("$queue", targetQueue.ToString());
+                    cmd.Parameters.AddWithValue("$loc", location ?? "");
+                    cmd.Parameters.AddWithValue("$now", now);
+                    cmd.Parameters.AddWithValue("$id", assetId);
+                    cmd.ExecuteNonQuery();
+                }
+
+                CustodyEventType eventType = targetQueue switch
+                {
+                    AssetQueueStatus.ReadyForTest => CustodyEventType.Move,
+                    AssetQueueStatus.InTest => CustodyEventType.Move,
+                    AssetQueueStatus.Hold => CustodyEventType.Hold,
+                    AssetQueueStatus.Repair => CustodyEventType.RepairStart,
+                    AssetQueueStatus.Retest => CustodyEventType.RetestQueued,
+                    AssetQueueStatus.ReadyForRelease => CustodyEventType.ReleaseStaged,
+                    AssetQueueStatus.Disposed => CustodyEventType.Disposed,
+                    _ => CustodyEventType.Move
+                };
+
+                string eventId = Guid.NewGuid().ToString("N");
+                using (var cmdCustody = connection.CreateCommand())
+                {
+                    cmdCustody.Transaction = transaction;
+                    cmdCustody.CommandText = @"INSERT INTO custody_events(id, asset_id, event_type, location, actor, reason_code, batch_id, notes, scan_confirmed, recorded_at_utc)
+VALUES($id, $assetId, $type, $loc, $actor, $reason, '', $notes, $scan, $recorded);";
+                    cmdCustody.Parameters.AddWithValue("$id", eventId);
+                    cmdCustody.Parameters.AddWithValue("$assetId", assetId);
+                    cmdCustody.Parameters.AddWithValue("$type", eventType.ToString());
+                    cmdCustody.Parameters.AddWithValue("$loc", location ?? "");
+                    cmdCustody.Parameters.AddWithValue("$actor", string.IsNullOrWhiteSpace(actor) ? "OPERATOR" : actor);
+                    cmdCustody.Parameters.AddWithValue("$reason", reasonCode ?? "");
+                    cmdCustody.Parameters.AddWithValue("$notes", notes ?? "");
+                    cmdCustody.Parameters.AddWithValue("$scan", scanConfirmed ? 1 : 0);
+                    cmdCustody.Parameters.AddWithValue("$recorded", now);
+                    cmdCustody.ExecuteNonQuery();
+                }
+
+                AddOutboxEvent(connection, transaction, "AssetQueueTransitioned", assetId,
+                    "{\"assetId\":\"" + assetId + "\",\"queue\":\"" + targetQueue + "\",\"location\":\"" + EscapeJson(location) + "\",\"actor\":\"" + EscapeJson(actor) + "\"}", now);
+
+                transaction.Commit();
+                AppLogger.Info($"Asset {assetId} transitioned to queue {targetQueue} by {actor}");
+            }
+        }
+
+        public AssetWipRecord FindAssetBySerialOrTag(string identifier)
+        {
+            if (string.IsNullOrWhiteSpace(identifier)) return null;
+            lock (_gate)
+            {
+                using var connection = Open();
+                using var cmd = connection.CreateCommand();
+                cmd.CommandText = @"
+SELECT a.id, a.serial_number, a.asset_tag, a.model, a.current_location, a.lifecycle_queue,
+       a.intake_batch_id, a.source_stream, a.charger_status, a.test_profile_id,
+       a.created_at_utc, a.updated_at_utc,
+       r.id AS run_id, r.grade AS run_grade, r.status AS run_status, r.verification_hash AS run_hash
+FROM assets a
+LEFT JOIN qc_runs r ON r.asset_id = a.id AND r.started_at_utc = (SELECT MAX(started_at_utc) FROM qc_runs WHERE asset_id = a.id)
+WHERE (a.id = $id OR a.serial_number = $id COLLATE NOCASE OR a.asset_tag = $id COLLATE NOCASE OR a.asset_uuid = $id)
+LIMIT 1;";
+                cmd.Parameters.AddWithValue("$id", identifier.Trim());
+                using var reader = cmd.ExecuteReader();
+                if (!reader.Read()) return null;
+                return ReadAssetWipRecord(reader);
+            }
+        }
+
+        public AssetWipRecord GetAssetById(string assetId)
+        {
+            return FindAssetBySerialOrTag(assetId);
+        }
+
+        public List<AssetWipRecord> GetAssetsByQueue(AssetQueueStatus queue)
+        {
+            var list = new List<AssetWipRecord>();
+            lock (_gate)
+            {
+                using var connection = Open();
+                using var cmd = connection.CreateCommand();
+                cmd.CommandText = @"
+SELECT a.id, a.serial_number, a.asset_tag, a.model, a.current_location, a.lifecycle_queue,
+       a.intake_batch_id, a.source_stream, a.charger_status, a.test_profile_id,
+       a.created_at_utc, a.updated_at_utc,
+       r.id AS run_id, r.grade AS run_grade, r.status AS run_status, r.verification_hash AS run_hash
+FROM assets a
+LEFT JOIN qc_runs r ON r.asset_id = a.id AND r.started_at_utc = (SELECT MAX(started_at_utc) FROM qc_runs WHERE asset_id = a.id)
+WHERE a.lifecycle_queue = $queue
+ORDER BY a.updated_at_utc DESC;";
+                cmd.Parameters.AddWithValue("$queue", queue.ToString());
+                using var reader = cmd.ExecuteReader();
+                while (reader.Read())
+                {
+                    list.Add(ReadAssetWipRecord(reader));
+                }
+            }
+            return list;
+        }
+
+        public List<AssetWipRecord> GetAllWipAssets()
+        {
+            var list = new List<AssetWipRecord>();
+            lock (_gate)
+            {
+                using var connection = Open();
+                using var cmd = connection.CreateCommand();
+                cmd.CommandText = @"
+SELECT a.id, a.serial_number, a.asset_tag, a.model, a.current_location, a.lifecycle_queue,
+       a.intake_batch_id, a.source_stream, a.charger_status, a.test_profile_id,
+       a.created_at_utc, a.updated_at_utc,
+       r.id AS run_id, r.grade AS run_grade, r.status AS run_status, r.verification_hash AS run_hash
+FROM assets a
+LEFT JOIN qc_runs r ON r.asset_id = a.id AND r.started_at_utc = (SELECT MAX(started_at_utc) FROM qc_runs WHERE asset_id = a.id)
+ORDER BY a.updated_at_utc DESC;";
+                using var reader = cmd.ExecuteReader();
+                while (reader.Read())
+                {
+                    list.Add(ReadAssetWipRecord(reader));
+                }
+            }
+            return list;
+        }
+
+        public AssetJourneySummary GetAssetJourney(string serialOrTag)
+        {
+            var asset = FindAssetBySerialOrTag(serialOrTag);
+            if (asset == null) return null;
+
+            lock (_gate)
+            {
+                using var connection = Open();
+                var summary = new AssetJourneySummary { Asset = asset };
+
+                // 1. Get all runs
+                using (var cmd = connection.CreateCommand())
+                {
+                    cmd.CommandText = "SELECT id FROM qc_runs WHERE asset_id=$assetId ORDER BY started_at_utc DESC;";
+                    cmd.Parameters.AddWithValue("$assetId", asset.AssetId);
+                    using var reader = cmd.ExecuteReader();
+                    var runIds = new List<string>();
+                    while (reader.Read()) runIds.Add(reader.GetString(0));
+                    reader.Close();
+
+                    foreach (var runId in runIds)
+                    {
+                        var runSummary = GetRunSummary(runId);
+                        if (runSummary != null)
+                        {
+                            summary.Runs.Add(runSummary);
+                            summary.EvidenceItems.AddRange(runSummary.EvidenceItems);
+                        }
+                    }
+                }
+
+                // 2. Get custody events
+                using (var cmdCustody = connection.CreateCommand())
+                {
+                    cmdCustody.CommandText = @"SELECT id, asset_id, event_type, location, actor, reason_code, batch_id, notes, scan_confirmed, recorded_at_utc
+FROM custody_events WHERE asset_id=$assetId ORDER BY recorded_at_utc ASC;";
+                    cmdCustody.Parameters.AddWithValue("$assetId", asset.AssetId);
+                    using var reader = cmdCustody.ExecuteReader();
+                    while (reader.Read())
+                    {
+                        Enum.TryParse<CustodyEventType>(reader.GetString(2), out var evType);
+                        summary.CustodyEvents.Add(new CustodyEventRecord
+                        {
+                            Id = reader.GetString(0),
+                            AssetId = reader.GetString(1),
+                            EventType = evType,
+                            Location = reader.IsDBNull(3) ? "" : reader.GetString(3),
+                            Actor = reader.IsDBNull(4) ? "" : reader.GetString(4),
+                            ReasonCode = reader.IsDBNull(5) ? "" : reader.GetString(5),
+                            BatchId = reader.IsDBNull(6) ? "" : reader.GetString(6),
+                            Notes = reader.IsDBNull(7) ? "" : reader.GetString(7),
+                            ScanConfirmed = reader.GetInt32(8) == 1,
+                            RecordedAtUtc = DateTimeOffset.Parse(reader.GetString(9), CultureInfo.InvariantCulture)
+                        });
+                    }
+                }
+
+                return summary;
+            }
+        }
+
+        public void AttachEvidence(string runId, string testKey, string evidenceType, string filePath, string fileHash, string metadataJson)
+        {
+            RecordEvidence(runId, new QcEvidence
+            {
+                TestKey = testKey,
+                EvidenceType = evidenceType,
+                FilePath = filePath,
+                FileHash = fileHash,
+                MetadataJson = metadataJson,
+                RecordedAtUtc = DateTimeOffset.UtcNow
+            });
+        }
+
+        public void AttachEvidenceToAsset(string assetId, string testKey, string evidenceType, string filePath, string fileHash, string metadataJson)
+        {
+            lock (_gate)
+            {
+                using var connection = Open();
+                using var cmd = connection.CreateCommand();
+                cmd.CommandText = "SELECT id FROM qc_runs WHERE asset_id=$assetId ORDER BY started_at_utc DESC LIMIT 1;";
+                cmd.Parameters.AddWithValue("$assetId", assetId);
+                var runId = cmd.ExecuteScalar() as string;
+                if (string.IsNullOrEmpty(runId))
+                {
+                    var identity = new QcRunIdentity { AssetUuid = assetId, Technician = "EVIDENCE_ATTACH" };
+                    runId = StartRun(identity);
+                }
+                AttachEvidence(runId, testKey, evidenceType, filePath, fileHash, metadataJson);
+            }
+        }
+
+        private static AssetWipRecord ReadAssetWipRecord(SqliteDataReader reader)
+        {
+            Enum.TryParse<AssetQueueStatus>(reader.IsDBNull(5) ? "ReadyForTest" : reader.GetString(5), out var q);
+            return new AssetWipRecord
+            {
+                AssetId = reader.GetString(0),
+                SerialNumber = reader.IsDBNull(1) ? "" : reader.GetString(1),
+                AssetTag = reader.IsDBNull(2) ? "" : reader.GetString(2),
+                Model = reader.IsDBNull(3) ? "" : reader.GetString(3),
+                CurrentLocation = reader.IsDBNull(4) ? "" : reader.GetString(4),
+                LifecycleQueue = q,
+                IntakeBatchId = reader.IsDBNull(6) ? "" : reader.GetString(6),
+                SourceStream = reader.IsDBNull(7) ? "" : reader.GetString(7),
+                ChargerStatus = reader.IsDBNull(8) ? "" : reader.GetString(8),
+                TestProfileId = reader.IsDBNull(9) ? "" : reader.GetString(9),
+                CreatedAtUtc = DateTimeOffset.Parse(reader.GetString(10), CultureInfo.InvariantCulture),
+                UpdatedAtUtc = DateTimeOffset.Parse(reader.GetString(11), CultureInfo.InvariantCulture),
+                LatestRunId = reader.IsDBNull(12) ? "" : reader.GetString(12),
+                LatestRunGrade = reader.IsDBNull(13) ? "" : reader.GetString(13),
+                LatestRunStatus = reader.IsDBNull(14) ? "" : reader.GetString(14),
+                LatestVerificationHash = reader.IsDBNull(15) ? "" : reader.GetString(15)
+            };
+        }
+
+        #endregion
+
         private SqliteConnection Open()
         {
             var connection = new SqliteConnection(_connectionString);
@@ -766,6 +1219,16 @@ VALUES($id, $serial, $tag, $model, $uuid, $conf, $src, $created, $updated);";
             var status = command.ExecuteScalar() as string;
             if (status == null) throw new InvalidOperationException("The QC run does not exist.");
             if (!string.Equals(status, "InProgress", StringComparison.Ordinal)) throw new InvalidOperationException("The QC run has already been completed and cannot be modified.");
+        }
+
+        private static void EnsureRunExists(SqliteConnection connection, SqliteTransaction transaction, string runId)
+        {
+            using var command = connection.CreateCommand();
+            command.Transaction = transaction;
+            command.CommandText = "SELECT COUNT(*) FROM qc_runs WHERE id=$id;";
+            command.Parameters.AddWithValue("$id", runId);
+            long count = Convert.ToInt64(command.ExecuteScalar(), CultureInfo.InvariantCulture);
+            if (count == 0) throw new InvalidOperationException($"The QC run '{runId}' does not exist.");
         }
 
         private static void AddOutboxEvent(SqliteConnection connection, SqliteTransaction transaction, string type, string aggregateId, string payload, string now)

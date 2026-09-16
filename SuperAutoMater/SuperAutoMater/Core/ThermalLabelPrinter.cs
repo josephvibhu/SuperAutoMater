@@ -539,5 +539,251 @@ namespace SuperAutoMater
                 AppLogger.Warn("DrawFallbackQr failed", ex);
             }
         }
+
+        #region Warehouse Intake & Release Labels
+
+        public static Bitmap RenderIntakeLabelBitmap(
+            AssetWipRecord asset,
+            LabelSizePreset preset = LabelSizePreset.Chassis3x2)
+        {
+            if (asset == null) throw new ArgumentNullException(nameof(asset));
+            var dims = GetPresetDimensions(preset);
+            Bitmap bmp = new Bitmap(dims.Width, dims.Height);
+            using (Graphics g = Graphics.FromImage(bmp))
+            {
+                g.Clear(Color.White);
+                g.SmoothingMode = SmoothingMode.HighQuality;
+                g.TextRenderingHint = System.Drawing.Text.TextRenderingHint.ClearTypeGridFit;
+
+                Rectangle bounds = new Rectangle(8, 8, dims.Width - 16, dims.Height - 16);
+
+                // 1. Header badge
+                int headerH = 34;
+                Rectangle headerRect = new Rectangle(bounds.X, bounds.Y, bounds.Width, headerH);
+                using (SolidBrush blackBrush = new SolidBrush(Color.Black))
+                {
+                    g.FillRectangle(blackBrush, headerRect);
+                }
+                using (Font fontHeader = new Font("Arial", 10.5f, FontStyle.Bold))
+                using (SolidBrush whiteBrush = new SolidBrush(Color.White))
+                using (StringFormat sfHeader = new StringFormat { Alignment = StringAlignment.Center, LineAlignment = StringAlignment.Center })
+                {
+                    g.DrawString("AUTOMATER INTAKE & ROUTING", fontHeader, whiteBrush, headerRect, sfHeader);
+                }
+
+                // 2. Left Column: QR Code
+                int leftColW = 160;
+                int qrSize = 140;
+                Rectangle qrRect = new Rectangle(bounds.X + 8, bounds.Y + headerH + 12, qrSize, qrSize);
+                string qrPayload = $"INTAKE|ID:{asset.AssetId}|TAG:{asset.AssetTag}|LOC:{asset.CurrentLocation}";
+                DrawFallbackQr(g, qrRect, qrPayload);
+                using (Pen pen = new Pen(Color.Black, 1)) g.DrawRectangle(pen, qrRect);
+
+                // QR Caption
+                using (Font fontCap = new Font("Consolas", 8.5f, FontStyle.Bold))
+                using (SolidBrush textBrush = new SolidBrush(Color.Black))
+                using (StringFormat sfCenter = new StringFormat { Alignment = StringAlignment.Center })
+                {
+                    Rectangle capRect = new Rectangle(bounds.X + 4, qrRect.Bottom + 4, leftColW, 18);
+                    g.DrawString(asset.AssetTag, fontCap, textBrush, capRect, sfCenter);
+                }
+
+                // 3. Right Column: Metadata
+                int metaX = bounds.X + leftColW + 12;
+                int metaY = bounds.Y + headerH + 8;
+                int metaW = bounds.Right - metaX - 8;
+
+                using (SolidBrush textBrush = new SolidBrush(Color.Black))
+                using (StringFormat sfLeft = new StringFormat { Trimming = StringTrimming.EllipsisCharacter, FormatFlags = StringFormatFlags.NoWrap })
+                {
+                    using (Font fontTag = new Font("Arial", 12f, FontStyle.Bold))
+                    {
+                        g.DrawString($"TAG: {asset.AssetTag}", fontTag, textBrush, new Rectangle(metaX, metaY, metaW, 22), sfLeft);
+                        metaY += 24;
+                    }
+                    using (Font fontSn = new Font("Arial", 9.5f, FontStyle.Bold))
+                    {
+                        g.DrawString($"S/N: {asset.SerialNumber}", fontSn, textBrush, new Rectangle(metaX, metaY, metaW, 18), sfLeft);
+                        metaY += 20;
+                    }
+                    using (Pen dividerPen = new Pen(Color.FromArgb(200, 200, 200), 1))
+                    {
+                        g.DrawLine(dividerPen, metaX, metaY, bounds.Right - 8, metaY);
+                    }
+                    metaY += 6;
+
+                    using (Font fontBody = new Font("Arial", 9.5f, FontStyle.Regular))
+                    {
+                        g.DrawString($"BATCH: {asset.IntakeBatchId}", fontBody, textBrush, new Rectangle(metaX, metaY, metaW, 18), sfLeft);
+                        metaY += 18;
+                        g.DrawString($"SOURCE: {asset.SourceStream}", fontBody, textBrush, new Rectangle(metaX, metaY, metaW, 18), sfLeft);
+                        metaY += 18;
+                        g.DrawString($"CHARGER: {asset.ChargerStatus}", fontBody, textBrush, new Rectangle(metaX, metaY, metaW, 18), sfLeft);
+                        metaY += 18;
+                        g.DrawString($"PROFILE: {asset.TestProfileId}", fontBody, textBrush, new Rectangle(metaX, metaY, metaW, 18), sfLeft);
+                        metaY += 22;
+                    }
+                }
+
+                // 4. Bottom Routing Pill
+                int pillH = 26;
+                Rectangle pillRect = new Rectangle(metaX, bounds.Bottom - pillH - 6, metaW, pillH);
+                using (SolidBrush blackBrush = new SolidBrush(Color.Black))
+                {
+                    g.FillRectangle(blackBrush, pillRect);
+                }
+                using (Font fontPill = new Font("Arial", 9.5f, FontStyle.Bold))
+                using (SolidBrush whiteBrush = new SolidBrush(Color.White))
+                using (StringFormat sfCenter = new StringFormat { Alignment = StringAlignment.Center, LineAlignment = StringAlignment.Center })
+                {
+                    g.DrawString($"★ QUEUE: {asset.LifecycleQueue} · LOC: {asset.CurrentLocation} ★", fontPill, whiteBrush, pillRect, sfCenter);
+                }
+
+                // 5. Perimeter border
+                using (Pen borderPen = new Pen(Color.Black, 2))
+                {
+                    g.DrawRectangle(borderPen, bounds);
+                }
+            }
+            return bmp;
+        }
+
+        public static Bitmap RenderReleaseLabelBitmap(
+            QcRunSummary summary,
+            LabelSizePreset preset = LabelSizePreset.Chassis3x2,
+            string verifyBaseUrl = "http://127.0.0.1:8080")
+        {
+            if (summary == null) throw new ArgumentNullException(nameof(summary));
+            var dims = GetPresetDimensions(preset);
+            Bitmap bmp = new Bitmap(dims.Width, dims.Height);
+            using (Graphics g = Graphics.FromImage(bmp))
+            {
+                g.Clear(Color.White);
+                g.SmoothingMode = SmoothingMode.HighQuality;
+                g.TextRenderingHint = System.Drawing.Text.TextRenderingHint.ClearTypeGridFit;
+
+                Rectangle bounds = new Rectangle(8, 8, dims.Width - 16, dims.Height - 16);
+
+                // 1. Header badge
+                int headerH = 34;
+                Rectangle headerRect = new Rectangle(bounds.X, bounds.Y, bounds.Width, headerH);
+                using (SolidBrush blackBrush = new SolidBrush(Color.Black))
+                {
+                    g.FillRectangle(blackBrush, headerRect);
+                }
+                using (Font fontHeader = new Font("Arial", 10.5f, FontStyle.Bold))
+                using (SolidBrush whiteBrush = new SolidBrush(Color.White))
+                using (StringFormat sfHeader = new StringFormat { Alignment = StringAlignment.Center, LineAlignment = StringAlignment.Center })
+                {
+                    g.DrawString("HARDWARE VERIFIED & RELEASED", fontHeader, whiteBrush, headerRect, sfHeader);
+                }
+
+                // 2. Left Column: QR Code linking to Scan-To-Verify
+                int leftColW = 160;
+                int qrSize = 140;
+                Rectangle qrRect = new Rectangle(bounds.X + 8, bounds.Y + headerH + 12, qrSize, qrSize);
+                string verifyUrl = $"{verifyBaseUrl.TrimEnd('/')}/verify/{summary.RunId}";
+                DrawFallbackQr(g, qrRect, verifyUrl);
+                using (Pen pen = new Pen(Color.Black, 1)) g.DrawRectangle(pen, qrRect);
+
+                // QR Caption
+                using (Font fontCap = new Font("Consolas", 8f, FontStyle.Bold))
+                using (SolidBrush textBrush = new SolidBrush(Color.Black))
+                using (StringFormat sfCenter = new StringFormat { Alignment = StringAlignment.Center })
+                {
+                    Rectangle capRect = new Rectangle(bounds.X + 4, qrRect.Bottom + 4, leftColW, 18);
+                    g.DrawString("SCAN TO VERIFY", fontCap, textBrush, capRect, sfCenter);
+                }
+
+                // 3. Right Column: Verification Metadata
+                int metaX = bounds.X + leftColW + 12;
+                int metaY = bounds.Y + headerH + 8;
+                int metaW = bounds.Right - metaX - 8;
+
+                using (SolidBrush textBrush = new SolidBrush(Color.Black))
+                using (StringFormat sfLeft = new StringFormat { Trimming = StringTrimming.EllipsisCharacter, FormatFlags = StringFormatFlags.NoWrap })
+                {
+                    using (Font fontGrade = new Font("Arial", 14f, FontStyle.Bold))
+                    {
+                        g.DrawString($"GRADE: {summary.Grade}", fontGrade, textBrush, new Rectangle(metaX, metaY, metaW, 26), sfLeft);
+                        metaY += 28;
+                    }
+                    using (Font fontSn = new Font("Arial", 9.5f, FontStyle.Bold))
+                    {
+                        g.DrawString($"S/N: {summary.SerialNumber}", fontSn, textBrush, new Rectangle(metaX, metaY, metaW, 18), sfLeft);
+                        metaY += 20;
+                    }
+                    using (Pen dividerPen = new Pen(Color.FromArgb(200, 200, 200), 1))
+                    {
+                        g.DrawLine(dividerPen, metaX, metaY, bounds.Right - 8, metaY);
+                    }
+                    metaY += 6;
+
+                    using (Font fontBody = new Font("Arial", 9f, FontStyle.Regular))
+                    {
+                        g.DrawString($"MDL: {summary.Model}", fontBody, textBrush, new Rectangle(metaX, metaY, metaW, 18), sfLeft);
+                        metaY += 18;
+                        string shortRun = summary.RunId.Length > 12 ? summary.RunId.Substring(0, 12) + "..." : summary.RunId;
+                        g.DrawString($"RUN: {shortRun}", fontBody, textBrush, new Rectangle(metaX, metaY, metaW, 18), sfLeft);
+                        metaY += 18;
+                        string shortHash = summary.VerificationHash.Length > 14 ? summary.VerificationHash.Substring(0, 14) + "..." : summary.VerificationHash;
+                        g.DrawString($"SEAL: {shortHash}", fontBody, textBrush, new Rectangle(metaX, metaY, metaW, 18), sfLeft);
+                        metaY += 18;
+                        string dateStr = summary.CompletedAtUtc?.ToString("yyyy-MM-dd HH:mm") ?? DateTime.UtcNow.ToString("yyyy-MM-dd HH:mm");
+                        g.DrawString($"DATE: {dateStr}", fontBody, textBrush, new Rectangle(metaX, metaY, metaW, 18), sfLeft);
+                        metaY += 22;
+                    }
+                }
+
+                // 4. Bottom Release Pill
+                int pillH = 26;
+                Rectangle pillRect = new Rectangle(metaX, bounds.Bottom - pillH - 6, metaW, pillH);
+                using (SolidBrush blackBrush = new SolidBrush(Color.Black))
+                {
+                    g.FillRectangle(blackBrush, pillRect);
+                }
+                using (Font fontPill = new Font("Arial", 9f, FontStyle.Bold))
+                using (SolidBrush whiteBrush = new SolidBrush(Color.White))
+                using (StringFormat sfCenter = new StringFormat { Alignment = StringAlignment.Center, LineAlignment = StringAlignment.Center })
+                {
+                    g.DrawString("★ AUDIT VERIFIED · READY FOR RELEASE ★", fontPill, whiteBrush, pillRect, sfCenter);
+                }
+
+                // 5. Perimeter border
+                using (Pen borderPen = new Pen(Color.Black, 2))
+                {
+                    g.DrawRectangle(borderPen, bounds);
+                }
+            }
+            return bmp;
+        }
+
+        public static bool ExportIntakePdfLabel(AssetWipRecord asset, string targetPath, LabelSizePreset preset = LabelSizePreset.Chassis3x2)
+        {
+            var dims = GetPresetDimensions(preset);
+            using (Bitmap bmp = RenderIntakeLabelBitmap(asset, preset))
+            using (MemoryStream jpegStream = new MemoryStream())
+            {
+                bmp.Save(jpegStream, ImageFormat.Jpeg);
+                byte[] pdfBytes = BuildSingleImagePdf(jpegStream.ToArray(), dims.Width, dims.Height, dims.PtW, dims.PtH);
+                File.WriteAllBytes(targetPath, pdfBytes);
+                return true;
+            }
+        }
+
+        public static bool ExportReleasePdfLabel(QcRunSummary summary, string targetPath, LabelSizePreset preset = LabelSizePreset.Chassis3x2, string verifyBaseUrl = "http://127.0.0.1:8080")
+        {
+            var dims = GetPresetDimensions(preset);
+            using (Bitmap bmp = RenderReleaseLabelBitmap(summary, preset, verifyBaseUrl))
+            using (MemoryStream jpegStream = new MemoryStream())
+            {
+                bmp.Save(jpegStream, ImageFormat.Jpeg);
+                byte[] pdfBytes = BuildSingleImagePdf(jpegStream.ToArray(), dims.Width, dims.Height, dims.PtW, dims.PtH);
+                File.WriteAllBytes(targetPath, pdfBytes);
+                return true;
+            }
+        }
+
+        #endregion
     }
 }

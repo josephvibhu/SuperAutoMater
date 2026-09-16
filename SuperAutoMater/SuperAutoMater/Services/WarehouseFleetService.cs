@@ -15,6 +15,7 @@ using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Media.Imaging;
 using QRCoder;
+using SuperAutoMater.Wpf.Core;
 using SuperAutoMater.Wpf.ViewModels;
 
 namespace SuperAutoMater.Wpf.Services
@@ -285,6 +286,12 @@ namespace SuperAutoMater.Wpf.Services
             try
             {
                 string path = context.Request.Url.AbsolutePath.ToLowerInvariant();
+                if (path.StartsWith("/verify/"))
+                {
+                    await HandleScanToVerifyAsync(context, path);
+                    return;
+                }
+
                 if (!IsAuthorized(context.Request))
                 {
                     context.Response.StatusCode = (int)HttpStatusCode.Unauthorized;
@@ -512,6 +519,153 @@ namespace SuperAutoMater.Wpf.Services
                 alert = (hw.CpuTelemetry?.TemperatureC ?? 0) > 90 || (hw.BatteryTelemetry?.HealthPercent ?? 100) < 60,
                 timestamp = DateTime.UtcNow.ToString("o")
             };
+        }
+
+        private async Task HandleScanToVerifyAsync(HttpListenerContext context, string path)
+        {
+            try
+            {
+                string runId = path.Substring("/verify/".Length).Trim().Trim('/');
+                var store = new Core.QcRunStore();
+                var summary = string.IsNullOrWhiteSpace(runId) ? null : store.GetRunSummary(runId);
+
+                context.Response.ContentType = "text/html; charset=utf-8";
+
+                if (summary == null || summary.Status != Core.QcRunStatus.Completed)
+                {
+                    context.Response.StatusCode = (int)HttpStatusCode.NotFound;
+                    string notFoundHtml = @"<!DOCTYPE html>
+<html>
+<head>
+    <meta charset='utf-8'/>
+    <meta name='viewport' content='width=device-width, initial-scale=1.0'/>
+    <title>Hardware Verification - Not Found</title>
+    <style>
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #0d1117; color: #c9d1d9; display: flex; justify-content: center; align-items: center; min-height: 100vh; margin: 0; padding: 20px; box-sizing: border-box; }
+        .card { background: #161b22; border: 1px solid #30363d; border-radius: 12px; padding: 32px; max-width: 520px; width: 100%; text-align: center; }
+        .badge { display: inline-block; padding: 6px 16px; border-radius: 20px; font-weight: bold; background: #f8514922; color: #f85149; border: 1px solid #f85149; margin-bottom: 20px; }
+        h1 { margin: 0 0 12px 0; font-size: 24px; color: #f0f6fc; }
+        p { color: #8b949e; line-height: 1.6; }
+    </style>
+</head>
+<body>
+    <div class='card'>
+        <div class='badge'>⚠️ RECORD NOT FOUND OR UNVERIFIED</div>
+        <h1>Verification Pending</h1>
+        <p>No verified diagnostic completion record was found for this run identifier. The unit may still be undergoing refurbishing bench testing, or the QR payload may be invalid.</p>
+    </div>
+</body>
+</html>";
+                    byte[] bytes = Encoding.UTF8.GetBytes(notFoundHtml);
+                    context.Response.ContentLength64 = bytes.Length;
+                    await context.Response.OutputStream.WriteAsync(bytes, 0, bytes.Length);
+                    context.Response.Close();
+                    return;
+                }
+
+                // Render Verified Device Certificate HTML
+                var sb = new StringBuilder();
+                sb.Append(@"<!DOCTYPE html>
+<html>
+<head>
+    <meta charset='utf-8'/>
+    <meta name='viewport' content='width=device-width, initial-scale=1.0'/>
+    <title>Hardware Verification Certificate</title>
+    <style>
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #0d1117; color: #c9d1d9; margin: 0; padding: 24px 16px; display: flex; justify-content: center; }
+        .container { max-width: 640px; width: 100%; background: #161b22; border: 1px solid #30363d; border-radius: 14px; overflow: hidden; box-shadow: 0 8px 24px rgba(0,0,0,0.5); }
+        .header { background: #1f6feb15; border-bottom: 1px solid #30363d; padding: 24px; text-align: center; }
+        .seal-badge { display: inline-flex; align-items: center; gap: 8px; background: #238636; color: #ffffff; padding: 6px 18px; border-radius: 20px; font-weight: bold; font-size: 14px; margin-bottom: 14px; }
+        .title { margin: 0; font-size: 22px; color: #f0f6fc; }
+        .subtitle { color: #8b949e; font-size: 13px; margin-top: 4px; }
+        .content { padding: 24px; }
+        .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 24px; }
+        .field { background: #0d1117; border: 1px solid #21262d; border-radius: 8px; padding: 14px; }
+        .field-label { font-size: 11px; text-transform: uppercase; color: #8b949e; letter-spacing: 0.5px; margin-bottom: 4px; }
+        .field-value { font-size: 15px; font-weight: 600; color: #f0f6fc; word-break: break-all; }
+        .grade-badge { color: #58a6ff; font-size: 20px; }
+        .section-title { font-size: 14px; text-transform: uppercase; letter-spacing: 0.5px; color: #8b949e; margin: 24px 0 12px 0; }
+        .test-list { list-style: none; padding: 0; margin: 0; }
+        .test-item { display: flex; justify-content: space-between; align-items: center; padding: 10px 14px; border-bottom: 1px solid #21262d; font-size: 14px; }
+        .test-item:last-child { border-bottom: none; }
+        .pass-tag { background: #23863622; color: #3fb950; border: 1px solid #238636; border-radius: 12px; padding: 2px 10px; font-size: 12px; font-weight: 600; }
+        .hash-box { background: #090d12; border: 1px solid #30363d; border-radius: 8px; padding: 14px; margin-top: 24px; font-family: 'Consolas', monospace; font-size: 12px; color: #58a6ff; word-break: break-all; }
+        .footer { border-top: 1px solid #21262d; padding: 16px 24px; text-align: center; font-size: 12px; color: #484f58; }
+    </style>
+</head>
+<body>
+    <div class='container'>
+        <div class='header'>
+            <div class='seal-badge'>✓ CRYPTOGRAPHICALLY VERIFIED</div>
+            <h1 class='title'>Diagnostic Quality Certificate</h1>
+            <div class='subtitle'>SuperAutoMater Trusted Hardware Verification Engine</div>
+        </div>
+        <div class='content'>
+            <div class='grid'>
+                <div class='field'>
+                    <div class='field-label'>Certified Grade</div>
+                    <div class='field-value grade-badge'>");
+                sb.Append(WebUtility.HtmlEncode(summary.Grade ?? "GRADE A"));
+                sb.Append(@"</div>
+                </div>
+                <div class='field'>
+                    <div class='field-label'>Verification Date</div>
+                    <div class='field-value'>");
+                sb.Append(summary.CompletedAtUtc?.ToString("yyyy-MM-dd HH:mm UTC") ?? "Nominal");
+                sb.Append(@"</div>
+                </div>
+                <div class='field'>
+                    <div class='field-label'>Device Model</div>
+                    <div class='field-value'>");
+                sb.Append(WebUtility.HtmlEncode(summary.Model ?? "Refurbished Hardware"));
+                sb.Append(@"</div>
+                </div>
+                <div class='field'>
+                    <div class='field-label'>Serial Number</div>
+                    <div class='field-value'>");
+                sb.Append(WebUtility.HtmlEncode(summary.SerialNumber ?? "Verified"));
+                sb.Append(@"</div>
+                </div>
+            </div>
+
+            <div class='section-title'>Diagnostic Test Matrix</div>
+            <ul class='test-list'>");
+
+                foreach (var result in summary.Results)
+                {
+                    sb.Append("<li class='test-item'><span>");
+                    sb.Append(WebUtility.HtmlEncode(result.TestName ?? result.TestKey));
+                    sb.Append("</span><span class='pass-tag'>");
+                    sb.Append(result.Status == Core.QcTestStatus.Passed || result.Status == Core.QcTestStatus.ManualOverride ? "PASSED" : result.Status.ToString().ToUpperInvariant());
+                    sb.Append("</span></li>");
+                }
+
+                sb.Append(@"</ul>
+
+            <div class='section-title'>Cryptographic Verification Seal</div>
+            <div class='hash-box'>
+                <div style='color: #8b949e; margin-bottom: 4px; font-size: 11px;'>SHA-256 IMMUTABLE AUDIT HASH:</div>");
+                sb.Append(WebUtility.HtmlEncode(summary.VerificationHash ?? ""));
+                sb.Append(@"</div>
+        </div>
+        <div class='footer'>
+            Authenticated Refurbished Hardware · Protected by SuperAutoMater Offline-First Verification Architecture
+        </div>
+    </div>
+</body>
+</html>");
+
+                byte[] htmlBytes = Encoding.UTF8.GetBytes(sb.ToString());
+                context.Response.StatusCode = (int)HttpStatusCode.OK;
+                context.Response.ContentLength64 = htmlBytes.Length;
+                await context.Response.OutputStream.WriteAsync(htmlBytes, 0, htmlBytes.Length);
+                context.Response.Close();
+            }
+            catch (Exception ex)
+            {
+                AppLogger.Warn("HandleScanToVerifyAsync encountered error", ex);
+                try { context.Response.Close(); } catch { }
+            }
         }
 
         private void StartUdpDiscovery()

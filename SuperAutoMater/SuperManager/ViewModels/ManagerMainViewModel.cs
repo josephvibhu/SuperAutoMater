@@ -65,6 +65,7 @@ namespace SuperManager.ViewModels
         }
 
         public string ManagerWebUrl => ManagerWebServer.Instance.DashboardUrl;
+        public WipBoardViewModel WipBoard { get; } = new WipBoardViewModel();
 
         public ManagerMainViewModel()
         {
@@ -103,6 +104,7 @@ namespace SuperManager.ViewModels
         private void OnFleetUpdated()
         {
             UpdateKpis();
+            WipBoard.RefreshBoard();
             OnPropertyChanged(nameof(ManagerWebUrl));
         }
 

@@ -47,6 +47,16 @@ namespace SuperManager.Views
             }
         }
 
+        private void BtnRefreshWip_Click(object sender, RoutedEventArgs e)
+        {
+            ViewModel.WipBoard.RefreshBoard();
+        }
+
+        private void BtnConfirmIntake_Click(object sender, RoutedEventArgs e)
+        {
+            ViewModel.WipBoard.ExecuteIntake();
+        }
+
         private void BtnShowQr_Click(object sender, RoutedEventArgs e)
         {
             try
