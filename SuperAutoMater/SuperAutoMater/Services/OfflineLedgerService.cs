@@ -14,15 +14,23 @@ namespace SuperAutoMater.Wpf.Services
     {
         public string Id { get; set; } = Guid.NewGuid().ToString("N");
         public DateTime Timestamp { get; set; } = DateTime.Now;
+        public string Tag { get; set; } = "";
         public string Serial_Number { get; set; } = "";
         public string Model { get; set; } = "";
         public string Physical_Grade { get; set; } = "A+";
-        public string Status { get; set; } = "PASSED";
+        public string Status { get; set; } = "RTS";
+        public string Work_In_Progress { get; set; } = "All Okay";
         public string Technician_Notes { get; set; } = "";
         public string CPU_Model { get; set; } = "";
         public string RAM_GB { get; set; } = "";
         public string Storage_Details { get; set; } = "";
-        public string Battery_Health { get; set; } = "";
+        public string Battery_Health { get; set; } = "100";
+        public int Storage_Health { get; set; } = 100;
+        public string Technician { get; set; } = "";
+        public string In_Date { get; set; } = "";
+        public string Supplier { get; set; } = "";
+        public string Out_Date { get; set; } = "";
+        public string Customer { get; set; } = "";
         public string Battery_Capacity { get; set; } = "";
         public string GPU_Model { get; set; } = "";
         public string Passed_Tests { get; set; } = "";
@@ -178,17 +186,25 @@ namespace SuperAutoMater.Wpf.Services
                 {
                     try
                     {
-                        bool success = await GoogleSheetsDispatcher.DispatchQcRecordAsync(
+                        int.TryParse((rec.Battery_Health ?? "").Replace("%", "").Trim(), out int bHealth);
+                        if (bHealth <= 0) bHealth = 100;
+
+                        bool success = await GoogleSheetsDispatcher.DispatchItamRecordAsync(
+                            string.IsNullOrWhiteSpace(rec.Tag) ? rec.Serial_Number : rec.Tag,
                             rec.Serial_Number,
-                            rec.Model,
-                            rec.Physical_Grade,
-                            rec.Status,
-                            rec.Technician_Notes,
                             rec.CPU_Model,
-                            rec.RAM_GB,
-                            rec.Storage_Details,
-                            rec.Battery_Health,
-                            rec.GPU_Model
+                            string.IsNullOrWhiteSpace(rec.Storage_Details) ? rec.RAM_GB : $"{rec.RAM_GB} / {rec.Storage_Details}",
+                            bHealth,
+                            rec.Storage_Health > 0 ? rec.Storage_Health : 100,
+                            rec.Status,
+                            string.IsNullOrWhiteSpace(rec.Work_In_Progress) ? "All Okay" : rec.Work_In_Progress,
+                            rec.Physical_Grade,
+                            rec.Technician_Notes,
+                            rec.Technician,
+                            rec.In_Date,
+                            rec.Supplier,
+                            rec.Out_Date,
+                            rec.Customer
                         );
 
                         if (success)
@@ -220,17 +236,22 @@ namespace SuperAutoMater.Wpf.Services
 
         public const string DefaultSheetsUrl = "https://script.google.com/macros/s/AKfycbyx4LIL1xbzTypuYKTUK2XuMVnLq8TRbdVsupEQlSjI0CxGQ3mG92yR7rY3bjq1EH4t/exec";
 
-        public static async Task<bool> DispatchQcRecordAsync(
+        public static async Task<bool> DispatchItamRecordAsync(
+            string tag,
             string serialNumber,
-            string model,
-            string physicalGrade,
+            string processor,
+            string memory,
+            int batteryHealth,
+            int storageHealth,
             string status,
-            string notes,
-            string cpu,
-            string ram,
-            string storage,
-            string batteryHealth,
-            string gpu,
+            string workInProgress,
+            string physicalGrade,
+            string remarks,
+            string technician,
+            string inDate,
+            string supplier,
+            string outDate,
+            string customer,
             string webhookUrl = DefaultSheetsUrl)
         {
             if (string.IsNullOrWhiteSpace(webhookUrl)) return false;
@@ -239,16 +260,21 @@ namespace SuperAutoMater.Wpf.Services
             {
                 var payload = new
                 {
-                    Serial_Number  = serialNumber ?? "",
-                    Model          = model ?? "",
-                    Processor      = cpu ?? "",
-                    Memory         = ram ?? "",
-                    Battery_Health = batteryHealth ?? "",
-                    Status         = status ?? "PASSED",
-                    Wip_Issue      = notes ?? "All Okay",
-                    Physical_Grade = physicalGrade ?? "A+",
-                    Remarks        = $"GPU: {gpu}; Storage: {storage}",
-                    Timestamp      = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss")
+                    Tag              = tag ?? "",
+                    Serial_Number    = serialNumber ?? "",
+                    Processor        = processor ?? "",
+                    Memory           = memory ?? "",
+                    Battery_Health   = Math.Clamp(batteryHealth, 0, 100),
+                    Storage_Health   = Math.Clamp(storageHealth, 0, 100),
+                    Status           = status ?? "RTS",
+                    Work_In_Progress = workInProgress ?? "All Okay",
+                    Physical_Grade   = physicalGrade ?? "A+",
+                    Remarks          = remarks ?? "",
+                    Technician       = technician ?? "",
+                    In_Date          = string.IsNullOrWhiteSpace(inDate) ? DateTime.Now.ToString("yyyy-MM-dd") : inDate,
+                    Supplier         = supplier ?? "",
+                    Out_Date         = outDate ?? "",
+                    Customer         = customer ?? ""
                 };
 
                 string json = JsonSerializer.Serialize(payload);
@@ -262,6 +288,42 @@ namespace SuperAutoMater.Wpf.Services
             {
                 return false;
             }
+        }
+
+        public static async Task<bool> DispatchQcRecordAsync(
+            string serialNumber,
+            string model,
+            string physicalGrade,
+            string status,
+            string notes,
+            string cpu,
+            string ram,
+            string storage,
+            string batteryHealth,
+            string gpu,
+            string webhookUrl = DefaultSheetsUrl)
+        {
+            int.TryParse((batteryHealth ?? "").Replace("%", "").Trim(), out int bHealth);
+            if (bHealth <= 0) bHealth = 100;
+
+            return await DispatchItamRecordAsync(
+                serialNumber,
+                serialNumber,
+                cpu,
+                $"{ram} / {storage}",
+                bHealth,
+                100,
+                status,
+                notes,
+                physicalGrade,
+                $"GPU: {gpu}",
+                "OPERATOR",
+                DateTime.Now.ToString("yyyy-MM-dd"),
+                "Lease Return",
+                "",
+                "",
+                webhookUrl
+            );
         }
     }
 }

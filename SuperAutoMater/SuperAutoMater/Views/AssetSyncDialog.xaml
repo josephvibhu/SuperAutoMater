@@ -1,10 +1,10 @@
 <Window x:Class="SuperAutoMater.Wpf.Views.AssetSyncDialog"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        Title="QC Sign-Off &amp; Warehouse Cloud Dispatch"
-        Height="640" Width="820"
+        Title="ITAM Asset Dispatch &amp; Google Sheets Synchronization"
+        Height="780" Width="980"
         WindowStartupLocation="CenterOwner"
-        ResizeMode="NoResize"
+        ResizeMode="CanResize"
         Background="#0E1116"
         Icon="pack://application:,,,/app.ico">
 
@@ -20,10 +20,13 @@
             <DockPanel LastChildFill="False">
                 <StackPanel Orientation="Horizontal" DockPanel.Dock="Left" VerticalAlignment="Center">
                     <Ellipse Width="10" Height="10" Fill="{StaticResource BrushAccentEmerald}" Margin="0,0,10,0"/>
-                    <TextBlock Text="INVENTORY QC VERIFICATION &amp; CLOUD DISPATCH" FontFamily="{StaticResource FontMono}" FontWeight="Bold" FontSize="13" Foreground="{StaticResource BrushTextWhite}"/>
+                    <TextBlock Text="ITAM ASSET SYNCHRONIZATION &amp; QC DISPATCH" FontFamily="{StaticResource FontMono}" FontWeight="Bold" FontSize="13" Foreground="{StaticResource BrushTextWhite}"/>
+                    <Border Background="#1F2937" BorderBrush="#374151" BorderThickness="1" CornerRadius="4" Padding="6,2" Margin="12,0,0,0">
+                        <TextBlock Text="15-FIELD ITAM COMPLIANT" FontFamily="{StaticResource FontMono}" FontSize="10" Foreground="#10B981" FontWeight="Bold"/>
+                    </Border>
                 </StackPanel>
                 <Border DockPanel.Dock="Right" Background="#1D2430" BorderBrush="#388BFD" BorderThickness="1" CornerRadius="6" Padding="8,3">
-                    <TextBlock Text="TARGET: Refurb_Inventory_2026" FontFamily="{StaticResource FontMono}" FontSize="11" Foreground="#58A6FF" FontWeight="SemiBold"/>
+                    <TextBlock Text="TARGET: Google Sheets / SQLite ITAM Ledger" FontFamily="{StaticResource FontMono}" FontSize="11" Foreground="#58A6FF" FontWeight="SemiBold"/>
                 </Border>
             </DockPanel>
         </Border>
@@ -31,102 +34,193 @@
         <!-- Main Form (2 Columns) -->
         <Grid Grid.Row="1">
             <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="1.2*"/> <!-- Edit Fields -->
-                <ColumnDefinition Width="0.8*"/> <!-- QR & Label Preview -->
+                <ColumnDefinition Width="1.35*"/> <!-- Edit Fields -->
+                <ColumnDefinition Width="0.65*"/> <!-- QR & Label Preview -->
             </Grid.ColumnDefinitions>
 
             <!-- Column 1: Editable Fields -->
             <ScrollViewer Grid.Column="0" VerticalScrollBarVisibility="Auto" Margin="0,0,12,0">
                 <StackPanel Margin="0,0,8,0">
-                    <!-- Row 1: Serial & Asset Tag -->
-                    <Grid Margin="0,0,0,10">
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="*"/>
-                            <ColumnDefinition Width="*"/>
-                        </Grid.ColumnDefinitions>
-                        <StackPanel Grid.Column="0" Margin="0,0,6,0">
-                            <TextBlock Text="SERIAL NUMBER" Style="{StaticResource TextBadgeMono}" Foreground="{StaticResource BrushTextVioletSubdued}" Margin="0,0,0,4"/>
-                            <TextBox x:Name="TxtSerial" Background="#161B22" Foreground="#FFFFFF" BorderBrush="#2D333B" Padding="8,6" FontFamily="{StaticResource FontMono}" TextChanged="Field_TextChanged"/>
+
+                    <!-- Group 1: Hardware Identification -->
+                    <Border Background="#12161E" BorderBrush="#232936" BorderThickness="1" CornerRadius="8" Padding="12" Margin="0,0,0,12">
+                        <StackPanel>
+                            <TextBlock Text="1. ASSET IDENTIFIERS &amp; HARDWARE SPECS" FontFamily="{StaticResource FontMono}" FontWeight="Bold" FontSize="11" Foreground="#58A6FF" Margin="0,0,0,8"/>
+                            
+                            <!-- Row: Tag & Serial -->
+                            <Grid Margin="0,0,0,8">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="*"/>
+                                </Grid.ColumnDefinitions>
+                                <StackPanel Grid.Column="0" Margin="0,0,4,0">
+                                    <DockPanel Margin="0,0,0,4">
+                                        <TextBlock Text="TAG" Style="{StaticResource TextBadgeMono}" Foreground="{StaticResource BrushTextVioletSubdued}"/>
+                                        <TextBlock Text="[BOLD IN EXPORTS]" FontFamily="{StaticResource FontMono}" FontSize="9" Foreground="#F59E0B" HorizontalAlignment="Right"/>
+                                    </DockPanel>
+                                    <TextBox x:Name="TxtAssetTag" FontWeight="Bold" Background="#161B22" Foreground="#38BDF8" BorderBrush="#2D333B" Padding="8,6" FontFamily="{StaticResource FontMono}" TextChanged="Field_TextChanged"/>
+                                </StackPanel>
+                                <StackPanel Grid.Column="1" Margin="4,0,0,0">
+                                    <TextBlock Text="SERIAL NUMBER" Style="{StaticResource TextBadgeMono}" Foreground="{StaticResource BrushTextVioletSubdued}" Margin="0,0,0,4"/>
+                                    <TextBox x:Name="TxtSerial" Background="#161B22" Foreground="#FFFFFF" BorderBrush="#2D333B" Padding="8,6" FontFamily="{StaticResource FontMono}" TextChanged="Field_TextChanged"/>
+                                </StackPanel>
+                            </Grid>
+
+                            <!-- Row: Processor & Memory -->
+                            <Grid Margin="0,0,0,8">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="1.1*"/>
+                                    <ColumnDefinition Width="0.9*"/>
+                                </Grid.ColumnDefinitions>
+                                <StackPanel Grid.Column="0" Margin="0,0,4,0">
+                                    <TextBlock Text="PROCESSOR" Style="{StaticResource TextBadgeMono}" Foreground="{StaticResource BrushTextVioletSubdued}" Margin="0,0,0,4"/>
+                                    <TextBox x:Name="TxtCpu" Background="#161B22" Foreground="#FFFFFF" BorderBrush="#2D333B" Padding="8,6" FontFamily="{StaticResource FontMono}"/>
+                                </StackPanel>
+                                <StackPanel Grid.Column="1" Margin="4,0,0,0">
+                                    <TextBlock Text="MEMORY [RAM/STORAGE]" Style="{StaticResource TextBadgeMono}" Foreground="{StaticResource BrushTextVioletSubdued}" Margin="0,0,0,4"/>
+                                    <TextBox x:Name="TxtRamStorage" Background="#161B22" Foreground="#FFFFFF" BorderBrush="#2D333B" Padding="8,6" FontFamily="{StaticResource FontMono}"/>
+                                </StackPanel>
+                            </Grid>
+
+                            <!-- Row: Device Model & Shelf -->
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="1.2*"/>
+                                    <ColumnDefinition Width="0.8*"/>
+                                </Grid.ColumnDefinitions>
+                                <StackPanel Grid.Column="0" Margin="0,0,4,0">
+                                    <TextBlock Text="DEVICE MODEL" Style="{StaticResource TextBadgeMono}" Foreground="{StaticResource BrushTextVioletSubdued}" Margin="0,0,0,4"/>
+                                    <TextBox x:Name="TxtModel" Background="#161B22" Foreground="#FFFFFF" BorderBrush="#2D333B" Padding="8,6" FontFamily="{StaticResource FontMono}" TextChanged="Field_TextChanged"/>
+                                </StackPanel>
+                                <StackPanel Grid.Column="1" Margin="4,0,0,0">
+                                    <TextBlock Text="SHELF BAY" Style="{StaticResource TextBadgeMono}" Foreground="{StaticResource BrushTextVioletSubdued}" Margin="0,0,0,4"/>
+                                    <TextBox x:Name="TxtShelf" Text="QC-BAY-01" Background="#161B22" Foreground="#FFFFFF" BorderBrush="#2D333B" Padding="8,6" FontFamily="{StaticResource FontMono}"/>
+                                </StackPanel>
+                            </Grid>
                         </StackPanel>
-                        <StackPanel Grid.Column="1" Margin="6,0,0,0">
-                            <TextBlock Text="ASSET TAG" Style="{StaticResource TextBadgeMono}" Foreground="{StaticResource BrushTextVioletSubdued}" Margin="0,0,0,4"/>
-                            <TextBox x:Name="TxtAssetTag" Background="#161B22" Foreground="#FFFFFF" BorderBrush="#2D333B" Padding="8,6" FontFamily="{StaticResource FontMono}" TextChanged="Field_TextChanged"/>
+                    </Border>
+
+                    <!-- Group 2: Health, Grade & Status -->
+                    <Border Background="#12161E" BorderBrush="#232936" BorderThickness="1" CornerRadius="8" Padding="12" Margin="0,0,0,12">
+                        <StackPanel>
+                            <TextBlock Text="2. TELEMETRY, HEALTH &amp; CLASSIFICATION" FontFamily="{StaticResource FontMono}" FontWeight="Bold" FontSize="11" Foreground="#10B981" Margin="0,0,0,8"/>
+                            
+                            <Grid Margin="0,0,0,8">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="*"/>
+                                </Grid.ColumnDefinitions>
+
+                                <!-- Battery Health -->
+                                <StackPanel Grid.Column="0" Margin="0,0,4,0">
+                                    <TextBlock Text="BATTERY HEALTH" Style="{StaticResource TextBadgeMono}" Foreground="{StaticResource BrushTextVioletSubdued}" Margin="0,0,0,4"/>
+                                    <TextBox x:Name="TxtBatteryHealth" Text="100" Background="#161B22" Foreground="#3FB950" FontWeight="Bold" BorderBrush="#2D333B" Padding="8,6" FontFamily="{StaticResource FontMono}" ToolTip="0-100 integer without %"/>
+                                </StackPanel>
+
+                                <!-- Storage Health -->
+                                <StackPanel Grid.Column="1" Margin="4,0,4,0">
+                                    <TextBlock Text="STORAGE HEALTH" Style="{StaticResource TextBadgeMono}" Foreground="{StaticResource BrushTextVioletSubdued}" Margin="0,0,0,4"/>
+                                    <TextBox x:Name="TxtStorageHealth" Text="100" Background="#161B22" Foreground="#3FB950" FontWeight="Bold" BorderBrush="#2D333B" Padding="8,6" FontFamily="{StaticResource FontMono}" ToolTip="0-100 integer without %"/>
+                                </StackPanel>
+
+                                <!-- Physical Grade -->
+                                <StackPanel Grid.Column="2" Margin="4,0,4,0">
+                                    <TextBlock Text="PHYSICAL GRADE" Style="{StaticResource TextBadgeMono}" Foreground="{StaticResource BrushTextVioletSubdued}" Margin="0,0,0,4"/>
+                                    <ComboBox x:Name="CmbGrade" Background="#161B22" Foreground="#FFFFFF" BorderBrush="#2D333B" Padding="6,4">
+                                        <ComboBoxItem Content="A+" IsSelected="True"/>
+                                        <ComboBoxItem Content="A"/>
+                                        <ComboBoxItem Content="B"/>
+                                        <ComboBoxItem Content="C"/>
+                                        <ComboBoxItem Content="D"/>
+                                    </ComboBox>
+                                </StackPanel>
+
+                                <!-- Status -->
+                                <StackPanel Grid.Column="3" Margin="4,0,0,0">
+                                    <TextBlock Text="STATUS" Style="{StaticResource TextBadgeMono}" Foreground="{StaticResource BrushTextVioletSubdued}" Margin="0,0,0,4"/>
+                                    <ComboBox x:Name="CmbStatus" Background="#161B22" Foreground="#FFFFFF" BorderBrush="#2D333B" Padding="6,4">
+                                        <ComboBoxItem Content="RTS" IsSelected="True"/>
+                                        <ComboBoxItem Content="WIP"/>
+                                        <ComboBoxItem Content="SOLD"/>
+                                        <ComboBoxItem Content="RFR"/>
+                                        <ComboBoxItem Content="DEMO"/>
+                                        <ComboBoxItem Content="RENT"/>
+                                    </ComboBox>
+                                </StackPanel>
+                            </Grid>
+
+                            <!-- Work in Progress Defect / Status -->
+                            <StackPanel Margin="0,4,0,0">
+                                <TextBlock Text="WORK IN PROGRESS [DEFECT / REPAIR REASON]" Style="{StaticResource TextBadgeMono}" Foreground="{StaticResource BrushTextVioletSubdued}" Margin="0,0,0,4"/>
+                                <ComboBox x:Name="CmbWorkInProgress" IsEditable="True" Background="#161B22" Foreground="#FFFFFF" BorderBrush="#2D333B" Padding="6,4">
+                                    <ComboBoxItem Content="All Okay" IsSelected="True"/>
+                                    <ComboBoxItem Content="No OS"/>
+                                    <ComboBoxItem Content="Power On issue"/>
+                                    <ComboBoxItem Content="Undefined"/>
+                                    <ComboBoxItem Content="keyboard issue"/>
+                                    <ComboBoxItem Content="battery issue"/>
+                                    <ComboBoxItem Content="bios issue"/>
+                                    <ComboBoxItem Content="camera issue"/>
+                                    <ComboBoxItem Content="multiple issue"/>
+                                </ComboBox>
+                            </StackPanel>
                         </StackPanel>
-                    </Grid>
+                    </Border>
 
-                    <!-- Row 2: Model & Shelf -->
-                    <Grid Margin="0,0,0,10">
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="1.3*"/>
-                            <ColumnDefinition Width="0.7*"/>
-                        </Grid.ColumnDefinitions>
-                        <StackPanel Grid.Column="0" Margin="0,0,6,0">
-                            <TextBlock Text="DEVICE MODEL" Style="{StaticResource TextBadgeMono}" Foreground="{StaticResource BrushTextVioletSubdued}" Margin="0,0,0,4"/>
-                            <TextBox x:Name="TxtModel" Background="#161B22" Foreground="#FFFFFF" BorderBrush="#2D333B" Padding="8,6" FontFamily="{StaticResource FontMono}" TextChanged="Field_TextChanged"/>
+                    <!-- Group 3: Custody, Provenance & Dates -->
+                    <Border Background="#12161E" BorderBrush="#232936" BorderThickness="1" CornerRadius="8" Padding="12" Margin="0,0,0,12">
+                        <StackPanel>
+                            <TextBlock Text="3. PROVENANCE, CUSTODY &amp; DATES" FontFamily="{StaticResource FontMono}" FontWeight="Bold" FontSize="11" Foreground="#A78BFA" Margin="0,0,0,8"/>
+                            
+                            <!-- Row: Technician & In Date -->
+                            <Grid Margin="0,0,0,8">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="*"/>
+                                </Grid.ColumnDefinitions>
+                                <StackPanel Grid.Column="0" Margin="0,0,4,0">
+                                    <TextBlock Text="TECHNICIAN NAME OR ID" Style="{StaticResource TextBadgeMono}" Foreground="{StaticResource BrushTextVioletSubdued}" Margin="0,0,0,4"/>
+                                    <TextBox x:Name="TxtTechnician" Text="TECH-01" Background="#161B22" Foreground="#FFFFFF" BorderBrush="#2D333B" Padding="8,6" FontFamily="{StaticResource FontMono}"/>
+                                </StackPanel>
+                                <StackPanel Grid.Column="1" Margin="4,0,0,0">
+                                    <TextBlock Text="IN DATE [YYYY-MM-DD]" Style="{StaticResource TextBadgeMono}" Foreground="{StaticResource BrushTextVioletSubdued}" Margin="0,0,0,4"/>
+                                    <TextBox x:Name="TxtInDate" Background="#161B22" Foreground="#FFFFFF" BorderBrush="#2D333B" Padding="8,6" FontFamily="{StaticResource FontMono}"/>
+                                </StackPanel>
+                            </Grid>
+
+                            <!-- Row: Supplier, Out Date, Customer -->
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="*"/>
+                                </Grid.ColumnDefinitions>
+                                <StackPanel Grid.Column="0" Margin="0,0,4,0">
+                                    <TextBlock Text="SUPPLIER" Style="{StaticResource TextBadgeMono}" Foreground="{StaticResource BrushTextVioletSubdued}" Margin="0,0,0,4"/>
+                                    <TextBox x:Name="TxtSupplier" Text="Enterprise Lease Return" Background="#161B22" Foreground="#FFFFFF" BorderBrush="#2D333B" Padding="8,6" FontFamily="{StaticResource FontMono}"/>
+                                </StackPanel>
+                                <StackPanel Grid.Column="1" Margin="4,0,4,0">
+                                    <TextBlock Text="OUT DATE [YYYY-MM-DD]" Style="{StaticResource TextBadgeMono}" Foreground="{StaticResource BrushTextVioletSubdued}" Margin="0,0,0,4"/>
+                                    <TextBox x:Name="TxtOutDate" Background="#161B22" Foreground="#8B949E" BorderBrush="#2D333B" Padding="8,6" FontFamily="{StaticResource FontMono}"/>
+                                </StackPanel>
+                                <StackPanel Grid.Column="2" Margin="4,0,0,0">
+                                    <TextBlock Text="CUSTOMER" Style="{StaticResource TextBadgeMono}" Foreground="{StaticResource BrushTextVioletSubdued}" Margin="0,0,0,4"/>
+                                    <TextBox x:Name="TxtCustomer" Background="#161B22" Foreground="#8B949E" BorderBrush="#2D333B" Padding="8,6" FontFamily="{StaticResource FontMono}"/>
+                                </StackPanel>
+                            </Grid>
                         </StackPanel>
-                        <StackPanel Grid.Column="1" Margin="6,0,0,0">
-                            <TextBlock Text="SHELF BAY" Style="{StaticResource TextBadgeMono}" Foreground="{StaticResource BrushTextVioletSubdued}" Margin="0,0,0,4"/>
-                            <TextBox x:Name="TxtShelf" Text="QC-BAY-01" Background="#161B22" Foreground="#FFFFFF" BorderBrush="#2D333B" Padding="8,6" FontFamily="{StaticResource FontMono}"/>
+                    </Border>
+
+                    <!-- Group 4: Remarks -->
+                    <Border Background="#12161E" BorderBrush="#232936" BorderThickness="1" CornerRadius="8" Padding="12" Margin="0,0,0,8">
+                        <StackPanel>
+                            <TextBlock Text="4. REMARKS &amp; AUDIT NOTES" FontFamily="{StaticResource FontMono}" FontWeight="Bold" FontSize="11" Foreground="#F59E0B" Margin="0,0,0,8"/>
+                            <TextBox x:Name="TxtRemarks" Text="SuperAutoMater Certified Nominal" Background="#161B22" Foreground="#FFFFFF" BorderBrush="#2D333B" Padding="8,6" FontFamily="{StaticResource FontMono}"/>
                         </StackPanel>
-                    </Grid>
+                    </Border>
 
-                    <!-- Row 3: CPU Specs -->
-                    <StackPanel Margin="0,0,0,10">
-                        <TextBlock Text="PROCESSOR / CPU SPEC" Style="{StaticResource TextBadgeMono}" Foreground="{StaticResource BrushTextVioletSubdued}" Margin="0,0,0,4"/>
-                        <TextBox x:Name="TxtCpu" Background="#161B22" Foreground="#FFFFFF" BorderBrush="#2D333B" Padding="8,6" FontFamily="{StaticResource FontMono}"/>
-                    </StackPanel>
-
-                    <!-- Row 4: RAM & Storage -->
-                    <StackPanel Margin="0,0,0,10">
-                        <TextBlock Text="RAM &amp; STORAGE SPEC" Style="{StaticResource TextBadgeMono}" Foreground="{StaticResource BrushTextVioletSubdued}" Margin="0,0,0,4"/>
-                        <TextBox x:Name="TxtRamStorage" Background="#161B22" Foreground="#FFFFFF" BorderBrush="#2D333B" Padding="8,6" FontFamily="{StaticResource FontMono}"/>
-                    </StackPanel>
-
-                    <!-- Row 5: Battery, Grade, Status -->
-                    <Grid Margin="0,0,0,10">
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="*"/>
-                            <ColumnDefinition Width="*"/>
-                            <ColumnDefinition Width="*"/>
-                        </Grid.ColumnDefinitions>
-
-                        <StackPanel Grid.Column="0" Margin="0,0,4,0">
-                            <TextBlock Text="BATTERY %" Style="{StaticResource TextBadgeMono}" Foreground="{StaticResource BrushTextVioletSubdued}" Margin="0,0,0,4"/>
-                            <TextBox x:Name="TxtBatteryHealth" Text="100" Background="#161B22" Foreground="#3FB950" FontWeight="Bold" BorderBrush="#2D333B" Padding="8,6" FontFamily="{StaticResource FontMono}"/>
-                        </StackPanel>
-
-                        <StackPanel Grid.Column="1" Margin="4,0,4,0">
-                            <TextBlock Text="GRADE" Style="{StaticResource TextBadgeMono}" Foreground="{StaticResource BrushTextVioletSubdued}" Margin="0,0,0,4"/>
-                            <ComboBox x:Name="CmbGrade" Background="#161B22" Foreground="#FFFFFF" BorderBrush="#2D333B" Padding="6,4">
-                                <ComboBoxItem Content="A+" IsSelected="True"/>
-                                <ComboBoxItem Content="A"/>
-                                <ComboBoxItem Content="B"/>
-                                <ComboBoxItem Content="C"/>
-                                <ComboBoxItem Content="DEFECTIVE"/>
-                            </ComboBox>
-                        </StackPanel>
-
-                        <StackPanel Grid.Column="2" Margin="4,0,0,0">
-                            <TextBlock Text="STATUS" Style="{StaticResource TextBadgeMono}" Foreground="{StaticResource BrushTextVioletSubdued}" Margin="0,0,0,4"/>
-                            <ComboBox x:Name="CmbStatus" Background="#161B22" Foreground="#FFFFFF" BorderBrush="#2D333B" Padding="6,4">
-                                <ComboBoxItem Content="RTS" IsSelected="True"/>
-                                <ComboBoxItem Content="WIP"/>
-                                <ComboBoxItem Content="BER"/>
-                            </ComboBox>
-                        </StackPanel>
-                    </Grid>
-
-                    <!-- Row 6: WIP / Issue Reason -->
-                    <StackPanel Margin="0,0,0,10">
-                        <TextBlock Text="WIP DEFECT OR PASS REASON" Style="{StaticResource TextBadgeMono}" Foreground="{StaticResource BrushTextVioletSubdued}" Margin="0,0,0,4"/>
-                        <TextBox x:Name="TxtWipReason" Text="All Tests Passed - Certified Nominal" Background="#161B22" Foreground="#FFFFFF" BorderBrush="#2D333B" Padding="8,6" FontFamily="{StaticResource FontMono}"/>
-                    </StackPanel>
-
-                    <!-- Row 7: Remarks -->
-                    <StackPanel Margin="0,0,0,10">
-                        <TextBlock Text="TECHNICIAN REMARKS" Style="{StaticResource TextBadgeMono}" Foreground="{StaticResource BrushTextVioletSubdued}" Margin="0,0,0,4"/>
-                        <TextBox x:Name="TxtRemarks" Text="SuperAutoMater v1.0 Bench Sign-Off" Background="#161B22" Foreground="#FFFFFF" BorderBrush="#2D333B" Padding="8,6" FontFamily="{StaticResource FontMono}"/>
-                    </StackPanel>
                 </StackPanel>
             </ScrollViewer>
 
@@ -143,9 +237,12 @@
 
                     <StackPanel Grid.Row="1" VerticalAlignment="Center" HorizontalAlignment="Center">
                         <Border Background="#FFFFFF" CornerRadius="8" Padding="10" HorizontalAlignment="Center">
-                            <Image x:Name="ImgQrCode" Width="150" Height="150" Stretch="Uniform"/>
+                            <Image x:Name="ImgQrCode" Width="160" Height="160" Stretch="Uniform"/>
                         </Border>
                         <TextBlock x:Name="TxtQrCaption" Text="SCAN ASSET BARCODE" Style="{StaticResource TextBadgeMono}" Foreground="{StaticResource BrushTextVioletSubdued}" HorizontalAlignment="Center" Margin="0,8,0,0"/>
+                        <Border Background="#1D2430" BorderBrush="#388BFD" BorderThickness="1" CornerRadius="4" Padding="6,3" Margin="0,10,0,0" HorizontalAlignment="Center">
+                            <TextBlock Text="15 ITAM COLUMNS MAPPED" FontFamily="{StaticResource FontMono}" FontSize="10" Foreground="#58A6FF"/>
+                        </Border>
                     </StackPanel>
 
                     <StackPanel Grid.Row="2" Margin="0,10,0,0">
@@ -159,7 +256,7 @@
         <Border Grid.Row="2" Background="#161B22" BorderBrush="#2D333B" BorderThickness="1" CornerRadius="10" Padding="14,10" Margin="0,14,0,0">
             <DockPanel LastChildFill="False">
                 <Button DockPanel.Dock="Left" Content="CANCEL [ESC]" Style="{StaticResource StyleDarkActionBtn}" Click="BtnCancel_Click" Width="130"/>
-                <Button DockPanel.Dock="Right" Content="☁ SUBMIT TO GOOGLE SHEETS [ENTER]" Style="{StaticResource StyleCloudPassButton}" Click="BtnSubmit_Click" Width="300"/>
+                <Button DockPanel.Dock="Right" Content="☁ SUBMIT TO GOOGLE SHEETS &amp; LEDGER [ENTER]" Style="{StaticResource StyleCloudPassButton}" Click="BtnSubmit_Click" Width="380"/>
             </DockPanel>
         </Border>
     </Grid>

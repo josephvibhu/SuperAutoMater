@@ -152,18 +152,21 @@ function doPost(e) {
     // Setup headers and format on first run
     if (sheet.getLastRow() === 0) {
       var headers = [
-        'Asset Tag',
+        'Tag',
         'Serial Number',
-        'Model',
         'Processor',
-        'Memory (RAM/SSD)',
-        'Battery Health (%)',
+        'Memory [ram/storage]',
+        'Battery health',
+        'Storage Health',
         'Status',
-        'Work In Progress Issue',
+        'Work in Progress',
         'Physical Grade',
         'Remarks',
-        'Shelf Location',
-        'Timestamp'
+        'Technician Name or ID',
+        'In Date',
+        'Supplier',
+        'Out Date',
+        'Customer'
       ];
       sheet.appendRow(headers);
 
@@ -182,72 +185,71 @@ function doPost(e) {
       payload = JSON.parse(e.postData.contents);
     }
 
-    var assetTag      = payload.Asset_Tag || payload.assetTag || '';
-    var serialNo      = payload.Serial_Number || payload.serialNumber || '';
-    var model         = payload.Model || payload.model || '';
+    var tag           = payload.Tag || payload.tag || payload.Asset_Tag || payload.assetTag || '';
+    var serialNo      = payload.Serial_Number || payload.serial_number || payload.serialNumber || '';
     var processor     = payload.Processor || payload.processor || '';
-    var memory        = payload.Memory || payload.ramStorage || '';
-    var batteryHealth = payload.Battery_Health || payload.batteryHealth || '100';
+    var memory        = payload.Memory || payload.memory || payload.ramStorage || '';
+    var batteryHealth = payload.Battery_Health || payload.battery_health || payload.batteryHealth || '100';
+    var storageHealth = payload.Storage_Health || payload.storage_health || payload.storageHealth || '100';
     var status        = payload.Status || payload.status || 'RTS';
-    var wipIssue      = payload.Wip_Issue || payload.wipIssue || 'All Okay';
-    var physicalGrade = payload.Physical_Grade || payload.physicalGrade || 'A+';
+    var wipIssue      = payload.Work_In_Progress || payload.work_in_progress || payload.Wip_Issue || payload.wipIssue || 'All Okay';
+    var physicalGrade = payload.Physical_Grade || payload.physical_grade || payload.physicalGrade || 'A+';
     var remarks       = payload.Remarks || payload.remarks || '';
-    var shelf         = payload.Shelf_Location || payload.shelf || '';
-    var timestamp     = payload.Timestamp || Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'yyyy-MM-dd HH:mm:ss');
+    var technician    = payload.Technician || payload.technician || '';
+    var inDate        = payload.In_Date || payload.in_date || Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'yyyy-MM-dd');
+    var supplier      = payload.Supplier || payload.supplier || '';
+    var outDate       = payload.Out_Date || payload.out_date || '';
+    var customer      = payload.Customer || payload.customer || '';
 
+    // Pure integer 0-100 without percent symbol
     var numBattery = parseInt(batteryHealth.toString().replace(/[^0-9]/g, ''), 10);
     if (isNaN(numBattery) || numBattery < 0) numBattery = 100;
     if (numBattery > 100) numBattery = 100;
 
+    var numStorage = parseInt(storageHealth.toString().replace(/[^0-9]/g, ''), 10);
+    if (isNaN(numStorage) || numStorage < 0) numStorage = 100;
+    if (numStorage > 100) numStorage = 100;
+
     var newRow = [
-      assetTag,
+      tag,
       serialNo,
-      model,
       processor,
       memory,
       numBattery,
+      numStorage,
       status,
       wipIssue,
       physicalGrade,
       remarks,
-      shelf,
-      timestamp
+      technician,
+      inDate,
+      supplier,
+      outDate,
+      customer
     ];
 
     var lastRow = sheet.getLastRow();
     var targetRow = -1;
     var updated = false;
 
-    // Deduplication Guard: if serial or asset was added in last 45s, update and avoid duplicate
-    if (lastRow > 1 && (serialNo || assetTag)) {
+    // Deduplication Guard: if serial or tag was added in last 45s, update and avoid duplicate
+    if (lastRow > 1 && (serialNo || tag)) {
       var rangeValues = sheet.getRange(2, 1, lastRow - 1, 2).getValues();
-      var timeValues  = sheet.getRange(2, 12, lastRow - 1, 1).getValues();
       var nowMs = new Date().getTime();
 
       for (var i = rangeValues.length - 1; i >= 0; i--) {
-        var rowAsset  = rangeValues[i][0] ? rangeValues[i][0].toString().trim().toUpperCase() : '';
+        var rowTag    = rangeValues[i][0] ? rangeValues[i][0].toString().trim().toUpperCase() : '';
         var rowSerial = rangeValues[i][1] ? rangeValues[i][1].toString().trim().toUpperCase() : '';
         var isMatch = false;
 
         if (serialNo && serialNo !== 'N/A' && serialNo !== 'UNKNOWN' && rowSerial === serialNo.trim().toUpperCase()) {
           isMatch = true;
-        } else if (assetTag && assetTag !== 'UNKNOWN' && rowAsset === assetTag.trim().toUpperCase()) {
+        } else if (tag && tag !== 'UNKNOWN' && rowTag === tag.trim().toUpperCase()) {
           isMatch = true;
         }
 
         if (isMatch) {
           targetRow = i + 2;
-          var rowTime = new Date(timeValues[i][0]).getTime();
-          if (!isNaN(rowTime) && (nowMs - rowTime < 45000)) {
-            sheet.getRange(targetRow, 1, 1, newRow.length).setValues([newRow]);
-            return ContentService.createTextOutput(JSON.stringify({
-              status: 'OK',
-              action: 'DEDUPLICATED',
-              row: targetRow,
-              message: 'Duplicate prevented. Record updated at Row ' + targetRow
-            })).setMimeType(ContentService.MimeType.JSON);
-          }
-
           sheet.getRange(targetRow, 1, 1, newRow.length).setValues([newRow]);
           updated = true;
           break;
@@ -264,21 +266,40 @@ function doPost(e) {
     dataRowRange.setFontFamily('Roboto');
     dataRowRange.setVerticalAlignment('middle');
 
+    // 1. Tag [in bold]
+    var tagCell = sheet.getRange(targetRow, 1);
+    tagCell.setFontWeight('bold');
+
+    // 2. Battery & Storage Health numbers (0-100 without percent symbol)
+    var battCell = sheet.getRange(targetRow, 5);
+    battCell.setHorizontalAlignment('center');
+    battCell.setNumberFormat('0');
+
+    var storageCell = sheet.getRange(targetRow, 6);
+    storageCell.setHorizontalAlignment('center');
+    storageCell.setNumberFormat('0');
+
+    // 3. Status styling [RTS, WIP, SOLD, RFR, DEMO, RENT]
     var statusCell = sheet.getRange(targetRow, 7);
     statusCell.setFontWeight('bold');
     statusCell.setHorizontalAlignment('center');
-    if (status === 'RTS' || status.indexOf('Ready') !== -1) {
+    if (status === 'RTS') {
       statusCell.setBackground('#DCFCE7').setFontColor('#15803D');
-    } else if (status === 'WIP' || status.indexOf('Progress') !== -1) {
+    } else if (status === 'WIP') {
       statusCell.setBackground('#FEF3C7').setFontColor('#B45309');
-    } else if (status === 'RFR' || status.indexOf('Repair') !== -1 || status.indexOf('Flagged') !== -1) {
-      statusCell.setBackground('#FEE2E2').setFontColor('#B91C1C');
     } else if (status === 'SOLD') {
       statusCell.setBackground('#E0E7FF').setFontColor('#3730A3');
+    } else if (status === 'RFR') {
+      statusCell.setBackground('#FEE2E2').setFontColor('#B91C1C');
+    } else if (status === 'DEMO') {
+      statusCell.setBackground('#F3E8FF').setFontColor('#6B21A8');
+    } else if (status === 'RENT') {
+      statusCell.setBackground('#FFEDD5').setFontColor('#C2410C');
     }
 
-    var battCell = sheet.getRange(targetRow, 6);
-    battCell.setHorizontalAlignment('center');
+    // 4. In Date and Out Date centered
+    sheet.getRange(targetRow, 12).setHorizontalAlignment('center');
+    sheet.getRange(targetRow, 14).setHorizontalAlignment('center');
 
     return ContentService
       .createTextOutput(JSON.stringify({

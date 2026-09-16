@@ -224,6 +224,13 @@ namespace SuperAutoMater.Wpf.Core
         public string LatestRunGrade { get; set; } = "";
         public string LatestRunStatus { get; set; } = "";
         public string LatestVerificationHash { get; set; } = "";
+        public int StorageHealth { get; set; } = 100;
+        public string WorkInProgress { get; set; } = "All Okay";
+        public string Supplier { get; set; } = "";
+        public string Customer { get; set; } = "";
+        public string InDate { get; set; } = "";
+        public string OutDate { get; set; } = "";
+        public string Remarks { get; set; } = "";
         public DateTimeOffset CreatedAtUtc { get; set; }
         public DateTimeOffset UpdatedAtUtc { get; set; }
     }

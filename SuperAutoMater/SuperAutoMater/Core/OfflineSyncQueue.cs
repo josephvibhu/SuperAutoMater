@@ -104,18 +104,41 @@ namespace SuperAutoMater
                     {
                         string json = JsonSerializer.Serialize(new
                         {
-                            Asset_Tag      = record.Asset_Tag,
-                            Serial_Number  = record.Serial_Number,
-                            Model          = record.Model,
-                            Processor      = record.Processor,
-                            Memory         = record.Memory,
-                            Battery_Health = record.Battery_Health,
-                            Status         = record.Status,
-                            Wip_Issue      = record.Wip_Issue,
-                            Physical_Grade = record.Physical_Grade,
-                            Remarks        = record.Remarks,
-                            Shelf_Location = record.Shelf_Location,
-                            Timestamp      = record.Timestamp
+                            Tag              = string.IsNullOrWhiteSpace(record.Tag) ? record.Asset_Tag : record.Tag,
+                            tag              = string.IsNullOrWhiteSpace(record.Tag) ? record.Asset_Tag : record.Tag,
+                            Asset_Tag        = string.IsNullOrWhiteSpace(record.Tag) ? record.Asset_Tag : record.Tag,
+                            Serial_Number    = record.Serial_Number,
+                            serial_number    = record.Serial_Number,
+                            Processor        = record.Processor,
+                            processor        = record.Processor,
+                            Memory           = record.Memory,
+                            memory           = record.Memory,
+                            Battery_Health   = record.Battery_Health,
+                            battery_health   = record.Battery_Health,
+                            Storage_Health   = record.Storage_Health,
+                            storage_health   = record.Storage_Health,
+                            Status           = record.Status,
+                            status           = record.Status,
+                            Work_In_Progress = record.Work_In_Progress,
+                            work_in_progress = record.Work_In_Progress,
+                            Wip_Issue        = record.Work_In_Progress,
+                            Physical_Grade   = record.Physical_Grade,
+                            physical_grade   = record.Physical_Grade,
+                            Remarks          = record.Remarks,
+                            remarks          = record.Remarks,
+                            Technician       = record.Technician,
+                            technician       = record.Technician,
+                            In_Date          = record.In_Date,
+                            in_date          = record.In_Date,
+                            Supplier         = record.Supplier,
+                            supplier         = record.Supplier,
+                            Out_Date         = record.Out_Date,
+                            out_date         = record.Out_Date,
+                            Customer         = record.Customer,
+                            customer         = record.Customer,
+                            Model            = record.Model,
+                            Shelf_Location   = record.Shelf_Location,
+                            Timestamp        = record.Timestamp
                         });
 
                         var content = new StringContent(json, Encoding.UTF8, "application/json");
@@ -189,18 +212,35 @@ namespace SuperAutoMater
 
     public class AssetQueueRecord
     {
-        public string Asset_Tag { get; set; } = "";
+        public string Tag { get; set; } = "";
+        public string Asset_Tag
+        {
+            get => string.IsNullOrEmpty(Tag) ? _assetTag : Tag;
+            set { _assetTag = value; if (string.IsNullOrEmpty(Tag)) Tag = value; }
+        }
+        private string _assetTag = "";
+
         public string Serial_Number { get; set; } = "";
         public string Model { get; set; } = "";
         public string Processor { get; set; } = "";
-        public string Memory { get; set; } = "";
-        public int Battery_Health { get; set; } = 100;
-        public string Status { get; set; } = "RTS";
-        public string Wip_Issue { get; set; } = "All Okay";
-        public string Physical_Grade { get; set; } = "A+";
+        public string Memory { get; set; } = ""; // [ram/storage]
+        public int Battery_Health { get; set; } = 100; // in 0-100 without percent symbol
+        public int Storage_Health { get; set; } = 100; // in 0-100 without percent symbol
+        public string Status { get; set; } = "RTS"; // RTS, WIP, SOLD, RFR, DEMO, RENT
+        public string Work_In_Progress { get; set; } = "All Okay"; // All Okay, No OS, Power On issue, Undefined, keyboard issue, battery issue, bios issue, camera issue, multiple issue, etc..
+        public string Wip_Issue
+        {
+            get => Work_In_Progress;
+            set => Work_In_Progress = value;
+        }
+        public string Physical_Grade { get; set; } = "A+"; // A+, A, B, C, D
         public string Remarks { get; set; } = "";
         public string Shelf_Location { get; set; } = "";
-        public string Technician { get; set; } = "TECH-01";
+        public string Technician { get; set; } = "TECH-01"; // Technician Name or ID
+        public string In_Date { get; set; } = "";
+        public string Supplier { get; set; } = "";
+        public string Out_Date { get; set; } = "";
+        public string Customer { get; set; } = "";
         public string Timestamp { get; set; } = "";
         public DateTime QueuedAt { get; set; } = DateTime.Now;
     }

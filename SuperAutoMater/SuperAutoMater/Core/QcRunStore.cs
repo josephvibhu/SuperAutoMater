@@ -4,6 +4,7 @@ using System.Globalization;
 using System.IO;
 using System.Security.Cryptography;
 using System.Text;
+using System.Text.Json;
 using Microsoft.Data.Sqlite;
 
 namespace SuperAutoMater.Wpf.Core
@@ -205,6 +206,17 @@ CREATE INDEX IF NOT EXISTS ix_custody_asset ON custody_events(asset_id);
                 Execute(connection, "CREATE INDEX IF NOT EXISTS ix_custody_recorded ON custody_events(recorded_at_utc DESC);");
 
                 Execute(connection, "INSERT OR IGNORE INTO schema_migrations(version, applied_at_utc) VALUES(3, CURRENT_TIMESTAMP);");
+
+                // Migration 4: Formatted ITAM Asset Attributes (Storage Health, Supplier, Customer, In/Out Dates, Work In Progress)
+                AddColumnIfNotExists(connection, "assets", "storage_health", "INTEGER NOT NULL DEFAULT 100");
+                AddColumnIfNotExists(connection, "assets", "work_in_progress", "TEXT NOT NULL DEFAULT 'All Okay'");
+                AddColumnIfNotExists(connection, "assets", "supplier", "TEXT NULL");
+                AddColumnIfNotExists(connection, "assets", "customer", "TEXT NULL");
+                AddColumnIfNotExists(connection, "assets", "in_date", "TEXT NULL");
+                AddColumnIfNotExists(connection, "assets", "out_date", "TEXT NULL");
+                AddColumnIfNotExists(connection, "assets", "remarks", "TEXT NULL");
+
+                Execute(connection, "INSERT OR IGNORE INTO schema_migrations(version, applied_at_utc) VALUES(4, CURRENT_TIMESTAMP);");
             }
         }
 
@@ -697,6 +709,97 @@ VALUES($id, $type, $agg, $key, $payload, $now);";
 
         #region Warehouse Journey & WIP Management
 
+        public void SaveItamRecord(AssetQueueRecord record)
+        {
+            if (record == null) return;
+            lock (_gate)
+            {
+                using var connection = Open();
+                using var transaction = connection.BeginTransaction();
+                string now = UtcNow();
+
+                string tag = string.IsNullOrWhiteSpace(record.Tag) ? record.Asset_Tag : record.Tag;
+                string serial = record.Serial_Number ?? "";
+
+                // Find existing asset or create
+                var existing = FindAssetBySerialOrTag(serial);
+                if (existing == null && !string.IsNullOrEmpty(tag))
+                {
+                    existing = FindAssetBySerialOrTag(tag);
+                }
+
+                string assetId;
+                if (existing != null)
+                {
+                    assetId = existing.AssetId;
+                    using var cmd = connection.CreateCommand();
+                    cmd.Transaction = transaction;
+                    cmd.CommandText = @"UPDATE assets SET 
+                        asset_tag = COALESCE(NULLIF($tag, ''), asset_tag),
+                        storage_health = $storageHealth,
+                        work_in_progress = $wip,
+                        supplier = COALESCE(NULLIF($supplier, ''), supplier),
+                        customer = COALESCE(NULLIF($customer, ''), customer),
+                        in_date = COALESCE(NULLIF($inDate, ''), in_date),
+                        out_date = COALESCE(NULLIF($outDate, ''), out_date),
+                        remarks = COALESCE(NULLIF($remarks, ''), remarks),
+                        updated_at_utc = $now
+                        WHERE id = $id;";
+                    cmd.Parameters.AddWithValue("$tag", tag ?? "");
+                    cmd.Parameters.AddWithValue("$storageHealth", Math.Clamp(record.Storage_Health, 0, 100));
+                    cmd.Parameters.AddWithValue("$wip", string.IsNullOrWhiteSpace(record.Work_In_Progress) ? "All Okay" : record.Work_In_Progress);
+                    cmd.Parameters.AddWithValue("$supplier", record.Supplier ?? "");
+                    cmd.Parameters.AddWithValue("$customer", record.Customer ?? "");
+                    cmd.Parameters.AddWithValue("$inDate", record.In_Date ?? "");
+                    cmd.Parameters.AddWithValue("$outDate", record.Out_Date ?? "");
+                    cmd.Parameters.AddWithValue("$remarks", record.Remarks ?? "");
+                    cmd.Parameters.AddWithValue("$now", now);
+                    cmd.Parameters.AddWithValue("$id", assetId);
+                    cmd.ExecuteNonQuery();
+                }
+                else
+                {
+                    var identity = new QcRunIdentity
+                    {
+                        AssetTag = tag,
+                        SerialNumber = serial,
+                        Model = record.Model ?? "",
+                        Technician = record.Technician ?? ""
+                    };
+                    assetId = FindOrCreateAsset(connection, transaction, identity, now);
+
+                    using var cmd = connection.CreateCommand();
+                    cmd.Transaction = transaction;
+                    cmd.CommandText = @"UPDATE assets SET 
+                        storage_health = $storageHealth,
+                        work_in_progress = $wip,
+                        supplier = $supplier,
+                        customer = $customer,
+                        in_date = $inDate,
+                        out_date = $outDate,
+                        remarks = $remarks,
+                        updated_at_utc = $now
+                        WHERE id = $id;";
+                    cmd.Parameters.AddWithValue("$storageHealth", Math.Clamp(record.Storage_Health, 0, 100));
+                    cmd.Parameters.AddWithValue("$wip", string.IsNullOrWhiteSpace(record.Work_In_Progress) ? "All Okay" : record.Work_In_Progress);
+                    cmd.Parameters.AddWithValue("$supplier", record.Supplier ?? "");
+                    cmd.Parameters.AddWithValue("$customer", record.Customer ?? "");
+                    cmd.Parameters.AddWithValue("$inDate", record.In_Date ?? "");
+                    cmd.Parameters.AddWithValue("$outDate", record.Out_Date ?? "");
+                    cmd.Parameters.AddWithValue("$remarks", record.Remarks ?? "");
+                    cmd.Parameters.AddWithValue("$now", now);
+                    cmd.Parameters.AddWithValue("$id", assetId);
+                    cmd.ExecuteNonQuery();
+                }
+
+                AddOutboxEvent(connection, transaction, "ItamRecordSaved", assetId,
+                    JsonSerializer.Serialize(record), now);
+
+                transaction.Commit();
+                AppLogger.Info($"Saved ITAM Record in SQLite for Asset '{assetId}' (Tag: '{tag}', Serial: '{serial}')");
+            }
+        }
+
         public string IntakeAsset(AssetIntakeRequest req)
         {
             if (req == null) throw new ArgumentNullException(nameof(req));
@@ -886,7 +989,9 @@ VALUES($id, $assetId, $type, $loc, $actor, $reason, '', $notes, $scan, $recorded
 SELECT a.id, a.serial_number, a.asset_tag, a.model, a.current_location, a.lifecycle_queue,
        a.intake_batch_id, a.source_stream, a.charger_status, a.test_profile_id,
        a.created_at_utc, a.updated_at_utc,
-       r.id AS run_id, r.grade AS run_grade, r.status AS run_status, r.verification_hash AS run_hash
+       r.id AS run_id, r.grade AS run_grade, r.status AS run_status, r.verification_hash AS run_hash,
+       COALESCE(a.storage_health, 100), COALESCE(a.work_in_progress, 'All Okay'), COALESCE(a.supplier, ''),
+       COALESCE(a.customer, ''), COALESCE(a.in_date, ''), COALESCE(a.out_date, ''), COALESCE(a.remarks, '')
 FROM assets a
 LEFT JOIN qc_runs r ON r.asset_id = a.id AND r.started_at_utc = (SELECT MAX(started_at_utc) FROM qc_runs WHERE asset_id = a.id)
 WHERE (a.id = $id OR a.serial_number = $id COLLATE NOCASE OR a.asset_tag = $id COLLATE NOCASE OR a.asset_uuid = $id)
@@ -914,7 +1019,9 @@ LIMIT 1;";
 SELECT a.id, a.serial_number, a.asset_tag, a.model, a.current_location, a.lifecycle_queue,
        a.intake_batch_id, a.source_stream, a.charger_status, a.test_profile_id,
        a.created_at_utc, a.updated_at_utc,
-       r.id AS run_id, r.grade AS run_grade, r.status AS run_status, r.verification_hash AS run_hash
+       r.id AS run_id, r.grade AS run_grade, r.status AS run_status, r.verification_hash AS run_hash,
+       COALESCE(a.storage_health, 100), COALESCE(a.work_in_progress, 'All Okay'), COALESCE(a.supplier, ''),
+       COALESCE(a.customer, ''), COALESCE(a.in_date, ''), COALESCE(a.out_date, ''), COALESCE(a.remarks, '')
 FROM assets a
 LEFT JOIN qc_runs r ON r.asset_id = a.id AND r.started_at_utc = (SELECT MAX(started_at_utc) FROM qc_runs WHERE asset_id = a.id)
 WHERE a.lifecycle_queue = $queue
@@ -940,7 +1047,9 @@ ORDER BY a.updated_at_utc DESC;";
 SELECT a.id, a.serial_number, a.asset_tag, a.model, a.current_location, a.lifecycle_queue,
        a.intake_batch_id, a.source_stream, a.charger_status, a.test_profile_id,
        a.created_at_utc, a.updated_at_utc,
-       r.id AS run_id, r.grade AS run_grade, r.status AS run_status, r.verification_hash AS run_hash
+       r.id AS run_id, r.grade AS run_grade, r.status AS run_status, r.verification_hash AS run_hash,
+       COALESCE(a.storage_health, 100), COALESCE(a.work_in_progress, 'All Okay'), COALESCE(a.supplier, ''),
+       COALESCE(a.customer, ''), COALESCE(a.in_date, ''), COALESCE(a.out_date, ''), COALESCE(a.remarks, '')
 FROM assets a
 LEFT JOIN qc_runs r ON r.asset_id = a.id AND r.started_at_utc = (SELECT MAX(started_at_utc) FROM qc_runs WHERE asset_id = a.id)
 ORDER BY a.updated_at_utc DESC;";
@@ -1048,6 +1157,7 @@ FROM custody_events WHERE asset_id=$assetId ORDER BY recorded_at_utc ASC;";
         private static AssetWipRecord ReadAssetWipRecord(SqliteDataReader reader)
         {
             Enum.TryParse<AssetQueueStatus>(reader.IsDBNull(5) ? "ReadyForTest" : reader.GetString(5), out var q);
+            int fc = reader.FieldCount;
             return new AssetWipRecord
             {
                 AssetId = reader.GetString(0),
@@ -1065,7 +1175,14 @@ FROM custody_events WHERE asset_id=$assetId ORDER BY recorded_at_utc ASC;";
                 LatestRunId = reader.IsDBNull(12) ? "" : reader.GetString(12),
                 LatestRunGrade = reader.IsDBNull(13) ? "" : reader.GetString(13),
                 LatestRunStatus = reader.IsDBNull(14) ? "" : reader.GetString(14),
-                LatestVerificationHash = reader.IsDBNull(15) ? "" : reader.GetString(15)
+                LatestVerificationHash = reader.IsDBNull(15) ? "" : reader.GetString(15),
+                StorageHealth = fc > 16 && !reader.IsDBNull(16) ? reader.GetInt32(16) : 100,
+                WorkInProgress = fc > 17 && !reader.IsDBNull(17) ? reader.GetString(17) : "All Okay",
+                Supplier = fc > 18 && !reader.IsDBNull(18) ? reader.GetString(18) : "",
+                Customer = fc > 19 && !reader.IsDBNull(19) ? reader.GetString(19) : "",
+                InDate = fc > 20 && !reader.IsDBNull(20) ? reader.GetString(20) : "",
+                OutDate = fc > 21 && !reader.IsDBNull(21) ? reader.GetString(21) : "",
+                Remarks = fc > 22 && !reader.IsDBNull(22) ? reader.GetString(22) : ""
             };
         }
 

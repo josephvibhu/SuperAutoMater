@@ -1075,16 +1075,24 @@ namespace SuperAutoMater.Wpf.Views
                 {
                     OfflineLedgerService.Instance.SaveRecord(new QcAuditRecord
                     {
+                        Tag = rec.Tag,
                         Serial_Number = rec.Serial_Number,
                         Model = rec.Model,
                         Physical_Grade = rec.Physical_Grade,
                         Status = rec.Status,
+                        Work_In_Progress = rec.Work_In_Progress,
                         CPU_Model = rec.Processor,
                         RAM_GB = rec.Memory,
                         Storage_Details = ViewModel.PrimaryDriveModel,
-                        Battery_Health = rec.Battery_Health.ToString() + "%",
+                        Battery_Health = rec.Battery_Health.ToString(),
+                        Storage_Health = rec.Storage_Health,
+                        Technician = rec.Technician,
+                        In_Date = rec.In_Date,
+                        Supplier = rec.Supplier,
+                        Out_Date = rec.Out_Date,
+                        Customer = rec.Customer,
                         GPU_Model = ViewModel.GpuName,
-                        Technician_Notes = rec.Wip_Issue
+                        Technician_Notes = rec.Remarks
                     });
                 }
                 string sn = rec?.Serial_Number ?? ViewModel.Serial;
