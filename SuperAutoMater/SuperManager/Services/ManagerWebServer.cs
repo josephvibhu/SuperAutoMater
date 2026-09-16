@@ -31,7 +31,11 @@ namespace SuperManager.Services
 
         public int Port { get; private set; } = DEFAULT_PORT;
         public string LocalIpAddress { get; private set; } = "127.0.0.1";
-        public string BindHost { get; set; } = "127.0.0.1";
+        /// <summary>
+        /// Bind address for the TCP listener. Defaults to IPAddress.Any so the HUD is reachable
+        /// from other machines on the same LAN. Set to "127.0.0.1" to restrict to local only.
+        /// </summary>
+        public string BindHost { get; set; } = "0.0.0.0";
         public string AdminToken => _adminSessionToken;
         public string DashboardUrl => $"http://{LocalIpAddress}:{Port}/?token={_adminSessionToken}";
         public BitmapSource QrCodeBitmap { get; private set; }
@@ -52,12 +56,14 @@ namespace SuperManager.Services
                 {
                     try
                     {
-                        // Secure Binding: bind to configured host (default 127.0.0.1) without automatic firewall alterations
-                        IPAddress bindAddress = IPAddress.TryParse(BindHost, out var parsed) ? parsed : IPAddress.Loopback;
+                        // Bind to any/all adapters (0.0.0.0) or a specific configured IP
+                        IPAddress bindAddress = (BindHost == "0.0.0.0" || BindHost == "*")
+                            ? IPAddress.Any
+                            : (IPAddress.TryParse(BindHost, out var parsed) ? parsed : IPAddress.Any);
                         _tcpListener = new TcpListener(bindAddress, p);
                         _tcpListener.Start();
                         Port = p;
-                        AppLogger.Info($"[ManagerWebServer] Securely bound to {bindAddress}:{p} without automatic firewall modifications.");
+                        AppLogger.Info($"[ManagerWebServer] Listening on {bindAddress}:{p} (LAN accessible).");
                         break;
                     }
                     catch
@@ -131,7 +137,7 @@ namespace SuperManager.Services
                     if (method == "OPTIONS")
                     {
                         string corsHeader = $"HTTP/1.1 204 No Content\r\n" +
-                                            $"Access-Control-Allow-Origin: http://127.0.0.1:{Port}\r\n" +
+                                            $"Access-Control-Allow-Origin: *\r\n" +
                                             $"Access-Control-Allow-Methods: GET, POST, OPTIONS\r\n" +
                                             $"Access-Control-Allow-Headers: Authorization, Content-Type\r\n" +
                                             $"Content-Length: 0\r\n" +
@@ -151,7 +157,7 @@ namespace SuperManager.Services
                             string unauthHeader = $"HTTP/1.1 401 Unauthorized\r\n" +
                                                   $"Content-Type: application/json; charset=utf-8\r\n" +
                                                   $"Content-Length: {unauthBody.Length}\r\n" +
-                                                  $"Access-Control-Allow-Origin: http://127.0.0.1:{Port}\r\n" +
+                                                  $"Access-Control-Allow-Origin: *\r\n" +
                                                   $"Connection: close\r\n\r\n";
                             byte[] unauthHeaderBytes = Encoding.UTF8.GetBytes(unauthHeader);
                             await stream.WriteAsync(unauthHeaderBytes, 0, unauthHeaderBytes.Length);
@@ -263,7 +269,7 @@ namespace SuperManager.Services
                                             $"Content-Type: {contentType}\r\n" +
                                             $"Content-Length: {body.Length}\r\n" +
                                             $"Connection: close\r\n" +
-                                            $"Access-Control-Allow-Origin: http://127.0.0.1:{Port}\r\n\r\n";
+                                            $"Access-Control-Allow-Origin: *\r\n\r\n";
                     byte[] headerBytes = Encoding.UTF8.GetBytes(responseHeader);
                     await stream.WriteAsync(headerBytes, 0, headerBytes.Length);
                     await stream.WriteAsync(body, 0, body.Length);

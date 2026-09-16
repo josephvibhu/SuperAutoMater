@@ -84,6 +84,15 @@ namespace SuperManager.Services
                     string id = root.GetProperty("id").GetString();
                     string ip = root.GetProperty("ip").GetString();
 
+                    // If the bench payload reports a loopback/APIPA/blank IP (multi-NIC issue),
+                    // fall back to the actual UDP socket remote endpoint — the real LAN address.
+                    string senderIp = result.RemoteEndPoint?.Address?.ToString() ?? ip;
+                    bool payloadIpIsUsable = !string.IsNullOrWhiteSpace(ip)
+                        && !ip.StartsWith("127.")
+                        && !ip.StartsWith("169.254.")
+                        && ip != "::1";
+                    string resolvedIp = payloadIpIsUsable ? ip : senderIp;
+
                     bool isNew = !_devices.TryGetValue(id, out var dev);
                     if (isNew)
                     {
@@ -92,7 +101,7 @@ namespace SuperManager.Services
                     }
 
                     dev.MachineName = root.GetProperty("name").GetString();
-                    dev.IpAddress = ip;
+                    dev.IpAddress = resolvedIp;
                     dev.Port = root.GetProperty("port").GetInt32();
                     dev.Model = root.GetProperty("model").GetString();
                     dev.Serial = root.GetProperty("serial").GetString();
