@@ -24,6 +24,22 @@ namespace SuperManager.ViewModels
         public ObservableCollection<AssetWipRecord> RetestLane { get; } = new ObservableCollection<AssetWipRecord>();
         public ObservableCollection<AssetWipRecord> ReadyForReleaseLane { get; } = new ObservableCollection<AssetWipRecord>();
         public ObservableCollection<AssetWipRecord> DisposedLane { get; } = new ObservableCollection<AssetWipRecord>();
+        public ObservableCollection<AgingWipUnit> TenOldestWipUnits { get; } = new ObservableCollection<AgingWipUnit>();
+
+        private DepotKpiSummary _kpiSummary = new DepotKpiSummary();
+        public DepotKpiSummary KpiSummary { get => _kpiSummary; set { _kpiSummary = value; OnPropertyChanged(); } }
+
+        private double _firstTimePassRate;
+        public double FirstTimePassRate { get => _firstTimePassRate; set { _firstTimePassRate = value; OnPropertyChanged(); } }
+
+        private int _dailyThroughput;
+        public int DailyThroughput { get => _dailyThroughput; set { _dailyThroughput = value; OnPropertyChanged(); } }
+
+        private int _activeExceptionsCount;
+        public int ActiveExceptionsCount { get => _activeExceptionsCount; set { _activeExceptionsCount = value; OnPropertyChanged(); } }
+
+        private string _oldestWipAgeDisplay = "0h";
+        public string OldestWipAgeDisplay { get => _oldestWipAgeDisplay; set { _oldestWipAgeDisplay = value; OnPropertyChanged(); } }
 
         private int _totalAssets;
         public int TotalAssets { get => _totalAssets; set { _totalAssets = value; OnPropertyChanged(); } }
@@ -78,6 +94,23 @@ namespace SuperManager.ViewModels
 
                 TotalAssets = ReadyForTestLane.Count + InTestLane.Count + HoldLane.Count +
                               RepairLane.Count + RetestLane.Count + ReadyForReleaseLane.Count + DisposedLane.Count;
+
+                // Load Depot OS operational KPIs & Aging WIP
+                var kpi = _store.GetDepotKpis();
+                KpiSummary = kpi;
+                FirstTimePassRate = kpi.FirstTimePassRatePercent;
+                DailyThroughput = kpi.DailyThroughput;
+                ActiveExceptionsCount = kpi.ActiveExceptionsCount;
+                OldestWipAgeDisplay = kpi.OldestWipUnitAgeHours < 24
+                    ? $"{Math.Round(kpi.OldestWipUnitAgeHours, 1)}h"
+                    : $"{Math.Round(kpi.OldestWipUnitAgeHours / 24.0, 1)}d";
+
+                var aging = _store.GetAgingWip(10);
+                TenOldestWipUnits.Clear();
+                foreach (var unit in aging)
+                {
+                    TenOldestWipUnits.Add(unit);
+                }
             }
             catch (Exception ex)
             {

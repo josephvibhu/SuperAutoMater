@@ -217,6 +217,56 @@ CREATE INDEX IF NOT EXISTS ix_custody_asset ON custody_events(asset_id);
                 AddColumnIfNotExists(connection, "assets", "remarks", "TEXT NULL");
 
                 Execute(connection, "INSERT OR IGNORE INTO schema_migrations(version, applied_at_utc) VALUES(4, CURRENT_TIMESTAMP);");
+
+                // Migration 5: Depot OS Security, RBAC, Audit Logs & Integration Manifests
+                Execute(connection, @"
+CREATE TABLE IF NOT EXISTS depot_users (
+    id TEXT PRIMARY KEY,
+    username TEXT NOT NULL UNIQUE COLLATE NOCASE,
+    full_name TEXT NOT NULL,
+    role TEXT NOT NULL,
+    pin_or_token_hash TEXT NOT NULL,
+    is_active INTEGER NOT NULL DEFAULT 1,
+    created_at_utc TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS ix_depot_users_username ON depot_users(username);
+
+CREATE TABLE IF NOT EXISTS audit_log (
+    id TEXT PRIMARY KEY,
+    actor TEXT NOT NULL,
+    role TEXT NOT NULL,
+    action TEXT NOT NULL,
+    entity_type TEXT NOT NULL,
+    entity_id TEXT NOT NULL,
+    details_json TEXT NOT NULL,
+    timestamp_utc TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS ix_audit_log_timestamp ON audit_log(timestamp_utc DESC);
+
+CREATE TABLE IF NOT EXISTS integration_manifests (
+    id TEXT PRIMARY KEY,
+    direction TEXT NOT NULL,
+    connector_type TEXT NOT NULL,
+    batch_id TEXT NOT NULL,
+    total_items INTEGER NOT NULL,
+    accepted_items INTEGER NOT NULL,
+    quarantined_items INTEGER NOT NULL,
+    signature TEXT NULL,
+    manifest_json TEXT NOT NULL,
+    created_at_utc TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS ix_manifests_created ON integration_manifests(created_at_utc DESC);
+
+INSERT OR IGNORE INTO depot_users (id, username, full_name, role, pin_or_token_hash, is_active, created_at_utc)
+VALUES
+('usr-admin-01', 'admin', 'Lead System Administrator', 'Administrator', 'e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855', 1, CURRENT_TIMESTAMP),
+('usr-tech-01', 'technician', 'Senior Bench Technician', 'Technician', 'e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855', 1, CURRENT_TIMESTAMP),
+('usr-super-01', 'supervisor', 'Floor Repair Supervisor', 'Supervisor', 'e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855', 1, CURRENT_TIMESTAMP),
+('usr-mgr-01', 'manager', 'Depot Operations Manager', 'WarehouseManager', 'e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855', 1, CURRENT_TIMESTAMP),
+('usr-view-01', 'viewer', 'Auditor & Client Viewer', 'Viewer', 'e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855', 1, CURRENT_TIMESTAMP);
+");
+
+                Execute(connection, "INSERT OR IGNORE INTO schema_migrations(version, applied_at_utc) VALUES(5, CURRENT_TIMESTAMP);");
             }
         }
 
@@ -237,11 +287,18 @@ CREATE INDEX IF NOT EXISTS ix_custody_asset ON custody_events(asset_id);
                 var destBuilder = new SqliteConnectionStringBuilder
                 {
                     DataSource = destinationPath,
-                    Mode = SqliteOpenMode.ReadWriteCreate
+                    Mode = SqliteOpenMode.ReadWriteCreate,
+                    Pooling = false
                 };
-                using var dest = new SqliteConnection(destBuilder.ToString());
-                dest.Open();
-                source.BackupDatabase(dest);
+                using (var dest = new SqliteConnection(destBuilder.ToString()))
+                {
+                    dest.Open();
+                    source.BackupDatabase(dest);
+                    dest.Close();
+                    SqliteConnection.ClearPool(dest);
+                }
+                source.Close();
+                SqliteConnection.ClearPool(source);
                 AppLogger.Info($"SQLite database successfully backed up to {destinationPath}");
             }
         }
@@ -1371,6 +1428,351 @@ VALUES($id, $serial, $tag, $model, $uuid, $conf, $src, $created, $updated);";
             using var sha = SHA256.Create();
             byte[] bytes = sha.ComputeHash(Encoding.UTF8.GetBytes(input ?? ""));
             return BitConverter.ToString(bytes).Replace("-", "").ToUpperInvariant();
+        }
+
+        // ====================================================================
+        // DEPOT OS ANALYTICS, AGING WIP, RBAC & INTEGRATION MANIFESTS
+        // ====================================================================
+
+        public List<AgingWipUnit> GetAgingWip(int limit = 10)
+        {
+            lock (_gate)
+            {
+                using var connection = Open();
+                using var command = connection.CreateCommand();
+                command.CommandText = @"
+SELECT a.id, a.serial_number, a.asset_tag, a.model, a.lifecycle_queue, 
+       a.current_location, a.work_in_progress, a.created_at_utc, a.updated_at_utc,
+       COALESCE((SELECT technician FROM qc_runs WHERE asset_id = a.id ORDER BY started_at_utc DESC LIMIT 1), 'Unassigned') as last_tech,
+       COALESCE((SELECT test_name FROM qc_test_results tr JOIN qc_runs r ON tr.qc_run_id = r.id WHERE r.asset_id = a.id AND tr.status = 'Failed' ORDER BY tr.recorded_at_utc DESC LIMIT 1), '') as fail_test
+FROM assets a
+WHERE a.lifecycle_queue IN ('ReadyForTest', 'InTest', 'Hold', 'Repair', 'Retest')
+ORDER BY a.created_at_utc ASC
+LIMIT $limit;";
+                command.Parameters.AddWithValue("$limit", limit);
+
+                var list = new List<AgingWipUnit>();
+                using var reader = command.ExecuteReader();
+                while (reader.Read())
+                {
+                    string id = reader.GetString(0);
+                    string serial = reader.IsDBNull(1) ? "" : reader.GetString(1);
+                    string tag = reader.IsDBNull(2) ? "" : reader.GetString(2);
+                    string model = reader.IsDBNull(3) ? "" : reader.GetString(3);
+                    string queueStr = reader.GetString(4);
+                    string location = reader.IsDBNull(5) ? "" : reader.GetString(5);
+                    string wipDefect = reader.IsDBNull(6) ? "" : reader.GetString(6);
+                    string createdStr = reader.GetString(7);
+                    string updatedStr = reader.GetString(8);
+                    string tech = reader.IsDBNull(9) ? "" : reader.GetString(9);
+                    string failedTest = reader.IsDBNull(10) ? "" : reader.GetString(10);
+
+                    DateTimeOffset created = DateTimeOffset.TryParse(createdStr, out var c) ? c : DateTimeOffset.UtcNow;
+                    DateTimeOffset updated = DateTimeOffset.TryParse(updatedStr, out var u) ? u : created;
+                    double dwellHours = Math.Max(0.0, (DateTimeOffset.UtcNow - created).TotalHours);
+
+                    AssetQueueStatus queue = Enum.TryParse<AssetQueueStatus>(queueStr, out var q) ? q : AssetQueueStatus.ReadyForTest;
+
+                    string blocker = !string.IsNullOrWhiteSpace(wipDefect) && !wipDefect.Equals("All Okay", StringComparison.OrdinalIgnoreCase)
+                        ? $"Defect: {wipDefect}"
+                        : (!string.IsNullOrWhiteSpace(failedTest) ? $"QC Failure: {failedTest}" : "");
+
+                    if (string.IsNullOrEmpty(blocker))
+                    {
+                        blocker = queue switch
+                        {
+                            AssetQueueStatus.Repair => "Awaiting Technician Repair",
+                            AssetQueueStatus.Hold => "Administrative / Parts Hold",
+                            AssetQueueStatus.Retest => "Awaiting Retest Bench Run",
+                            AssetQueueStatus.InTest => "Diagnostic Bench Run In Progress",
+                            _ => "Awaiting Initial Intake Test"
+                        };
+                    }
+
+                    list.Add(new AgingWipUnit
+                    {
+                        AssetId = id,
+                        SerialNumber = serial,
+                        AssetTag = tag,
+                        Model = model,
+                        LifecycleQueue = queue,
+                        CurrentLocation = location,
+                        WorkInProgressDefect = wipDefect,
+                        DwellHours = dwellHours,
+                        PrimaryBlocker = blocker,
+                        Technician = tech,
+                        CreatedAtUtc = created,
+                        UpdatedAtUtc = updated
+                    });
+                }
+                return list;
+            }
+        }
+
+        public DepotKpiSummary GetDepotKpis()
+        {
+            lock (_gate)
+            {
+                using var connection = Open();
+                var summary = new DepotKpiSummary();
+
+                // 1. Throughput (runs completed or assets released)
+                using (var cmd = connection.CreateCommand())
+                {
+                    cmd.CommandText = @"
+SELECT 
+    COUNT(CASE WHEN completed_at_utc >= datetime('now', '-24 hours') THEN 1 END) as daily,
+    COUNT(CASE WHEN completed_at_utc >= datetime('now', '-7 days') THEN 1 END) as weekly
+FROM qc_runs 
+WHERE status = 'Passed';";
+                    using var reader = cmd.ExecuteReader();
+                    if (reader.Read())
+                    {
+                        summary.DailyThroughput = reader.IsDBNull(0) ? 0 : Convert.ToInt32(reader.GetInt64(0));
+                        summary.WeeklyThroughput = reader.IsDBNull(1) ? 0 : Convert.ToInt32(reader.GetInt64(1));
+                    }
+                }
+
+                // 2. Total active WIP
+                using (var cmd = connection.CreateCommand())
+                {
+                    cmd.CommandText = "SELECT COUNT(*) FROM assets WHERE lifecycle_queue != 'Disposed';";
+                    summary.TotalWipUnits = Convert.ToInt32(cmd.ExecuteScalar());
+                }
+
+                // 3. First-Time Pass Rate (FTPR)
+                // Evaluates the very first QC run recorded for every distinct asset.
+                using (var cmd = connection.CreateCommand())
+                {
+                    cmd.CommandText = @"
+WITH FirstRuns AS (
+    SELECT asset_id, status,
+           ROW_NUMBER() OVER(PARTITION BY asset_id ORDER BY started_at_utc ASC) as rn
+    FROM qc_runs
+    WHERE status IN ('Passed', 'Failed')
+)
+SELECT 
+    COUNT(*) as total_initial_runs,
+    COUNT(CASE WHEN status = 'Passed' THEN 1 END) as passed_first_time
+FROM FirstRuns
+WHERE rn = 1;";
+                    using var reader = cmd.ExecuteReader();
+                    if (reader.Read())
+                    {
+                        int totalInitial = reader.IsDBNull(0) ? 0 : Convert.ToInt32(reader.GetInt64(0));
+                        int passedFirst = reader.IsDBNull(1) ? 0 : Convert.ToInt32(reader.GetInt64(1));
+                        summary.FirstTimePassDenominator = totalInitial;
+                        summary.FirstTimePassNumerator = passedFirst;
+                        summary.FirstTimePassRatePercent = totalInitial > 0
+                            ? Math.Round((double)passedFirst / totalInitial * 100.0, 1)
+                            : 100.0;
+                    }
+                }
+
+                // 4. Retest Reasons Breakdown
+                using (var cmd = connection.CreateCommand())
+                {
+                    cmd.CommandText = @"
+SELECT COALESCE(work_in_progress, 'Undefined') as reason, COUNT(*) as cnt
+FROM assets
+WHERE work_in_progress != 'All Okay' AND work_in_progress IS NOT NULL AND work_in_progress != ''
+GROUP BY work_in_progress
+ORDER BY cnt DESC;";
+                    using var reader = cmd.ExecuteReader();
+                    while (reader.Read())
+                    {
+                        string reason = reader.GetString(0);
+                        int cnt = Convert.ToInt32(reader.GetInt64(1));
+                        summary.RetestReasons[reason] = cnt;
+                    }
+                }
+
+                // 5. Active Exceptions Count (Hold queue + total overrides)
+                using (var cmd = connection.CreateCommand())
+                {
+                    cmd.CommandText = @"
+SELECT 
+    (SELECT COUNT(*) FROM assets WHERE lifecycle_queue = 'Hold') +
+    (SELECT COUNT(*) FROM overrides);";
+                    summary.ActiveExceptionsCount = Convert.ToInt32(cmd.ExecuteScalar());
+                }
+
+                // 6. Oldest WIP Unit Age in Hours
+                using (var cmd = connection.CreateCommand())
+                {
+                    cmd.CommandText = @"
+SELECT created_at_utc 
+FROM assets 
+WHERE lifecycle_queue IN ('ReadyForTest', 'InTest', 'Hold', 'Repair', 'Retest')
+ORDER BY created_at_utc ASC 
+LIMIT 1;";
+                    var val = cmd.ExecuteScalar() as string;
+                    if (!string.IsNullOrEmpty(val) && DateTimeOffset.TryParse(val, out var oldestCreated))
+                    {
+                        summary.OldestWipUnitAgeHours = Math.Max(0.0, (DateTimeOffset.UtcNow - oldestCreated).TotalHours);
+                    }
+                }
+
+                return summary;
+            }
+        }
+
+        public void RecordAuditLog(string actor, string role, string action, string entityType, string entityId, string detailsJson)
+        {
+            lock (_gate)
+            {
+                using var connection = Open();
+                using var cmd = connection.CreateCommand();
+                cmd.CommandText = @"
+INSERT INTO audit_log (id, actor, role, action, entity_type, entity_id, details_json, timestamp_utc)
+VALUES ($id, $actor, $role, $action, $entityType, $entityId, $details, $ts);";
+                cmd.Parameters.AddWithValue("$id", Guid.NewGuid().ToString("N"));
+                cmd.Parameters.AddWithValue("$actor", actor ?? "SYSTEM");
+                cmd.Parameters.AddWithValue("$role", role ?? "Technician");
+                cmd.Parameters.AddWithValue("$action", action ?? "UNKNOWN");
+                cmd.Parameters.AddWithValue("$entityType", entityType ?? "");
+                cmd.Parameters.AddWithValue("$entityId", entityId ?? "");
+                cmd.Parameters.AddWithValue("$details", detailsJson ?? "{}");
+                cmd.Parameters.AddWithValue("$ts", UtcNow());
+                cmd.ExecuteNonQuery();
+            }
+        }
+
+        public List<AuditLogRecord> GetAuditLogs(int limit = 50)
+        {
+            lock (_gate)
+            {
+                using var connection = Open();
+                using var cmd = connection.CreateCommand();
+                cmd.CommandText = "SELECT id, actor, role, action, entity_type, entity_id, details_json, timestamp_utc FROM audit_log ORDER BY timestamp_utc DESC LIMIT $limit;";
+                cmd.Parameters.AddWithValue("$limit", limit);
+
+                var list = new List<AuditLogRecord>();
+                using var reader = cmd.ExecuteReader();
+                while (reader.Read())
+                {
+                    list.Add(new AuditLogRecord
+                    {
+                        Id = reader.GetString(0),
+                        Actor = reader.GetString(1),
+                        Role = reader.GetString(2),
+                        Action = reader.GetString(3),
+                        EntityType = reader.GetString(4),
+                        EntityId = reader.GetString(5),
+                        DetailsJson = reader.GetString(6),
+                        TimestampUtc = DateTimeOffset.TryParse(reader.GetString(7), out var ts) ? ts : DateTimeOffset.UtcNow
+                    });
+                }
+                return list;
+            }
+        }
+
+        public void SaveIntegrationManifest(IntegrationManifestRecord manifest)
+        {
+            if (manifest == null) return;
+            lock (_gate)
+            {
+                using var connection = Open();
+                using var cmd = connection.CreateCommand();
+                cmd.CommandText = @"
+INSERT INTO integration_manifests (id, direction, connector_type, batch_id, total_items, accepted_items, quarantined_items, signature, manifest_json, created_at_utc)
+VALUES ($id, $dir, $conn, $batch, $tot, $acc, $quar, $sig, $json, $created);";
+                cmd.Parameters.AddWithValue("$id", manifest.Id);
+                cmd.Parameters.AddWithValue("$dir", manifest.Direction);
+                cmd.Parameters.AddWithValue("$conn", manifest.ConnectorType);
+                cmd.Parameters.AddWithValue("$batch", manifest.BatchId);
+                cmd.Parameters.AddWithValue("$tot", manifest.TotalItems);
+                cmd.Parameters.AddWithValue("$acc", manifest.AcceptedItems);
+                cmd.Parameters.AddWithValue("$quar", manifest.QuarantinedItems);
+                cmd.Parameters.AddWithValue("$sig", manifest.Signature ?? "");
+                cmd.Parameters.AddWithValue("$json", manifest.ManifestJson ?? "{}");
+                cmd.Parameters.AddWithValue("$created", manifest.CreatedAtUtc.ToString("O", CultureInfo.InvariantCulture));
+                cmd.ExecuteNonQuery();
+            }
+        }
+
+        public List<IntegrationManifestRecord> GetIntegrationManifests(int limit = 20)
+        {
+            lock (_gate)
+            {
+                using var connection = Open();
+                using var cmd = connection.CreateCommand();
+                cmd.CommandText = "SELECT id, direction, connector_type, batch_id, total_items, accepted_items, quarantined_items, signature, manifest_json, created_at_utc FROM integration_manifests ORDER BY created_at_utc DESC LIMIT $limit;";
+                cmd.Parameters.AddWithValue("$limit", limit);
+
+                var list = new List<IntegrationManifestRecord>();
+                using var reader = cmd.ExecuteReader();
+                while (reader.Read())
+                {
+                    list.Add(new IntegrationManifestRecord
+                    {
+                        Id = reader.GetString(0),
+                        Direction = reader.GetString(1),
+                        ConnectorType = reader.GetString(2),
+                        BatchId = reader.GetString(3),
+                        TotalItems = reader.GetInt32(4),
+                        AcceptedItems = reader.GetInt32(5),
+                        QuarantinedItems = reader.GetInt32(6),
+                        Signature = reader.IsDBNull(7) ? "" : reader.GetString(7),
+                        ManifestJson = reader.GetString(8),
+                        CreatedAtUtc = DateTimeOffset.TryParse(reader.GetString(9), out var ts) ? ts : DateTimeOffset.UtcNow
+                    });
+                }
+                return list;
+            }
+        }
+
+        public DepotUserRecord GetDepotUser(string username)
+        {
+            if (string.IsNullOrWhiteSpace(username)) return null;
+            lock (_gate)
+            {
+                using var connection = Open();
+                using var cmd = connection.CreateCommand();
+                cmd.CommandText = "SELECT id, username, full_name, role, pin_or_token_hash, is_active, created_at_utc FROM depot_users WHERE username = $u COLLATE NOCASE LIMIT 1;";
+                cmd.Parameters.AddWithValue("$u", username.Trim());
+                using var reader = cmd.ExecuteReader();
+                if (reader.Read())
+                {
+                    return new DepotUserRecord
+                    {
+                        Id = reader.GetString(0),
+                        Username = reader.GetString(1),
+                        FullName = reader.GetString(2),
+                        Role = Enum.TryParse<DepotRole>(reader.GetString(3), out var r) ? r : DepotRole.Technician,
+                        PinOrTokenHash = reader.GetString(4),
+                        IsActive = reader.GetInt32(5) == 1,
+                        CreatedAtUtc = DateTimeOffset.TryParse(reader.GetString(6), out var ts) ? ts : DateTimeOffset.UtcNow
+                    };
+                }
+                return null;
+            }
+        }
+
+        public void SaveDepotUser(DepotUserRecord user)
+        {
+            if (user == null) return;
+            lock (_gate)
+            {
+                using var connection = Open();
+                using var cmd = connection.CreateCommand();
+                cmd.CommandText = @"
+INSERT INTO depot_users (id, username, full_name, role, pin_or_token_hash, is_active, created_at_utc)
+VALUES ($id, $u, $name, $role, $pin, $active, $created)
+ON CONFLICT(id) DO UPDATE SET
+    full_name = excluded.full_name,
+    role = excluded.role,
+    pin_or_token_hash = excluded.pin_or_token_hash,
+    is_active = excluded.is_active;";
+                cmd.Parameters.AddWithValue("$id", user.Id);
+                cmd.Parameters.AddWithValue("$u", user.Username);
+                cmd.Parameters.AddWithValue("$name", user.FullName);
+                cmd.Parameters.AddWithValue("$role", user.Role.ToString());
+                cmd.Parameters.AddWithValue("$pin", user.PinOrTokenHash ?? "");
+                cmd.Parameters.AddWithValue("$active", user.IsActive ? 1 : 0);
+                cmd.Parameters.AddWithValue("$created", user.CreatedAtUtc.ToString("O", CultureInfo.InvariantCulture));
+                cmd.ExecuteNonQuery();
+            }
         }
     }
 }

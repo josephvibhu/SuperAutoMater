@@ -245,5 +245,102 @@ namespace SuperAutoMater.Wpf.Core
         public List<CustodyEventRecord> CustodyEvents { get; set; } = new List<CustodyEventRecord>();
         public List<QcEvidence> EvidenceItems { get; set; } = new List<QcEvidence>();
     }
+
+    /// <summary>
+    /// Five canonical Depot OS security roles.
+    /// </summary>
+    public enum DepotRole
+    {
+        Technician,
+        Supervisor,
+        WarehouseManager,
+        Viewer,
+        Administrator
+    }
+
+    /// <summary>
+    /// User identity and assigned role for depot operations.
+    /// </summary>
+    public sealed class DepotUserRecord
+    {
+        public string Id { get; set; } = Guid.NewGuid().ToString("N");
+        public string Username { get; set; } = "";
+        public string FullName { get; set; } = "";
+        public DepotRole Role { get; set; } = DepotRole.Technician;
+        public string PinOrTokenHash { get; set; } = "";
+        public bool IsActive { get; set; } = true;
+        public DateTimeOffset CreatedAtUtc { get; set; } = DateTimeOffset.UtcNow;
+    }
+
+    /// <summary>
+    /// Tamper-evident immutable audit log entry for administrative and mutation actions.
+    /// </summary>
+    public sealed class AuditLogRecord
+    {
+        public string Id { get; set; } = Guid.NewGuid().ToString("N");
+        public string Actor { get; set; } = "";
+        public string Role { get; set; } = "";
+        public string Action { get; set; } = "";
+        public string EntityType { get; set; } = "";
+        public string EntityId { get; set; } = "";
+        public string DetailsJson { get; set; } = "";
+        public DateTimeOffset TimestampUtc { get; set; } = DateTimeOffset.UtcNow;
+    }
+
+    /// <summary>
+    /// Aging WIP unit with queue dwell duration and diagnosed defect blockers.
+    /// </summary>
+    public sealed class AgingWipUnit
+    {
+        public string AssetId { get; set; } = "";
+        public string SerialNumber { get; set; } = "";
+        public string AssetTag { get; set; } = "";
+        public string Model { get; set; } = "";
+        public AssetQueueStatus LifecycleQueue { get; set; } = AssetQueueStatus.Hold;
+        public string CurrentLocation { get; set; } = "";
+        public string WorkInProgressDefect { get; set; } = "";
+        public double DwellHours { get; set; }
+        public double DwellDays => Math.Round(DwellHours / 24.0, 1);
+        public string DwellDisplay => DwellHours < 24 ? $"{Math.Round(DwellHours, 1)}h" : $"{DwellDays}d";
+        public string PrimaryBlocker { get; set; } = "";
+        public string Technician { get; set; } = "";
+        public DateTimeOffset CreatedAtUtc { get; set; }
+        public DateTimeOffset UpdatedAtUtc { get; set; }
+    }
+
+    /// <summary>
+    /// Depot OS operational KPI summary calculated from canonical SQLite data.
+    /// </summary>
+    public sealed class DepotKpiSummary
+    {
+        public int DailyThroughput { get; set; }
+        public int WeeklyThroughput { get; set; }
+        public int TotalWipUnits { get; set; }
+        public double FirstTimePassRatePercent { get; set; }
+        public int FirstTimePassNumerator { get; set; }
+        public int FirstTimePassDenominator { get; set; }
+        public double AverageCycleTimeMinutes { get; set; }
+        public int ActiveExceptionsCount { get; set; }
+        public double OldestWipUnitAgeHours { get; set; }
+        public Dictionary<string, int> RetestReasons { get; set; } = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+        public int ActiveBenchConcurrency { get; set; }
+    }
+
+    /// <summary>
+    /// Inbound or outbound integration manifest audit record.
+    /// </summary>
+    public sealed class IntegrationManifestRecord
+    {
+        public string Id { get; set; } = Guid.NewGuid().ToString("N");
+        public string Direction { get; set; } = "Inbound"; // Inbound or Outbound
+        public string ConnectorType { get; set; } = "ITAM_CSV";
+        public string BatchId { get; set; } = "";
+        public int TotalItems { get; set; }
+        public int AcceptedItems { get; set; }
+        public int QuarantinedItems { get; set; }
+        public string Signature { get; set; } = "";
+        public string ManifestJson { get; set; } = "{}";
+        public DateTimeOffset CreatedAtUtc { get; set; } = DateTimeOffset.UtcNow;
+    }
 }
 

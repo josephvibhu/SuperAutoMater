@@ -222,6 +222,31 @@ namespace SuperManager.Services
                         body = Encoding.UTF8.GetBytes(json);
                         contentType = "application/json; charset=utf-8";
                     }
+                    else if (path == "/api/depot/analytics")
+                    {
+                        var kpis = DepotAnalyticsService.Instance.GetDepotKpis();
+                        string json = JsonSerializer.Serialize(kpis, new JsonSerializerOptions { WriteIndented = true });
+                        body = Encoding.UTF8.GetBytes(json);
+                        contentType = "application/json; charset=utf-8";
+                    }
+                    else if (path == "/api/depot/wip/aging")
+                    {
+                        string limitStr = ExtractQueryParam(rawUrl, "limit");
+                        int limit = int.TryParse(limitStr, out var lim) && lim > 0 ? lim : 10;
+                        var aging = DepotAnalyticsService.Instance.GetAgingWip(limit);
+                        string json = JsonSerializer.Serialize(aging, new JsonSerializerOptions { WriteIndented = true });
+                        body = Encoding.UTF8.GetBytes(json);
+                        contentType = "application/json; charset=utf-8";
+                    }
+                    else if (path == "/api/depot/audit")
+                    {
+                        string limitStr = ExtractQueryParam(rawUrl, "limit");
+                        int limit = int.TryParse(limitStr, out var lim) && lim > 0 ? lim : 50;
+                        var logs = DepotAnalyticsService.Instance.GetAuditLogs(limit);
+                        string json = JsonSerializer.Serialize(logs, new JsonSerializerOptions { WriteIndented = true });
+                        body = Encoding.UTF8.GetBytes(json);
+                        contentType = "application/json; charset=utf-8";
+                    }
                     else if (path == "/api/qr" && _qrPngBytes != null)
                     {
                         body = _qrPngBytes;
