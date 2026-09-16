@@ -251,7 +251,7 @@ namespace SuperAutoMater.Wpf.Services
             Timeout = TimeSpan.FromSeconds(25)
         };
 
-        public const string DefaultSheetsUrl = "https://script.google.com/macros/s/AKfycbyx4LIL1xbzTypuYKTUK2XuMVnLq8TRbdVsupEQlSjI0CxGQ3mG92yR7rY3bjq1EH4t/exec";
+        public const string DefaultSheetsUrl = "https://script.google.com/macros/s/AKfycbxh1-pzrBC1DieKrlM55_TsIfjP5sKoTfCdPuJ_PkMDe5E1HXwY1przZkejTBnuWm2_DQ/exec";
 
         public static async Task<bool> DispatchItamRecordAsync(
             string tag,

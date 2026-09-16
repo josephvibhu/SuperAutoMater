@@ -22,7 +22,7 @@ namespace SuperAutoMater
 
         public static OfflineSyncQueue Instance => _instance.Value;
 
-        public const string DefaultSheetsUrl = "https://script.google.com/macros/s/AKfycbyx4LIL1xbzTypuYKTUK2XuMVnLq8TRbdVsupEQlSjI0CxGQ3mG92yR7rY3bjq1EH4t/exec";
+        public const string DefaultSheetsUrl = "https://script.google.com/macros/s/AKfycbxh1-pzrBC1DieKrlM55_TsIfjP5sKoTfCdPuJ_PkMDe5E1HXwY1przZkejTBnuWm2_DQ/exec";
 
         public static string GetActiveWebhookUrl()
         {
@@ -176,8 +176,11 @@ namespace SuperAutoMater
                             Timestamp        = record.Timestamp
                         });
 
-                        var content = new StringContent(json, Encoding.UTF8, "application/json");
-                        var response = await _httpClient.PostAsync(webhookUrl, content);
+                        var req = new HttpRequestMessage(HttpMethod.Post, webhookUrl)
+                        {
+                            Content = new StringContent(json, Encoding.UTF8, "application/json")
+                        };
+                        var response = await SendWithGoogleRedirectAsync(req);
                         string body = await response.Content.ReadAsStringAsync();
 
                         if (response.IsSuccessStatusCode && (body.Contains("OK") || body.Contains("status\":\"OK\"")))
@@ -257,7 +260,8 @@ namespace SuperAutoMater
             try
             {
                 string queryUrl = $"{webhookUrl}?q={Uri.EscapeDataString(serialOrTag.Trim())}";
-                var response = await _httpClient.GetAsync(queryUrl);
+                var req = new HttpRequestMessage(HttpMethod.Get, queryUrl);
+                var response = await SendWithGoogleRedirectAsync(req);
                 if (!response.IsSuccessStatusCode) return null;
 
                 string body = await response.Content.ReadAsStringAsync();
@@ -304,6 +308,28 @@ namespace SuperAutoMater
                 AppLogger.Warn($"Failed to query Google Sheet for '{serialOrTag}': {ex.Message}");
                 return null;
             }
+        }
+
+        private static async Task<HttpResponseMessage> SendWithGoogleRedirectAsync(HttpRequestMessage request)
+        {
+            using var noRedirectClient = new HttpClient(new HttpClientHandler { AllowAutoRedirect = false })
+            {
+                Timeout = TimeSpan.FromSeconds(25)
+            };
+
+            var response = await noRedirectClient.SendAsync(request);
+            if (response.StatusCode == System.Net.HttpStatusCode.Found ||
+                response.StatusCode == System.Net.HttpStatusCode.Redirect ||
+                response.StatusCode == System.Net.HttpStatusCode.SeeOther)
+            {
+                var redirectUrl = response.Headers.Location?.ToString();
+                if (!string.IsNullOrEmpty(redirectUrl))
+                {
+                    using var getClient = new HttpClient { Timeout = TimeSpan.FromSeconds(25) };
+                    return await getClient.GetAsync(redirectUrl);
+                }
+            }
+            return response;
         }
 
         public AssetQueueRecord FindLocalQueuedRecord(string serialOrTag)
