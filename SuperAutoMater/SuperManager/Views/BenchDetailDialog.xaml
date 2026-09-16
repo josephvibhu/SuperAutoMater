@@ -130,7 +130,8 @@
             <DockPanel LastChildFill="False">
                 <StackPanel Orientation="Horizontal" DockPanel.Dock="Left">
                     <Button Content="📍 PING / IDENTIFY" Style="{StaticResource StyleWarningActionBtn}" Click="BtnPing_Click" Margin="0,0,8,0" Padding="12,6"/>
-                    <Button Content="📄 ARCHIVE CERTIFICATE" Style="{StaticResource StylePrimaryActionBtn}" Click="BtnDownloadCert_Click" Margin="0,0,8,0" Padding="12,6"/>
+                    <Button Content="🖥️ REMOTE DESKTOP" Style="{StaticResource StylePrimaryActionBtn}" Click="BtnRemoteDesktop_Click" Margin="0,0,8,0" Padding="12,6" ToolTip="Open live interactive Remote Desktop mirror"/>
+                    <Button Content="📄 ARCHIVE CERT" Style="{StaticResource StyleDarkActionBtn}" Click="BtnDownloadCert_Click" Margin="0,0,8,0" Padding="12,6"/>
                     <Button Content="🌐 OPEN WEB HUD" Style="{StaticResource StyleDarkActionBtn}" Click="BtnOpenWeb_Click" Margin="0,0,8,0" Padding="12,6"/>
                     <Button Content="✓ REMOTE PASS" Style="{StaticResource StylePassActionBtn}" Click="BtnRemotePass_Click" Padding="12,6"/>
                 </StackPanel>

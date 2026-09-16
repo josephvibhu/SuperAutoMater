@@ -173,6 +173,15 @@ namespace SuperManager.Views
             }
         }
 
+        private void BtnBenchRemote_Click(object sender, RoutedEventArgs e)
+        {
+            if (sender is Button btn && btn.Tag is BenchDevice bench)
+            {
+                var win = new RemoteDesktopWindow(bench) { Owner = this };
+                win.Show();
+            }
+        }
+
         private void BtnBenchInspect_Click(object sender, RoutedEventArgs e)
         {
             if (sender is Button btn && btn.Tag is BenchDevice bench)

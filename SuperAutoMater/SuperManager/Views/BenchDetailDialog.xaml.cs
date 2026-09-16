@@ -64,6 +64,12 @@ namespace SuperManager.Views
             MessageBox.Show(ok ? $"✓ Ping sent to {_bench.MachineName}! Laptop is chiming." : "❌ Ping failed to connect.", "Bench Ping", MessageBoxButton.OK, MessageBoxImage.Information);
         }
 
+        private void BtnRemoteDesktop_Click(object sender, RoutedEventArgs e)
+        {
+            var win = new RemoteDesktopWindow(_bench) { Owner = this };
+            win.Show();
+        }
+
         private async void BtnDownloadCert_Click(object sender, RoutedEventArgs e)
         {
             string desktop = Environment.GetFolderPath(Environment.SpecialFolder.Desktop);

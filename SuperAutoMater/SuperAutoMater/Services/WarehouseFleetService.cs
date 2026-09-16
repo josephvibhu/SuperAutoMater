@@ -517,6 +517,21 @@ namespace SuperAutoMater.Wpf.Services
                     responseBytes = _qrPngBytes;
                     contentType = "image/png";
                 }
+                else if (path == "/api/remote/frame")
+                {
+                    responseBytes = ScreenCaptureService.Instance.GetScreenFrame(1280, 65L);
+                    contentType = "image/jpeg";
+                }
+                else if (path == "/api/remote/stream")
+                {
+                    await HandleRemoteStreamAsync(context);
+                    return;
+                }
+                else if (path == "/api/remote/input")
+                {
+                    await HandleRemoteInputAsync(context);
+                    return;
+                }
                 else
                 {
                     string html = GenerateAvionicsDashboardHtml();
@@ -533,6 +548,92 @@ namespace SuperAutoMater.Wpf.Services
             catch
             {
                 try { context.Response.Close(); } catch { }
+            }
+        }
+
+        private async Task HandleRemoteStreamAsync(HttpListenerContext context)
+        {
+            try
+            {
+                context.Response.ContentType = "multipart/x-mixed-replace; boundary=--frame";
+                context.Response.Headers.Add("Cache-Control", "no-store, no-cache, must-revalidate, max-age=0");
+                context.Response.Headers.Add("Access-Control-Allow-Origin", "*");
+                context.Response.StatusCode = 200;
+
+                var stream = context.Response.OutputStream;
+
+                while (_cts != null && !_cts.IsCancellationRequested && stream.CanWrite)
+                {
+                    byte[] frame = ScreenCaptureService.Instance.GetScreenFrame(1280, 65L);
+                    if (frame != null && frame.Length > 0)
+                    {
+                        string header = $"--frame\r\nContent-Type: image/jpeg\r\nContent-Length: {frame.Length}\r\n\r\n";
+                        byte[] headerBytes = Encoding.UTF8.GetBytes(header);
+                        await stream.WriteAsync(headerBytes, 0, headerBytes.Length);
+                        await stream.WriteAsync(frame, 0, frame.Length);
+                        byte[] footer = Encoding.UTF8.GetBytes("\r\n");
+                        await stream.WriteAsync(footer, 0, footer.Length);
+                        await stream.FlushAsync();
+                    }
+                    await Task.Delay(55); // ~18 FPS
+                }
+            }
+            catch
+            {
+                // Remote client disconnected cleanly
+            }
+            finally
+            {
+                try { context.Response.Close(); } catch { }
+            }
+        }
+
+        private async Task HandleRemoteInputAsync(HttpListenerContext context)
+        {
+            try
+            {
+                context.Response.ContentType = "application/json; charset=utf-8";
+                context.Response.Headers.Add("Access-Control-Allow-Origin", "*");
+
+                using var reader = new StreamReader(context.Request.InputStream, Encoding.UTF8);
+                string json = await reader.ReadToEndAsync();
+                using var doc = JsonDocument.Parse(json);
+                var root = doc.RootElement;
+
+                string type = root.TryGetProperty("type", out var pt) ? pt.GetString() : "mouse";
+
+                if (type == "mouse")
+                {
+                    string action = root.TryGetProperty("action", out var pa) ? pa.GetString() : "left_click";
+                    double x = root.TryGetProperty("x", out var px) ? px.GetDouble() : 0.5;
+                    double y = root.TryGetProperty("y", out var py) ? py.GetDouble() : 0.5;
+                    int delta = root.TryGetProperty("delta", out var pd) ? pd.GetInt32() : 0;
+
+                    RemoteInputService.Instance.ProcessMouse(action, x, y, delta);
+                }
+                else if (type == "key")
+                {
+                    string key = root.TryGetProperty("key", out var pk) ? pk.GetString() : "";
+                    RemoteInputService.Instance.SendKey(key);
+                }
+                else if (type == "action")
+                {
+                    string action = root.TryGetProperty("action", out var pa) ? pa.GetString() : "";
+                    RemoteInputService.Instance.ExecuteQuickAction(action);
+                }
+
+                byte[] okBytes = Encoding.UTF8.GetBytes("{\"success\":true}");
+                context.Response.StatusCode = 200;
+                context.Response.ContentLength64 = okBytes.Length;
+                await context.Response.OutputStream.WriteAsync(okBytes, 0, okBytes.Length);
+                context.Response.Close();
+            }
+            catch (Exception ex)
+            {
+                context.Response.StatusCode = 400;
+                byte[] err = Encoding.UTF8.GetBytes($"{{\"error\":\"{ex.Message}\"}}");
+                await context.Response.OutputStream.WriteAsync(err, 0, err.Length);
+                context.Response.Close();
             }
         }
 
@@ -972,14 +1073,92 @@ namespace SuperAutoMater.Wpf.Services
         </div>
     </div>
 
+    <div class=""screen-box"" style=""background: var(--bg-card); border: 1px solid var(--border); border-radius: 12px; padding: 14px; margin-bottom: 16px;"">
+        <div style=""display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;"">
+            <span style=""font-size: 12px; font-weight: 800; text-transform: uppercase; color: var(--accent-cyan);"">🖥️ LIVE REMOTE SCREEN MIRROR</span>
+            <button id=""btnToggleScreen"" onclick=""toggleRemoteStream()"" style=""background: var(--accent-cyan); color: #000; border: none; font-weight: 800; font-size: 11px; padding: 4px 10px; border-radius: 6px; cursor: pointer;"">▶ START STREAM</button>
+        </div>
+        <div id=""screenContainer"" style=""position: relative; width: 100%; aspect-ratio: 16/9; background: #000; border-radius: 8px; overflow: hidden; display: flex; align-items: center; justify-content: center; cursor: crosshair;"">
+            <span id=""screenPlaceholder"" style=""color: var(--text-muted); font-size: 12px; font-family: monospace;"">Click 'START STREAM' to mirror live bench screen</span>
+            <img id=""remoteImg"" style=""width: 100%; height: 100%; object-fit: contain; display: none;"" alt=""Bench Desktop"" />
+        </div>
+        <div style=""display: flex; gap: 6px; flex-wrap: wrap; margin-top: 10px;"">
+            <button onclick=""sendRemoteAction('cmd')"" style=""background: var(--bg-elevated); color: var(--text-primary); border: 1px solid var(--border); border-radius: 4px; padding: 5px 8px; font-size: 10px; font-family: monospace; cursor: pointer;"">📁 CMD</button>
+            <button onclick=""sendRemoteAction('taskmgr')"" style=""background: var(--bg-elevated); color: var(--text-primary); border: 1px solid var(--border); border-radius: 4px; padding: 5px 8px; font-size: 10px; font-family: monospace; cursor: pointer;"">⚙️ TaskMgr</button>
+            <button onclick=""sendRemoteAction('show_desktop')"" style=""background: var(--bg-elevated); color: var(--text-primary); border: 1px solid var(--border); border-radius: 4px; padding: 5px 8px; font-size: 10px; font-family: monospace; cursor: pointer;"">🪟 Desktop</button>
+            <button onclick=""sendRemoteKey('Enter')"" style=""background: var(--bg-elevated); color: var(--text-primary); border: 1px solid var(--border); border-radius: 4px; padding: 5px 8px; font-size: 10px; font-family: monospace; cursor: pointer;"">↵ Enter</button>
+            <button onclick=""sendRemoteKey('Escape')"" style=""background: var(--bg-elevated); color: var(--text-primary); border: 1px solid var(--border); border-radius: 4px; padding: 5px 8px; font-size: 10px; font-family: monospace; cursor: pointer;"">ESC</button>
+            <button onclick=""triggerRemotePass()"" style=""background: rgba(63, 185, 80, 0.2); color: var(--accent-green); border: 1px solid var(--accent-green); border-radius: 4px; padding: 5px 8px; font-size: 10px; font-weight: bold; cursor: pointer;"">✓ Pass Active Test</button>
+        </div>
+    </div>
+
     <div class=""footer"">
         SUPERAUTOMATER v1.2 · WAREHOUSE FLEET PROTOCOL
     </div>
 
     <script>
+        const sessionToken = new URLSearchParams(window.location.search).get('token') || '';
+        let streaming = false;
+
+        function toggleRemoteStream() {
+            const img = document.getElementById('remoteImg');
+            const placeholder = document.getElementById('screenPlaceholder');
+            const btn = document.getElementById('btnToggleScreen');
+
+            if (!streaming) {
+                streaming = true;
+                img.src = '/api/remote/stream?token=' + encodeURIComponent(sessionToken);
+                img.style.display = 'block';
+                placeholder.style.display = 'none';
+                btn.textContent = '⏸ PAUSE STREAM';
+                btn.style.background = 'var(--accent-red)';
+                btn.style.color = '#fff';
+            } else {
+                streaming = false;
+                img.src = '';
+                img.style.display = 'none';
+                placeholder.style.display = 'block';
+                btn.textContent = '▶ START STREAM';
+                btn.style.background = 'var(--accent-cyan)';
+                btn.style.color = '#000';
+            }
+        }
+
+        async function sendRemoteInput(payload) {
+            try {
+                await fetch('/api/remote/input?token=' + encodeURIComponent(sessionToken), {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+            } catch (e) { }
+        }
+
+        function sendRemoteAction(action) {
+            sendRemoteInput({ type: 'action', action: action });
+        }
+
+        function sendRemoteKey(key) {
+            sendRemoteInput({ type: 'key', key: key });
+        }
+
+        async function triggerRemotePass() {
+            try {
+                await fetch('/api/action/pass?token=' + encodeURIComponent(sessionToken));
+                fetchTelemetry();
+            } catch (e) { }
+        }
+
+        const remoteImg = document.getElementById('remoteImg');
+        remoteImg.addEventListener('click', (e) => {
+            const rect = remoteImg.getBoundingClientRect();
+            const x = (e.clientX - rect.left) / rect.width;
+            const y = (e.clientY - rect.top) / rect.height;
+            sendRemoteInput({ type: 'mouse', action: 'left_click', x: x, y: y });
+        });
+
         async function fetchTelemetry() {
             try {
-                const sessionToken = new URLSearchParams(window.location.search).get('token') || '';
                 const res = await fetch('/api/status?token=' + encodeURIComponent(sessionToken), { cache: 'no-store' });
                 if (!res.ok) return;
                 const data = await res.json();
