@@ -350,7 +350,7 @@ namespace SuperAutoMater.Wpf.Views
                 OfflineSyncQueue.Instance.Enqueue(record);
 
                 // 3. Flush queue to Google Sheets webhook
-                int flushed = await OfflineSyncQueue.Instance.FlushQueueAsync(OfflineSyncQueue.DefaultSheetsUrl);
+                int flushed = await OfflineSyncQueue.Instance.FlushQueueAsync(OfflineSyncQueue.GetActiveWebhookUrl());
 
                 string msg = flushed > 0
                     ? $"Asset {record.Serial_Number} successfully synced to Google Sheets!\n\nTag: {record.Tag} [Bold]\nStatus: {record.Status} | Grade: {record.Physical_Grade}\nBattery: {record.Battery_Health} | Storage: {record.Storage_Health}\nTechnician: {record.Technician}"
@@ -443,6 +443,39 @@ namespace SuperAutoMater.Wpf.Views
             catch (Exception ex)
             {
                 MessageBox.Show("Failed to copy code.gs: " + ex.Message, "Error", MessageBoxButton.OK, MessageBoxImage.Error);
+            }
+        }
+
+        private void BtnChangeWebhook_Click(object sender, RoutedEventArgs e)
+        {
+            try
+            {
+                string localFile = System.IO.Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "sheets_url.txt");
+                if (!System.IO.File.Exists(localFile))
+                {
+                    System.IO.File.WriteAllText(localFile, OfflineSyncQueue.GetActiveWebhookUrl());
+                }
+
+                var res = MessageBox.Show(
+                    $"Current Webhook URL:\n{OfflineSyncQueue.GetActiveWebhookUrl()}\n\n" +
+                    "To point SuperAutoMater to a NEW Google Sheet:\n" +
+                    "1. Click 'Yes' to open 'sheets_url.txt' in Notepad.\n" +
+                    "2. Paste your new Web App URL on line 1.\n" +
+                    "3. Save (Ctrl+S) and close Notepad.\n\n" +
+                    "The app will immediately use the new Google Sheet URL for all syncs.\n\n" +
+                    "Open 'sheets_url.txt' now?",
+                    "Configure Google Sheets Webhook URL",
+                    MessageBoxButton.YesNo,
+                    MessageBoxImage.Question);
+
+                if (res == MessageBoxResult.Yes)
+                {
+                    System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo("notepad.exe", $"\"{localFile}\"") { UseShellExecute = true });
+                }
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show("Failed to open sheets_url.txt: " + ex.Message, "Error", MessageBoxButton.OK, MessageBoxImage.Error);
             }
         }
 

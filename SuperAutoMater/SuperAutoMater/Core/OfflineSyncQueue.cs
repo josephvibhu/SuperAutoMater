@@ -24,6 +24,54 @@ namespace SuperAutoMater
 
         public const string DefaultSheetsUrl = "https://script.google.com/macros/s/AKfycbyx4LIL1xbzTypuYKTUK2XuMVnLq8TRbdVsupEQlSjI0CxGQ3mG92yR7rY3bjq1EH4t/exec";
 
+        public static string GetActiveWebhookUrl()
+        {
+            try
+            {
+                // Check 1: sheets_url.txt beside the executable
+                string localFile = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "sheets_url.txt");
+                if (File.Exists(localFile))
+                {
+                    string url = File.ReadAllText(localFile).Trim();
+                    if (Uri.TryCreate(url, UriKind.Absolute, out var uri) && (uri.Scheme == "http" || uri.Scheme == "https"))
+                        return url;
+                }
+
+                // Check 2: sheets_url.txt in LocalApplicationData
+                string appDataDir = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "SuperAutoMater");
+                string appDataFile = Path.Combine(appDataDir, "sheets_url.txt");
+                if (File.Exists(appDataFile))
+                {
+                    string url = File.ReadAllText(appDataFile).Trim();
+                    if (Uri.TryCreate(url, UriKind.Absolute, out var uri) && (uri.Scheme == "http" || uri.Scheme == "https"))
+                        return url;
+                }
+            }
+            catch { }
+            return DefaultSheetsUrl;
+        }
+
+        public static void SaveActiveWebhookUrl(string url)
+        {
+            if (string.IsNullOrWhiteSpace(url)) return;
+            string trimmed = url.Trim();
+            try
+            {
+                string localFile = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "sheets_url.txt");
+                File.WriteAllText(localFile, trimmed);
+            }
+            catch { }
+
+            try
+            {
+                string appDataDir = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "SuperAutoMater");
+                if (!Directory.Exists(appDataDir)) Directory.CreateDirectory(appDataDir);
+                string appDataFile = Path.Combine(appDataDir, "sheets_url.txt");
+                File.WriteAllText(appDataFile, trimmed);
+            }
+            catch { }
+        }
+
         private readonly string _queueFilePath;
         private readonly object _fileLock = new object();
         private readonly SemaphoreSlim _flushLock = new SemaphoreSlim(1, 1);
@@ -79,8 +127,11 @@ namespace SuperAutoMater
             }
         }
 
-        public async Task<int> FlushQueueAsync(string webhookUrl)
+        public async Task<int> FlushQueueAsync(string webhookUrl = null)
         {
+            if (string.IsNullOrWhiteSpace(webhookUrl))
+                webhookUrl = GetActiveWebhookUrl();
+
             if (string.IsNullOrWhiteSpace(webhookUrl) || !webhookUrl.StartsWith("https://script.google.com/macros/s/"))
                 return 0;
 
@@ -195,10 +246,13 @@ namespace SuperAutoMater
             catch { }
         }
 
-        public async Task<AssetQueueRecord> QueryRemoteSheetAsync(string serialOrTag, string webhookUrl = DefaultSheetsUrl)
+        public async Task<AssetQueueRecord> QueryRemoteSheetAsync(string serialOrTag, string webhookUrl = null)
         {
-            if (string.IsNullOrWhiteSpace(serialOrTag) || string.IsNullOrWhiteSpace(webhookUrl))
+            if (string.IsNullOrWhiteSpace(serialOrTag))
                 return null;
+
+            if (string.IsNullOrWhiteSpace(webhookUrl))
+                webhookUrl = GetActiveWebhookUrl();
 
             try
             {
