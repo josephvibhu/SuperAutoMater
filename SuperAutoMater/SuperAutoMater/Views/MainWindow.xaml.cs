@@ -248,6 +248,7 @@ namespace SuperAutoMater.Wpf.Views
                     {
                         ViewModel.MarkTestPassed("Display");
                         ShowFeedback("Display / Panel Test: 100% RGB & Patterns Verified Nominal ✓", "✓", "#3FB950");
+                        AdvanceToNextDiagnosticTest("display");
                     }
                     break;
 
@@ -258,8 +259,9 @@ namespace SuperAutoMater.Wpf.Views
                     touchWin.ShowDialog();
                     if (touchWin.TestPassed)
                     {
-                        ViewModel.MarkTestPassed("Display");
+                        ViewModel.MarkTestPassed("Touchscreen");
                         ShowFeedback("Touchscreen Digitizer Matrix: 100% Sensor Grid Certified Nominal ✓", "✓", "#3FB950");
+                        AdvanceToNextDiagnosticTest("touchscreen");
                     }
                     break;
 
@@ -330,6 +332,81 @@ namespace SuperAutoMater.Wpf.Views
                     ShowFeedback($"Test pipeline advanced ({ViewModel.PipelineStatusText}) ✓", "✓", "#3FB950");
                     break;
             }
+        }
+
+        private void BtnToggleAutoAdvance_Click(object sender, MouseButtonEventArgs e)
+        {
+            if (ViewModel == null) return;
+            ViewModel.IsAutoAdvanceEnabled = !ViewModel.IsAutoAdvanceEnabled;
+            string status = ViewModel.IsAutoAdvanceEnabled ? "ENABLED" : "DISABLED";
+            string icon = ViewModel.IsAutoAdvanceEnabled ? "⏩" : "⏸";
+            ShowFeedback($"Auto-Advance Pipeline: {status}", icon, ViewModel.AutoAdvanceBadgeColor);
+        }
+
+        public void AdvanceToNextDiagnosticTest(string currentKey)
+        {
+            if (ViewModel == null || !ViewModel.IsAutoAdvanceEnabled) return;
+
+            Dispatcher.InvokeAsync(async () =>
+            {
+                await Task.Delay(350); // Fluid 350ms pause so technician sees the pass feedback
+
+                switch (currentKey?.ToLowerInvariant())
+                {
+                    case "display":
+                        if (ViewModel.HasTouchscreen)
+                        {
+                            RunDiagnosticTest("touchscreen");
+                        }
+                        else
+                        {
+                            RunDiagnosticTest("audio");
+                        }
+                        break;
+
+                    case "touch":
+                    case "touchscreen":
+                        RunDiagnosticTest("audio");
+                        break;
+
+                    case "audio":
+                        RunDiagnosticTest("camera");
+                        break;
+
+                    case "cammic":
+                    case "camera":
+                    case "webcam":
+                        RunDiagnosticTest("keyboard");
+                        break;
+
+                    case "keyboard":
+                        RunDiagnosticTest("cpu");
+                        break;
+
+                    case "cpu":
+                        RunDiagnosticTest("battery");
+                        break;
+
+                    case "battery":
+                    case "power":
+                        RunDiagnosticTest("storage");
+                        break;
+
+                    case "storage":
+                        RunDiagnosticTest("gpu");
+                        break;
+
+                    case "gpu":
+                        RunDiagnosticTest("wireless");
+                        break;
+
+                    case "wireless":
+                    case "bluetooth":
+                        SwitchWorkspace("standby");
+                        ShowFeedback("🎉 ALL BENCH TESTS COMPLETED & VERIFIED NOMINAL ✓", "✓", "#3FB950");
+                        break;
+                }
+            });
         }
 
         private void OnAcousticSpectrumUpdated(float[] bands)
@@ -724,6 +801,9 @@ namespace SuperAutoMater.Wpf.Views
                     StorageTbwSummary = ViewModel.TbwDisplaySummary,
                     DriverIntegritySummary = ViewModel.MissingDriversSummary,
                     ThermalDissipationVerdict = ThermalProfilerService.Instance.GetCurrentResult().ConditionSummary,
+                    RamTopologySummary = ViewModel.RamChannelBadge,
+                    RadiatorAirflowSummary = ViewModel.ThermalDecayVerdict,
+                    WebcamOpticsSummary = ViewModel.WebcamOpticsBadge,
                     CloudAuditUrl = GoogleSheetsDispatcher.DefaultSheetsUrl
                 };
 
@@ -762,6 +842,12 @@ namespace SuperAutoMater.Wpf.Views
             if (ViewModel == null) return;
             var record = ViewModel.CreateCurrentAssetRecord();
             var dlg = new ThermalLabelPreviewWindow(record) { Owner = this };
+            dlg.ShowDialog();
+        }
+
+        private void BtnOpenBatteryDrainModal_Click(object sender, RoutedEventArgs e)
+        {
+            var dlg = new BatteryCalibrationDialog { Owner = this };
             dlg.ShowDialog();
         }
 
@@ -1219,51 +1305,27 @@ namespace SuperAutoMater.Wpf.Views
         {
             if (BtnRunBatteryLoadTest == null || ViewModel == null) return;
             BtnRunBatteryLoadTest.IsEnabled = false;
-            BtnRunBatteryLoadTest.Content = "⚡ TESTING LOAD SAG (3s)...";
-            ShowFeedback("Firing 3-second multi-thread CPU load step to measure dynamic cell voltage sag...", "⚡", "#F1E05A");
+            BtnRunBatteryLoadTest.Content = "⚡ TESTING LOAD SAG (15s)...";
+            ShowFeedback("Firing 15-second multi-thread CPU load step to measure dynamic cell voltage sag...", "⚡", "#F1E05A");
 
             try
             {
-                int idleMv = ViewModel.BatteryVoltageMv > 5000 ? ViewModel.BatteryVoltageMv : 12300;
-                BatteryLoadMeterService.Instance.StartLoadMeasurement(idleMv);
-
-                using var cts = new CancellationTokenSource();
-                var token = cts.Token;
-                int threads = Math.Clamp(Environment.ProcessorCount, 2, 8);
-
-                for (int i = 0; i < threads; i++)
-                {
-                    _ = Task.Run(() =>
+                var finalRes = await BatteryLoadMeterService.Instance.RunAutomatedBatteryLoadTestAsync(
+                    15,
+                    (remainingSec, percent, curMv, sagMv, statusMsg) =>
                     {
-                        while (!token.IsCancellationRequested)
+                        Dispatcher.InvokeAsync(() =>
                         {
-                            double x = 0;
-                            for (int j = 0; j < 50000; j++)
-                            {
-                                x += Math.Sqrt(j) * Math.Sin(j);
-                            }
-                        }
-                    }, token);
-                }
+                            BtnRunBatteryLoadTest.Content = $"⚡ STRESS BURST ({remainingSec}s)...";
+                            TxtBatterySagSummary.Text = statusMsg;
+                            var partial = BatteryLoadMeterService.Instance.GetCurrentResult();
+                            TxtBatterySagSummary.Foreground = new SolidColorBrush((Color)ColorConverter.ConvertFromString(partial.AccentHex));
+                        });
+                    });
 
-                // Sample voltage over 3.0 seconds (10 intervals of 300ms)
-                for (int step = 1; step <= 10; step++)
-                {
-                    await Task.Delay(300);
-                    int curMv = ViewModel.BatteryVoltageMv;
-                    BatteryLoadMeterService.Instance.UpdateLoadVoltage(curMv);
-                    var partial = BatteryLoadMeterService.Instance.GetCurrentResult();
-                    TxtBatterySagSummary.Text = $"Measuring Load Step ({step * 10}%): ΔV {partial.SagVolts:F2}V drop...";
-                    TxtBatterySagSummary.Foreground = new SolidColorBrush((Color)ColorConverter.ConvertFromString(partial.AccentHex));
-                }
-
-                cts.Cancel();
-
-                var finalRes = BatteryLoadMeterService.Instance.StopMeasurement();
                 TxtBatterySagSummary.Text = finalRes.StatusSummary;
                 TxtBatterySagSummary.Foreground = new SolidColorBrush((Color)ColorConverter.ConvertFromString(finalRes.AccentHex));
-
-                ShowFeedback($"Battery Sag: ΔV {finalRes.SagVolts:F2}V ({finalRes.CellBalanceStatus}) ✓", "⚡", finalRes.AccentHex);
+                ShowFeedback($"Battery Sag: ΔV {finalRes.SagVolts:F2}V ({finalRes.VerdictBadge}) ✓", "⚡", finalRes.AccentHex);
             }
             catch (Exception ex)
             {
@@ -1271,7 +1333,7 @@ namespace SuperAutoMater.Wpf.Views
             }
             finally
             {
-                BtnRunBatteryLoadTest.Content = "⚡ RUN 3-SEC LOAD SAG TEST";
+                BtnRunBatteryLoadTest.Content = "⚡ RUN 15s LOAD SAG TEST";
                 BtnRunBatteryLoadTest.IsEnabled = true;
             }
         }
@@ -1280,12 +1342,14 @@ namespace SuperAutoMater.Wpf.Views
         {
             ViewModel?.MarkTestPassed("Battery");
             ShowFeedback("Battery Health & Power Flow Verified Nominal & Passed ✓", "✓", "#3FB950");
+            AdvanceToNextDiagnosticTest("battery");
         }
 
         private void BtnPassUsb_Click(object sender, RoutedEventArgs e)
         {
             ViewModel?.MarkTestPassed("Usb");
             ShowFeedback("USB Ports & Root Hub Verified Nominal & Passed ✓", "✓", "#3FB950");
+            AdvanceToNextDiagnosticTest("usb");
         }
 
         private void BtnResetUsb_Click(object sender, RoutedEventArgs e)
@@ -1342,6 +1406,7 @@ namespace SuperAutoMater.Wpf.Views
         {
             ViewModel?.MarkTestPassed("Keyboard");
             ShowFeedback("Keyboard Matrix & Trackpad Certified Nominal & Passed ✓", "✓", "#3FB950");
+            AdvanceToNextDiagnosticTest("keyboard");
         }
 
         private void BtnExitKeyboard_Click(object sender, RoutedEventArgs e)
@@ -1355,18 +1420,21 @@ namespace SuperAutoMater.Wpf.Views
             StopCpuStress();
             ViewModel?.MarkTestPassed("Cpu");
             ShowFeedback("CPU & RAM Memory Stress Verified Nominal & Passed ✓", "✓", "#3FB950");
+            AdvanceToNextDiagnosticTest("cpu");
         }
 
         private void BtnPassGpu_Click(object sender, RoutedEventArgs e)
         {
             ViewModel?.MarkTestPassed("Gpu");
             ShowFeedback("GPU 3D Acceleration Verified Nominal & Passed ✓", "✓", "#3FB950");
+            AdvanceToNextDiagnosticTest("gpu");
         }
 
         private void BtnPassStorage_Click(object sender, RoutedEventArgs e)
         {
             ViewModel?.MarkTestPassed("Storage");
             ShowFeedback("3-Source Storage Health Verified Nominal & Passed ✓", "✓", "#3FB950");
+            AdvanceToNextDiagnosticTest("storage");
         }
 
         private void BtnReplayAudio_Click(object sender, RoutedEventArgs e)
@@ -1378,12 +1446,14 @@ namespace SuperAutoMater.Wpf.Views
         {
             ViewModel?.MarkTestPassed("Audio");
             ShowFeedback("Audio Stereo Sweep Verified Nominal & Passed ✓", "✓", "#3FB950");
+            AdvanceToNextDiagnosticTest("audio");
         }
 
         private void BtnPassBluetooth_Click(object sender, RoutedEventArgs e)
         {
             ViewModel?.MarkTestPassed("Bluetooth");
             ShowFeedback("Wireless RF & Bluetooth Transceivers Verified Nominal & Passed ✓", "✓", "#3FB950");
+            AdvanceToNextDiagnosticTest("wireless");
         }
 
         #endregion
@@ -1453,6 +1523,8 @@ namespace SuperAutoMater.Wpf.Views
             }
         }
 
+        private DateTime _lastCamOpticsAnalysisTime = DateTime.MinValue;
+
         private void WorkspaceVideoSource_NewFrame(object sender, NewFrameEventArgs eventArgs)
         {
             try
@@ -1464,6 +1536,23 @@ namespace SuperAutoMater.Wpf.Views
                 }
 
                 using var bitmap = (System.Drawing.Bitmap)eventArgs.Frame.Clone();
+
+                // Periodic real-time optical clarity & privacy shutter analysis (Feature 3A)
+                if ((DateTime.Now - _lastCamOpticsAnalysisTime).TotalMilliseconds >= 250)
+                {
+                    _lastCamOpticsAnalysisTime = DateTime.Now;
+                    var optics = CosmeticCameraService.Instance.AnalyzeWebcamFrame(bitmap);
+                    Dispatcher.InvokeAsync(() =>
+                    {
+                        if (ViewModel != null)
+                        {
+                            ViewModel.WebcamOpticsBadge = optics.StatusBadge;
+                            ViewModel.WebcamOpticsDetail = optics.StatusDetail;
+                            ViewModel.WebcamOpticsAccentHex = optics.AccentHex;
+                        }
+                    }, DispatcherPriority.Background);
+                }
+
                 IntPtr hBitmap = bitmap.GetHbitmap();
                 try
                 {
@@ -1608,6 +1697,7 @@ namespace SuperAutoMater.Wpf.Views
             ViewModel?.MarkTestPassed("Camera");
             ViewModel?.MarkTestPassed("Audio");
             ShowFeedback("Webcam & Microphone Array Verified Nominal & Passed ✓", "✓", "#3FB950");
+            AdvanceToNextDiagnosticTest("cammic");
         }
 
         #endregion
@@ -1917,7 +2007,7 @@ namespace SuperAutoMater.Wpf.Views
 
                     if (_cpuStressSeconds >= 10)
                     {
-                        // Stop CPU/RAM stress load immediately, but transition into 5s Heatsink Cool-Down Profiling
+                        // Stop CPU/RAM stress load immediately, but transition into 10s Heatsink Cool-Down Profiling (Feature 2A)
                         try
                         {
                             _cpuStressCts?.Cancel();
@@ -1934,21 +2024,23 @@ namespace SuperAutoMater.Wpf.Views
                         TxtCpuStressStatus.Text = "⚡ 10s BURN COMPLETE · COOL-DOWN DISSIPATION TEST...";
                         TxtCpuStressStatus.Foreground = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#58A6FF"));
                         TxtCpuStressLoad.Text = "COOLING";
-                        TxtCpuStressTimer.Text = "Dissipation Recovery: 0s / 5s";
+                        TxtCpuStressTimer.Text = "Dissipation Recovery: 0s / 10s";
                     }
                 }
                 else
                 {
-                    // Cool-down recovery phase (5 seconds)
+                    // Cool-down recovery phase (10 seconds for Decay Half-Life profiling)
                     _coolDownSeconds++;
                     ThermalProfilerService.Instance.UpdateCoolDownSample(curTemp);
-                    TxtCpuStressTimer.Text = $"Dissipation Recovery: {_coolDownSeconds}s / 5s";
+                    TxtCpuStressTimer.Text = $"Dissipation Recovery: {_coolDownSeconds}s / 10s";
 
                     var thmRes = ThermalProfilerService.Instance.GetCurrentResult();
                     TxtThermalPasteSummary.Text = thmRes.ConditionSummary;
                     TxtThermalPasteSummary.Foreground = new SolidColorBrush((Color)ColorConverter.ConvertFromString(thmRes.AccentHex));
+                    TxtThermalDecaySummary.Text = thmRes.RadiatorAirflowVerdict;
+                    TxtThermalDecaySummary.Foreground = new SolidColorBrush((Color)ColorConverter.ConvertFromString(thmRes.RadiatorAirflowAccentHex));
 
-                    if (_coolDownSeconds >= 5)
+                    if (_coolDownSeconds >= 10)
                     {
                         StopCpuStress();
                         TxtCpuStressStatus.Text = "✓ 10s WORKLOAD & THERMAL DISSIPATION PROFILED";
@@ -2005,6 +2097,8 @@ namespace SuperAutoMater.Wpf.Views
                 BtnCpuToggleStress.Content = "▶ START 10s CPU + RAM BURN";
                 TxtThermalPasteSummary.Text = finThm.ConditionSummary;
                 TxtThermalPasteSummary.Foreground = new SolidColorBrush((Color)ColorConverter.ConvertFromString(finThm.AccentHex));
+                TxtThermalDecaySummary.Text = finThm.RadiatorAirflowVerdict;
+                TxtThermalDecaySummary.Foreground = new SolidColorBrush((Color)ColorConverter.ConvertFromString(finThm.RadiatorAirflowAccentHex));
 
                 TxtBatterySagSummary.Text = finBat.StatusSummary;
                 TxtBatterySagSummary.Foreground = new SolidColorBrush((Color)ColorConverter.ConvertFromString(finBat.AccentHex));

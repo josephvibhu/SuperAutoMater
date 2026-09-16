@@ -11,6 +11,8 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "old", "old", "{48DCF74D-3AA
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Automater", "old\Automater\Automater.csproj", "{6263D2A2-B779-4C45-998B-BB24ACF5A753}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SuperManager", "SuperAutoMater\SuperManager\SuperManager.csproj", "{FA9CF0E7-0F10-457B-84BA-4D0A835BBFB7}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -45,6 +47,18 @@ Global
 		{6263D2A2-B779-4C45-998B-BB24ACF5A753}.Release|x64.Build.0 = Release|Any CPU
 		{6263D2A2-B779-4C45-998B-BB24ACF5A753}.Release|x86.ActiveCfg = Release|Any CPU
 		{6263D2A2-B779-4C45-998B-BB24ACF5A753}.Release|x86.Build.0 = Release|Any CPU
+		{FA9CF0E7-0F10-457B-84BA-4D0A835BBFB7}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{FA9CF0E7-0F10-457B-84BA-4D0A835BBFB7}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{FA9CF0E7-0F10-457B-84BA-4D0A835BBFB7}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{FA9CF0E7-0F10-457B-84BA-4D0A835BBFB7}.Debug|x64.Build.0 = Debug|Any CPU
+		{FA9CF0E7-0F10-457B-84BA-4D0A835BBFB7}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{FA9CF0E7-0F10-457B-84BA-4D0A835BBFB7}.Debug|x86.Build.0 = Debug|Any CPU
+		{FA9CF0E7-0F10-457B-84BA-4D0A835BBFB7}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{FA9CF0E7-0F10-457B-84BA-4D0A835BBFB7}.Release|Any CPU.Build.0 = Release|Any CPU
+		{FA9CF0E7-0F10-457B-84BA-4D0A835BBFB7}.Release|x64.ActiveCfg = Release|Any CPU
+		{FA9CF0E7-0F10-457B-84BA-4D0A835BBFB7}.Release|x64.Build.0 = Release|Any CPU
+		{FA9CF0E7-0F10-457B-84BA-4D0A835BBFB7}.Release|x86.ActiveCfg = Release|Any CPU
+		{FA9CF0E7-0F10-457B-84BA-4D0A835BBFB7}.Release|x86.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
@@ -52,5 +66,6 @@ Global
 	GlobalSection(NestedProjects) = preSolution
 		{EF6EFC30-FEA0-46A4-BD9E-94A6585F978F} = {75D47F26-466F-A3D5-12D3-D728B6F4B65A}
 		{6263D2A2-B779-4C45-998B-BB24ACF5A753} = {48DCF74D-3AA9-37DE-8188-E18F574070E8}
+		{FA9CF0E7-0F10-457B-84BA-4D0A835BBFB7} = {75D47F26-466F-A3D5-12D3-D728B6F4B65A}
 	EndGlobalSection
 EndGlobal

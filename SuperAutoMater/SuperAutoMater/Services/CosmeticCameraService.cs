@@ -4,9 +4,22 @@ using System.Drawing;
 using System.Drawing.Drawing2D;
 using System.Drawing.Imaging;
 using System.IO;
+using System.Runtime.InteropServices;
 
 namespace SuperAutoMater.Wpf.Services
 {
+    public class WebcamOpticsResult
+    {
+        public bool IsShutterClosed { get; set; } = false;
+        public bool IsLensHazy { get; set; } = false;
+        public double MeanLuminance { get; set; } = 128.0;
+        public double StandardDeviation { get; set; } = 35.0;
+        public int ClarityScore { get; set; } = 100;
+        public string StatusBadge { get; set; } = "✓ OPTICS CRISP & CLEAR";
+        public string StatusDetail { get; set; } = "Lens clarity and sensor dynamic range nominal.";
+        public string AccentHex { get; set; } = "#3FB950";
+    }
+
     public class CosmeticPhotoRecord
     {
         public string PresetName { get; set; } = "Chassis";
@@ -121,6 +134,103 @@ namespace SuperAutoMater.Wpf.Services
                     return codec;
             }
             return null;
+        }
+
+        public WebcamOpticsResult AnalyzeWebcamFrame(Bitmap rawBitmap)
+        {
+            if (rawBitmap == null)
+                return new WebcamOpticsResult { StatusBadge = "NO FRAME", AccentHex = "#8B949E" };
+
+            try
+            {
+                int w = rawBitmap.Width;
+                int h = rawBitmap.Height;
+                if (w < 16 || h < 16)
+                    return new WebcamOpticsResult();
+
+                int sampleCols = 32;
+                int sampleRows = 24;
+                int totalSamples = sampleCols * sampleRows;
+                double sumLum = 0.0;
+                double sumSqLum = 0.0;
+
+                var rect = new Rectangle(0, 0, w, h);
+                BitmapData bmpData = rawBitmap.LockBits(rect, ImageLockMode.ReadOnly, PixelFormat.Format24bppRgb);
+                try
+                {
+                    int stride = bmpData.Stride;
+                    IntPtr scan0 = bmpData.Scan0;
+                    int stepX = Math.Max(1, w / sampleCols);
+                    int stepY = Math.Max(1, h / sampleRows);
+
+                    for (int r = 0; r < sampleRows; r++)
+                    {
+                        int py = Math.Min(h - 1, r * stepY);
+                        IntPtr rowPtr = IntPtr.Add(scan0, py * stride);
+
+                        for (int c = 0; c < sampleCols; c++)
+                        {
+                            int px = Math.Min(w - 1, c * stepX);
+                            int pixelOffset = px * 3;
+
+                            byte b = Marshal.ReadByte(rowPtr, pixelOffset);
+                            byte g = Marshal.ReadByte(rowPtr, pixelOffset + 1);
+                            byte rVal = Marshal.ReadByte(rowPtr, pixelOffset + 2);
+
+                            // Rec. 601 Luma
+                            double lum = (0.299 * rVal) + (0.587 * g) + (0.114 * b);
+                            sumLum += lum;
+                            sumSqLum += lum * lum;
+                        }
+                    }
+                }
+                finally
+                {
+                    rawBitmap.UnlockBits(bmpData);
+                }
+
+                double mean = sumLum / totalSamples;
+                double variance = Math.Max(0.0, (sumSqLum / totalSamples) - (mean * mean));
+                double stdDev = Math.Sqrt(variance);
+
+                var res = new WebcamOpticsResult
+                {
+                    MeanLuminance = Math.Round(mean, 1),
+                    StandardDeviation = Math.Round(stdDev, 1),
+                    ClarityScore = Math.Min(100, Math.Max(0, (int)(stdDev * 2.5)))
+                };
+
+                // 1. Shutter Closed: frame is pitch black, very low luminance and near-zero standard deviation
+                if (mean < 8.0 && stdDev < 3.5)
+                {
+                    res.IsShutterClosed = true;
+                    res.StatusBadge = "🔒 PRIVACY SHUTTER CLOSED";
+                    res.StatusDetail = "Camera sensor is occluded. Slide the physical privacy shutter open on top bezel.";
+                    res.AccentHex = "#F85149";
+                    res.ClarityScore = 0;
+                }
+                // 2. Lens Hazy / Smudged: light is present (mean > 35) but contrast is severely suppressed (stdDev < 13.0)
+                else if (mean > 35.0 && stdDev < 13.0)
+                {
+                    res.IsLensHazy = true;
+                    res.StatusBadge = "⚠️ LENS HAZY / SMUDGED";
+                    res.StatusDetail = $"Low optical contrast (std: {stdDev:F1}). Clean webcam lens cover with microfiber cloth.";
+                    res.AccentHex = "#D29922";
+                }
+                // 3. Crisp optics
+                else
+                {
+                    res.StatusBadge = "✓ OPTICS CRISP & CLEAR";
+                    res.StatusDetail = $"Clarity {res.ClarityScore}% · Contrast & sensor dynamic range nominal.";
+                    res.AccentHex = "#3FB950";
+                }
+
+                return res;
+            }
+            catch
+            {
+                return new WebcamOpticsResult();
+            }
         }
     }
 }

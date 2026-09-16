@@ -162,6 +162,44 @@ namespace SuperAutoMater.Wpf.Views
             }
         }
 
+        private void BtnExportPdf_Click(object sender, RoutedEventArgs e)
+        {
+            try
+            {
+                var preset = GetSelectedPreset();
+                var barcodeMode = GetSelectedBarcodeMode();
+
+                var dlg = new SaveFileDialog
+                {
+                    FileName = $"ThermalLabel_{_record.Serial_Number}_{DateTime.Now:yyyyMMdd}.pdf",
+                    DefaultExt = ".pdf",
+                    Filter = "PDF Document (.pdf)|*.pdf"
+                };
+
+                if (dlg.ShowDialog(this) == true)
+                {
+                    bool ok = ThermalLabelPrinter.ExportPdfLabel(_record, preset, barcodeMode, dlg.FileName);
+                    if (ok)
+                    {
+                        TxtStatusMessage.Text = $"Exported 1-page PDF: {Path.GetFileName(dlg.FileName)} ✓";
+                        try
+                        {
+                            System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(dlg.FileName) { UseShellExecute = true });
+                        }
+                        catch { }
+                    }
+                    else
+                    {
+                        TxtStatusMessage.Text = "PDF export failed.";
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                TxtStatusMessage.Text = "PDF export failed: " + ex.Message;
+            }
+        }
+
         private void BtnClose_Click(object sender, RoutedEventArgs e)
         {
             Close();

@@ -3,6 +3,7 @@ using System.IO;
 using System.Linq;
 using System.Windows;
 using System.Windows.Threading;
+using SuperAutoMater.Wpf.Core;
 
 namespace SuperAutoMater.Wpf
 {
@@ -17,6 +18,8 @@ namespace SuperAutoMater.Wpf
 
             DispatcherUnhandledException += App_DispatcherUnhandledException;
             AppDomain.CurrentDomain.UnhandledException += CurrentDomain_UnhandledException;
+
+            AppLogger.Info("Lifecycle", $"SuperAutoMater v1.6.3 starting on {Environment.MachineName} ({Environment.OSVersion}) [Elevated: {Environment.IsPrivilegedProcess}].");
 
             try
             {
@@ -93,6 +96,7 @@ namespace SuperAutoMater.Wpf
         {
             try
             {
+                AppLogger.Error("Lifecycle", "Fatal crash or unhandled exception encountered.", ex);
                 string details = GetExceptionDetails(ex);
                 Console.WriteLine($"[FATAL CRASH]\n{details}");
                 string logPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "startup_crash.log");

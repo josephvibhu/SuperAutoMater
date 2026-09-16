@@ -3,7 +3,7 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:controls="clr-namespace:SuperAutoMater.Wpf.Controls"
         xmlns:vm="clr-namespace:SuperAutoMater.Wpf.ViewModels"
-        Title="SuperAutoMater v1.3 — Hardware Diagnostic &amp; QC Cockpit"
+        Title="SuperAutoMater v1.6 — Hardware Diagnostic &amp; QC Cockpit"
         Height="800" Width="1280"
         MinHeight="600" MinWidth="1024"
         WindowState="Maximized"
@@ -81,7 +81,7 @@
                     </StackPanel>
 
                     <Border Background="#21262D" BorderBrush="#30363D" BorderThickness="1" CornerRadius="6" Padding="6,2" Margin="10,0,14,0" VerticalAlignment="Center">
-                        <TextBlock Text="v1.4.0" Style="{StaticResource TextBadgeMono}" Foreground="{StaticResource BrushTextVioletMuted}"/>
+                        <TextBlock Text="v1.6.0" Style="{StaticResource TextBadgeMono}" Foreground="{StaticResource BrushTextVioletMuted}"/>
                     </Border>
 
                     <Rectangle Width="1" Height="16" Fill="#30363D" Margin="0,0,14,0" VerticalAlignment="Center"/>
@@ -98,6 +98,14 @@
                             <TextBlock Text="👤 " FontSize="11" VerticalAlignment="Center"/>
                             <TextBlock Text="{Binding TechnicianDisplayBadge}" Style="{StaticResource TextBadgeMono}" FontWeight="Bold" Foreground="#58A6FF"/>
                             <TextBlock Text=" 📷" FontSize="9" Foreground="#8B949E" Margin="4,0,0,0"/>
+                        </StackPanel>
+                    </Border>
+
+                    <!-- Auto-Advance Pipeline Mode Toggle Pill -->
+                    <Border x:Name="BtnToggleAutoAdvance" Background="#161B22" BorderBrush="{Binding AutoAdvanceBadgeColor}" BorderThickness="1" CornerRadius="6" Padding="8,3" Cursor="Hand" MouseLeftButtonUp="BtnToggleAutoAdvance_Click" ToolTip="Click to toggle Pass Auto-Advance sequence on/off" Margin="10,0,0,0" VerticalAlignment="Center">
+                        <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                            <TextBlock Text="⏩ " FontSize="11" VerticalAlignment="Center"/>
+                            <TextBlock Text="{Binding AutoAdvanceStatusText}" Style="{StaticResource TextBadgeMono}" FontWeight="Bold" Foreground="{Binding AutoAdvanceBadgeColor}"/>
                         </StackPanel>
                     </Border>
                 </StackPanel>
@@ -498,6 +506,13 @@
                                                     </StackPanel>
                                                 </Border>
 
+                                                <!-- Privacy Shutter & Lens Clarity Overlay Tag (Feature 3A) -->
+                                                <Border x:Name="BorderCamOptics" Background="#E60E1116" BorderBrush="#30363D" BorderThickness="1" CornerRadius="6" HorizontalAlignment="Right" VerticalAlignment="Top" Margin="8" Padding="8,4">
+                                                    <StackPanel Orientation="Horizontal">
+                                                        <TextBlock x:Name="TxtCamOpticsBadge" Text="{Binding WebcamOpticsBadge}" Style="{StaticResource TextBadgeMono}" FontWeight="Bold" Foreground="{Binding WebcamOpticsAccentHex}"/>
+                                                    </StackPanel>
+                                                </Border>
+
                                                 <!-- Overlay when no camera or searching -->
                                                 <StackPanel x:Name="StackCamNoDevice" HorizontalAlignment="Center" VerticalAlignment="Center" Visibility="Collapsed">
                                                     <TextBlock Text="📷" FontSize="32" HorizontalAlignment="Center" Margin="0,0,0,6"/>
@@ -694,6 +709,11 @@
                                                 <Border x:Name="CardThermalPasteStatus" Background="#161B22" BorderBrush="#30363D" BorderThickness="1" CornerRadius="6" Padding="8,4" Margin="0,8,0,0">
                                                     <TextBlock x:Name="TxtThermalPasteSummary" Text="✓ HEATSINK &amp; THERMAL CONDUCTION NOMINAL" FontFamily="{StaticResource FontMono}" FontWeight="Bold" FontSize="10" Foreground="#3FB950" HorizontalAlignment="Center"/>
                                                 </Border>
+
+                                                <!-- Real-Time Cool-Down Decay & Clogged Radiator Airflow Badge (Feature 2A) -->
+                                                <Border x:Name="CardThermalDecayStatus" Background="#161B22" BorderBrush="#30363D" BorderThickness="1" CornerRadius="6" Padding="8,4" Margin="0,4,0,0">
+                                                    <TextBlock x:Name="TxtThermalDecaySummary" Text="{Binding ThermalDecayVerdict}" FontFamily="{StaticResource FontMono}" FontWeight="Bold" FontSize="10" Foreground="{Binding ThermalDecayAccentHex}" HorizontalAlignment="Center"/>
+                                                </Border>
                                             </StackPanel>
                                         </Border>
 
@@ -727,6 +747,14 @@
                                                         <TextBlock Text="Bus Parity: OK" FontFamily="{StaticResource FontMono}" FontSize="10" Foreground="{StaticResource BrushTextWhite}"/>
                                                     </Border>
                                                 </StackPanel>
+
+                                                <!-- Dual-Channel vs. Single-Channel RAM & Mismatch Topology Badge (Feature 1A) -->
+                                                <Border x:Name="CardRamTopology" Background="#0D1117" BorderBrush="{Binding RamChannelBorderBrush}" BorderThickness="1" CornerRadius="6" Padding="8,5" Margin="0,8,0,0">
+                                                    <StackPanel HorizontalAlignment="Center">
+                                                        <TextBlock Text="{Binding RamChannelBadge}" FontFamily="{StaticResource FontMono}" FontWeight="Bold" FontSize="10" Foreground="{Binding RamChannelAccentHex}" HorizontalAlignment="Center"/>
+                                                        <TextBlock Text="{Binding RamChannelDetail}" FontFamily="{StaticResource FontMono}" FontSize="9" Foreground="#8B949E" HorizontalAlignment="Center" Margin="0,2,0,0" TextWrapping="Wrap" TextAlignment="Center"/>
+                                                    </StackPanel>
+                                                </Border>
                                             </StackPanel>
                                         </Border>
                                     </Grid>
@@ -1242,6 +1270,10 @@
                                                     <Border Background="#1C2128" BorderBrush="#388BFD" BorderThickness="1" CornerRadius="4" Padding="6,1" Margin="8,0,0,0">
                                                         <TextBlock Text="{Binding BatteryChemistry}" Style="{StaticResource TextBadgeMono}" Foreground="#79C0FF"/>
                                                     </Border>
+                                                    <!-- OEM Genuine vs Aftermarket Clone Authenticity Chip -->
+                                                    <Border Background="#161B22" BorderBrush="{Binding BatteryAuthenticityAccentHex}" BorderThickness="1" CornerRadius="4" Padding="8,1" Margin="8,0,0,0" ToolTip="{Binding BatteryAuthenticityDetails}">
+                                                        <TextBlock Text="{Binding BatteryAuthenticityBadge}" Style="{StaticResource TextBadgeMono}" Foreground="{Binding BatteryAuthenticityAccentHex}" FontWeight="Bold"/>
+                                                    </Border>
                                                 </StackPanel>
                                                 <Border DockPanel.Dock="Right" Background="#1B4D3E" BorderBrush="#34D399" BorderThickness="1" CornerRadius="6" Padding="8,3">
                                                     <TextBlock Text="{Binding BatteryAcStatus}" Style="{StaticResource TextBadgeMono}" Foreground="#3FB950" FontWeight="Bold"/>
@@ -1379,7 +1411,7 @@
                                     <Border Grid.Row="1" Background="#161B22" BorderBrush="#262C36" BorderThickness="1" CornerRadius="10" Padding="10,8" Margin="0,8,0,0">
                                         <DockPanel LastChildFill="False">
                                             <Button DockPanel.Dock="Left" Content="🔄 RE-PROBE BATTERY SENSORS" Style="{StaticResource StyleDarkActionBtn}" Click="BtnPollBattery_Click" Padding="14,6"/>
-                                            <Button x:Name="BtnRunBatteryLoadTest" DockPanel.Dock="Left" Content="⚡ RUN 3-SEC LOAD SAG TEST" Style="{StaticResource StyleDarkActionBtn}" Click="BtnRunBatteryLoadTest_Click" Padding="14,6" Margin="10,0,0,0" ToolTip="Run 3-second multi-thread CPU stress burst to measure dynamic voltage sag &amp; per-cell drift"/>
+                                            <Button x:Name="BtnRunBatteryLoadTest" DockPanel.Dock="Left" Content="⚡ RUN 15s LOAD SAG TEST" Style="{StaticResource StyleDarkActionBtn}" Click="BtnRunBatteryLoadTest_Click" Padding="14,6" Margin="10,0,0,0" ToolTip="Run autonomous 15-second multi-thread CPU stress burst to measure dynamic voltage sag &amp; per-cell drift"/>
                                             <Button DockPanel.Dock="Right" Content="✓ PASS BATTERY TEST [ENTER]" Style="{StaticResource StyleCloudPassButton}" Click="BtnPassBattery_Click" Padding="14,6"/>
                                         </DockPanel>
                                     </Border>
@@ -1862,7 +1894,7 @@
                                             <ColumnDefinition Width="1.15*"/>
                                             <ColumnDefinition Width="*"/>
                                         </Grid.ColumnDefinitions>
-                                        <Button Grid.Column="0" Content="📄 PDF CERTIFICATE" Style="{StaticResource StyleCloudPassButton}" Click="BtnExportPdf_Click" Margin="0,0,3,0" Padding="4,4" FontSize="10"/>
+                                        <Button Grid.Column="0" Content="🔋 BATTERY CALIBRATE" Style="{StaticResource StyleWarningActionBtn}" Click="BtnOpenBatteryDrainModal_Click" Margin="0,0,3,0" Padding="4,4" FontSize="10" ToolTip="Open BMS Battery Recalibration &amp; Controlled Drain Protocol Cockpit"/>
                                         <Button Grid.Column="1" Content="📸 QC PHOTOS" Style="{StaticResource StyleDarkActionBtn}" Click="BtnCaptureQcPhoto_Click" Margin="3,0,0,0" Padding="4,4" FontSize="10"/>
                                     </Grid>
                                 </StackPanel>

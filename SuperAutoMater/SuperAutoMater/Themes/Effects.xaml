@@ -20,6 +20,13 @@
                       ShadowDepth="0"
                       Opacity="0.45"/>
 
+    <!-- Alias for NeonGlowEmerald -->
+    <DropShadowEffect x:Key="NeonGlowEmerald"
+                      Color="#2EA043"
+                      BlurRadius="14"
+                      ShadowDepth="0"
+                      Opacity="0.45"/>
+
     <DropShadowEffect x:Key="EffectCardShadow"
                       Color="#000000"
                       BlurRadius="12"

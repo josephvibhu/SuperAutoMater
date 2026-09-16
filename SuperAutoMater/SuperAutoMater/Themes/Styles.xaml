@@ -161,6 +161,107 @@
         </Setter>
     </Style>
 
+    <!-- Primary Blue Action Button -->
+    <Style x:Key="StylePrimaryActionBtn" TargetType="Button">
+        <Setter Property="Cursor" Value="Hand"/>
+        <Setter Property="FocusVisualStyle" Value="{x:Null}"/>
+        <Setter Property="Foreground" Value="#FFFFFF"/>
+        <Setter Property="FontFamily" Value="{StaticResource FontMono}"/>
+        <Setter Property="FontSize" Value="11"/>
+        <Setter Property="FontWeight" Value="Bold"/>
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="Button">
+                    <Border x:Name="border"
+                            Background="#1F324D"
+                            BorderBrush="#388BFD"
+                            BorderThickness="1"
+                            CornerRadius="8"
+                            Padding="12,6">
+                        <ContentPresenter x:Name="cp" HorizontalAlignment="Center" VerticalAlignment="Center" TextElement.Foreground="#FFFFFF"/>
+                    </Border>
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="IsMouseOver" Value="True">
+                            <Setter TargetName="border" Property="Background" Value="#2A4368"/>
+                            <Setter TargetName="border" Property="BorderBrush" Value="#58A6FF"/>
+                        </Trigger>
+                        <Trigger Property="IsPressed" Value="True">
+                            <Setter TargetName="border" Property="Background" Value="#142133"/>
+                        </Trigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <!-- Amber / Warning Action Button (Crisp Amber on Dark Gold Border) -->
+    <Style x:Key="StyleWarningActionBtn" TargetType="Button">
+        <Setter Property="Cursor" Value="Hand"/>
+        <Setter Property="FocusVisualStyle" Value="{x:Null}"/>
+        <Setter Property="Foreground" Value="#F0883E"/>
+        <Setter Property="FontFamily" Value="{StaticResource FontMono}"/>
+        <Setter Property="FontSize" Value="11"/>
+        <Setter Property="FontWeight" Value="Bold"/>
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="Button">
+                    <Border x:Name="border"
+                            Background="#272115"
+                            BorderBrush="#D29922"
+                            BorderThickness="1"
+                            CornerRadius="8"
+                            Padding="10,6">
+                        <ContentPresenter x:Name="cp" HorizontalAlignment="Center" VerticalAlignment="Center" TextElement.Foreground="#F0883E"/>
+                    </Border>
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="IsMouseOver" Value="True">
+                            <Setter TargetName="border" Property="Background" Value="#382C18"/>
+                            <Setter TargetName="border" Property="BorderBrush" Value="#E3B341"/>
+                            <Setter TargetName="cp" Property="TextElement.Foreground" Value="#FFFFFF"/>
+                        </Trigger>
+                        <Trigger Property="IsPressed" Value="True">
+                            <Setter TargetName="border" Property="Background" Value="#1C160C"/>
+                        </Trigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <!-- Danger Red Action Button -->
+    <Style x:Key="StyleDangerActionBtn" TargetType="Button">
+        <Setter Property="Cursor" Value="Hand"/>
+        <Setter Property="FocusVisualStyle" Value="{x:Null}"/>
+        <Setter Property="Foreground" Value="#F85149"/>
+        <Setter Property="FontFamily" Value="{StaticResource FontMono}"/>
+        <Setter Property="FontSize" Value="11"/>
+        <Setter Property="FontWeight" Value="Bold"/>
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="Button">
+                    <Border x:Name="border"
+                            Background="#2A1215"
+                            BorderBrush="#DA3633"
+                            BorderThickness="1"
+                            CornerRadius="8"
+                            Padding="10,6">
+                        <ContentPresenter x:Name="cp" HorizontalAlignment="Center" VerticalAlignment="Center" TextElement.Foreground="#F85149"/>
+                    </Border>
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="IsMouseOver" Value="True">
+                            <Setter TargetName="border" Property="Background" Value="#3C1A1E"/>
+                            <Setter TargetName="border" Property="BorderBrush" Value="#F85149"/>
+                            <Setter TargetName="cp" Property="TextElement.Foreground" Value="#FFFFFF"/>
+                        </Trigger>
+                        <Trigger Property="IsPressed" Value="True">
+                            <Setter TargetName="border" Property="Background" Value="#1A0C0E"/>
+                        </Trigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
     <!-- Modern Dark ComboBox ToggleButton Template -->
     <ControlTemplate x:Key="DarkComboBoxToggleButton" TargetType="{x:Type ToggleButton}">
         <Grid>

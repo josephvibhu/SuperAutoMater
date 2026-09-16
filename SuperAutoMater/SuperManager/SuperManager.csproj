@@ -1,0 +1,36 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+	<PropertyGroup>
+		<OutputType>WinExe</OutputType>
+		<TargetFramework>net10.0-windows</TargetFramework>
+		<Nullable>disable</Nullable>
+		<UseWPF>true</UseWPF>
+		<UseWindowsForms>true</UseWindowsForms>
+		<AssemblyName>SuperManager</AssemblyName>
+		<Product>SuperManager - Warehouse Fleet Server</Product>
+		<Company>SuperAutoMater Fleet Systems</Company>
+		<Version>1.0.0</Version>
+		<AssemblyVersion>1.0.0.0</AssemblyVersion>
+		<FileVersion>1.0.0.0</FileVersion>
+		<ApplicationIcon>app.ico</ApplicationIcon>
+		<NoWarn>NU1701;WFO1000</NoWarn>
+
+		<PublishSingleFile>true</PublishSingleFile>
+		<SelfContained>true</SelfContained>
+		<PublishReadyToRun>true</PublishReadyToRun>
+		<PublishReadyToRunComposite>true</PublishReadyToRunComposite>
+		<EnableCompressionInSingleFile>false</EnableCompressionInSingleFile>
+		<TieredCompilation>true</TieredCompilation>
+		<Optimize>true</Optimize>
+		<IncludeNativeLibrariesForSelfExtract>true</IncludeNativeLibrariesForSelfExtract>
+	</PropertyGroup>
+
+	<ItemGroup>
+		<Resource Include="app.ico" />
+	</ItemGroup>
+
+	<ItemGroup>
+		<PackageReference Include="QRCoder" Version="1.8.0" />
+	</ItemGroup>
+
+</Project>

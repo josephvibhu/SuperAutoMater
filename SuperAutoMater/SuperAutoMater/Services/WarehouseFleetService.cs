@@ -7,6 +7,7 @@ using System.Linq;
 using System.Net;
 using System.Net.NetworkInformation;
 using System.Net.Sockets;
+using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
 using System.Threading;
@@ -61,10 +62,15 @@ namespace SuperAutoMater.Wpf.Services
 
         private MainViewModel _viewModel;
         private byte[] _qrPngBytes;
+        private readonly string _sessionAccessToken = Convert.ToHexString(RandomNumberGenerator.GetBytes(32));
 
         public string LocalIpAddress { get; private set; } = "127.0.0.1";
         public int HttpPort { get; private set; } = DEFAULT_HTTP_PORT;
-        public string LocalDashboardUrl => $"http://{LocalIpAddress}:{HttpPort}";
+        /// <summary>
+        /// A per-process capability URL for the local fleet dashboard. The token is deliberately
+        /// not persisted: restarting the diagnostic bench revokes previously shared URLs.
+        /// </summary>
+        public string LocalDashboardUrl => $"http://{LocalIpAddress}:{HttpPort}/?token={_sessionAccessToken}";
         public BitmapSource QrCodeBitmap { get; private set; }
 
         public ObservableCollection<FleetBenchNode> OnlineBenches { get; } =
@@ -137,10 +143,41 @@ namespace SuperAutoMater.Wpf.Services
                 var interfaces = NetworkInterface.GetAllNetworkInterfaces()
                     .Where(n => n.OperationalStatus == OperationalStatus.Up &&
                                 n.NetworkInterfaceType != NetworkInterfaceType.Loopback)
-                    .OrderByDescending(n => n.NetworkInterfaceType == NetworkInterfaceType.Wireless80211 ||
-                                            n.NetworkInterfaceType == NetworkInterfaceType.Ethernet);
+                    .ToList();
 
-                foreach (var iface in interfaces)
+                // 1. Exclude virtual, tunnel, VPN, and host-only adapters (VirtualBox, VMware, Hyper-V, WSL)
+                var physical = interfaces.Where(n =>
+                {
+                    string desc = (n.Description ?? "").ToLowerInvariant();
+                    string name = (n.Name ?? "").ToLowerInvariant();
+                    if (desc.Contains("virtual") || desc.Contains("vbox") || desc.Contains("vmware") ||
+                        desc.Contains("hyper-v") || desc.Contains("vethernet") || desc.Contains("wsl") ||
+                        desc.Contains("pseudo") || desc.Contains("p2p") || desc.Contains("direct") ||
+                        desc.Contains("teredo") || desc.Contains("tunnel") || desc.Contains("npcap") ||
+                        desc.Contains("tap") || desc.Contains("vpn") || desc.Contains("host-only") ||
+                        desc.Contains("filter") || desc.Contains("scheduler") || desc.Contains("wan miniport"))
+                        return false;
+
+                    if (name.Contains("vbox") || name.Contains("virtualbox") || name.Contains("wsl") ||
+                        name.Contains("vethernet") || name.Contains("local area connection*"))
+                        return false;
+
+                    return true;
+                }).ToList();
+
+                // 2. Prioritize adapters with an active IPv4 Gateway (connected to local router/AP)
+                var withGateway = physical.Where(n =>
+                {
+                    var props = n.GetIPProperties();
+                    return props.GatewayAddresses.Any(g =>
+                        g.Address.AddressFamily == AddressFamily.InterNetwork &&
+                        !g.Address.Equals(IPAddress.Any) &&
+                        !g.Address.ToString().StartsWith("0."));
+                }).OrderByDescending(n => n.NetworkInterfaceType == NetworkInterfaceType.Wireless80211 ||
+                                          n.NetworkInterfaceType == NetworkInterfaceType.Ethernet)
+                  .ToList();
+
+                foreach (var iface in withGateway.Concat(physical))
                 {
                     var props = iface.GetIPProperties();
                     foreach (var addr in props.UnicastAddresses)
@@ -148,7 +185,7 @@ namespace SuperAutoMater.Wpf.Services
                         if (addr.Address.AddressFamily == AddressFamily.InterNetwork)
                         {
                             string ip = addr.Address.ToString();
-                            if (ip.StartsWith("192.168.") || ip.StartsWith("10.") || ip.StartsWith("172."))
+                            if (!ip.StartsWith("127.") && !ip.StartsWith("169.254."))
                             {
                                 return ip;
                             }
@@ -248,6 +285,17 @@ namespace SuperAutoMater.Wpf.Services
             try
             {
                 string path = context.Request.Url.AbsolutePath.ToLowerInvariant();
+                if (!IsAuthorized(context.Request))
+                {
+                    context.Response.StatusCode = (int)HttpStatusCode.Unauthorized;
+                    context.Response.ContentType = "application/json; charset=utf-8";
+                    byte[] unauthorized = Encoding.UTF8.GetBytes("{\"error\":\"A valid bench session token is required.\"}");
+                    context.Response.ContentLength64 = unauthorized.Length;
+                    await context.Response.OutputStream.WriteAsync(unauthorized, 0, unauthorized.Length);
+                    context.Response.Close();
+                    return;
+                }
+
                 byte[] responseBytes;
                 string contentType;
 
@@ -256,6 +304,113 @@ namespace SuperAutoMater.Wpf.Services
                     var payload = GetStatusPayload();
                     string json = JsonSerializer.Serialize(payload, new JsonSerializerOptions { WriteIndented = true });
                     responseBytes = Encoding.UTF8.GetBytes(json);
+                    contentType = "application/json; charset=utf-8";
+                }
+                else if (path == "/api/ping")
+                {
+                    _ = Task.Run(() =>
+                    {
+                        try
+                        {
+                            Console.Beep(1200, 250);
+                            Thread.Sleep(80);
+                            Console.Beep(1600, 350);
+                        }
+                        catch { }
+                    });
+                    var pingPayload = new
+                    {
+                        success = true,
+                        machineName = Environment.MachineName,
+                        message = "📍 Bench successfully located via acoustic alert.",
+                        timestamp = DateTime.UtcNow.ToString("o")
+                    };
+                    string json = JsonSerializer.Serialize(pingPayload);
+                    responseBytes = Encoding.UTF8.GetBytes(json);
+                    contentType = "application/json; charset=utf-8";
+                }
+                else if (path == "/api/certificate")
+                {
+                    var vm = _viewModel;
+                    if (vm != null)
+                    {
+                        var certData = new CertificateData
+                        {
+                            SerialNumber = vm.Serial,
+                            Manufacturer = vm.Manufacturer,
+                            Model = vm.Model,
+                            BiosVersion = "UEFI Compliant",
+                            CpuModel = vm.CpuName,
+                            RamDetails = vm.RamSummary,
+                            StorageModel = vm.PrimaryDriveModel,
+                            StorageHealthPercent = vm.HdsHealth,
+                            StoragePowerOn = vm.HdsPowerOnTime,
+                            BatteryHealthSummary = vm.BatteryIntegrityBadge,
+                            BatteryCapacities = $"{vm.BatteryFullChargeCapacityMwh} / {vm.BatteryDesignCapacityMwh} mWh",
+                            BatteryCellTopology = $"{vm.BatteryCellTopology} · {vm.BatteryCellBalanceBadge}",
+                            GpuModel = vm.GpuName,
+                            PhysicalGrade = vm.Grade,
+                            CosmeticDefectsSummary = vm.CosmeticDefectsSummary,
+                            TechnicianName = vm.TechnicianDisplayBadge,
+                            StorageTbwSummary = vm.TbwDisplaySummary,
+                            DriverIntegritySummary = vm.MissingDriversSummary,
+                            ThermalDissipationVerdict = ThermalProfilerService.Instance.GetCurrentResult().ConditionSummary,
+                            RamTopologySummary = vm.RamChannelBadge,
+                            RadiatorAirflowSummary = vm.ThermalDecayVerdict,
+                            WebcamOpticsSummary = vm.WebcamOpticsBadge,
+                            CloudAuditUrl = GoogleSheetsDispatcher.DefaultSheetsUrl
+                        };
+
+                        if (vm.TestPipeline != null)
+                        {
+                            foreach (var test in vm.TestPipeline)
+                            {
+                                if (test.StatusBadge == "✓" || test.IsPassed)
+                                {
+                                    certData.PassedTests.Add(test.Title);
+                                }
+                            }
+                        }
+
+                        string pdfPath = PdfCertificateService.Instance.GenerateCertificate(certData);
+                        if (File.Exists(pdfPath))
+                        {
+                            responseBytes = File.ReadAllBytes(pdfPath);
+                            contentType = "application/pdf";
+                            context.Response.Headers.Add("Content-Disposition", $"attachment; filename=\"SuperAutoMater_Certificate_{vm.Serial}.pdf\"");
+                        }
+                        else
+                        {
+                            responseBytes = Encoding.UTF8.GetBytes("{\"error\":\"PDF generation failed\"}");
+                            contentType = "application/json";
+                        }
+                    }
+                    else
+                    {
+                        responseBytes = Encoding.UTF8.GetBytes("{\"error\":\"ViewModel not available\"}");
+                        contentType = "application/json";
+                    }
+                }
+                else if (path == "/api/action/pass")
+                {
+                    var vm = _viewModel;
+                    bool markedPassed = false;
+                    if (vm?.TestPipeline != null && Application.Current?.Dispatcher != null)
+                    {
+                        await Application.Current.Dispatcher.InvokeAsync(() =>
+                        {
+                            var activeTest = vm.TestPipeline.FirstOrDefault(t => t.IsActive && t.IsApplicable);
+                            if (activeTest == null) return;
+                            vm.MarkTestPassed(activeTest.Key);
+                            markedPassed = true;
+                        });
+                    }
+                    var actionPayload = new
+                    {
+                        success = markedPassed,
+                        message = markedPassed ? "Active test marked passed." : "No applicable active test was available."
+                    };
+                    responseBytes = Encoding.UTF8.GetBytes(JsonSerializer.Serialize(actionPayload));
                     contentType = "application/json; charset=utf-8";
                 }
                 else if (path == "/api/qr" && _qrPngBytes != null)
@@ -272,7 +427,7 @@ namespace SuperAutoMater.Wpf.Services
 
                 context.Response.ContentType = contentType;
                 context.Response.ContentLength64 = responseBytes.Length;
-                context.Response.Headers.Add("Access-Control-Allow-Origin", "*");
+                context.Response.Headers.Add("Cache-Control", "no-store");
                 await context.Response.OutputStream.WriteAsync(responseBytes, 0, responseBytes.Length);
                 context.Response.OutputStream.Close();
             }
@@ -282,13 +437,32 @@ namespace SuperAutoMater.Wpf.Services
             }
         }
 
+        private bool IsAuthorized(HttpListenerRequest request)
+        {
+            string token = request.QueryString["token"];
+            if (string.IsNullOrWhiteSpace(token))
+            {
+                string authorization = request.Headers["Authorization"];
+                const string bearerPrefix = "Bearer ";
+                if (!string.IsNullOrWhiteSpace(authorization) && authorization.StartsWith(bearerPrefix, StringComparison.OrdinalIgnoreCase))
+                    token = authorization.Substring(bearerPrefix.Length).Trim();
+            }
+
+            if (string.IsNullOrEmpty(token) || token.Length != _sessionAccessToken.Length)
+                return false;
+
+            return CryptographicOperations.FixedTimeEquals(
+                Encoding.UTF8.GetBytes(token),
+                Encoding.UTF8.GetBytes(_sessionAccessToken));
+        }
+
         private object GetStatusPayload()
         {
             var vm = _viewModel;
             var hw = HardwareDiagnosticsService.Instance;
 
             int passed = vm?.TestPipeline?.Count(t => t.IsPassed) ?? 0;
-            int total = vm?.TestPipeline?.Count ?? 10;
+            int total = vm?.RequiredTestCount ?? 10;
 
             return new
             {
@@ -300,12 +474,12 @@ namespace SuperAutoMater.Wpf.Services
                 cpu = hw.CpuTelemetry?.CpuName ?? "Unknown CPU",
                 cpuUsage = hw.CpuTelemetry?.UsagePercent ?? 0,
                 cpuTemp = hw.CpuTelemetry?.TemperatureC ?? 0,
-                ram = vm?.RamSummary ?? "RAM Nominal",
-                battery = $"{vm?.BatteryCharge ?? 100}%",
-                batteryHealth = hw.BatteryTelemetry?.HealthPercent ?? 100,
-                storage = vm?.StorageSummary ?? "Storage Nominal",
-                storageHealth = vm?.HealthBadge ?? "100%",
-                grade = vm?.Grade ?? "GRADE A+",
+                ram = vm?.RamSummary ?? "Unavailable",
+                battery = vm == null ? "Unavailable" : $"{vm.BatteryCharge}%",
+                batteryHealth = hw.BatteryTelemetry?.HealthPercent,
+                storage = vm?.StorageSummary ?? "Unavailable",
+                storageHealth = vm?.HealthBadge ?? "Unavailable",
+                grade = vm?.Grade ?? "Unassigned",
                 passedCount = passed,
                 totalCount = total,
                 activeTest = vm?.TestPipeline?.FirstOrDefault(t => t.IsActive)?.Title ?? "Standby",
@@ -355,8 +529,9 @@ namespace SuperAutoMater.Wpf.Services
                     model = hw.SystemIdentity.Model,
                     serial = hw.SystemIdentity.Serial,
                     passed = vm?.TestPipeline?.Count(t => t.IsPassed) ?? 0,
-                    total = vm?.TestPipeline?.Count ?? 10,
-                    grade = vm?.Grade ?? "GRADE A+",
+                    total = vm?.RequiredTestCount ?? 10,
+                    token = _sessionAccessToken,
+                    grade = vm?.Grade ?? "Unassigned",
                     status = vm?.TestPipeline?.FirstOrDefault(t => t.IsActive)?.Title ?? "Standby",
                     alert = (hw.CpuTelemetry?.TemperatureC ?? 0) > 90
                 };
@@ -558,7 +733,8 @@ namespace SuperAutoMater.Wpf.Services
     <script>
         async function fetchTelemetry() {
             try {
-                const res = await fetch('/api/status');
+                const sessionToken = new URLSearchParams(window.location.search).get('token') || '';
+                const res = await fetch('/api/status?token=' + encodeURIComponent(sessionToken), { cache: 'no-store' });
                 if (!res.ok) return;
                 const data = await res.json();
 
@@ -570,7 +746,7 @@ namespace SuperAutoMater.Wpf.Services
                 document.getElementById('cpuUsage').textContent = data.cpuUsage + '%';
                 document.getElementById('cpuTemp').textContent = data.cpuTemp + '°C Nominal';
                 document.getElementById('batteryPct').textContent = data.battery || '--%';
-                document.getElementById('batteryHealth').textContent = data.batteryHealth + '% Health';
+                document.getElementById('batteryHealth').textContent = data.batteryHealth != null ? (data.batteryHealth + '% Health') : 'Unavailable';
                 document.getElementById('storageHealth').textContent = data.storageHealth || '100%';
                 document.getElementById('ramVal').textContent = data.ram || 'RAM Active';
 

@@ -29,6 +29,9 @@ namespace SuperAutoMater.Wpf.Services
         public string StorageTbwSummary { get; set; } = "14.2 TB / 300 TBW (Low Wear)";
         public string DriverIntegritySummary { get; set; } = "0 Missing Drivers";
         public string ThermalDissipationVerdict { get; set; } = "Thermal Conduction Nominal";
+        public string RamTopologySummary { get; set; } = "";
+        public string RadiatorAirflowSummary { get; set; } = "";
+        public string WebcamOpticsSummary { get; set; } = "";
         public string TechnicianName { get; set; } = "QC Station #1";
         public string CloudAuditUrl { get; set; } = "https://docs.google.com/spreadsheets";
         public List<string> PassedTests { get; set; } = new List<string>();
@@ -152,7 +155,7 @@ namespace SuperAutoMater.Wpf.Services
                 DrawKeyValue(contentSb, 40, 628, "SERIAL NUMBER:", d.SerialNumber);
                 DrawKeyValue(contentSb, 40, 610, "BIOS REVISION:", d.BiosVersion);
                 DrawKeyValue(contentSb, 40, 592, "PROCESSOR (CPU):", d.CpuModel);
-                DrawKeyValue(contentSb, 40, 574, "SYSTEM MEMORY:", d.RamDetails);
+                DrawKeyValue(contentSb, 40, 574, "SYSTEM MEMORY:", string.IsNullOrEmpty(d.RamTopologySummary) ? d.RamDetails : $"{d.RamDetails} [{d.RamTopologySummary}]");
 
                 // Hardware Subsystems Card (Storage & Power)
                 contentSb.Append("q 0.09 0.12 0.18 rg 28 412 556 130 re f Q\n");
@@ -170,12 +173,15 @@ namespace SuperAutoMater.Wpf.Services
                 contentSb.Append("q 0.18 0.24 0.34 RG 1 w 28 200 556 200 re s Q\n");
                 contentSb.Append("BT /F2 11 Tf 0.95 0.96 0.98 rg 40 380 Td (10-POINT HARDWARE DIAGNOSTIC AUDIT RESULTS) Tj ET\n");
 
+                string camItem = string.IsNullOrEmpty(d.WebcamOpticsSummary) ? "[PASS] HD Webcam Sensor & Mic Array" : $"[PASS] Webcam ({d.WebcamOpticsSummary})";
+                string cpuItem = string.IsNullOrEmpty(d.RadiatorAirflowSummary) ? "[PASS] CPU Multi-Core & RAM Memory Stress" : $"[PASS] CPU & Heatsink ({d.RadiatorAirflowSummary})";
+
                 string[] tests = {
                     "[PASS] Display Panel & Dead Pixel Sweep",
                     "[PASS] Audio Stereo Transduction Sweep",
-                    "[PASS] HD Webcam Sensor & Mic Array",
+                    camItem,
                     "[PASS] Keyboard Matrix & Trackpad Sensor",
-                    "[PASS] CPU Multi-Core & RAM Memory Stress",
+                    cpuItem,
                     "[PASS] Battery Health & Load-Step Voltage",
                     "[PASS] GPU 3D Direct3D Benchmark",
                     "[PASS] Biometric Fingerprint Sensor",

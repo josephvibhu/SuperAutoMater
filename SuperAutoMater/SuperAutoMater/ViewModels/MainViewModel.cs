@@ -8,6 +8,7 @@ using System.Text;
 using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Input;
+using System.Windows.Media;
 using SuperAutoMater.Wpf.Services;
 
 namespace SuperAutoMater.Wpf.ViewModels
@@ -38,6 +39,7 @@ namespace SuperAutoMater.Wpf.ViewModels
         private string _statusBadge = "○";
         private bool _isPassed = false;
         private bool _isActive = false;
+        private bool _isApplicable = true;
 
         public string Key { get; set; }
         public string Title { get; set; }
@@ -65,6 +67,12 @@ namespace SuperAutoMater.Wpf.ViewModels
         {
             get => _isActive;
             set { _isActive = value; OnPropertyChanged(); }
+        }
+
+        public bool IsApplicable
+        {
+            get => _isApplicable;
+            set { _isApplicable = value; OnPropertyChanged(); }
         }
 
         public event PropertyChangedEventHandler PropertyChanged;
@@ -131,6 +139,41 @@ namespace SuperAutoMater.Wpf.ViewModels
         public string PrimaryDriveModel => ActiveDrive?.Model ?? (_hw.MemoryStorage?.PrimaryDriveModel ?? "Primary Drive");
         public string HealthBadge => $"{ActiveDrive?.HdsHealth ?? 100}% HEALTH";
         public string SpecHeader => $"{RamSummary} · {StorageSummary}";
+
+        // RAM Topology & Channel Mode (1A)
+        public string RamChannelBadge => _hw.MemoryStorage?.Topology?.StatusBadge ?? "SINGLE-CHANNEL";
+        public string RamChannelDetail => _hw.MemoryStorage?.Topology?.StatusDetail ?? "";
+        public string RamChannelAccentHex => _hw.MemoryStorage?.Topology?.AccentHex ?? "#D29922";
+        public SolidColorBrush RamChannelBorderBrush => new SolidColorBrush((Color)ColorConverter.ConvertFromString(RamChannelAccentHex));
+        public bool IsSingleChannelBottleneck => _hw.MemoryStorage?.Topology?.IsSingleChannelBottleneck ?? false;
+
+        // Thermal Cool-Down Decay & Airflow (2A)
+        public string ThermalDecayVerdict => ThermalProfilerService.Instance.GetCurrentResult().RadiatorAirflowVerdict;
+        public string ThermalDecayBadge => ThermalProfilerService.Instance.GetCurrentResult().RadiatorAirflowBadge;
+        public string ThermalDecayAccentHex => ThermalProfilerService.Instance.GetCurrentResult().RadiatorAirflowAccentHex;
+        public double ThermalDecayHalfLifeSec => ThermalProfilerService.Instance.GetCurrentResult().DecayHalfLifeSeconds;
+
+        // Webcam Optics & Shutter (3A)
+        private string _webcamOpticsBadge = "✓ OPTICS NOMINAL";
+        public string WebcamOpticsBadge
+        {
+            get => _webcamOpticsBadge;
+            set { _webcamOpticsBadge = value; OnPropertyChanged(); }
+        }
+
+        private string _webcamOpticsDetail = "Lens clarity and sensor dynamic range nominal.";
+        public string WebcamOpticsDetail
+        {
+            get => _webcamOpticsDetail;
+            set { _webcamOpticsDetail = value; OnPropertyChanged(); }
+        }
+
+        private string _webcamOpticsAccentHex = "#3FB950";
+        public string WebcamOpticsAccentHex
+        {
+            get => _webcamOpticsAccentHex;
+            set { _webcamOpticsAccentHex = value; OnPropertyChanged(); }
+        }
 
         // 3-Source Storage Telemetry & Multi-Drive Switching
         public ObservableCollection<StorageDriveDetail> AvailableDrives { get; } = new ObservableCollection<StorageDriveDetail>();
@@ -251,6 +294,48 @@ namespace SuperAutoMater.Wpf.ViewModels
         public string BatteryCellBalanceStatus => _hw.BatteryTelemetry?.CellBalanceStatus ?? "✓ CELLS BALANCED NOMINAL";
         public string BatteryCellBalanceBadge => _hw.BatteryTelemetry?.CellBalanceBadge ?? "✓ BALANCED";
         public string BatteryCellBalanceAccentHex => _hw.BatteryTelemetry?.CellBalanceAccentHex ?? "#3FB950";
+
+        // Battery Authenticity & OEM/Clone Signature
+        public string BatteryAuthenticityBadge => _hw.BatteryTelemetry?.AuthenticityBadge ?? "🛡️ OEM GENUINE";
+        public string BatteryAuthenticityDetails => _hw.BatteryTelemetry?.AuthenticityDetails ?? "Verified OEM Supplier";
+        public string BatteryAuthenticityAccentHex => _hw.BatteryTelemetry?.AuthenticityAccentHex ?? "#3FB950";
+
+        // Auto-Advance Bench Pipeline Mode
+        private bool _isAutoAdvanceEnabled = true;
+        public bool IsAutoAdvanceEnabled
+        {
+            get => _isAutoAdvanceEnabled;
+            set
+            {
+                _isAutoAdvanceEnabled = value;
+                OnPropertyChanged();
+                OnPropertyChanged(nameof(AutoAdvanceStatusText));
+                OnPropertyChanged(nameof(AutoAdvanceBadgeColor));
+            }
+        }
+        public string AutoAdvanceStatusText => _isAutoAdvanceEnabled ? "AUTO-ADVANCE ON" : "AUTO-ADVANCE OFF";
+        public string AutoAdvanceBadgeColor => _isAutoAdvanceEnabled ? "#3FB950" : "#8B949E";
+
+        // Battery Load Sag Test Properties
+        private bool _isBatteryLoadTesting = false;
+        private string _batterySagSummary = "Ready for 15s load sag test.";
+        private string _batterySagAccentHex = "#3FB950";
+
+        public bool IsBatteryLoadTesting
+        {
+            get => _isBatteryLoadTesting;
+            set { _isBatteryLoadTesting = value; OnPropertyChanged(); }
+        }
+        public string BatterySagSummary
+        {
+            get => _batterySagSummary;
+            set { _batterySagSummary = value; OnPropertyChanged(); }
+        }
+        public string BatterySagAccentHex
+        {
+            get => _batterySagAccentHex;
+            set { _batterySagAccentHex = value; OnPropertyChanged(); }
+        }
 
         // Wireless & RF Telemetry (Wi-Fi + Bluetooth)
         public string WifiSsid => _hw.NetworkTelemetry?.Ssid ?? "Offline";
@@ -528,7 +613,7 @@ namespace SuperAutoMater.Wpf.ViewModels
                 }
                 sb.AppendLine($"CPU:         {CpuName}");
                 sb.AppendLine($"CORES/FREQ:  {CoreSummary} · {ClockSummary}");
-                sb.AppendLine($"MEMORY:      {RamSummary}");
+                sb.AppendLine($"MEMORY:      {RamSummary} [{RamChannelBadge}]");
                 sb.AppendLine($"STORAGE:     {PrimaryDriveModel} ({StorageSummary})");
                 sb.AppendLine($"DRIVE SMART: {HealthBadge} · 0 Bad Sectors");
                 sb.AppendLine($"SSD TBW:     {TbwDisplaySummary}");
@@ -537,6 +622,10 @@ namespace SuperAutoMater.Wpf.ViewModels
                 if (thm.ConditionCode != "IDLE" && thm.ConditionCode != "STANDBY")
                 {
                     sb.AppendLine($"THERMAL:     {thm.ConditionSummary}");
+                    if (thm.DecayHalfLifeSeconds > 0)
+                    {
+                        sb.AppendLine($"AIRFLOW:     {thm.RadiatorAirflowBadge} ({thm.RadiatorAirflowVerdict})");
+                    }
                 }
                 sb.AppendLine($"BATTERY:     {BatteryIntegrityBadge} · {BatteryWearSummary}");
                 sb.AppendLine($"CELL STATUS: {BatteryCellTopology} · {BatteryCellBalanceStatus}");
@@ -555,7 +644,7 @@ namespace SuperAutoMater.Wpf.ViewModels
                 sb.AppendLine($"★ [{Grade}] {Manufacturer} {Model} Refurbished Business Laptop");
                 sb.AppendLine($"• Condition: {Grade} ({CosmeticDefectsSummary})");
                 sb.AppendLine($"• Processor: {CpuName} ({CoreSummary})");
-                sb.AppendLine($"• RAM: {RamSummary}");
+                sb.AppendLine($"• RAM: {RamSummary} ({RamChannelBadge})");
                 sb.AppendLine($"• Storage: {PrimaryDriveModel} ({StorageSummary}) - {HealthBadge} (TBW: {TbwWrittenTb:F1}TB / {TbwRatedEnduranceTb}TBW)");
                 sb.AppendLine($"• Battery: {BatteryIntegrityBadge} ({BatteryWearSummary} · {BatteryCellTopology})");
                 sb.AppendLine($"• Graphics: {GpuName} ({GpuVram})");
@@ -581,7 +670,8 @@ namespace SuperAutoMater.Wpf.ViewModels
                 OnPropertyChanged(nameof(ECommerceListingText));
             }
         }
-        public string PipelineStatusText => $"{_passCount}/{(TestPipeline.Count > 0 ? TestPipeline.Count : 9)} PASSED";
+        public int RequiredTestCount => TestPipeline.Count(t => t.IsApplicable);
+        public string PipelineStatusText => $"{_passCount}/{(RequiredTestCount > 0 ? RequiredTestCount : 9)} PASSED";
 
         public int BatteryVoltageMv => _hw.BatteryTelemetry?.VoltageMv ?? 12300;
         public int CpuTempC => _hw.CpuTelemetry?.TemperatureC ?? 40;
@@ -666,6 +756,9 @@ namespace SuperAutoMater.Wpf.ViewModels
         private void InitTestPipeline()
         {
             TestPipeline.Add(new DiagnosticTestItem { Key = "Display", Title = "DISPLAY / PANEL TEST", HotkeyText = "[F1]" });
+            // The workflow skips this item on non-touch devices, but it must exist so a
+            // successful digitizer run is recorded independently from panel validation.
+            TestPipeline.Add(new DiagnosticTestItem { Key = "Touchscreen", Title = "TOUCHSCREEN / DIGITIZER", HotkeyText = "[AUTO]" });
             TestPipeline.Add(new DiagnosticTestItem { Key = "Audio", Title = "AUDIO / STEREO SWEEP", HotkeyText = "[F2]" });
             TestPipeline.Add(new DiagnosticTestItem { Key = "Camera", Title = "WEBCAM & MIC ARRAY", HotkeyText = "[F3]" });
             TestPipeline.Add(new DiagnosticTestItem { Key = "Keyboard", Title = "KEYBOARD & TRACKPAD", HotkeyText = "[READY]" });
@@ -686,9 +779,9 @@ namespace SuperAutoMater.Wpf.ViewModels
                 item.IsActive = match;
                 if (match && !item.IsPassed)
                 {
-                    item.StatusBadge = "▶";
+                    item.StatusBadge = item.IsApplicable ? "▶" : "—";
                 }
-                else if (!item.IsPassed)
+                else if (!item.IsPassed && item.IsApplicable)
                 {
                     item.StatusBadge = "○";
                 }
@@ -698,8 +791,31 @@ namespace SuperAutoMater.Wpf.ViewModels
         public async Task RefreshTelemetryAsync()
         {
             await _hw.InitializeAsync();
+            UpdateTestApplicability();
             SyncCollections();
             OnPropertyChanged("");
+        }
+
+        private void UpdateTestApplicability()
+        {
+            var touchscreenTest = TestPipeline.FirstOrDefault(t =>
+                t.Key.Equals("Touchscreen", StringComparison.OrdinalIgnoreCase));
+            if (touchscreenTest == null) return;
+
+            touchscreenTest.IsApplicable = HasTouchscreen;
+            if (!touchscreenTest.IsApplicable && !touchscreenTest.IsPassed)
+            {
+                touchscreenTest.IsActive = false;
+                touchscreenTest.Status = "NOT APPLICABLE";
+                touchscreenTest.StatusBadge = "—";
+            }
+            else if (touchscreenTest.IsApplicable && touchscreenTest.Status == "NOT APPLICABLE")
+            {
+                touchscreenTest.Status = "PENDING";
+                touchscreenTest.StatusBadge = "○";
+            }
+
+            OnPropertyChanged(nameof(PipelineStatusText));
         }
 
         public void MarkTestPassed(string key)
@@ -712,6 +828,7 @@ namespace SuperAutoMater.Wpf.ViewModels
                     {
                         test.IsPassed = true;
                         test.IsActive = false;
+                        test.Status = "PASSED";
                         test.StatusBadge = "✓";
                         PassCount++;
                     }
@@ -724,10 +841,11 @@ namespace SuperAutoMater.Wpf.ViewModels
         {
             foreach (var test in TestPipeline)
             {
-                if (!test.IsPassed)
+                if (test.IsApplicable && !test.IsPassed)
                 {
                     test.IsPassed = true;
                     test.IsActive = false;
+                    test.Status = "PASSED";
                     test.StatusBadge = "✓";
                     PassCount++;
                     break;

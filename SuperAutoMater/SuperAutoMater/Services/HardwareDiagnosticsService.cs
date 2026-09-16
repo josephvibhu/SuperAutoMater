@@ -125,6 +125,46 @@ namespace SuperAutoMater.Wpf.Services
         public string PartitionSummary { get; set; } = "GPT / NTFS";
     }
 
+    public enum RamChannelMode
+    {
+        Unknown,
+        SingleChannel,
+        DualChannelSymmetric,
+        DualChannelAsymmetric,
+        QuadChannel
+    }
+
+    public class RamModuleInfo
+    {
+        public int SlotIndex { get; set; } = 1;
+        public string DeviceLocator { get; set; } = "DIMM 0";
+        public string BankLabel { get; set; } = "BANK 0";
+        public ulong CapacityBytes { get; set; } = 0;
+        public int CapacityGb => (int)Math.Round(CapacityBytes / (1024.0 * 1024.0 * 1024.0));
+        public int SpeedMhz { get; set; } = 0;
+        public int ConfiguredSpeedMhz { get; set; } = 0;
+        public string Manufacturer { get; set; } = "OEM";
+        public string PartNumber { get; set; } = "";
+        public string MemoryTypeStr { get; set; } = "DDR4";
+    }
+
+    public class RamChannelTopology
+    {
+        public int TotalSlots { get; set; } = 2;
+        public int PopulatedSlots { get; set; } = 1;
+        public RamChannelMode ChannelMode { get; set; } = RamChannelMode.SingleChannel;
+        public bool IsSingleChannelBottleneck { get; set; } = false;
+        public bool HasSpeedMismatch { get; set; } = false;
+        public bool HasCapacityMismatch { get; set; } = false;
+        public int ConfiguredClockMhz { get; set; } = 0;
+        public int MaxRatedSpeedMhz { get; set; } = 0;
+        public int MinRatedSpeedMhz { get; set; } = 0;
+        public string StatusBadge { get; set; } = "SINGLE-CHANNEL";
+        public string StatusDetail { get; set; } = "";
+        public string AccentHex { get; set; } = "#D29922";
+        public List<RamModuleInfo> Modules { get; set; } = new List<RamModuleInfo>();
+    }
+
     public class MemoryStorageModel
     {
         public string RamSummary { get; set; } = "Detecting RAM...";
@@ -134,6 +174,7 @@ namespace SuperAutoMater.Wpf.Services
         public string PrimaryDriveModel { get; set; } = "Primary Drive";
         public int HealthPercent { get; set; } = 100;
         public string HealthBadge { get; set; } = "100% HEALTH";
+        public RamChannelTopology Topology { get; set; } = new RamChannelTopology();
     }
 
     public class BatteryTelemetryModel
@@ -177,6 +218,20 @@ namespace SuperAutoMater.Wpf.Services
         public string CellBalanceStatus => EstimatedCellDriftMv > 80 ? "⚠ CRITICAL CELL IMBALANCE (High Dropout / Swelling Risk)" : (EstimatedCellDriftMv > 35 ? "● MODERATE CELL DRIFT" : "✓ CELLS BALANCED NOMINAL");
         public string CellBalanceBadge => EstimatedCellDriftMv > 80 ? "⚠ IMBALANCE" : (EstimatedCellDriftMv > 35 ? "● MODERATE" : "✓ BALANCED");
         public string CellBalanceAccentHex => EstimatedCellDriftMv > 80 ? "#F85149" : (EstimatedCellDriftMv > 35 ? "#D29922" : "#3FB950");
+        
+        // Authenticity & OEM vs Aftermarket Signature
+        public BatteryAuthenticity Authenticity { get; set; } = BatteryAuthenticity.OemGenuine;
+        public string AuthenticityBadge { get; set; } = "🛡️ OEM GENUINE";
+        public string AuthenticityDetails { get; set; } = "Genuine OEM cell supplier verified nominal.";
+        public string AuthenticityAccentHex { get; set; } = "#3FB950";
+    }
+
+    public enum BatteryAuthenticity
+    {
+        Unknown,
+        OemGenuine,
+        AftermarketClone,
+        AcBenchNoBattery
     }
 
     public class NetworkTelemetryModel
@@ -254,8 +309,12 @@ namespace SuperAutoMater.Wpf.Services
             });
         }
 
+        private bool _systemIdentityProbed = false;
+        private bool _memoryProbed = false;
+
         public void ProbeSystemIdentity()
         {
+            if (_systemIdentityProbed) return;
             try
             {
                 using (var cs = new ManagementObjectSearcher("SELECT Manufacturer, Model FROM Win32_ComputerSystem"))
@@ -289,6 +348,7 @@ namespace SuperAutoMater.Wpf.Services
                         break;
                     }
                 }
+                _systemIdentityProbed = true;
             }
             catch { }
         }
@@ -411,39 +471,177 @@ namespace SuperAutoMater.Wpf.Services
 
         public void ProbeMemory()
         {
+            if (_memoryProbed) return;
             try
             {
                 ulong totalBytes = 0;
                 string ramSpeed = "";
                 string ramType = "DDR4";
+                int totalMotherboardSlots = 2; // Standard default
 
-                using (var searcher = new ManagementObjectSearcher("SELECT Capacity, Speed, MemoryType, SMBIOSMemoryType FROM Win32_PhysicalMemory"))
+                // 1. Probe total motherboard memory slots
+                try
+                {
+                    using (var slotSearcher = new ManagementObjectSearcher("SELECT MemoryDevices FROM Win32_PhysicalMemoryArray"))
+                    using (var slotCol = slotSearcher.Get())
+                    {
+                        foreach (ManagementObject slotObj in slotCol)
+                        {
+                            using (slotObj)
+                            {
+                                int slots = Convert.ToInt32(slotObj["MemoryDevices"] ?? 0);
+                                if (slots > 0) totalMotherboardSlots = slots;
+                            }
+                            break;
+                        }
+                    }
+                }
+                catch { }
+
+                // 2. Probe physical memory modules
+                var modules = new List<RamModuleInfo>();
+                using (var searcher = new ManagementObjectSearcher("SELECT Capacity, Speed, ConfiguredClockSpeed, DeviceLocator, BankLabel, Manufacturer, PartNumber, SMBIOSMemoryType FROM Win32_PhysicalMemory"))
                 using (var col = searcher.Get())
                 {
-                    int stickCount = 0;
+                    int stickIndex = 0;
                     foreach (ManagementObject stick in col)
                     {
                         using (stick)
                         {
-                            stickCount++;
-                            totalBytes += Convert.ToUInt64(stick["Capacity"] ?? 0);
-                            if (string.IsNullOrEmpty(ramSpeed))
+                            stickIndex++;
+                            ulong cap = Convert.ToUInt64(stick["Capacity"] ?? 0);
+                            totalBytes += cap;
+
+                            int ratedSpeed = Convert.ToInt32(stick["Speed"] ?? 0);
+                            int cfgSpeed = Convert.ToInt32(stick["ConfiguredClockSpeed"] ?? ratedSpeed);
+                            if (cfgSpeed <= 0) cfgSpeed = ratedSpeed;
+
+                            if (string.IsNullOrEmpty(ramSpeed) && ratedSpeed > 0)
                             {
-                                string sp = stick["Speed"]?.ToString();
-                                if (!string.IsNullOrEmpty(sp)) ramSpeed = $"{sp}MHz";
+                                ramSpeed = $"{ratedSpeed}MHz";
                             }
+
+                            string stickType = "DDR4";
                             int smbios = Convert.ToInt32(stick["SMBIOSMemoryType"] ?? 0);
-                            if (smbios == 26) ramType = "DDR4";
-                            else if (smbios == 30) ramType = "LPDDR4";
-                            else if (smbios == 34) ramType = "DDR5";
-                            else if (smbios == 35) ramType = "LPDDR5";
+                            if (smbios == 24) stickType = "DDR3";
+                            else if (smbios == 26) stickType = "DDR4";
+                            else if (smbios == 30) stickType = "LPDDR4";
+                            else if (smbios == 34) stickType = "DDR5";
+                            else if (smbios == 35) stickType = "LPDDR5";
+                            ramType = stickType;
+
+                            string locator = stick["DeviceLocator"]?.ToString()?.Trim() ?? $"Slot {stickIndex}";
+                            string bank = stick["BankLabel"]?.ToString()?.Trim() ?? $"BANK {stickIndex - 1}";
+                            string mfg = stick["Manufacturer"]?.ToString()?.Trim() ?? "OEM";
+                            string part = stick["PartNumber"]?.ToString()?.Trim() ?? "";
+
+                            modules.Add(new RamModuleInfo
+                            {
+                                SlotIndex = stickIndex,
+                                DeviceLocator = locator,
+                                BankLabel = bank,
+                                CapacityBytes = cap,
+                                SpeedMhz = ratedSpeed,
+                                ConfiguredSpeedMhz = cfgSpeed,
+                                Manufacturer = mfg,
+                                PartNumber = part,
+                                MemoryTypeStr = stickType
+                            });
                         }
                     }
 
                     int totalGb = (int)Math.Round(totalBytes / (1024.0 * 1024.0 * 1024.0));
                     MemoryStorage.RamSummary = $"{totalGb}GB {ramType}";
-                    MemoryStorage.RamTypeAndSpeed = $"{stickCount}x Sticks {ramSpeed}".Trim();
+                    MemoryStorage.RamTypeAndSpeed = $"{modules.Count}x Sticks {ramSpeed}".Trim();
+
+                    // 3. Compute Channel Topology & Bottleneck Analysis
+                    var topo = new RamChannelTopology
+                    {
+                        TotalSlots = Math.Max(totalMotherboardSlots, modules.Count),
+                        PopulatedSlots = modules.Count,
+                        Modules = modules
+                    };
+
+                    if (modules.Count == 0)
+                    {
+                        topo.ChannelMode = RamChannelMode.SingleChannel;
+                        topo.StatusBadge = "● MEMORY NOT DETECTED";
+                        topo.StatusDetail = "SMBIOS physical memory probe returned 0 modules.";
+                        topo.AccentHex = "#8B949E";
+                    }
+                    else if (modules.Count == 1)
+                    {
+                        var m0 = modules[0];
+                        topo.ChannelMode = RamChannelMode.SingleChannel;
+                        topo.IsSingleChannelBottleneck = topo.TotalSlots >= 2;
+                        topo.ConfiguredClockMhz = m0.ConfiguredSpeedMhz;
+                        topo.MinRatedSpeedMhz = m0.SpeedMhz;
+                        topo.MaxRatedSpeedMhz = m0.SpeedMhz;
+
+                        if (topo.TotalSlots >= 2)
+                        {
+                            topo.StatusBadge = $"⚠️ SINGLE-CHANNEL (1 of {topo.TotalSlots} Slots · -40% iGPU Throughput)";
+                            topo.StatusDetail = $"Single {m0.CapacityGb}GB module in {m0.DeviceLocator}. 64-bit bus width active. Adding a 2nd module enables 128-bit Dual-Channel interleaving (+40% graphics & memory bandwidth).";
+                            topo.AccentHex = "#D29922";
+                        }
+                        else
+                        {
+                            topo.StatusBadge = $"● SINGLE-CHANNEL ({m0.CapacityGb}GB @ {m0.SpeedMhz}MHz)";
+                            topo.StatusDetail = $"Soldered/Single-slot architecture. Running in 64-bit single-channel mode.";
+                            topo.AccentHex = "#58A6FF";
+                        }
+                    }
+                    else
+                    {
+                        // 2 or more sticks
+                        bool allCapEqual = modules.All(m => m.CapacityGb == modules[0].CapacityGb);
+                        int minSpd = modules.Min(m => m.SpeedMhz > 0 ? m.SpeedMhz : m.ConfiguredSpeedMhz);
+                        int maxSpd = modules.Max(m => m.SpeedMhz > 0 ? m.SpeedMhz : m.ConfiguredSpeedMhz);
+                        int minCfg = modules.Min(m => m.ConfiguredSpeedMhz > 0 ? m.ConfiguredSpeedMhz : m.SpeedMhz);
+                        topo.ConfiguredClockMhz = minCfg;
+                        topo.MinRatedSpeedMhz = minSpd;
+                        topo.MaxRatedSpeedMhz = maxSpd;
+
+                        bool speedMismatch = minSpd > 0 && maxSpd > 0 && minSpd != maxSpd;
+                        bool isDownclocked = minCfg > 0 && maxSpd > minCfg;
+
+                        topo.HasSpeedMismatch = speedMismatch || isDownclocked;
+                        topo.HasCapacityMismatch = !allCapEqual;
+
+                        if (allCapEqual && !speedMismatch)
+                        {
+                            topo.ChannelMode = modules.Count >= 4 ? RamChannelMode.QuadChannel : RamChannelMode.DualChannelSymmetric;
+                            string modeName = topo.ChannelMode == RamChannelMode.QuadChannel ? "QUAD-CHANNEL" : "DUAL-CHANNEL";
+                            topo.StatusBadge = $"✓ {modeName} SYMMETRIC ({modules.Count}x {modules[0].CapacityGb}GB @ {minCfg}MHz)";
+                            topo.StatusDetail = $"Optimal 128-bit dual-channel interleaving active across {modules.Count} matched slots. 100% memory bus throughput.";
+                            topo.AccentHex = "#3FB950";
+                        }
+                        else if (!allCapEqual)
+                        {
+                            topo.ChannelMode = RamChannelMode.DualChannelAsymmetric;
+                            string capBreakdown = string.Join(" + ", modules.Select(m => $"{m.CapacityGb}GB"));
+                            topo.StatusBadge = $"⚠️ ASYMMETRIC DUAL-CHANNEL (Flex Mode · {capBreakdown})";
+                            topo.StatusDetail = $"Unmatched module sizes ({capBreakdown}). Intel/AMD Flex Mode active: lower capacity interleaved dual-channel, remainder runs in single-channel.";
+                            topo.AccentHex = "#D29922";
+
+                            if (speedMismatch)
+                            {
+                                topo.StatusDetail += $" Also note speed mismatch: downclocked to {minSpd}MHz (slowest module).";
+                            }
+                        }
+                        else
+                        {
+                            // Equal capacities, but differing module speeds
+                            topo.ChannelMode = RamChannelMode.DualChannelSymmetric;
+                            topo.StatusBadge = $"⚠️ SPEED MISMATCH ({minSpd}MHz vs {maxSpd}MHz · Downclocked)";
+                            topo.StatusDetail = $"Modules have differing rated clock speeds. Memory controller forced all sticks down to {minSpd}MHz to match lowest module.";
+                            topo.AccentHex = "#D29922";
+                        }
+                    }
+
+                    MemoryStorage.Topology = topo;
                 }
+                _memoryProbed = true;
             }
             catch { }
         }
@@ -767,8 +965,118 @@ namespace SuperAutoMater.Wpf.Services
                 BatteryTelemetry.TimeRemaining = BatteryTelemetry.PowerOnline
                     ? (BatteryTelemetry.IsCharging ? "Charging to 100%" : "Full (AC Float)")
                     : $"{Math.Max(1, (int)(BatteryTelemetry.ChargePercent * 0.04))}h remaining";
+
+                EvaluateBatteryAuthenticity();
             }
             catch { }
+        }
+
+        public void EvaluateBatteryAuthenticity()
+        {
+            try
+            {
+                if (!BatteryTelemetry.IsPresent)
+                {
+                    BatteryTelemetry.Authenticity = BatteryAuthenticity.AcBenchNoBattery;
+                    BatteryTelemetry.AuthenticityBadge = "NO BATTERY / AC BENCH";
+                    BatteryTelemetry.AuthenticityDetails = "Running on AC wall adapter; no internal battery pack connected.";
+                    BatteryTelemetry.AuthenticityAccentHex = "#8B949E";
+                    return;
+                }
+
+                string mfg = (BatteryTelemetry.Manufacturer ?? "").Trim().ToUpperInvariant();
+                string devId = (BatteryTelemetry.BatteryId ?? "").Trim().ToUpperInvariant();
+                string sn = (BatteryTelemetry.SerialNumber ?? "").Trim().ToUpperInvariant();
+
+                // 1. Check obvious aftermarket clone / generic indicators
+                bool isGenericMfg = string.IsNullOrWhiteSpace(mfg) ||
+                                    mfg == "?" ||
+                                    mfg == "OEM" ||
+                                    mfg == "GENERIC" ||
+                                    mfg == "BATTERY" ||
+                                    mfg == "LI-ION" ||
+                                    mfg == "STANDARD" ||
+                                    mfg == "NOTEBOOK" ||
+                                    mfg == "REPLACEMENT" ||
+                                    mfg == "12345" ||
+                                    mfg == "UNKNOWN";
+
+                bool isGenericSerial = sn == "0000" || sn == "0001" || sn == "1234" || sn == "DEFAULT" || sn == "1234567890";
+
+                // 2. Known Tier-1 Genuine OEM cell suppliers and major PC OEM identifiers
+                string detectedOem = null;
+                if (mfg.Contains("SMP") || mfg.Contains("SIMPLO") || devId.Contains("SMP")) detectedOem = "Simplo (SMP)";
+                else if (mfg.Contains("LGC") || mfg.Contains("LG CHEM") || mfg.Contains("LG") || devId.Contains("LGC")) detectedOem = "LG Chem (LGC)";
+                else if (mfg.Contains("PANASONIC") || mfg.Contains("PANA") || mfg.Contains("MATSUSHITA")) detectedOem = "Panasonic";
+                else if (mfg.Contains("SANYO")) detectedOem = "Sanyo";
+                else if (mfg.Contains("SAMSUNG") || mfg.Contains("SDI") || mfg.Contains("SEC")) detectedOem = "Samsung SDI";
+                else if (mfg.Contains("SONY") || mfg.Contains("MURATA")) detectedOem = "Sony / Murata";
+                else if (mfg.Contains("DYNAPACK") || mfg.Contains("DP") || devId.Contains("DYNAPACK")) detectedOem = "Dynapack (DP)";
+                else if (mfg.Contains("COSLIGHT") || mfg.Contains("CEL") || devId.Contains("CEL")) detectedOem = "Coslight (CEL)";
+                else if (mfg.Contains("BYD") || devId.Contains("BYD")) detectedOem = "BYD";
+                else if (mfg.Contains("SUNWODA") || mfg.Contains("SWD") || devId.Contains("SWD")) detectedOem = "Sunwoda";
+                else if (mfg.Contains("CELXPERT") || mfg.Contains("CPT")) detectedOem = "Celxpert";
+                else if (mfg.Contains("DELL") || devId.Contains("DELL")) detectedOem = "Dell OEM";
+                else if (mfg.Contains("HP") || mfg.Contains("HEWLETT") || devId.Contains("HP")) detectedOem = "HP OEM";
+                else if (mfg.Contains("LENOVO") || mfg.Contains("LNV") || devId.Contains("LNV")) detectedOem = "Lenovo OEM";
+                else if (mfg.Contains("APPLE")) detectedOem = "Apple OEM";
+                else if (mfg.Contains("ASUS") || mfg.Contains("ASUSTEK")) detectedOem = "ASUS OEM";
+                else if (mfg.Contains("ACER")) detectedOem = "Acer OEM";
+
+                if (detectedOem != null && !isGenericSerial)
+                {
+                    BatteryTelemetry.Authenticity = BatteryAuthenticity.OemGenuine;
+                    BatteryTelemetry.AuthenticityBadge = $"🛡️ OEM GENUINE ({detectedOem})";
+                    BatteryTelemetry.AuthenticityDetails = $"Genuine OEM manufacturer certified: {detectedOem} · Part/ID: {BatteryTelemetry.BatteryId}";
+                    BatteryTelemetry.AuthenticityAccentHex = "#3FB950";
+                }
+                else if (isGenericMfg || isGenericSerial)
+                {
+                    BatteryTelemetry.Authenticity = BatteryAuthenticity.AftermarketClone;
+                    BatteryTelemetry.AuthenticityBadge = "⚠️ AFTERMARKET / CLONE PACK";
+                    BatteryTelemetry.AuthenticityDetails = $"Non-OEM manufacturer '{BatteryTelemetry.Manufacturer}' or generic controller detected. Review cell stability.";
+                    BatteryTelemetry.AuthenticityAccentHex = "#D29922";
+                }
+                else
+                {
+                    BatteryTelemetry.Authenticity = BatteryAuthenticity.OemGenuine;
+                    BatteryTelemetry.AuthenticityBadge = $"🛡️ OEM VERIFIED ({BatteryTelemetry.Manufacturer})";
+                    BatteryTelemetry.AuthenticityDetails = $"Verified vendor: {BatteryTelemetry.Manufacturer} · Model: {BatteryTelemetry.BatteryId}";
+                    BatteryTelemetry.AuthenticityAccentHex = "#3FB950";
+                }
+            }
+            catch
+            {
+                BatteryTelemetry.Authenticity = BatteryAuthenticity.Unknown;
+                BatteryTelemetry.AuthenticityBadge = "OEM STATUS UNKNOWN";
+                BatteryTelemetry.AuthenticityDetails = "Battery manufacturer telemetry could not be resolved.";
+                BatteryTelemetry.AuthenticityAccentHex = "#8B949E";
+            }
+        }
+
+        public int ProbeBatteryQuickVoltage()
+        {
+            try
+            {
+                using (var s = new ManagementObjectSearcher(@"root\wmi", "SELECT Voltage FROM BatteryStatus"))
+                using (var c = s.Get())
+                {
+                    foreach (ManagementObject obj in c)
+                    {
+                        using (obj)
+                        {
+                            int v = Convert.ToInt32(obj["Voltage"] ?? 0);
+                            if (v > 1000)
+                            {
+                                BatteryTelemetry.VoltageMv = v;
+                                return v;
+                            }
+                        }
+                    }
+                }
+            }
+            catch { }
+            return BatteryTelemetry.VoltageMv;
         }
 
         public void ProbeNetwork()

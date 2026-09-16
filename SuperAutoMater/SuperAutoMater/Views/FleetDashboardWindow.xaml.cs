@@ -1,5 +1,6 @@
 using System;
 using System.Diagnostics;
+using System.IO;
 using System.Linq;
 using System.Windows;
 using System.Windows.Input;
@@ -120,6 +121,36 @@ namespace SuperAutoMater.Wpf.Views
         private void BtnForceBeacon_Click(object sender, RoutedEventArgs e)
         {
             RefreshDashboard();
+        }
+
+        private void BtnLaunchSuperManager_Click(object sender, RoutedEventArgs e)
+        {
+            try
+            {
+                string baseDir = AppDomain.CurrentDomain.BaseDirectory;
+                string[] candidates = new[]
+                {
+                    Path.Combine(baseDir, "SuperManager.exe"),
+                    Path.Combine(baseDir, "..", "SuperManager", "SuperManager.exe"),
+                    Path.Combine(baseDir, "..", "..", "..", "..", "SuperManager", "bin", "Release", "net10.0-windows", "win-x64", "SuperManager.exe"),
+                    Path.Combine(baseDir, "..", "..", "..", "..", "SuperManager", "bin", "Debug", "net10.0-windows", "win-x64", "SuperManager.exe"),
+                    Path.Combine(baseDir, "..", "Releases", "SuperManager", "SuperManager.exe")
+                };
+
+                string found = candidates.FirstOrDefault(File.Exists);
+                if (found != null)
+                {
+                    Process.Start(new ProcessStartInfo { FileName = found, UseShellExecute = true });
+                }
+                else
+                {
+                    MessageBox.Show("SuperManager executable not found.\nPlease ensure SuperManager.exe is compiled or placed in the application directory.", "SuperManager Launcher", MessageBoxButton.OK, MessageBoxImage.Information);
+                }
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Could not launch SuperManager: {ex.Message}", "Launch Error", MessageBoxButton.OK, MessageBoxImage.Error);
+            }
         }
 
         private void BtnClose_Click(object sender, RoutedEventArgs e)

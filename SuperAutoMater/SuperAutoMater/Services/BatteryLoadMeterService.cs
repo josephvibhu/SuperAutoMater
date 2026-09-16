@@ -1,4 +1,6 @@
 using System;
+using System.Threading;
+using System.Threading.Tasks;
 
 namespace SuperAutoMater.Wpf.Services
 {
@@ -15,7 +17,9 @@ namespace SuperAutoMater.Wpf.Services
         public string CellBalanceStatus => EstimatedCellDriftMv > 80 ? "⚠ CRITICAL CELL IMBALANCE" : (EstimatedCellDriftMv > 35 ? "● MODERATE CELL DRIFT" : "✓ CELLS BALANCED NOMINAL");
         public string CellIntegrityCode { get; set; } = "NOMINAL";
         public string StatusSummary { get; set; } = "Cell Voltage Stable";
+        public string VerdictBadge => VoltageSagMv >= 900 ? "🚨 HIGH SAG / DEGRADED" : (VoltageSagMv >= 450 ? "⚠ MODERATE SAG" : "✓ VOLTAGE STABLE");
         public string AccentHex { get; set; } = "#3FB950";
+        public int DurationSeconds { get; set; } = 15;
     }
 
     public class BatteryLoadMeterService
@@ -28,6 +32,7 @@ namespace SuperAutoMater.Wpf.Services
         private int _lowestLoadVoltageMv = 0;
         private bool _isMeasuring = false;
 
+        public bool IsRunning { get; private set; } = false;
         public event Action<BatteryLoadResult> LoadMeterUpdated;
 
         private BatteryLoadMeterService() { }
@@ -83,6 +88,77 @@ namespace SuperAutoMater.Wpf.Services
             return ComputeResult();
         }
 
+        /// <summary>
+        /// Runs an autonomous multi-threaded load-step battery stress test for the specified duration (default 15s)
+        /// while sampling battery voltage and calculating dynamic sag and cell drift.
+        /// </summary>
+        public async Task<BatteryLoadResult> RunAutomatedBatteryLoadTestAsync(
+            int durationSeconds,
+            Action<int, int, int, int, string> onProgress,
+            CancellationToken ct = default)
+        {
+            if (IsRunning) return GetCurrentResult();
+            IsRunning = true;
+
+            try
+            {
+                int initialMv = HardwareDiagnosticsService.Instance.ProbeBatteryQuickVoltage();
+                if (initialMv < 5000) initialMv = HardwareDiagnosticsService.Instance.BatteryTelemetry?.VoltageMv ?? 12300;
+                RecordIdleVoltage(initialMv);
+                StartLoadMeasurement(initialMv);
+
+                using var innerCts = CancellationTokenSource.CreateLinkedTokenSource(ct);
+                var token = innerCts.Token;
+
+                // Spin up multi-core CPU workload across threads
+                int threads = Math.Clamp(Environment.ProcessorCount, 2, 8);
+                for (int i = 0; i < threads; i++)
+                {
+                    _ = Task.Run(() =>
+                    {
+                        while (!token.IsCancellationRequested)
+                        {
+                            double x = 0;
+                            for (int j = 0; j < 50000; j++)
+                            {
+                                x += Math.Sqrt(j) * Math.Sin(j);
+                            }
+                        }
+                    }, token);
+                }
+
+                int totalIntervals = durationSeconds * 2; // 500ms intervals
+                for (int step = 1; step <= totalIntervals; step++)
+                {
+                    await Task.Delay(500, token);
+                    if (token.IsCancellationRequested) break;
+
+                    int curMv = HardwareDiagnosticsService.Instance.ProbeBatteryQuickVoltage();
+                    UpdateLoadVoltage(curMv);
+
+                    var currentRes = GetCurrentResult();
+                    int remainingSec = Math.Max(0, durationSeconds - (step / 2));
+                    int percent = (int)Math.Round((step / (double)totalIntervals) * 100);
+
+                    string statusMsg = $"Measuring Load Step ({percent}% · {remainingSec}s left): Terminal {curMv}mV · Sag -{currentRes.VoltageSagMv}mV ({currentRes.PerCellSagMv}mV/cell)";
+                    onProgress?.Invoke(remainingSec, percent, curMv, currentRes.VoltageSagMv, statusMsg);
+                }
+
+                innerCts.Cancel();
+                var finalResult = StopMeasurement();
+                finalResult.DurationSeconds = durationSeconds;
+                return finalResult;
+            }
+            catch
+            {
+                return StopMeasurement();
+            }
+            finally
+            {
+                IsRunning = false;
+            }
+        }
+
         private void NotifyUpdate()
         {
             var res = ComputeResult();
@@ -100,22 +176,22 @@ namespace SuperAutoMater.Wpf.Services
                 LoadVoltageMv = _lowestLoadVoltageMv
             };
 
-            if (res.VoltageSagMv >= 1200)
+            if (res.VoltageSagMv >= 900)
             {
                 res.CellIntegrityCode = "HIGH_SAG_WARNING";
-                res.StatusSummary = $"⚠ HIGH INTERNAL RESISTANCE (ΔV: {res.SagVolts}V drop · Sudden Dropout Risk)";
+                res.StatusSummary = $"🚨 CRITICAL VOLTAGE SAG (ΔV: -{res.VoltageSagMv}mV drop · Weak Cell / Dropout Risk)";
                 res.AccentHex = "#F85149";
             }
-            else if (res.VoltageSagMv >= 500)
+            else if (res.VoltageSagMv >= 450)
             {
                 res.CellIntegrityCode = "MODERATE_SAG";
-                res.StatusSummary = $"Moderate Cell Sag (ΔV: {res.SagVolts}V drop · Aging Cells)";
+                res.StatusSummary = $"⚠ MODERATE VOLTAGE SAG (ΔV: -{res.VoltageSagMv}mV drop · Cell Aging)";
                 res.AccentHex = "#D29922";
             }
             else
             {
                 res.CellIntegrityCode = "NOMINAL";
-                res.StatusSummary = $"✓ CELL INTEGRITY NOMINAL (ΔV: {res.SagVolts}V drop under load)";
+                res.StatusSummary = $"✓ CELL INTEGRITY NOMINAL (ΔV: -{res.VoltageSagMv}mV drop under load)";
                 res.AccentHex = "#3FB950";
             }
 
