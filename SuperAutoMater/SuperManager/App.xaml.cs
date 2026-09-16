@@ -14,6 +14,9 @@ namespace SuperManager
 
             try
             {
+                // Ensure Windows Firewall rules are provisioned
+                SuperAutoMater.Wpf.Core.FirewallHelper.EnsureFirewallRulesAsync();
+
                 // Start background services
                 FleetDiscoveryService.Instance.Start();
                 ManagerWebServer.Instance.Start();

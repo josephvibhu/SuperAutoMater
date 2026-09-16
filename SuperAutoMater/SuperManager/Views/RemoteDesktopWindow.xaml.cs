@@ -20,6 +20,7 @@ namespace SuperManager.Views
         private CancellationTokenSource _cts;
         private int _framesReceived = 0;
         private DateTime _lastFpsCalc = DateTime.UtcNow;
+        private int _consecutiveErrors = 0;
 
         public RemoteDesktopWindow(BenchDevice bench)
         {
@@ -83,6 +84,7 @@ namespace SuperManager.Views
                                     if (OverlayConnecting.Visibility == Visibility.Visible)
                                         OverlayConnecting.Visibility = Visibility.Collapsed;
 
+                                    _consecutiveErrors = 0;
                                     _framesReceived++;
                                     var now = DateTime.UtcNow;
                                     var elapsed = (now - _lastFpsCalc).TotalSeconds;
@@ -90,6 +92,8 @@ namespace SuperManager.Views
                                     {
                                         double fps = _framesReceived / elapsed;
                                         TxtFps.Text = $"{fps:F0} FPS";
+                                        TxtStatus.Text = $"● Live Stream Active ({fps:F0} FPS)";
+                                        TxtStatus.Foreground = System.Windows.Media.Brushes.LightGreen;
                                         _framesReceived = 0;
                                         _lastFpsCalc = now;
                                     }
@@ -113,16 +117,56 @@ namespace SuperManager.Views
                 }
                 catch (Exception ex)
                 {
+                    _consecutiveErrors++;
                     await Dispatcher.InvokeAsync(() =>
                     {
-                        TxtStatus.Text = $"❌ Reconnecting... ({ex.Message})";
-                        TxtStatus.Foreground = System.Windows.Media.Brushes.Red;
+                        if (_consecutiveErrors >= 2)
+                        {
+                            TxtStatus.Text = $"❌ Port {_bench.Port} Unreachable / Firewall Blocked";
+                            TxtStatus.Foreground = System.Windows.Media.Brushes.Red;
+
+                            OverlayConnecting.Visibility = Visibility.Visible;
+                            TxtOverlayIcon.Text = "⚠️";
+                            TxtOverlayTitle.Text = "Unable to Connect to Desktop Stream";
+                            TxtOverlayTitle.Foreground = System.Windows.Media.Brushes.Orange;
+                            TxtOverlayHint.Text = $"Endpoint: http://{_bench.IpAddress}:{_bench.Port}/api/remote/frame";
+                            TxtOverlayDiagnostic.Text = $"Troubleshooting steps for {_bench.MachineName} ({_bench.IpAddress}):\n" +
+                                $"1. Verify SuperAutoMater is running on the bench laptop.\n" +
+                                $"2. Windows Firewall may be blocking inbound Port {_bench.Port}.\n" +
+                                $"   Run 'Fix-Firewall.bat' (as Administrator) on {_bench.MachineName}.\n" +
+                                $"3. Verify both computers are connected to the same local Wi-Fi / subnet.";
+                            TxtOverlayDiagnostic.Visibility = Visibility.Visible;
+                            BtnRetryStream.Visibility = Visibility.Visible;
+                        }
+                        else
+                        {
+                            TxtStatus.Text = $"❌ Connecting... ({ex.Message})";
+                            TxtStatus.Foreground = System.Windows.Media.Brushes.Red;
+                        }
                     });
-                    await Task.Delay(1000, ct);
+                    await Task.Delay(1500, ct);
                 }
 
                 await Task.Delay(40, ct);
             }
+        }
+
+        private void BtnRetryStream_Click(object sender, RoutedEventArgs e)
+        {
+            _consecutiveErrors = 0;
+            TxtOverlayIcon.Text = "🔄";
+            TxtOverlayTitle.Text = "Connecting to live desktop stream...";
+            TxtOverlayTitle.Foreground = System.Windows.Media.Brushes.White;
+            TxtOverlayHint.Text = $"Connecting to http://{_bench.IpAddress}:{_bench.Port}...";
+            TxtOverlayDiagnostic.Visibility = Visibility.Collapsed;
+            BtnRetryStream.Visibility = Visibility.Collapsed;
+            TxtStatus.Text = "● Reconnecting...";
+            TxtStatus.Foreground = System.Windows.Media.Brushes.Orange;
+
+            _cts?.Cancel();
+            _cts?.Dispose();
+            _cts = new CancellationTokenSource();
+            Task.Run(() => StreamLoopAsync(_cts.Token));
         }
 
         #region Mouse & Keyboard Forwarding

@@ -7,6 +7,15 @@ using SuperManager.Models;
 
 namespace SuperManager.Services
 {
+    public class PingDiagnosticsResult
+    {
+        public bool Success { get; set; }
+        public bool IsFirewallBlocked { get; set; }
+        public bool IsHostReachableIcmp { get; set; }
+        public long RoundtripMs { get; set; }
+        public string Message { get; set; } = "";
+    }
+
     public class FleetCommandService
     {
         private static readonly Lazy<FleetCommandService> _instance =
@@ -14,6 +23,7 @@ namespace SuperManager.Services
         public static FleetCommandService Instance => _instance.Value;
 
         private readonly HttpClient _http = new HttpClient { Timeout = TimeSpan.FromSeconds(8) };
+        private readonly HttpClient _pingHttp = new HttpClient { Timeout = TimeSpan.FromMilliseconds(2500) };
 
         private FleetCommandService() { }
 
@@ -25,23 +35,83 @@ namespace SuperManager.Services
             return request;
         }
 
-        public async Task<bool> SendPingAsync(BenchDevice bench)
+        public async Task<PingDiagnosticsResult> SendPingWithDiagnosticsAsync(BenchDevice bench)
         {
-            if (bench == null) return false;
+            if (bench == null)
+                return new PingDiagnosticsResult { Success = false, Message = "Bench device is null." };
+
+            bench.IsIdentified = true;
+            var sw = System.Diagnostics.Stopwatch.StartNew();
+
             try
             {
-                bench.IsIdentified = true;
+                using var cts = new System.Threading.CancellationTokenSource(TimeSpan.FromMilliseconds(2500));
                 using var request = CreateAuthorizedRequest(HttpMethod.Get, bench, "/api/ping");
-                var response = await _http.SendAsync(request);
+                var response = await _pingHttp.SendAsync(request, cts.Token);
+                sw.Stop();
 
-                _ = Task.Delay(3000).ContinueWith(_ => bench.IsIdentified = false);
-                return response.IsSuccessStatusCode;
+                if (response.IsSuccessStatusCode)
+                {
+                    _ = Task.Delay(3000).ContinueWith(_ => bench.IsIdentified = false);
+                    return new PingDiagnosticsResult
+                    {
+                        Success = true,
+                        RoundtripMs = sw.ElapsedMilliseconds,
+                        Message = $"✓ Ping confirmed by {bench.MachineName} ({sw.ElapsedMilliseconds}ms) — acoustic chime triggered!"
+                    };
+                }
             }
             catch
             {
-                bench.IsIdentified = false;
-                return false;
+                // HTTP failed or timed out — test ICMP reachability to diagnose root cause
             }
+
+            bench.IsIdentified = false;
+
+            // Perform ICMP Echo Ping to verify if the physical host is alive on the LAN
+            bool icmpAlive = false;
+            long icmpMs = 0;
+            try
+            {
+                using var pingSender = new System.Net.NetworkInformation.Ping();
+                var reply = await pingSender.SendPingAsync(bench.IpAddress, 1500);
+                if (reply.Status == System.Net.NetworkInformation.IPStatus.Success)
+                {
+                    icmpAlive = true;
+                    icmpMs = reply.RoundtripTime;
+                }
+            }
+            catch { }
+
+            if (icmpAlive)
+            {
+                // Host is alive, but Port 8443 is blocked!
+                return new PingDiagnosticsResult
+                {
+                    Success = false,
+                    IsHostReachableIcmp = true,
+                    IsFirewallBlocked = true,
+                    RoundtripMs = icmpMs,
+                    Message = $"⚠️ {bench.MachineName} ({bench.IpAddress}) is ONLINE ({icmpMs}ms), but Port {bench.Port} is blocked by Windows Firewall! Run Fix-Firewall.bat on {bench.MachineName}."
+                };
+            }
+            else
+            {
+                // Host is completely unreachable
+                return new PingDiagnosticsResult
+                {
+                    Success = false,
+                    IsHostReachableIcmp = false,
+                    IsFirewallBlocked = false,
+                    Message = $"❌ Failed to reach {bench.MachineName} at {bench.IpAddress}:{bench.Port} (Host unreachable on LAN/Wi-Fi)."
+                };
+            }
+        }
+
+        public async Task<bool> SendPingAsync(BenchDevice bench)
+        {
+            var result = await SendPingWithDiagnosticsAsync(bench);
+            return result.Success;
         }
 
         public async Task<string> FetchCertificateAsync(BenchDevice bench, string destinationFolder)

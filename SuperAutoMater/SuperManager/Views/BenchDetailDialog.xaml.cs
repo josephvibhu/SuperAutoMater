@@ -60,8 +60,9 @@ namespace SuperManager.Views
 
         private async void BtnPing_Click(object sender, RoutedEventArgs e)
         {
-            bool ok = await FleetCommandService.Instance.SendPingAsync(_bench);
-            MessageBox.Show(ok ? $"✓ Ping sent to {_bench.MachineName}! Laptop is chiming." : "❌ Ping failed to connect.", "Bench Ping", MessageBoxButton.OK, MessageBoxImage.Information);
+            var result = await FleetCommandService.Instance.SendPingWithDiagnosticsAsync(_bench);
+            MessageBox.Show(result.Message, "Bench Ping", MessageBoxButton.OK,
+                result.Success ? MessageBoxImage.Information : MessageBoxImage.Warning);
         }
 
         private void BtnRemoteDesktop_Click(object sender, RoutedEventArgs e)

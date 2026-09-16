@@ -1,4 +1,4 @@
-﻿<Window x:Class="SuperManager.Views.RemoteDesktopWindow"
+<Window x:Class="SuperManager.Views.RemoteDesktopWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         Title="Remote Bench Desktop — SuperManager"
@@ -56,10 +56,15 @@
                        MouseWheel="ImgScreen_MouseWheel"/>
 
                 <!-- Connecting / Error Overlay -->
-                <StackPanel x:Name="OverlayConnecting" HorizontalAlignment="Center" VerticalAlignment="Center" Visibility="Visible">
-                    <TextBlock Text="🔄 Connecting to live desktop stream..." FontFamily="{StaticResource FontSans}" FontSize="14" Foreground="#8B949E" HorizontalAlignment="Center"/>
-                    <TextBlock x:Name="TxtOverlayHint" Text="Connecting to bench..." FontFamily="{StaticResource FontMono}" FontSize="11" Foreground="#58A6FF" HorizontalAlignment="Center" Margin="0,8,0,0"/>
-                </StackPanel>
+                <Border x:Name="OverlayConnecting" Background="#E60A0C10" CornerRadius="12" BorderBrush="#30363D" BorderThickness="1" Padding="28,24" HorizontalAlignment="Center" VerticalAlignment="Center" MaxWidth="580" Visibility="Visible">
+                    <StackPanel HorizontalAlignment="Center">
+                        <TextBlock x:Name="TxtOverlayIcon" Text="🔄" FontSize="32" HorizontalAlignment="Center" Margin="0,0,0,8"/>
+                        <TextBlock x:Name="TxtOverlayTitle" Text="Connecting to live desktop stream..." FontFamily="{StaticResource FontSans}" FontWeight="Bold" FontSize="15" Foreground="#F0F6FC" HorizontalAlignment="Center"/>
+                        <TextBlock x:Name="TxtOverlayHint" Text="Connecting to bench..." FontFamily="{StaticResource FontMono}" FontSize="11" Foreground="#58A6FF" HorizontalAlignment="Center" Margin="0,8,0,0" TextWrapping="Wrap" TextAlignment="Center"/>
+                        <TextBlock x:Name="TxtOverlayDiagnostic" Text="" FontFamily="{StaticResource FontSans}" FontSize="11" Foreground="#C9D1D9" HorizontalAlignment="Center" Margin="0,12,0,0" TextWrapping="Wrap" TextAlignment="Center" LineHeight="16" Visibility="Collapsed"/>
+                        <Button x:Name="BtnRetryStream" Content="🔄 RETRY CONNECTION" Style="{StaticResource StylePrimaryActionBtn}" Click="BtnRetryStream_Click" HorizontalAlignment="Center" Margin="0,16,0,0" Padding="14,6" FontSize="11" Visibility="Collapsed"/>
+                    </StackPanel>
+                </Border>
             </Grid>
         </Border>
 
@@ -67,7 +72,7 @@
         <Border Grid.Row="2" Background="#161B22" BorderBrush="#30363D" BorderThickness="0,1,0,0" Padding="12,5">
             <DockPanel LastChildFill="False">
                 <StackPanel Orientation="Horizontal" DockPanel.Dock="Left">
-                    <TextBlock x:Name="TxtStatus" Text="● Connected" Foreground="#3FB950" FontFamily="{StaticResource FontMono}" FontSize="10" VerticalAlignment="Center"/>
+                    <TextBlock x:Name="TxtStatus" Text="● Connecting to stream..." Foreground="#F0883E" FontFamily="{StaticResource FontMono}" FontSize="10" VerticalAlignment="Center"/>
                     <TextBlock Text=" · Click screen to interact · Keystrokes pass through when window is focused" Foreground="#8B949E" FontFamily="{StaticResource FontSans}" FontSize="10" VerticalAlignment="Center" Margin="6,0,0,0"/>
                 </StackPanel>
                 <StackPanel Orientation="Horizontal" DockPanel.Dock="Right">

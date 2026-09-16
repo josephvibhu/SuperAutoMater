@@ -23,6 +23,7 @@
 		<TieredCompilation>true</TieredCompilation>
 		<Optimize>true</Optimize>
 		<IncludeNativeLibrariesForSelfExtract>true</IncludeNativeLibrariesForSelfExtract>
+		<ApplicationManifest>app.manifest</ApplicationManifest>
 	</PropertyGroup>
 
 	<ItemGroup>

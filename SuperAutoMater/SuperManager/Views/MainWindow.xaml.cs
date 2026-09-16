@@ -18,6 +18,11 @@ namespace SuperManager.Views
             DataContext = ViewModel;
 
             InitializeComponent();
+
+            Loaded += (s, e) =>
+            {
+                WindowState = WindowState.Maximized;
+            };
         }
 
         private void BtnCopyWebUrl_Click(object sender, RoutedEventArgs e)
@@ -25,12 +30,25 @@ namespace SuperManager.Views
             try
             {
                 Clipboard.SetText(ViewModel.ManagerWebUrl);
-                ViewModel.StatusMessage = $"✓ Copied {ViewModel.ManagerWebUrl} to clipboard!";
+                ViewModel.StatusMessage = $"✓ Opened Central Web HUD ({ViewModel.ManagerWebUrl}) and copied URL to clipboard!";
                 Process.Start(new ProcessStartInfo(ViewModel.ManagerWebUrl) { UseShellExecute = true });
             }
             catch (Exception ex)
             {
                 ViewModel.StatusMessage = $"Web HUD: {ViewModel.ManagerWebUrl} ({ex.Message})";
+            }
+        }
+
+        private void BtnCopyOnlyUrl_Click(object sender, RoutedEventArgs e)
+        {
+            try
+            {
+                Clipboard.SetText(ViewModel.ManagerWebUrl);
+                ViewModel.StatusMessage = $"✓ Copied Central Web HUD URL to clipboard: {ViewModel.ManagerWebUrl}";
+            }
+            catch (Exception ex)
+            {
+                ViewModel.StatusMessage = $"❌ Copy error: {ex.Message}";
             }
         }
 
@@ -179,6 +197,22 @@ namespace SuperManager.Views
             {
                 var win = new RemoteDesktopWindow(bench) { Owner = this };
                 win.Show();
+            }
+        }
+
+        private void BtnBenchHud_Click(object sender, RoutedEventArgs e)
+        {
+            if (sender is Button btn && btn.Tag is BenchDevice bench)
+            {
+                try
+                {
+                    Process.Start(new ProcessStartInfo(bench.Url) { UseShellExecute = true });
+                    ViewModel.StatusMessage = $"✓ Opened Web HUD for {bench.MachineName} ({bench.Url})";
+                }
+                catch (Exception ex)
+                {
+                    ViewModel.StatusMessage = $"❌ Failed to open Web HUD: {ex.Message}";
+                }
             }
         }
 

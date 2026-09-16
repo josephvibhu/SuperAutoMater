@@ -51,6 +51,7 @@ namespace SuperAutoMater.Wpf.Services
         private const int UDP_DISCOVERY_PORT = 9876;
         private const int DEFAULT_HTTP_PORT = 8443;
 
+        private TcpListener _tcpListener;
         private HttpListener _httpListener;
         private UdpClient _udpBroadcaster;
         private UdpClient _udpReceiver;
@@ -91,13 +92,16 @@ namespace SuperAutoMater.Wpf.Services
             {
                 try
                 {
+                    // 0. Automatically provision Windows Firewall rules for Ports 8443, 9000, 9876
+                    FirewallHelper.EnsureFirewallRulesAsync();
+
                     // 1. Detect LAN IPv4 address
                     LocalIpAddress = DetectBestLanIp();
 
                     // 2. Generate QR Code pointing to mobile dashboard
                     GenerateQrCodeImage();
 
-                    // 3. Start embedded HttpListener
+                    // 3. Start embedded HTTP server
                     StartHttpServer();
 
                     // 4. Start UDP Discovery Mesh
@@ -119,6 +123,12 @@ namespace SuperAutoMater.Wpf.Services
                 _cts?.Cancel();
                 _broadcastTimer?.Dispose();
                 _cleanupTimer?.Dispose();
+
+                if (_tcpListener != null)
+                {
+                    try { _tcpListener.Stop(); } catch { }
+                    _tcpListener = null;
+                }
 
                 if (_httpListener != null && _httpListener.IsListening)
                 {
@@ -258,56 +268,37 @@ namespace SuperAutoMater.Wpf.Services
                 {
                     try
                     {
-                        _httpListener = new HttpListener();
-                        // Try binding wildcard first (requires Admin, which SuperAutoMater has)
-                        _httpListener.Prefixes.Add($"http://*:{port}/");
-                        _httpListener.Start();
+                        _tcpListener = new TcpListener(IPAddress.Any, port);
+                        _tcpListener.Start();
                         HttpPort = port;
+                        AppLogger.Info("Lifecycle", $"[WarehouseFleetService] TCP HTTP Server listening on 0.0.0.0:{port}");
                         break;
                     }
-                    catch
+                    catch (Exception ex)
                     {
-                        try
-                        {
-                            _httpListener = new HttpListener();
-                            _httpListener.Prefixes.Add($"http://localhost:{port}/");
-                            _httpListener.Prefixes.Add($"http://127.0.0.1:{port}/");
-                            if (LocalIpAddress != "127.0.0.1")
-                            {
-                                _httpListener.Prefixes.Add($"http://{LocalIpAddress}:{port}/");
-                            }
-                            foreach (var ip in GetAllActiveIpV4Addresses())
-                            {
-                                string pfx = $"http://{ip}:{port}/";
-                                if (!_httpListener.Prefixes.Contains(pfx))
-                                {
-                                    _httpListener.Prefixes.Add(pfx);
-                                }
-                            }
-                            _httpListener.Start();
-                            HttpPort = port;
-                            break;
-                        }
-                        catch
-                        {
-                            _httpListener?.Close();
-                            _httpListener = null;
-                        }
+                        AppLogger.Warn($"[WarehouseFleetService] Port {port} unavailable: {ex.Message}");
+                        try { _tcpListener?.Stop(); } catch { }
+                        _tcpListener = null;
                     }
                 }
 
-                if (_httpListener == null || !_httpListener.IsListening) return;
+                if (_tcpListener == null)
+                {
+                    AppLogger.Error("Lifecycle", "[WarehouseFleetService] Could not bind TCP server on ports 8443-8448.");
+                    return;
+                }
 
                 // Regenerate QR with confirmed port
                 GenerateQrCodeImage();
 
-                while (_cts != null && !_cts.IsCancellationRequested && _httpListener.IsListening)
+                while (_cts != null && !_cts.IsCancellationRequested && _tcpListener != null)
                 {
                     try
                     {
-                        var context = await _httpListener.GetContextAsync();
-                        _ = ProcessHttpRequestAsync(context);
+                        var client = await _tcpListener.AcceptTcpClientAsync(_cts.Token);
+                        _ = Task.Run(() => HandleTcpClientAsync(client));
                     }
+                    catch (OperationCanceledException) { break; }
                     catch
                     {
                         if (_cts == null || _cts.IsCancellationRequested) break;
@@ -316,251 +307,243 @@ namespace SuperAutoMater.Wpf.Services
             });
         }
 
-        private async Task ProcessHttpRequestAsync(HttpListenerContext context)
+        private async Task HandleTcpClientAsync(TcpClient client)
         {
             try
             {
-                string path = context.Request.Url.AbsolutePath.ToLowerInvariant();
-                if (path.StartsWith("/verify/"))
+                using (client)
+                using (var stream = client.GetStream())
                 {
-                    await HandleScanToVerifyAsync(context, path);
-                    return;
-                }
+                    stream.ReadTimeout = 8000;
+                    stream.WriteTimeout = 8000;
 
-                // /api/ping is a harmless acoustic locate chime — allow without session token
-                if (path == "/api/ping")
-                {
-                    _ = Task.Run(() =>
+                    byte[] readBuffer = new byte[8192];
+                    int bytesRead = await stream.ReadAsync(readBuffer, 0, readBuffer.Length);
+                    if (bytesRead <= 0) return;
+
+                    string requestText = Encoding.UTF8.GetString(readBuffer, 0, bytesRead);
+                    string firstLine = requestText.Split(new[] { "\r\n", "\n" }, StringSplitOptions.None)[0];
+                    string[] parts = firstLine.Split(' ');
+                    if (parts.Length < 2) return;
+
+                    string method = parts[0].ToUpperInvariant();
+                    string rawUrl = parts[1];
+                    string path = rawUrl.Split('?')[0].ToLowerInvariant();
+
+                    // 1. CORS Preflight
+                    if (method == "OPTIONS")
                     {
-                        try
+                        string corsHeader = "HTTP/1.1 204 No Content\r\n" +
+                                            "Access-Control-Allow-Origin: *\r\n" +
+                                            "Access-Control-Allow-Methods: GET, POST, OPTIONS\r\n" +
+                                            "Access-Control-Allow-Headers: Authorization, Content-Type\r\n" +
+                                            "Content-Length: 0\r\n" +
+                                            "Connection: close\r\n\r\n";
+                        byte[] corsBytes = Encoding.UTF8.GetBytes(corsHeader);
+                        await stream.WriteAsync(corsBytes, 0, corsBytes.Length);
+                        return;
+                    }
+
+                    // 2. Acoustic Ping Chime (Unauthenticated, whitelisted for warehouse floor locating)
+                    if (path == "/api/ping")
+                    {
+                        _ = Task.Run(() =>
                         {
-                            Console.Beep(1200, 250);
-                            Thread.Sleep(80);
-                            Console.Beep(1600, 350);
-                        }
-                        catch { }
-                    });
-                    var pingPayload = new
-                    {
-                        success = true,
-                        machineName = Environment.MachineName,
-                        message = "📍 Bench successfully located via acoustic alert.",
-                        timestamp = DateTime.UtcNow.ToString("o")
-                    };
-                    string pingJson = JsonSerializer.Serialize(pingPayload);
-                    byte[] pingBytes = Encoding.UTF8.GetBytes(pingJson);
-                    context.Response.ContentType = "application/json; charset=utf-8";
-                    context.Response.ContentLength64 = pingBytes.Length;
-                    context.Response.StatusCode = (int)HttpStatusCode.OK;
-                    context.Response.Headers.Add("Access-Control-Allow-Origin", "*");
-                    await context.Response.OutputStream.WriteAsync(pingBytes, 0, pingBytes.Length);
-                    context.Response.Close();
-                    return;
-                }
+                            try
+                            {
+                                Console.Beep(1200, 250);
+                                Thread.Sleep(80);
+                                Console.Beep(1600, 350);
+                            }
+                            catch { }
+                        });
 
-                if (!IsAuthorized(context.Request))
-                {
-                    context.Response.StatusCode = (int)HttpStatusCode.Unauthorized;
-                    context.Response.ContentType = "application/json; charset=utf-8";
-                    byte[] unauthorized = Encoding.UTF8.GetBytes("{\"error\":\"A valid bench session token is required.\"}");
-                    context.Response.ContentLength64 = unauthorized.Length;
-                    await context.Response.OutputStream.WriteAsync(unauthorized, 0, unauthorized.Length);
-                    context.Response.Close();
-                    return;
-                }
-
-                byte[] responseBytes;
-                string contentType;
-
-                if (path == "/api/status")
-                {
-                    var payload = GetStatusPayload();
-                    string json = JsonSerializer.Serialize(payload, new JsonSerializerOptions { WriteIndented = true });
-                    responseBytes = Encoding.UTF8.GetBytes(json);
-                    contentType = "application/json; charset=utf-8";
-                }
-                else if (path == "/api/ping")
-                {
-                    _ = Task.Run(() =>
-                    {
-                        try
+                        var pingPayload = new
                         {
-                            Console.Beep(1200, 250);
-                            Thread.Sleep(80);
-                            Console.Beep(1600, 350);
-                        }
-                        catch { }
-                    });
-                    var pingPayload = new
-                    {
-                        success = true,
-                        machineName = Environment.MachineName,
-                        message = "📍 Bench successfully located via acoustic alert.",
-                        timestamp = DateTime.UtcNow.ToString("o")
-                    };
-                    string json = JsonSerializer.Serialize(pingPayload);
-                    responseBytes = Encoding.UTF8.GetBytes(json);
-                    contentType = "application/json; charset=utf-8";
-                }
-                else if (path == "/api/certificate")
-                {
-                    var vm = _viewModel;
-                    if (vm != null)
-                    {
-                        var certData = new CertificateData
-                        {
-                            SerialNumber = vm.Serial,
-                            Manufacturer = vm.Manufacturer,
-                            Model = vm.Model,
-                            BiosVersion = "UEFI Compliant",
-                            CpuModel = vm.CpuName,
-                            RamDetails = vm.RamSummary,
-                            StorageModel = vm.PrimaryDriveModel,
-                            StorageHealthPercent = vm.HdsHealth,
-                            StoragePowerOn = vm.HdsPowerOnTime,
-                            BatteryHealthSummary = vm.BatteryIntegrityBadge,
-                            BatteryCapacities = $"{vm.BatteryFullChargeCapacityMwh} / {vm.BatteryDesignCapacityMwh} mWh",
-                            BatteryCellTopology = $"{vm.BatteryCellTopology} · {vm.BatteryCellBalanceBadge}",
-                            GpuModel = vm.GpuName,
-                            PhysicalGrade = vm.Grade,
-                            CosmeticDefectsSummary = vm.CosmeticDefectsSummary,
-                            TechnicianName = vm.TechnicianDisplayBadge,
-                            StorageTbwSummary = vm.TbwDisplaySummary,
-                            DriverIntegritySummary = vm.MissingDriversSummary,
-                            ThermalDissipationVerdict = ThermalProfilerService.Instance.GetCurrentResult().ConditionSummary,
-                            RamTopologySummary = vm.RamChannelBadge,
-                            RadiatorAirflowSummary = vm.ThermalDecayVerdict,
-                            WebcamOpticsSummary = vm.WebcamOpticsBadge,
-                            CloudAuditUrl = GoogleSheetsDispatcher.DefaultSheetsUrl
+                            success = true,
+                            machineName = Environment.MachineName,
+                            message = "📍 Bench successfully located via acoustic alert.",
+                            timestamp = DateTime.UtcNow.ToString("o")
                         };
+                        string pingJson = JsonSerializer.Serialize(pingPayload);
+                        byte[] pingBytes = Encoding.UTF8.GetBytes(pingJson);
+                        string respHeader = $"HTTP/1.1 200 OK\r\n" +
+                                            $"Content-Type: application/json; charset=utf-8\r\n" +
+                                            $"Content-Length: {pingBytes.Length}\r\n" +
+                                            $"Access-Control-Allow-Origin: *\r\n" +
+                                            $"Connection: close\r\n\r\n";
+                        byte[] hBytes = Encoding.UTF8.GetBytes(respHeader);
+                        await stream.WriteAsync(hBytes, 0, hBytes.Length);
+                        await stream.WriteAsync(pingBytes, 0, pingBytes.Length);
+                        await stream.FlushAsync();
+                        return;
+                    }
 
-                        if (vm.TestPipeline != null)
+                    // 3. /verify/{runId} Cryptographic Proof HTML
+                    if (path.StartsWith("/verify/"))
+                    {
+                        string verifyHtml = GetScanToVerifyHtml(path);
+                        byte[] htmlBytes = Encoding.UTF8.GetBytes(verifyHtml);
+                        string respHeader = $"HTTP/1.1 200 OK\r\n" +
+                                            $"Content-Type: text/html; charset=utf-8\r\n" +
+                                            $"Content-Length: {htmlBytes.Length}\r\n" +
+                                            $"Access-Control-Allow-Origin: *\r\n" +
+                                            $"Connection: close\r\n\r\n";
+                        byte[] hBytes = Encoding.UTF8.GetBytes(respHeader);
+                        await stream.WriteAsync(hBytes, 0, hBytes.Length);
+                        await stream.WriteAsync(htmlBytes, 0, htmlBytes.Length);
+                        await stream.FlushAsync();
+                        return;
+                    }
+
+                    // 4. Authentication Check
+                    bool authorized = IsAuthorized(requestText, rawUrl);
+                    if (!authorized)
+                    {
+                        if (path.StartsWith("/api/"))
                         {
-                            foreach (var test in vm.TestPipeline)
-                            {
-                                if (test.StatusBadge == "✓" || test.IsPassed)
-                                {
-                                    certData.PassedTests.Add(test.Title);
-                                }
-                            }
+                            byte[] unauthBody = Encoding.UTF8.GetBytes("{\"error\":\"A valid bench session token is required.\"}");
+                            string unauthHeader = $"HTTP/1.1 401 Unauthorized\r\n" +
+                                                  $"Content-Type: application/json; charset=utf-8\r\n" +
+                                                  $"Content-Length: {unauthBody.Length}\r\n" +
+                                                  $"Access-Control-Allow-Origin: *\r\n" +
+                                                  $"Connection: close\r\n\r\n";
+                            byte[] uhBytes = Encoding.UTF8.GetBytes(unauthHeader);
+                            await stream.WriteAsync(uhBytes, 0, uhBytes.Length);
+                            await stream.WriteAsync(unauthBody, 0, unauthBody.Length);
+                            await stream.FlushAsync();
+                            return;
                         }
+                        else
+                        {
+                            string unauthHtml = "<!DOCTYPE html><html><head><meta charset='utf-8'/><title>Unauthorized</title><style>body{background:#0b0c10;color:#f0f6fc;font-family:sans-serif;text-align:center;padding:50px;}.card{background:#161b22;display:inline-block;padding:30px;border-radius:12px;border:1px solid #30363d;}h2{color:#f85149;}</style></head><body><div class='card'><h2>⚠️ Access Token Required</h2><p>Please scan the QR code displayed on the bench screen or access via SuperManager.</p></div></body></html>";
+                            byte[] uhBytes = Encoding.UTF8.GetBytes(unauthHtml);
+                            string header = $"HTTP/1.1 401 Unauthorized\r\nContent-Type: text/html; charset=utf-8\r\nContent-Length: {uhBytes.Length}\r\nConnection: close\r\n\r\n";
+                            byte[] hBytes = Encoding.UTF8.GetBytes(header);
+                            await stream.WriteAsync(hBytes, 0, hBytes.Length);
+                            await stream.WriteAsync(uhBytes, 0, uhBytes.Length);
+                            await stream.FlushAsync();
+                            return;
+                        }
+                    }
 
+                    // 5. Live MJPEG Remote Stream
+                    if (path == "/api/remote/stream")
+                    {
+                        await HandleRemoteStreamAsync(stream);
+                        return;
+                    }
+
+                    // 6. Authorized API Responses
+                    byte[] responseBytes;
+                    string contentType = "application/json; charset=utf-8";
+                    string extraHeader = "";
+
+                    if (path == "/api/remote/frame")
+                    {
+                        responseBytes = ScreenCaptureService.Instance.GetScreenFrame(1280, 65L) ?? Array.Empty<byte>();
+                        contentType = "image/jpeg";
+                    }
+                    else if (path == "/api/remote/input")
+                    {
+                        string bodyJson = await ReadRequestBodyAsync(requestText, readBuffer, bytesRead, stream);
                         try
                         {
-                            bool completed = SuperAutoMater.Wpf.Core.QcRunOrchestrator.Instance.TryCompleteRun(
-                                vm.BatteryHealth,
-                                vm.HdsHealth,
-                                out string failReason,
-                                out var summary);
-
-                            if (!completed)
+                            using var doc = JsonDocument.Parse(bodyJson);
+                            var root = doc.RootElement;
+                            string type = root.TryGetProperty("type", out var pt) ? pt.GetString() : "mouse";
+                            if (type == "mouse")
                             {
-                                responseBytes = Encoding.UTF8.GetBytes($"{{\"error\":\"Cannot generate certificate: {failReason}\"}}");
-                                contentType = "application/json";
-                                context.Response.StatusCode = 400;
+                                string action = root.TryGetProperty("action", out var pa) ? pa.GetString() : "left_click";
+                                double x = root.TryGetProperty("x", out var px) ? px.GetDouble() : 0.5;
+                                double y = root.TryGetProperty("y", out var py) ? py.GetDouble() : 0.5;
+                                int delta = root.TryGetProperty("delta", out var pd) ? pd.GetInt32() : 0;
+                                RemoteInputService.Instance.ProcessMouse(action, x, y, delta);
                             }
-                            else
+                            else if (type == "key")
                             {
-                                certData.RunSummary = summary;
-                                certData.RunId = summary.RunId;
-                                string pdfPath = PdfCertificateService.Instance.GenerateCertificate(certData);
-                                if (File.Exists(pdfPath))
-                                {
-                                    responseBytes = File.ReadAllBytes(pdfPath);
-                                    contentType = "application/pdf";
-                                    context.Response.Headers.Add("Content-Disposition", $"attachment; filename=\"SuperAutoMater_Certificate_{vm.Serial}.pdf\"");
-                                }
-                                else
-                                {
-                                    responseBytes = Encoding.UTF8.GetBytes("{\"error\":\"PDF generation failed\"}");
-                                    contentType = "application/json";
-                                }
+                                string key = root.TryGetProperty("key", out var pk) ? pk.GetString() : "";
+                                RemoteInputService.Instance.SendKey(key);
+                            }
+                            else if (type == "action")
+                            {
+                                string action = root.TryGetProperty("action", out var pa) ? pa.GetString() : "";
+                                RemoteInputService.Instance.ExecuteQuickAction(action);
                             }
                         }
-                        catch (Exception ex)
+                        catch { }
+                        responseBytes = Encoding.UTF8.GetBytes("{\"success\":true}");
+                    }
+                    else if (path == "/api/status")
+                    {
+                        var payload = GetStatusPayload();
+                        string json = JsonSerializer.Serialize(payload, new JsonSerializerOptions { WriteIndented = true });
+                        responseBytes = Encoding.UTF8.GetBytes(json);
+                    }
+                    else if (path == "/api/certificate")
+                    {
+                        responseBytes = GenerateCertificatePdfBytes(out contentType, out extraHeader);
+                    }
+                    else if (path == "/api/action/pass")
+                    {
+                        var vm = _viewModel;
+                        bool markedPassed = false;
+                        if (vm?.TestPipeline != null && Application.Current?.Dispatcher != null)
                         {
-                            responseBytes = Encoding.UTF8.GetBytes($"{{\"error\":\"{ex.Message}\"}}");
-                            contentType = "application/json";
-                            context.Response.StatusCode = 400;
+                            await Application.Current.Dispatcher.InvokeAsync(() =>
+                            {
+                                var activeTest = vm.TestPipeline.FirstOrDefault(t => t.IsActive && t.IsApplicable);
+                                if (activeTest == null) return;
+                                vm.MarkTestPassed(activeTest.Key);
+                                markedPassed = true;
+                            });
                         }
+                        var actionPayload = new
+                        {
+                            success = markedPassed,
+                            message = markedPassed ? "Active test marked passed." : "No applicable active test was available."
+                        };
+                        responseBytes = Encoding.UTF8.GetBytes(JsonSerializer.Serialize(actionPayload));
+                    }
+                    else if (path == "/api/qr" && _qrPngBytes != null)
+                    {
+                        responseBytes = _qrPngBytes;
+                        contentType = "image/png";
                     }
                     else
                     {
-                        responseBytes = Encoding.UTF8.GetBytes("{\"error\":\"ViewModel not available\"}");
-                        contentType = "application/json";
+                        // Root mobile/desktop dashboard HTML
+                        string html = GenerateAvionicsDashboardHtml();
+                        responseBytes = Encoding.UTF8.GetBytes(html);
+                        contentType = "text/html; charset=utf-8";
                     }
-                }
-                else if (path == "/api/action/pass")
-                {
-                    var vm = _viewModel;
-                    bool markedPassed = false;
-                    if (vm?.TestPipeline != null && Application.Current?.Dispatcher != null)
-                    {
-                        await Application.Current.Dispatcher.InvokeAsync(() =>
-                        {
-                            var activeTest = vm.TestPipeline.FirstOrDefault(t => t.IsActive && t.IsApplicable);
-                            if (activeTest == null) return;
-                            vm.MarkTestPassed(activeTest.Key);
-                            markedPassed = true;
-                        });
-                    }
-                    var actionPayload = new
-                    {
-                        success = markedPassed,
-                        message = markedPassed ? "Active test marked passed." : "No applicable active test was available."
-                    };
-                    responseBytes = Encoding.UTF8.GetBytes(JsonSerializer.Serialize(actionPayload));
-                    contentType = "application/json; charset=utf-8";
-                }
-                else if (path == "/api/qr" && _qrPngBytes != null)
-                {
-                    responseBytes = _qrPngBytes;
-                    contentType = "image/png";
-                }
-                else if (path == "/api/remote/frame")
-                {
-                    responseBytes = ScreenCaptureService.Instance.GetScreenFrame(1280, 65L);
-                    contentType = "image/jpeg";
-                }
-                else if (path == "/api/remote/stream")
-                {
-                    await HandleRemoteStreamAsync(context);
-                    return;
-                }
-                else if (path == "/api/remote/input")
-                {
-                    await HandleRemoteInputAsync(context);
-                    return;
-                }
-                else
-                {
-                    string html = GenerateAvionicsDashboardHtml();
-                    responseBytes = Encoding.UTF8.GetBytes(html);
-                    contentType = "text/html; charset=utf-8";
-                }
 
-                context.Response.ContentType = contentType;
-                context.Response.ContentLength64 = responseBytes.Length;
-                context.Response.Headers.Add("Cache-Control", "no-store");
-                await context.Response.OutputStream.WriteAsync(responseBytes, 0, responseBytes.Length);
-                context.Response.OutputStream.Close();
+                    string respHeaderStr = $"HTTP/1.1 200 OK\r\n" +
+                                           $"Content-Type: {contentType}\r\n" +
+                                           $"Content-Length: {responseBytes.Length}\r\n" +
+                                           $"Access-Control-Allow-Origin: *\r\n" +
+                                           $"Cache-Control: no-store\r\n" +
+                                           (string.IsNullOrEmpty(extraHeader) ? "" : extraHeader + "\r\n") +
+                                           $"Connection: close\r\n\r\n";
+                    byte[] respHeaderBytes = Encoding.UTF8.GetBytes(respHeaderStr);
+                    await stream.WriteAsync(respHeaderBytes, 0, respHeaderBytes.Length);
+                    await stream.WriteAsync(responseBytes, 0, responseBytes.Length);
+                    await stream.FlushAsync();
+                }
             }
-            catch
-            {
-                try { context.Response.Close(); } catch { }
-            }
+            catch { }
         }
 
-        private async Task HandleRemoteStreamAsync(HttpListenerContext context)
+        private async Task HandleRemoteStreamAsync(NetworkStream stream)
         {
             try
             {
-                context.Response.ContentType = "multipart/x-mixed-replace; boundary=--frame";
-                context.Response.Headers.Add("Cache-Control", "no-store, no-cache, must-revalidate, max-age=0");
-                context.Response.Headers.Add("Access-Control-Allow-Origin", "*");
-                context.Response.StatusCode = 200;
-
-                var stream = context.Response.OutputStream;
+                string initHeader = "HTTP/1.1 200 OK\r\n" +
+                                    "Content-Type: multipart/x-mixed-replace; boundary=--frame\r\n" +
+                                    "Cache-Control: no-store, no-cache, must-revalidate, max-age=0\r\n" +
+                                    "Access-Control-Allow-Origin: *\r\n\r\n";
+                byte[] initBytes = Encoding.UTF8.GetBytes(initHeader);
+                await stream.WriteAsync(initBytes, 0, initBytes.Length);
 
                 while (_cts != null && !_cts.IsCancellationRequested && stream.CanWrite)
                 {
@@ -582,70 +565,156 @@ namespace SuperAutoMater.Wpf.Services
             {
                 // Remote client disconnected cleanly
             }
-            finally
-            {
-                try { context.Response.Close(); } catch { }
-            }
         }
 
-        private async Task HandleRemoteInputAsync(HttpListenerContext context)
+        private static async Task<string> ReadRequestBodyAsync(string requestText, byte[] initialBuffer, int initialBytesRead, NetworkStream stream)
         {
             try
             {
-                context.Response.ContentType = "application/json; charset=utf-8";
-                context.Response.Headers.Add("Access-Control-Allow-Origin", "*");
+                int bodyStart = requestText.IndexOf("\r\n\r\n");
+                if (bodyStart < 0) return "";
 
-                using var reader = new StreamReader(context.Request.InputStream, Encoding.UTF8);
-                string json = await reader.ReadToEndAsync();
-                using var doc = JsonDocument.Parse(json);
-                var root = doc.RootElement;
+                string headerPart = requestText.Substring(0, bodyStart + 4);
+                int headerByteCount = Encoding.UTF8.GetByteCount(headerPart);
+                int bodyBytesAlreadyRead = initialBytesRead - headerByteCount;
 
-                string type = root.TryGetProperty("type", out var pt) ? pt.GetString() : "mouse";
-
-                if (type == "mouse")
+                int contentLength = 0;
+                var lines = headerPart.Split(new[] { "\r\n", "\n" }, StringSplitOptions.None);
+                foreach (var line in lines)
                 {
-                    string action = root.TryGetProperty("action", out var pa) ? pa.GetString() : "left_click";
-                    double x = root.TryGetProperty("x", out var px) ? px.GetDouble() : 0.5;
-                    double y = root.TryGetProperty("y", out var py) ? py.GetDouble() : 0.5;
-                    int delta = root.TryGetProperty("delta", out var pd) ? pd.GetInt32() : 0;
-
-                    RemoteInputService.Instance.ProcessMouse(action, x, y, delta);
-                }
-                else if (type == "key")
-                {
-                    string key = root.TryGetProperty("key", out var pk) ? pk.GetString() : "";
-                    RemoteInputService.Instance.SendKey(key);
-                }
-                else if (type == "action")
-                {
-                    string action = root.TryGetProperty("action", out var pa) ? pa.GetString() : "";
-                    RemoteInputService.Instance.ExecuteQuickAction(action);
+                    if (line.StartsWith("Content-Length:", StringComparison.OrdinalIgnoreCase))
+                    {
+                        int.TryParse(line.Substring(15).Trim(), out contentLength);
+                        break;
+                    }
                 }
 
-                byte[] okBytes = Encoding.UTF8.GetBytes("{\"success\":true}");
-                context.Response.StatusCode = 200;
-                context.Response.ContentLength64 = okBytes.Length;
-                await context.Response.OutputStream.WriteAsync(okBytes, 0, okBytes.Length);
-                context.Response.Close();
+                if (contentLength <= 0)
+                {
+                    return requestText.Substring(bodyStart + 4);
+                }
+
+                using var ms = new MemoryStream();
+                if (bodyBytesAlreadyRead > 0)
+                {
+                    ms.Write(initialBuffer, headerByteCount, Math.Min(bodyBytesAlreadyRead, contentLength));
+                }
+
+                while (ms.Length < contentLength && stream.DataAvailable)
+                {
+                    byte[] chunk = new byte[Math.Min(4096, contentLength - (int)ms.Length)];
+                    int read = await stream.ReadAsync(chunk, 0, chunk.Length);
+                    if (read <= 0) break;
+                    ms.Write(chunk, 0, read);
+                }
+
+                return Encoding.UTF8.GetString(ms.ToArray());
             }
-            catch (Exception ex)
+            catch
             {
-                context.Response.StatusCode = 400;
-                byte[] err = Encoding.UTF8.GetBytes($"{{\"error\":\"{ex.Message}\"}}");
-                await context.Response.OutputStream.WriteAsync(err, 0, err.Length);
-                context.Response.Close();
+                return "";
             }
         }
 
-        private bool IsAuthorized(HttpListenerRequest request)
+        private byte[] GenerateCertificatePdfBytes(out string contentType, out string extraHeader)
         {
-            string token = request.QueryString["token"];
+            contentType = "application/json; charset=utf-8";
+            extraHeader = "";
+
+            var vm = _viewModel;
+            if (vm == null)
+            {
+                return Encoding.UTF8.GetBytes("{\"error\":\"ViewModel not available\"}");
+            }
+
+            var certData = new CertificateData
+            {
+                SerialNumber = vm.Serial,
+                Manufacturer = vm.Manufacturer,
+                Model = vm.Model,
+                BiosVersion = "UEFI Compliant",
+                CpuModel = vm.CpuName,
+                RamDetails = vm.RamSummary,
+                StorageModel = vm.PrimaryDriveModel,
+                StorageHealthPercent = vm.HdsHealth,
+                StoragePowerOn = vm.HdsPowerOnTime,
+                BatteryHealthSummary = vm.BatteryIntegrityBadge,
+                BatteryCapacities = $"{vm.BatteryFullChargeCapacityMwh} / {vm.BatteryDesignCapacityMwh} mWh",
+                BatteryCellTopology = $"{vm.BatteryCellTopology} · {vm.BatteryCellBalanceBadge}",
+                GpuModel = vm.GpuName,
+                PhysicalGrade = vm.Grade,
+                CosmeticDefectsSummary = vm.CosmeticDefectsSummary,
+                TechnicianName = vm.TechnicianDisplayBadge,
+                StorageTbwSummary = vm.TbwDisplaySummary,
+                DriverIntegritySummary = vm.MissingDriversSummary,
+                ThermalDissipationVerdict = ThermalProfilerService.Instance.GetCurrentResult().ConditionSummary,
+                RamTopologySummary = vm.RamChannelBadge,
+                RadiatorAirflowSummary = vm.ThermalDecayVerdict,
+                WebcamOpticsSummary = vm.WebcamOpticsBadge,
+                CloudAuditUrl = GoogleSheetsDispatcher.DefaultSheetsUrl
+            };
+
+            if (vm.TestPipeline != null)
+            {
+                foreach (var test in vm.TestPipeline)
+                {
+                    if (test.StatusBadge == "✓" || test.IsPassed)
+                    {
+                        certData.PassedTests.Add(test.Title);
+                    }
+                }
+            }
+
+            try
+            {
+                bool completed = SuperAutoMater.Wpf.Core.QcRunOrchestrator.Instance.TryCompleteRun(
+                    vm.BatteryHealth,
+                    vm.HdsHealth,
+                    out string failReason,
+                    out var summary);
+
+                if (!completed)
+                {
+                    return Encoding.UTF8.GetBytes($"{{\"error\":\"Cannot generate certificate: {failReason}\"}}");
+                }
+
+                certData.RunSummary = summary;
+                certData.RunId = summary.RunId;
+                string pdfPath = PdfCertificateService.Instance.GenerateCertificate(certData);
+                if (File.Exists(pdfPath))
+                {
+                    contentType = "application/pdf";
+                    extraHeader = $"Content-Disposition: attachment; filename=\"SuperAutoMater_Certificate_{vm.Serial}.pdf\"";
+                    return File.ReadAllBytes(pdfPath);
+                }
+
+                return Encoding.UTF8.GetBytes("{\"error\":\"PDF generation failed\"}");
+            }
+            catch (Exception ex)
+            {
+                return Encoding.UTF8.GetBytes($"{{\"error\":\"{ex.Message}\"}}");
+            }
+        }
+
+        private bool IsAuthorized(string requestText, string rawUrl)
+        {
+            string token = ExtractQueryParam(rawUrl, "token");
             if (string.IsNullOrWhiteSpace(token))
             {
-                string authorization = request.Headers["Authorization"];
-                const string bearerPrefix = "Bearer ";
-                if (!string.IsNullOrWhiteSpace(authorization) && authorization.StartsWith(bearerPrefix, StringComparison.OrdinalIgnoreCase))
-                    token = authorization.Substring(bearerPrefix.Length).Trim();
+                var lines = requestText.Split(new[] { "\r\n", "\n" }, StringSplitOptions.None);
+                foreach (var line in lines)
+                {
+                    if (line.StartsWith("Authorization:", StringComparison.OrdinalIgnoreCase))
+                    {
+                        string val = line.Substring(14).Trim();
+                        const string bearer = "Bearer ";
+                        if (val.StartsWith(bearer, StringComparison.OrdinalIgnoreCase))
+                        {
+                            token = val.Substring(bearer.Length).Trim();
+                            break;
+                        }
+                    }
+                }
             }
 
             if (string.IsNullOrEmpty(token) || token.Length != _sessionAccessToken.Length)
@@ -654,6 +723,27 @@ namespace SuperAutoMater.Wpf.Services
             return CryptographicOperations.FixedTimeEquals(
                 Encoding.UTF8.GetBytes(token),
                 Encoding.UTF8.GetBytes(_sessionAccessToken));
+        }
+
+        private static string ExtractQueryParam(string url, string paramName)
+        {
+            try
+            {
+                int qIdx = url.IndexOf('?');
+                if (qIdx < 0 || qIdx >= url.Length - 1) return "";
+                string query = url.Substring(qIdx + 1);
+                var pairs = query.Split('&');
+                foreach (var pair in pairs)
+                {
+                    var kv = pair.Split('=');
+                    if (kv.Length >= 1 && string.Equals(Uri.UnescapeDataString(kv[0]), paramName, StringComparison.OrdinalIgnoreCase))
+                    {
+                        return kv.Length > 1 ? Uri.UnescapeDataString(kv[1]) : "";
+                    }
+                }
+            }
+            catch { }
+            return "";
         }
 
         private object GetStatusPayload()
@@ -688,7 +778,7 @@ namespace SuperAutoMater.Wpf.Services
             };
         }
 
-        private async Task HandleScanToVerifyAsync(HttpListenerContext context, string path)
+        private string GetScanToVerifyHtml(string path)
         {
             try
             {
@@ -696,12 +786,9 @@ namespace SuperAutoMater.Wpf.Services
                 var store = new Core.QcRunStore();
                 var summary = string.IsNullOrWhiteSpace(runId) ? null : store.GetRunSummary(runId);
 
-                context.Response.ContentType = "text/html; charset=utf-8";
-
                 if (summary == null || summary.Status != Core.QcRunStatus.Completed)
                 {
-                    context.Response.StatusCode = (int)HttpStatusCode.NotFound;
-                    string notFoundHtml = @"<!DOCTYPE html>
+                    return @"<!DOCTYPE html>
 <html>
 <head>
     <meta charset='utf-8'/>
@@ -723,11 +810,6 @@ namespace SuperAutoMater.Wpf.Services
     </div>
 </body>
 </html>";
-                    byte[] bytes = Encoding.UTF8.GetBytes(notFoundHtml);
-                    context.Response.ContentLength64 = bytes.Length;
-                    await context.Response.OutputStream.WriteAsync(bytes, 0, bytes.Length);
-                    context.Response.Close();
-                    return;
                 }
 
                 // Render Verified Device Certificate HTML
@@ -822,16 +904,12 @@ namespace SuperAutoMater.Wpf.Services
 </body>
 </html>");
 
-                byte[] htmlBytes = Encoding.UTF8.GetBytes(sb.ToString());
-                context.Response.StatusCode = (int)HttpStatusCode.OK;
-                context.Response.ContentLength64 = htmlBytes.Length;
-                await context.Response.OutputStream.WriteAsync(htmlBytes, 0, htmlBytes.Length);
-                context.Response.Close();
+                return sb.ToString();
             }
             catch (Exception ex)
             {
-                AppLogger.Warn("HandleScanToVerifyAsync encountered error", ex);
-                try { context.Response.Close(); } catch { }
+                AppLogger.Warn("GetScanToVerifyHtml encountered error", ex);
+                return "<!DOCTYPE html><html><body>Error generating verification page</body></html>";
             }
         }
 
@@ -863,6 +941,7 @@ namespace SuperAutoMater.Wpf.Services
             try
             {
                 if (_udpBroadcaster == null) return;
+                if (_tcpListener == null) return;
 
                 var vm = _viewModel;
                 var hw = HardwareDiagnosticsService.Instance;

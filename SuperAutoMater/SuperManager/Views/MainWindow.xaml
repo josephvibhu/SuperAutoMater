@@ -3,7 +3,7 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         Title="SuperManager — Master Warehouse Fleet Server &amp; Diagnostics Cockpit"
         Height="840" Width="1360"
-        MinHeight="600" MinWidth="960"
+        MinHeight="520" MinWidth="850"
         WindowState="Maximized"
         WindowStartupLocation="CenterScreen"
         Background="#0B0C10"
@@ -47,21 +47,22 @@
                 </StackPanel>
 
                 <!-- Center: 5 KPI Bento Cards -->
-                <Grid Grid.Column="1" HorizontalAlignment="Center" VerticalAlignment="Center" Margin="12,0">
+                <!-- Center: 5 KPI Bento Cards -->
+                <Grid Grid.Column="1" HorizontalAlignment="Center" VerticalAlignment="Center" Margin="8,0">
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="Auto"/>
-                        <ColumnDefinition Width="10"/>
+                        <ColumnDefinition Width="6"/>
                         <ColumnDefinition Width="Auto"/>
-                        <ColumnDefinition Width="10"/>
+                        <ColumnDefinition Width="6"/>
                         <ColumnDefinition Width="Auto"/>
-                        <ColumnDefinition Width="10"/>
+                        <ColumnDefinition Width="6"/>
                         <ColumnDefinition Width="Auto"/>
-                        <ColumnDefinition Width="10"/>
+                        <ColumnDefinition Width="6"/>
                         <ColumnDefinition Width="Auto"/>
                     </Grid.ColumnDefinitions>
 
                     <!-- KPI 1: Active Benches -->
-                    <Border Grid.Column="0" Background="#161B22" BorderBrush="{StaticResource BrushBorderSubtle}" BorderThickness="1" CornerRadius="8" Padding="10,6">
+                    <Border Grid.Column="0" Background="#161B22" BorderBrush="{StaticResource BrushBorderSubtle}" BorderThickness="1" CornerRadius="8" Padding="8,5">
                         <StackPanel HorizontalAlignment="Center">
                             <TextBlock Text="ONLINE BENCHES" Style="{StaticResource TextKpiLabel}" HorizontalAlignment="Center"/>
                             <TextBlock Text="{Binding Kpi.TotalActiveBenches}" Style="{StaticResource TextKpiValue}" HorizontalAlignment="Center" Margin="0,2,0,0"/>
@@ -69,7 +70,7 @@
                     </Border>
 
                     <!-- KPI 2: Testing Now -->
-                    <Border Grid.Column="2" Background="#161B22" BorderBrush="{StaticResource BrushBorderSubtle}" BorderThickness="1" CornerRadius="8" Padding="10,6">
+                    <Border Grid.Column="2" Background="#161B22" BorderBrush="{StaticResource BrushBorderSubtle}" BorderThickness="1" CornerRadius="8" Padding="8,5">
                         <StackPanel HorizontalAlignment="Center">
                             <TextBlock Text="TESTING NOW" Style="{StaticResource TextKpiLabel}" HorizontalAlignment="Center"/>
                             <TextBlock Text="{Binding Kpi.TotalTesting}" Style="{StaticResource TextKpiValue}" Foreground="#58A6FF" HorizontalAlignment="Center" Margin="0,2,0,0"/>
@@ -77,7 +78,7 @@
                     </Border>
 
                     <!-- KPI 3: Completed Today -->
-                    <Border Grid.Column="4" Background="#161B22" BorderBrush="{StaticResource BrushBorderSubtle}" BorderThickness="1" CornerRadius="8" Padding="10,6">
+                    <Border Grid.Column="4" Background="#161B22" BorderBrush="{StaticResource BrushBorderSubtle}" BorderThickness="1" CornerRadius="8" Padding="8,5">
                         <StackPanel HorizontalAlignment="Center">
                             <TextBlock Text="COMPLETED TODAY" Style="{StaticResource TextKpiLabel}" HorizontalAlignment="Center"/>
                             <TextBlock Text="{Binding Kpi.TotalCompletedToday}" Style="{StaticResource TextKpiValue}" Foreground="#3FB950" HorizontalAlignment="Center" Margin="0,2,0,0"/>
@@ -85,7 +86,7 @@
                     </Border>
 
                     <!-- KPI 4: First Time Pass Rate -->
-                    <Border Grid.Column="6" Background="#161B22" BorderBrush="{StaticResource BrushBorderSubtle}" BorderThickness="1" CornerRadius="8" Padding="10,6">
+                    <Border Grid.Column="6" Background="#161B22" BorderBrush="{StaticResource BrushBorderSubtle}" BorderThickness="1" CornerRadius="8" Padding="8,5">
                         <StackPanel HorizontalAlignment="Center">
                             <TextBlock Text="PASS RATE" Style="{StaticResource TextKpiLabel}" HorizontalAlignment="Center"/>
                             <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" Margin="0,2,0,0">
@@ -96,7 +97,7 @@
                     </Border>
 
                     <!-- KPI 5: Alerts -->
-                    <Border Grid.Column="8" Background="#161B22" BorderBrush="{StaticResource BrushBorderSubtle}" BorderThickness="1" CornerRadius="8" Padding="10,6">
+                    <Border Grid.Column="8" Background="#161B22" BorderBrush="{StaticResource BrushBorderSubtle}" BorderThickness="1" CornerRadius="8" Padding="8,5">
                         <StackPanel HorizontalAlignment="Center">
                             <TextBlock Text="FLEET ALERTS" Style="{StaticResource TextKpiLabel}" HorizontalAlignment="Center"/>
                             <TextBlock Text="{Binding Kpi.TotalAlerts}" Style="{StaticResource TextKpiValue}" Foreground="#F85149" HorizontalAlignment="Center" Margin="0,2,0,0"/>
@@ -106,10 +107,13 @@
 
 
                 <!-- Right: Mobile Web Dashboard Link -->
-                <Border Grid.Column="2" Background="#161B22" BorderBrush="{StaticResource BrushBorderDark}" BorderThickness="1" CornerRadius="8" Padding="12,8" VerticalAlignment="Center">
+                <Border Grid.Column="2" Background="#161B22" BorderBrush="{StaticResource BrushBorderDark}" BorderThickness="1" CornerRadius="8" Padding="10,6" VerticalAlignment="Center">
                     <StackPanel HorizontalAlignment="Center">
                         <TextBlock Text="WEB / MOBILE HUD" Style="{StaticResource TextBadgeMono}" Foreground="{StaticResource BrushTextSubdued}" HorizontalAlignment="Center"/>
-                        <Button Content="{Binding ManagerWebUrl}" Style="{StaticResource StyleDarkActionBtn}" Click="BtnCopyWebUrl_Click" Padding="8,4" FontSize="10" Margin="0,3,0,0" ToolTip="Click to copy Mobile Dashboard URL"/>
+                        <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" Margin="0,4,0,0">
+                            <Button Content="🌐 OPEN HUD" Style="{StaticResource StylePrimaryActionBtn}" Click="BtnCopyWebUrl_Click" Padding="8,4" FontSize="10" ToolTip="Open Central Web HUD in browser &amp; copy link"/>
+                            <Button Content="📋 COPY" Style="{StaticResource StyleDarkActionBtn}" Click="BtnCopyOnlyUrl_Click" Padding="8,4" FontSize="10" Margin="4,0,0,0" ToolTip="Copy HUD URL to clipboard"/>
+                        </StackPanel>
                     </StackPanel>
                 </Border>
             </Grid>
@@ -276,12 +280,15 @@
                                                 <ColumnDefinition Width="*"/>
                                                 <ColumnDefinition Width="4"/>
                                                 <ColumnDefinition Width="*"/>
+                                                <ColumnDefinition Width="4"/>
+                                                <ColumnDefinition Width="*"/>
                                             </Grid.ColumnDefinitions>
 
                                             <Button Grid.Column="0" Content="📍 PING" Style="{StaticResource StyleWarningActionBtn}" Click="BtnBenchPing_Click" Tag="{Binding}" Padding="2,4" FontSize="9" ToolTip="Trigger acoustic chime on laptop"/>
                                             <Button Grid.Column="2" Content="🖥️ REMOTE" Style="{StaticResource StyleDarkActionBtn}" Click="BtnBenchRemote_Click" Tag="{Binding}" Padding="2,4" FontSize="9" ToolTip="Open live interactive Remote Desktop mirror"/>
-                                            <Button Grid.Column="4" Content="🔍 INSPECT" Style="{StaticResource StyleDarkActionBtn}" Click="BtnBenchInspect_Click" Tag="{Binding}" Padding="2,4" FontSize="9" ToolTip="Open full hardware inspection modal"/>
-                                            <Button Grid.Column="6" Content="📄 CERT" Style="{StaticResource StylePrimaryActionBtn}" Click="BtnBenchCert_Click" Tag="{Binding}" Padding="2,4" FontSize="9" ToolTip="Download official PDF certificate to archive"/>
+                                            <Button Grid.Column="4" Content="🌐 HUD" Style="{StaticResource StyleDarkActionBtn}" Click="BtnBenchHud_Click" Tag="{Binding}" Padding="2,4" FontSize="9" ToolTip="Open Bench Web Telemetry HUD in browser"/>
+                                            <Button Grid.Column="6" Content="🔍 INSPECT" Style="{StaticResource StyleDarkActionBtn}" Click="BtnBenchInspect_Click" Tag="{Binding}" Padding="2,4" FontSize="9" ToolTip="Open full hardware inspection modal"/>
+                                            <Button Grid.Column="8" Content="📄 CERT" Style="{StaticResource StylePrimaryActionBtn}" Click="BtnBenchCert_Click" Tag="{Binding}" Padding="2,4" FontSize="9" ToolTip="Download official PDF certificate to archive"/>
                                         </Grid>
                                     </Grid>
                                 </Border>

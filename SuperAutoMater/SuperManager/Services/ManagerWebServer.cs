@@ -283,6 +283,7 @@ namespace SuperManager.Services
         {
             if (rawUrl.Contains($"token={_adminSessionToken}")) return true;
             if (requestText.Contains($"Authorization: Bearer {_adminSessionToken}", StringComparison.OrdinalIgnoreCase)) return true;
+            if (requestText.Contains($"token={_adminSessionToken}", StringComparison.OrdinalIgnoreCase)) return true;
             return false;
         }
 
@@ -439,9 +440,12 @@ namespace SuperManager.Services
     <div class=""grid"" id=""benchGrid""></div>
 
     <script>
+        const adminToken = new URLSearchParams(window.location.search).get('token') || '';
         async function refresh() {
             try {
-                const res = await fetch('/api/fleet');
+                const fleetUrl = '/api/fleet' + (adminToken ? '?token=' + encodeURIComponent(adminToken) : '');
+                const res = await fetch(fleetUrl);
+                if (!res.ok) throw new Error('HTTP ' + res.status);
                 const data = await res.json();
                 document.getElementById('lastSync').innerText = 'Live · ' + new Date().toLocaleTimeString();
                 
