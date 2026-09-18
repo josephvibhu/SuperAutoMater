@@ -21,11 +21,13 @@ namespace SuperAutoMater.Wpf.Views
 
         public ExpressQcFullReport Report { get; private set; }
         public bool CloudDispatchRequested { get; private set; } = false;
+        public QcProfile SelectedProfile { get; set; } = QcProfile.FullDiagnostic;
 
-        public ExpressQcRunnerWindow(MainViewModel viewModel)
+        public ExpressQcRunnerWindow(MainViewModel viewModel, QcProfile initialProfile = QcProfile.FullDiagnostic)
         {
             InitializeComponent();
             _viewModel = viewModel;
+            SelectedProfile = initialProfile;
 
             Loaded += ExpressQcRunnerWindow_Loaded;
             Closing += ExpressQcRunnerWindow_Closing;
@@ -37,9 +39,75 @@ namespace SuperAutoMater.Wpf.Views
             ExpressQcEngineService.Instance.OverallProgressChanged += OnOverallProgressChanged;
             ExpressQcEngineService.Instance.Completed += OnCompleted;
 
-            // Start autonomous diagnostic suite
-            Report = await ExpressQcEngineService.Instance.RunFullExpressQcAsync(_viewModel);
+            UpdateTechnicianBadge();
+            SyncProfileSelectionUi();
+
+            // Start autonomous diagnostic suite with selected profile
+            await StartDiagnosticRunAsync();
         }
+
+        private void UpdateTechnicianBadge()
+        {
+            try
+            {
+                TxtActiveQcTech.Text = TechnicianProfileService.Instance.CurrentProfile.DisplayBadge;
+            }
+            catch
+            {
+                TxtActiveQcTech.Text = "TECH-01";
+            }
+        }
+
+        private void SyncProfileSelectionUi()
+        {
+            if (CmbQcProfile == null) return;
+            foreach (System.Windows.Controls.ComboBoxItem item in CmbQcProfile.Items)
+            {
+                if (item.Tag?.ToString() == SelectedProfile.ToString())
+                {
+                    CmbQcProfile.SelectedItem = item;
+                    break;
+                }
+            }
+        }
+
+        private async Task StartDiagnosticRunAsync()
+        {
+            CmbQcProfile.IsEnabled = false;
+            BtnSwitchTech.IsEnabled = false;
+            BtnRerunQc.Visibility = Visibility.Collapsed;
+            TxtRunnerState.Text = $"● ACTIVE AUDIT [{SelectedProfile}]";
+
+            Report = await ExpressQcEngineService.Instance.RunFullExpressQcAsync(
+                _viewModel,
+                SelectedProfile,
+                TechnicianProfileService.Instance.CurrentProfile.Name);
+        }
+
+        private async void BtnRerunQc_Click(object sender, RoutedEventArgs e)
+        {
+            if (ExpressQcEngineService.Instance.IsRunning) return;
+            await StartDiagnosticRunAsync();
+        }
+
+        private void CmbQcProfile_SelectionChanged(object sender, System.Windows.Controls.SelectionChangedEventArgs e)
+        {
+            if (CmbQcProfile?.SelectedItem is System.Windows.Controls.ComboBoxItem item && item.Tag != null)
+            {
+                if (Enum.TryParse<QcProfile>(item.Tag.ToString(), out var prof))
+                {
+                    SelectedProfile = prof;
+                }
+            }
+        }
+
+        private void BtnSwitchTech_Click(object sender, RoutedEventArgs e)
+        {
+            var modal = new TechnicianModalWindow { Owner = this };
+            modal.ShowDialog();
+            UpdateTechnicianBadge();
+        }
+
 
         private void ExpressQcRunnerWindow_Closing(object sender, System.ComponentModel.CancelEventArgs e)
         {
@@ -182,8 +250,12 @@ namespace SuperAutoMater.Wpf.Views
 
                 BtnAcceptAll.IsEnabled = true;
                 BtnCloudDispatch.IsEnabled = true;
+                CmbQcProfile.IsEnabled = true;
+                BtnSwitchTech.IsEnabled = true;
+                BtnRerunQc.Visibility = Visibility.Visible;
 
                 try
+
                 {
                     SystemSounds.Asterisk.Play();
                 }

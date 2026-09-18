@@ -341,6 +341,18 @@
                                         <MenuItem Header="🏷️ Move to DEMO STOCK" Click="MenuItemMoveQueue_Click" Tag="DemoStock" Foreground="#E3B341" FontWeight="Bold"/>
                                         <Separator Background="#30363D"/>
                                         <MenuItem Header="🗑️ Move to SCRAP / HARVEST" Click="MenuItemMoveQueue_Click" Tag="ScrapHarvest" Foreground="#8B949E"/>
+                                        <Separator Background="#30363D"/>
+                                        <MenuItem Header="👤 Soft-Assign Technician" Foreground="#58A6FF" FontWeight="Bold">
+                                            <MenuItem Header="Lead Refurb Tech" Click="MenuItemQuickAssign_Click" Tag="Lead Refurb Tech" Foreground="#58A6FF"/>
+                                            <MenuItem Header="Marcus Vance" Click="MenuItemQuickAssign_Click" Tag="Marcus Vance" Foreground="#58A6FF"/>
+                                            <MenuItem Header="Elena Rostova" Click="MenuItemQuickAssign_Click" Tag="Elena Rostova" Foreground="#58A6FF"/>
+                                            <MenuItem Header="Sarah Jenkins" Click="MenuItemQuickAssign_Click" Tag="Sarah Jenkins" Foreground="#58A6FF"/>
+                                            <MenuItem Header="Joseph Vibhu" Click="MenuItemQuickAssign_Click" Tag="Joseph Vibhu" Foreground="#58A6FF"/>
+                                            <Separator Background="#30363D"/>
+                                            <MenuItem Header="📷 Scan Badge / Switch Tech..." Click="MenuItemScanOrCustomAssign_Click" Foreground="#D2A8FF"/>
+                                            <Separator Background="#30363D"/>
+                                            <MenuItem Header="❌ Clear Assignment" Click="MenuItemQuickAssign_Click" Tag="" Foreground="#8B949E"/>
+                                        </MenuItem>
                                     </ContextMenu>
                                 </Border.ContextMenu>
                                 <StackPanel>
@@ -440,7 +452,50 @@
                                                 <TextBlock Text="{Binding ExternalVendor}" Foreground="#D2A8FF" FontFamily="{StaticResource FontMono}" FontSize="8" FontWeight="Bold" VerticalAlignment="Center"/>
                                             </StackPanel>
                                         </Border>
+
+                                        <!-- Service Tech Pill -->
+                                        <Border Background="#2B1D1D" BorderBrush="#FF7B72" BorderThickness="1" CornerRadius="3" Padding="4,1" Margin="0,0,4,2">
+                                            <Border.Style>
+                                                <Style TargetType="Border">
+                                                    <Setter Property="Visibility" Value="Visible"/>
+                                                    <Style.Triggers>
+                                                        <DataTrigger Binding="{Binding ServiceTechnician}" Value="">
+                                                            <Setter Property="Visibility" Value="Collapsed"/>
+                                                        </DataTrigger>
+                                                        <DataTrigger Binding="{Binding ServiceTechnician}" Value="{x:Null}">
+                                                            <Setter Property="Visibility" Value="Collapsed"/>
+                                                        </DataTrigger>
+                                                    </Style.Triggers>
+                                                </Style>
+                                            </Border.Style>
+                                            <StackPanel Orientation="Horizontal">
+                                                <TextBlock Text="🔧 " FontSize="8" VerticalAlignment="Center"/>
+                                                <TextBlock Text="{Binding ServiceTechnician}" Foreground="#FF7B72" FontFamily="{StaticResource FontMono}" FontSize="8" FontWeight="Bold" VerticalAlignment="Center"/>
+                                            </StackPanel>
+                                        </Border>
+
+                                        <!-- QC Tech Pill -->
+                                        <Border Background="#162D1D" BorderBrush="#3FB950" BorderThickness="1" CornerRadius="3" Padding="4,1" Margin="0,0,4,2">
+                                            <Border.Style>
+                                                <Style TargetType="Border">
+                                                    <Setter Property="Visibility" Value="Visible"/>
+                                                    <Style.Triggers>
+                                                        <DataTrigger Binding="{Binding QcTechnician}" Value="">
+                                                            <Setter Property="Visibility" Value="Collapsed"/>
+                                                        </DataTrigger>
+                                                        <DataTrigger Binding="{Binding QcTechnician}" Value="{x:Null}">
+                                                            <Setter Property="Visibility" Value="Collapsed"/>
+                                                        </DataTrigger>
+                                                    </Style.Triggers>
+                                                </Style>
+                                            </Border.Style>
+                                            <StackPanel Orientation="Horizontal">
+                                                <TextBlock Text="🔬 " FontSize="8" VerticalAlignment="Center"/>
+                                                <TextBlock Text="{Binding QcTechnician}" Foreground="#56D364" FontFamily="{StaticResource FontMono}" FontSize="8" FontWeight="Bold" VerticalAlignment="Center"/>
+                                            </StackPanel>
+                                        </Border>
                                     </WrapPanel>
+
 
                                     <!-- Footer: Location & WorkInProgress / Health -->
                                     <DockPanel LastChildFill="False">
@@ -965,7 +1020,8 @@
                                 <TextBox Text="{Binding IntakeSupplier, UpdateSourceTrigger=PropertyChanged}" Background="#0D1117" Foreground="#FFFFFF" BorderBrush="{StaticResource BrushBorderSubtle}" Padding="6,4"/>
 
                                 <TextBlock Text="Soft Technician Assignment (Non-Locking):" Foreground="{StaticResource BrushTextSubdued}" FontSize="11" Margin="0,8,0,2"/>
-                                <TextBox Text="{Binding IntakeAssignedTo, UpdateSourceTrigger=PropertyChanged}" Background="#0D1117" Foreground="#FFFFFF" BorderBrush="{StaticResource BrushBorderSubtle}" Padding="6,4"/>
+                                <ComboBox Text="{Binding IntakeAssignedTo, UpdateSourceTrigger=PropertyChanged}" ItemsSource="{Binding TechnicianRoster}" IsEditable="True" Background="#0D1117" Foreground="#FFFFFF" BorderBrush="{StaticResource BrushBorderSubtle}" Padding="6,4"/>
+
 
                                 <TextBlock Text="Intake Batch ID:" Foreground="{StaticResource BrushTextSubdued}" FontSize="11" Margin="0,8,0,2"/>
                                 <TextBox Text="{Binding IntakeBatch, UpdateSourceTrigger=PropertyChanged}" Background="#0D1117" Foreground="#FFFFFF" BorderBrush="{StaticResource BrushBorderSubtle}" Padding="6,4" FontFamily="{StaticResource FontMono}"/>

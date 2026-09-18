@@ -37,11 +37,19 @@ namespace SuperAutoMater.Wpf.Services
         public string RadiatorAirflowSummary { get; set; } = "";
         public string WebcamOpticsSummary { get; set; } = "";
         public string TechnicianName { get; set; } = "QC Station #1";
+        public string AssetTag { get; set; } = "";
+        public string IntakeTechnician { get; set; } = "N/A";
+        public string ServiceTechnician { get; set; } = "N/A";
+        public string QcTechnician { get; set; } = "QC Station #1";
+        public string ApprovalTechnician { get; set; } = "Depot Lead";
+        public string QcProfileUsed { get; set; } = "Full Diagnostic";
+        public string MissingComponents { get; set; } = "";
         public string CloudAuditUrl { get; set; } = GoogleSheetsDispatcher.DefaultSheetsUrl;
         public List<string> PassedTests { get; set; } = new List<string>();
     }
 
     public class PdfCertificateService
+
     {
         private static readonly Lazy<PdfCertificateService> _instance =
             new Lazy<PdfCertificateService>(() => new PdfCertificateService());
@@ -97,9 +105,31 @@ namespace SuperAutoMater.Wpf.Services
                 data.TechnicianName = summary.Technician;
             }
 
+            if (string.IsNullOrWhiteSpace(data.AssetTag) && !string.IsNullOrWhiteSpace(summary.AssetTag))
+            {
+                data.AssetTag = summary.AssetTag;
+            }
+
+            try
+            {
+                var store = new QcRunStore();
+                var asset = store.FindAssetBySerialOrTag(!string.IsNullOrWhiteSpace(data.AssetTag) ? data.AssetTag : data.SerialNumber);
+                if (asset != null)
+                {
+                    if (string.IsNullOrWhiteSpace(data.AssetTag)) data.AssetTag = asset.AssetTag;
+                    if (!string.IsNullOrWhiteSpace(asset.IntakeTechnician)) data.IntakeTechnician = asset.IntakeTechnician;
+                    if (!string.IsNullOrWhiteSpace(asset.ServiceTechnician)) data.ServiceTechnician = asset.ServiceTechnician;
+                    if (!string.IsNullOrWhiteSpace(asset.QcTechnician)) data.QcTechnician = asset.QcTechnician;
+                    if (!string.IsNullOrWhiteSpace(asset.ApprovalTechnician)) data.ApprovalTechnician = asset.ApprovalTechnician;
+                    if (!string.IsNullOrWhiteSpace(asset.MissingComponents)) data.MissingComponents = asset.MissingComponents;
+                }
+            }
+            catch { }
+
             string cleanSerial = string.IsNullOrWhiteSpace(data.SerialNumber) || data.SerialNumber.Contains("Detecting")
                 ? (string.IsNullOrWhiteSpace(summary.AssetTag) ? "UNKNOWN" : summary.AssetTag)
                 : data.SerialNumber.Trim();
+
 
             string desktopDir = Environment.GetFolderPath(Environment.SpecialFolder.DesktopDirectory);
             string pdfPath = Path.Combine(desktopDir, $"SuperAutoMater_Certificate_{cleanSerial}_{summary.RunId.Substring(0, 8)}.pdf");
@@ -207,8 +237,11 @@ namespace SuperAutoMater.Wpf.Services
                 contentSb.Append("BT /F2 10 Tf 0.35 0.65 0.99 rg 40 666 Td (DECLARED HARDWARE IDENTIFIERS [FIRMWARE / DMI]) Tj ET\n");
 
                 DrawKeyValue(contentSb, 40, 646, "CHASSIS / MODEL:", $"{d.Manufacturer} {d.Model}");
-                DrawKeyValue(contentSb, 40, 628, "SERIAL NUMBER:", string.IsNullOrEmpty(summary.SerialNumber) ? "[FALLBACK IDENTIFIER]" : summary.SerialNumber);
+                string snText = string.IsNullOrEmpty(summary.SerialNumber) ? "[NO SERIAL]" : summary.SerialNumber;
+                string tagText = string.IsNullOrEmpty(d.AssetTag) ? "N/A" : d.AssetTag;
+                DrawKeyValue(contentSb, 40, 628, "ASSET TAG / SN:", $"{tagText} | SN: {snText}");
                 DrawKeyValue(contentSb, 40, 610, "BIOS REVISION:", d.BiosVersion);
+
                 DrawKeyValue(contentSb, 40, 592, "PROCESSOR ARCH:", d.CpuModel);
                 DrawKeyValue(contentSb, 40, 574, "MEMORY CONFIG:", string.IsNullOrEmpty(d.RamTopologySummary) ? d.RamDetails : $"{d.RamDetails} [{d.RamTopologySummary}]");
 
@@ -283,18 +316,27 @@ namespace SuperAutoMater.Wpf.Services
                 contentSb.Append("BT /F2 24 Tf 0.25 0.73 0.38 rg 40 130 Td (")
                          .Append(EscapePdf(summary.Grade))
                          .Append(") Tj ET\n");
-                contentSb.Append("BT /F1 8.5 Tf 0.85 0.87 0.91 rg 40 110 Td (Policy Version: ")
+                contentSb.Append("BT /F1 8.5 Tf 0.85 0.87 0.91 rg 40 110 Td (Policy: ")
                          .Append(EscapePdf(summary.PolicyVersion))
                          .Append(" · Station: ")
                          .Append(EscapePdf(summary.Station))
+                         .Append(" · Profile: ")
+                         .Append(EscapePdf(string.IsNullOrWhiteSpace(d.QcProfileUsed) ? "Full" : d.QcProfileUsed))
                          .Append(") Tj ET\n");
-                contentSb.Append("BT /F1 8 Tf 0.55 0.58 0.63 rg 40 92 Td (Inspected by: ")
-                         .Append(EscapePdf(summary.Technician))
-                         .Append(" · Tamper-Evident SHA-256 Ledger Sealed) Tj ET\n");
+                contentSb.Append("BT /F1 7.5 Tf 0.55 0.58 0.63 rg 40 92 Td (Attribution: Intake: ")
+                         .Append(EscapePdf(string.IsNullOrWhiteSpace(d.IntakeTechnician) ? "N/A" : d.IntakeTechnician))
+                         .Append(" | Srv: ")
+                         .Append(EscapePdf(string.IsNullOrWhiteSpace(d.ServiceTechnician) ? "N/A" : d.ServiceTechnician))
+                         .Append(" | QC: ")
+                         .Append(EscapePdf(string.IsNullOrWhiteSpace(d.QcTechnician) ? summary.Technician : d.QcTechnician))
+                         .Append(" | Appr: ")
+                         .Append(EscapePdf(string.IsNullOrWhiteSpace(d.ApprovalTechnician) ? "LEAD" : d.ApprovalTechnician))
+                         .Append(") Tj ET\n");
                 contentSb.Append("BT /F1 7.5 Tf 0.45 0.48 0.53 rg 40 70 Td (Verification Hash: ")
                          .Append(EscapePdf(summary.VerificationHash))
                          .Append(") Tj ET\n");
                 contentSb.Append("BT /F1 7 Tf 0.35 0.38 0.43 rg 40 54 Td (Any manual alteration of test metrics, serial, or telemetry invalidates the cryptographic seal above.) Tj ET\n");
+
 
                 // QR Code placement on bottom right
                 if (qrBytes != null && qrBytes.Length > 0)

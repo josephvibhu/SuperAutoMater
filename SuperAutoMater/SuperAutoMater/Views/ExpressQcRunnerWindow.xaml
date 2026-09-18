@@ -33,6 +33,7 @@
                 <Grid.RowDefinitions>
                     <RowDefinition Height="Auto"/>
                     <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="Auto"/>
                 </Grid.RowDefinitions>
 
                 <DockPanel Grid.Row="0" LastChildFill="False" Margin="0,0,0,8">
@@ -55,8 +56,29 @@
                     </StackPanel>
                 </DockPanel>
 
+                <!-- Adaptive Profile & Technician Controls -->
+                <DockPanel Grid.Row="1" LastChildFill="False" Margin="0,0,0,8">
+                    <StackPanel Orientation="Horizontal" DockPanel.Dock="Left" VerticalAlignment="Center">
+                        <TextBlock Text="QC PROFILE:" FontFamily="{StaticResource FontMono}" FontWeight="Bold" FontSize="10" Foreground="#8B949E" VerticalAlignment="Center" Margin="0,0,8,0"/>
+                        <ComboBox x:Name="CmbQcProfile" SelectionChanged="CmbQcProfile_SelectionChanged" Background="#0D1117" Foreground="#FFFFFF" FontFamily="{StaticResource FontMono}" FontSize="10" Padding="6,2" Height="24" Width="230">
+                            <ComboBoxItem Content="FULL DIAGNOSTIC (Standard)" IsSelected="True" Tag="FullDiagnostic"/>
+                            <ComboBoxItem Content="BAREBONES (No SSD / Storage)" Tag="BarebonesNoStorage"/>
+                            <ComboBoxItem Content="WINPE LIVE USB (Diskless)" Tag="WinPeLiveUsb"/>
+                            <ComboBoxItem Content="AC ONLY (No Battery)" Tag="AcOnlyNoBattery"/>
+                            <ComboBoxItem Content="QUICK AUDIT (30-Sec Scan)" Tag="QuickComponentAudit"/>
+                        </ComboBox>
+                    </StackPanel>
+
+                    <StackPanel Orientation="Horizontal" DockPanel.Dock="Right" VerticalAlignment="Center">
+                        <TextBlock Text="👤 QC TECH:" FontFamily="{StaticResource FontMono}" FontWeight="Bold" FontSize="10" Foreground="#8B949E" VerticalAlignment="Center" Margin="0,0,6,0"/>
+                        <TextBlock x:Name="TxtActiveQcTech" Text="TECH-01" FontFamily="{StaticResource FontMono}" FontWeight="Bold" FontSize="10" Foreground="#58A6FF" VerticalAlignment="Center" Margin="0,0,8,0"/>
+                        <Button x:Name="BtnSwitchTech" Content="SWITCH" Style="{StaticResource StyleDarkActionBtn}" Click="BtnSwitchTech_Click" Padding="6,2" FontSize="9" Height="22"/>
+                        <Button x:Name="BtnRerunQc" Content="🔄 RE-RUN" Style="{StaticResource StyleDarkActionBtn}" Click="BtnRerunQc_Click" Padding="6,2" FontSize="9" Height="22" Margin="6,0,0,0" Visibility="Collapsed"/>
+                    </StackPanel>
+                </DockPanel>
+
                 <!-- Runner Progress Bar -->
-                <ProgressBar Grid.Row="1" x:Name="ProgRunner" Height="8" Minimum="0" Maximum="100" Value="0"
+                <ProgressBar Grid.Row="2" x:Name="ProgRunner" Height="8" Minimum="0" Maximum="100" Value="0"
                              Foreground="#58A6FF" Background="#0E1116" BorderThickness="0"/>
             </Grid>
         </Border>

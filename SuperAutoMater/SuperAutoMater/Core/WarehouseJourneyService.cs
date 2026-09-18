@@ -52,6 +52,13 @@ namespace SuperAutoMater.Wpf.Core
             AppLogger.Info($"[WarehouseJourney] Asset '{assetId}' assigned to '{technician}' by '{actor}'");
         }
 
+        public void UpdateAttribution(string assetId, string intakeTech = null, string serviceTech = null, string qcTech = null, string approvalTech = null)
+        {
+            if (string.IsNullOrWhiteSpace(assetId)) throw new ArgumentException("Asset ID is required.", nameof(assetId));
+            _store.UpdateAssetAttribution(assetId, intakeTech, serviceTech, qcTech, approvalTech);
+        }
+
+
         public void MoveAsset(string assetId, string destinationLocation, string actor, string reasonCode = "LOCATION_TRANSFER", bool scanConfirmed = true)
         {
             if (string.IsNullOrWhiteSpace(assetId)) throw new ArgumentException("Asset ID is required.", nameof(assetId));

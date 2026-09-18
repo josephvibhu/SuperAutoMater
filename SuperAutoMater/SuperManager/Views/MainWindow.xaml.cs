@@ -3,7 +3,11 @@ using System.Diagnostics;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
+using System.Windows.Media;
+using SuperAutoMater.Core;
 using SuperAutoMater.Wpf.Core;
+using SuperAutoMater.Wpf.Services;
+using SuperAutoMater.Wpf.Views;
 using SuperManager.Models;
 using SuperManager.Services;
 using SuperManager.ViewModels;
@@ -356,23 +360,69 @@ namespace SuperManager.Views
             }
         }
 
+        private AssetWipRecord GetAssetFromMenuItem(MenuItem item)
+        {
+            if (item == null) return null;
+            if (item.DataContext is AssetWipRecord directAsset)
+                return directAsset;
+
+            DependencyObject current = item;
+            while (current != null)
+            {
+                if (current is ContextMenu cm && cm.PlacementTarget is FrameworkElement fe && fe.DataContext is AssetWipRecord contextAsset)
+                {
+                    return contextAsset;
+                }
+                if (current is MenuItem mi && mi.DataContext is AssetWipRecord miAsset)
+                {
+                    return miAsset;
+                }
+                current = LogicalTreeHelper.GetParent(current) ?? VisualTreeHelper.GetParent(current);
+            }
+            return null;
+        }
+
         private void MenuItemMoveQueue_Click(object sender, RoutedEventArgs e)
         {
             if (sender is MenuItem item && item.Tag is string targetQueueStr)
             {
-                AssetWipRecord asset = null;
-                if (item.DataContext is AssetWipRecord directAsset)
-                {
-                    asset = directAsset;
-                }
-                else if (item.Parent is ContextMenu cm && cm.PlacementTarget is FrameworkElement fe && fe.DataContext is AssetWipRecord contextAsset)
-                {
-                    asset = contextAsset;
-                }
-
+                AssetWipRecord asset = GetAssetFromMenuItem(item);
                 if (asset != null && Enum.TryParse<AssetQueueStatus>(targetQueueStr, out var targetQueue))
                 {
                     ViewModel.WipBoard.TransitionAsset(asset, targetQueue);
+                }
+            }
+        }
+
+        private void MenuItemQuickAssign_Click(object sender, RoutedEventArgs e)
+        {
+            if (sender is MenuItem item)
+            {
+                AssetWipRecord asset = GetAssetFromMenuItem(item);
+                if (asset != null)
+                {
+                    string targetTech = item.Tag as string;
+                    ViewModel.WipBoard.AssignTechnician(asset, targetTech);
+                }
+            }
+        }
+
+        private void MenuItemScanOrCustomAssign_Click(object sender, RoutedEventArgs e)
+        {
+            if (sender is MenuItem item)
+            {
+                AssetWipRecord asset = GetAssetFromMenuItem(item);
+                if (asset != null)
+                {
+                    var dlg = new TechnicianModalWindow { Owner = this };
+                    if (dlg.ShowDialog() == true)
+                    {
+                        string tech = TechnicianProfileService.Instance.CurrentProfile?.Name;
+                        if (!string.IsNullOrWhiteSpace(tech))
+                        {
+                            ViewModel.WipBoard.AssignTechnician(asset, tech);
+                        }
+                    }
                 }
             }
         }

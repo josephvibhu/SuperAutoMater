@@ -6,6 +6,7 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media.Imaging;
 using QRCoder;
+using SuperAutoMater.Core;
 using SuperAutoMater.Wpf.Core;
 using SuperAutoMater.Wpf.Services;
 using SuperAutoMater.Wpf.ViewModels;
@@ -72,8 +73,16 @@ namespace SuperAutoMater.Wpf.Views
 
             try
             {
+                var rosterNames = TechnicianRosterService.Instance.GetNamesList();
+                CmbAssignedTo.ItemsSource = rosterNames;
+                CmbIntakeTech.ItemsSource = rosterNames;
+                CmbServiceTech.ItemsSource = rosterNames;
+                CmbQcTech.ItemsSource = rosterNames;
+                CmbApprovalTech.ItemsSource = rosterNames;
+
                 var tech = TechnicianProfileService.Instance.CurrentProfile;
                 TxtTechnician.Text = !string.IsNullOrWhiteSpace(tech.Id) ? tech.Id : (tech.Name ?? "TECH-01");
+                CmbQcTech.Text = tech.Name ?? "Lead Refurb Tech";
             }
             catch
             {
@@ -109,7 +118,28 @@ namespace SuperAutoMater.Wpf.Views
             if (!string.IsNullOrWhiteSpace(_priorRecord.Model) && (string.IsNullOrWhiteSpace(TxtModel.Text) || TxtModel.Text.Contains("Detecting")))
                 TxtModel.Text = _priorRecord.Model;
 
-            MessageBox.Show("Prior provenance metadata (Supplier, Customer, Shelf Bay, Model) applied successfully!", "Historical Metadata Recall", MessageBoxButton.OK, MessageBoxImage.Information);
+            if (!string.IsNullOrWhiteSpace(_priorRecord.Assigned_To))
+                CmbAssignedTo.Text = _priorRecord.Assigned_To;
+
+            if (!string.IsNullOrWhiteSpace(_priorRecord.Intake_Tech))
+                CmbIntakeTech.Text = _priorRecord.Intake_Tech;
+
+            if (!string.IsNullOrWhiteSpace(_priorRecord.Service_Tech))
+                CmbServiceTech.Text = _priorRecord.Service_Tech;
+
+            if (!string.IsNullOrWhiteSpace(_priorRecord.QC_Tech))
+                CmbQcTech.Text = _priorRecord.QC_Tech;
+
+            if (!string.IsNullOrWhiteSpace(_priorRecord.Approval_Tech))
+                CmbApprovalTech.Text = _priorRecord.Approval_Tech;
+
+            if (!string.IsNullOrWhiteSpace(_priorRecord.External_Vendor))
+                TxtExternalVendor.Text = _priorRecord.External_Vendor;
+
+            if (!string.IsNullOrWhiteSpace(_priorRecord.Missing_Components))
+                TxtMissingComponents.Text = _priorRecord.Missing_Components;
+
+            MessageBox.Show("Prior provenance metadata (Supplier, Customer, Shelf Bay, Model, Technician Attribution) applied successfully!", "Historical Metadata Recall", MessageBoxButton.OK, MessageBoxImage.Information);
         }
 
         private async void CheckAssetHistoryAsync(string serial, string tag)
@@ -149,7 +179,14 @@ namespace SuperAutoMater.Wpf.Views
                         Out_Date = localAsset.OutDate,
                         Customer = localAsset.Customer,
                         Shelf_Location = localAsset.CurrentLocation,
-                        Timestamp = localAsset.UpdatedAtUtc.ToString("yyyy-MM-dd HH:mm")
+                        Timestamp = localAsset.UpdatedAtUtc.ToString("yyyy-MM-dd HH:mm"),
+                        Assigned_To = localAsset.AssignedTo,
+                        Intake_Tech = localAsset.IntakeTechnician,
+                        Service_Tech = localAsset.ServiceTechnician,
+                        QC_Tech = localAsset.QcTechnician,
+                        Approval_Tech = localAsset.ApprovalTechnician,
+                        Missing_Components = localAsset.MissingComponents,
+                        External_Vendor = localAsset.ExternalVendor
                     };
                     source = "Local SQLite Store";
                 }
@@ -179,7 +216,15 @@ namespace SuperAutoMater.Wpf.Views
                             Supplier = audit.Supplier,
                             Out_Date = audit.Out_Date,
                             Customer = audit.Customer,
-                            Timestamp = audit.Timestamp.ToString("yyyy-MM-dd HH:mm")
+                            Timestamp = audit.Timestamp.ToString("yyyy-MM-dd HH:mm"),
+                            Assigned_To = audit.Assigned_To,
+                            Intake_Tech = audit.Intake_Tech,
+                            Service_Tech = audit.Service_Tech,
+                            QC_Tech = audit.QC_Tech,
+                            Approval_Tech = audit.Approval_Tech,
+                            Missing_Components = audit.Missing_Components,
+                            External_Vendor = audit.External_Vendor,
+                            QC_Profile = audit.QC_Profile
                         };
                         source = "Local ITAM Ledger";
                     }
@@ -273,6 +318,29 @@ namespace SuperAutoMater.Wpf.Views
             else
             {
                 TxtPriorDefectNote.Visibility = Visibility.Collapsed;
+            }
+
+            // Autofill attribution & hardware details from prior record if empty
+            if (!string.IsNullOrWhiteSpace(prior.Assigned_To) && string.IsNullOrWhiteSpace(CmbAssignedTo.Text))
+                CmbAssignedTo.Text = prior.Assigned_To;
+            if (!string.IsNullOrWhiteSpace(prior.Intake_Tech) && string.IsNullOrWhiteSpace(CmbIntakeTech.Text))
+                CmbIntakeTech.Text = prior.Intake_Tech;
+            if (!string.IsNullOrWhiteSpace(prior.Service_Tech) && string.IsNullOrWhiteSpace(CmbServiceTech.Text))
+                CmbServiceTech.Text = prior.Service_Tech;
+            if (!string.IsNullOrWhiteSpace(prior.External_Vendor) && string.IsNullOrWhiteSpace(TxtExternalVendor.Text))
+                TxtExternalVendor.Text = prior.External_Vendor;
+            if (!string.IsNullOrWhiteSpace(prior.Missing_Components) && string.IsNullOrWhiteSpace(TxtMissingComponents.Text))
+                TxtMissingComponents.Text = prior.Missing_Components;
+            if (!string.IsNullOrWhiteSpace(prior.QC_Profile))
+            {
+                foreach (ComboBoxItem itm in CmbQcProfile.Items)
+                {
+                    if (string.Equals(itm.Content?.ToString(), prior.QC_Profile, StringComparison.OrdinalIgnoreCase))
+                    {
+                        CmbQcProfile.SelectedItem = itm;
+                        break;
+                    }
+                }
             }
         }
 
@@ -392,6 +460,29 @@ namespace SuperAutoMater.Wpf.Views
             string serial = TxtSerial.Text.Trim();
             if (string.IsNullOrWhiteSpace(tag)) tag = serial;
 
+            string assignedTo = CmbAssignedTo.Text?.Trim() ?? "";
+            string intakeTech = CmbIntakeTech.Text?.Trim() ?? "";
+            string serviceTech = CmbServiceTech.Text?.Trim() ?? "";
+            string qcTech = CmbQcTech.Text?.Trim() ?? "";
+            string approvalTech = CmbApprovalTech.Text?.Trim() ?? "";
+            string externalVendor = TxtExternalVendor.Text?.Trim() ?? "";
+            string missingComponents = TxtMissingComponents.Text?.Trim() ?? "";
+            string qcProfile = (CmbQcProfile.SelectedItem as ComboBoxItem)?.Content?.ToString()
+                               ?? CmbQcProfile.Text?.Trim()
+                               ?? "Full Diagnostic";
+
+            // Persist indelible attribution to SQLite store if asset exists
+            try
+            {
+                var store = new QcRunStore();
+                store.UpdateAssetAttribution(tag, intakeTech, serviceTech, qcTech, approvalTech);
+                if (!string.IsNullOrWhiteSpace(assignedTo))
+                {
+                    store.AssignAssetTechnician(tag, assignedTo, qcTech);
+                }
+            }
+            catch { }
+
             return new AssetQueueRecord
             {
                 Tag = tag,
@@ -409,6 +500,14 @@ namespace SuperAutoMater.Wpf.Views
                 Remarks = TxtRemarks.Text.Trim(),
                 Shelf_Location = TxtShelf.Text.Trim(),
                 Technician = TxtTechnician.Text.Trim(),
+                Assigned_To = assignedTo,
+                Intake_Tech = intakeTech,
+                Service_Tech = serviceTech,
+                QC_Tech = qcTech,
+                Approval_Tech = approvalTech,
+                Missing_Components = missingComponents,
+                External_Vendor = externalVendor,
+                QC_Profile = qcProfile,
                 In_Date = TxtInDate.Text.Trim(),
                 Supplier = TxtSupplier.Text.Trim(),
                 Out_Date = TxtOutDate.Text.Trim(),

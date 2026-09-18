@@ -4,7 +4,9 @@ using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.Linq;
 using System.Runtime.CompilerServices;
+using SuperAutoMater.Core;
 using SuperAutoMater.Wpf.Core;
+
 
 namespace SuperManager.ViewModels
 {
@@ -106,12 +108,33 @@ namespace SuperManager.ViewModels
         private string _intakeMissingComponents = "";
         public string IntakeMissingComponents { get => _intakeMissingComponents; set { _intakeMissingComponents = value; OnPropertyChanged(); } }
 
+        public ObservableCollection<string> TechnicianRoster { get; } = new ObservableCollection<string>();
+
         public WipBoardViewModel(WarehouseJourneyService warehouseService = null, QcRunStore store = null)
         {
             _store = store ?? new QcRunStore();
             _warehouseService = warehouseService ?? new WarehouseJourneyService(_store);
+            RefreshTechnicianRoster();
+            try
+            {
+                TechnicianRosterService.Instance.RosterChanged += () =>
+                {
+                    System.Windows.Application.Current?.Dispatcher?.Invoke(RefreshTechnicianRoster);
+                };
+            }
+            catch { }
             RefreshBoard();
         }
+
+        public void RefreshTechnicianRoster()
+        {
+            TechnicianRoster.Clear();
+            foreach (var name in TechnicianRosterService.Instance.GetNamesList())
+            {
+                TechnicianRoster.Add(name);
+            }
+        }
+
 
         public void AutoGenerateTag()
         {

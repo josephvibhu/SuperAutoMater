@@ -1112,6 +1112,38 @@ VALUES($id, $assetId, 'Move', '', $actor, 'TECHNICIAN_ASSIGNMENT', '', $notes, 1
             }
         }
 
+        public void UpdateAssetAttribution(string assetId, string intakeTech = null, string serviceTech = null, string qcTech = null, string approvalTech = null)
+        {
+            if (string.IsNullOrWhiteSpace(assetId)) return;
+            lock (_gate)
+            {
+                using var connection = Open();
+                using var transaction = connection.BeginTransaction();
+                string now = UtcNow();
+
+                var updates = new List<string>();
+                using var cmd = connection.CreateCommand();
+                cmd.Transaction = transaction;
+
+                if (intakeTech != null) { updates.Add("intake_technician = $inTech"); cmd.Parameters.AddWithValue("$inTech", intakeTech); }
+                if (serviceTech != null) { updates.Add("service_technician = $srvTech"); cmd.Parameters.AddWithValue("$srvTech", serviceTech); }
+                if (qcTech != null) { updates.Add("qc_technician = $qcTech"); cmd.Parameters.AddWithValue("$qcTech", qcTech); }
+                if (approvalTech != null) { updates.Add("approval_technician = $appTech"); cmd.Parameters.AddWithValue("$appTech", approvalTech); }
+
+                if (updates.Count > 0)
+                {
+                    updates.Add("updated_at_utc = $now");
+                    cmd.Parameters.AddWithValue("$now", now);
+                    cmd.Parameters.AddWithValue("$id", assetId);
+                    cmd.CommandText = $"UPDATE assets SET {string.Join(", ", updates)} WHERE id = $id;";
+                    cmd.ExecuteNonQuery();
+                }
+                transaction.Commit();
+                AppLogger.Info($"Asset {assetId} attribution updated.");
+            }
+        }
+
+
         public AssetWipRecord FindAssetBySerialOrTag(string identifier)
         {
             if (string.IsNullOrWhiteSpace(identifier)) return null;

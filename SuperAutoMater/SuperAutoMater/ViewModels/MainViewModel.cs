@@ -104,14 +104,40 @@ namespace SuperAutoMater.Wpf.ViewModels
         public string AssignedTechnician
         {
             get => _assignedTechnician;
-            set { _assignedTechnician = value; OnPropertyChanged(); }
+            set { _assignedTechnician = value; OnPropertyChanged(); OnPropertyChanged(nameof(AssignedTo)); }
+        }
+
+        public string AssignedTo
+        {
+            get => _assignedTechnician;
+            set { _assignedTechnician = value; OnPropertyChanged(); OnPropertyChanged(nameof(AssignedTechnician)); }
+        }
+
+        private string _intakeTechnician = "";
+        public string IntakeTechnician
+        {
+            get => _intakeTechnician;
+            set { _intakeTechnician = value; OnPropertyChanged(); }
+        }
+
+        private string _serviceTechnician = "";
+        public string ServiceTechnician
+        {
+            get => _serviceTechnician;
+            set { _serviceTechnician = value; OnPropertyChanged(); }
         }
 
         private string _missingComponentsWarning = "";
         public string MissingComponentsWarning
         {
             get => _missingComponentsWarning;
-            set { _missingComponentsWarning = value; OnPropertyChanged(); }
+            set { _missingComponentsWarning = value; OnPropertyChanged(); OnPropertyChanged(nameof(MissingComponents)); }
+        }
+
+        public string MissingComponents
+        {
+            get => _missingComponentsWarning;
+            set { _missingComponentsWarning = value; OnPropertyChanged(); OnPropertyChanged(nameof(MissingComponentsWarning)); }
         }
 
         private string _recognizedAssetBanner = "";

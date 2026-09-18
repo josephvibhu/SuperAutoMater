@@ -27,6 +27,14 @@ namespace SuperAutoMater.Wpf.Services
         public string Battery_Health { get; set; } = "100";
         public int Storage_Health { get; set; } = 100;
         public string Technician { get; set; } = "";
+        public string Assigned_To { get; set; } = "";
+        public string Intake_Tech { get; set; } = "";
+        public string Service_Tech { get; set; } = "";
+        public string QC_Tech { get; set; } = "";
+        public string Approval_Tech { get; set; } = "";
+        public string Missing_Components { get; set; } = "";
+        public string External_Vendor { get; set; } = "";
+        public string QC_Profile { get; set; } = "Full Diagnostic";
         public string In_Date { get; set; } = "";
         public string Supplier { get; set; } = "";
         public string Out_Date { get; set; } = "";
@@ -221,7 +229,15 @@ namespace SuperAutoMater.Wpf.Services
                             rec.In_Date,
                             rec.Supplier,
                             rec.Out_Date,
-                            rec.Customer
+                            rec.Customer,
+                            rec.Assigned_To,
+                            rec.Intake_Tech,
+                            rec.Service_Tech,
+                            rec.QC_Tech,
+                            rec.Approval_Tech,
+                            rec.Missing_Components,
+                            rec.External_Vendor,
+                            rec.QC_Profile
                         );
 
                         if (success)
@@ -269,6 +285,14 @@ namespace SuperAutoMater.Wpf.Services
             string supplier,
             string outDate,
             string customer,
+            string assignedTo = "",
+            string intakeTech = "",
+            string serviceTech = "",
+            string qcTech = "",
+            string approvalTech = "",
+            string missingComponents = "",
+            string externalVendor = "",
+            string qcProfile = "Full Diagnostic",
             string webhookUrl = DefaultSheetsUrl)
         {
             if (string.IsNullOrWhiteSpace(webhookUrl)) return false;
@@ -288,6 +312,14 @@ namespace SuperAutoMater.Wpf.Services
                     Physical_Grade   = physicalGrade ?? "A+",
                     Remarks          = remarks ?? "",
                     Technician       = technician ?? "",
+                    Assigned_To      = assignedTo ?? "",
+                    Intake_Tech      = intakeTech ?? "",
+                    Service_Tech     = serviceTech ?? "",
+                    QC_Tech          = qcTech ?? "",
+                    Approval_Tech    = approvalTech ?? "",
+                    Missing_Components = missingComponents ?? "",
+                    External_Vendor  = externalVendor ?? "",
+                    QC_Profile       = qcProfile ?? "Full Diagnostic",
                     In_Date          = string.IsNullOrWhiteSpace(inDate) ? DateTime.Now.ToString("yyyy-MM-dd") : inDate,
                     Supplier         = supplier ?? "",
                     Out_Date         = outDate ?? "",

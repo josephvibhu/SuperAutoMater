@@ -1,5 +1,5 @@
-﻿param(
-    [string]$Version = "1.6.8"
+param(
+    [string]$Version = "1.6.9"
 )
 
 $ErrorActionPreference = "Stop"
@@ -27,6 +27,6 @@ if (Test-Path "$rootDir\Fix-Firewall.bat") {
 # Duplicate to specific version folder
 Copy-Item -Path "$targetLatest\*" -Destination $targetVersion -Recurse -Force
 
-Write-Host "✓ Successfully published SuperManager Server to:" -ForegroundColor Green
+Write-Host "[OK] Successfully published SuperManager Server to:" -ForegroundColor Green
 Write-Host "  - Latest:  $targetLatest" -ForegroundColor White
 Write-Host "  - Version: $targetVersion" -ForegroundColor White

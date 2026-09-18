@@ -233,10 +233,87 @@
                         </StackPanel>
                     </Border>
 
-                    <!-- Group 3: Custody, Provenance & Dates -->
+                    <!-- Group 3: Multi-Technician Attribution & Workflow Roles -->
                     <Border Background="#12161E" BorderBrush="#232936" BorderThickness="1" CornerRadius="8" Padding="12" Margin="0,0,0,12">
                         <StackPanel>
-                            <TextBlock Text="3. PROVENANCE, CUSTODY &amp; DATES" FontFamily="{StaticResource FontMono}" FontWeight="Bold" FontSize="11" Foreground="#A78BFA" Margin="0,0,0,8"/>
+                            <DockPanel LastChildFill="False" Margin="0,0,0,8">
+                                <TextBlock Text="3. MULTI-TECHNICIAN ATTRIBUTION &amp; ROLES" FontFamily="{StaticResource FontMono}" FontWeight="Bold" FontSize="11" Foreground="#38BDF8" VerticalAlignment="Center"/>
+                                <Border Background="#162B3D" BorderBrush="#388BFD" BorderThickness="1" CornerRadius="4" Padding="6,2" DockPanel.Dock="Right">
+                                    <TextBlock Text="NON-LOCKING ATTRIBUTION" FontFamily="{StaticResource FontMono}" FontSize="9" Foreground="#58A6FF"/>
+                                </Border>
+                            </DockPanel>
+
+                            <!-- Row: Assigned To & Intake Tech -->
+                            <Grid Margin="0,0,0,8">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="*"/>
+                                </Grid.ColumnDefinitions>
+                                <StackPanel Grid.Column="0" Margin="0,0,4,0">
+                                    <TextBlock Text="ASSIGNED TO (SOFT)" Style="{StaticResource TextBadgeMono}" Foreground="{StaticResource BrushTextVioletSubdued}" Margin="0,0,0,4"/>
+                                    <ComboBox x:Name="CmbAssignedTo" IsEditable="True" Background="#161B22" Foreground="#FFFFFF" BorderBrush="#2D333B" Padding="6,4" FontFamily="{StaticResource FontMono}"/>
+                                </StackPanel>
+                                <StackPanel Grid.Column="1" Margin="4,0,0,0">
+                                    <TextBlock Text="INTAKE TECHNICIAN" Style="{StaticResource TextBadgeMono}" Foreground="{StaticResource BrushTextVioletSubdued}" Margin="0,0,0,4"/>
+                                    <ComboBox x:Name="CmbIntakeTech" IsEditable="True" Background="#161B22" Foreground="#FFFFFF" BorderBrush="#2D333B" Padding="6,4" FontFamily="{StaticResource FontMono}"/>
+                                </StackPanel>
+                            </Grid>
+
+                            <!-- Row: Service Tech, QC Tech & Approval Tech -->
+                            <Grid Margin="0,0,0,8">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="*"/>
+                                </Grid.ColumnDefinitions>
+                                <StackPanel Grid.Column="0" Margin="0,0,4,0">
+                                    <TextBlock Text="SERVICE TECHNICIAN" Style="{StaticResource TextBadgeMono}" Foreground="{StaticResource BrushTextVioletSubdued}" Margin="0,0,0,4"/>
+                                    <ComboBox x:Name="CmbServiceTech" IsEditable="True" Background="#161B22" Foreground="#FFFFFF" BorderBrush="#2D333B" Padding="6,4" FontFamily="{StaticResource FontMono}"/>
+                                </StackPanel>
+                                <StackPanel Grid.Column="1" Margin="4,0,4,0">
+                                    <TextBlock Text="QC AUDIT TECH" Style="{StaticResource TextBadgeMono}" Foreground="{StaticResource BrushTextVioletSubdued}" Margin="0,0,0,4"/>
+                                    <ComboBox x:Name="CmbQcTech" IsEditable="True" Background="#161B22" Foreground="#FFFFFF" BorderBrush="#2D333B" Padding="6,4" FontFamily="{StaticResource FontMono}"/>
+                                </StackPanel>
+                                <StackPanel Grid.Column="2" Margin="4,0,0,0">
+                                    <TextBlock Text="APPROVAL TECH" Style="{StaticResource TextBadgeMono}" Foreground="{StaticResource BrushTextVioletSubdued}" Margin="0,0,0,4"/>
+                                    <ComboBox x:Name="CmbApprovalTech" IsEditable="True" Background="#161B22" Foreground="#FFFFFF" BorderBrush="#2D333B" Padding="6,4" FontFamily="{StaticResource FontMono}"/>
+                                </StackPanel>
+                            </Grid>
+
+                            <!-- Row: QC Profile & External Vendor -->
+                            <Grid Margin="0,0,0,8">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="1.2*"/>
+                                    <ColumnDefinition Width="0.8*"/>
+                                </Grid.ColumnDefinitions>
+                                <StackPanel Grid.Column="0" Margin="0,0,4,0">
+                                    <TextBlock Text="ADAPTIVE QC PROFILE USED" Style="{StaticResource TextBadgeMono}" Foreground="{StaticResource BrushTextVioletSubdued}" Margin="0,0,0,4"/>
+                                    <ComboBox x:Name="CmbQcProfile" Background="#161B22" Foreground="#58A6FF" FontWeight="Bold" BorderBrush="#2D333B" Padding="6,4" FontFamily="{StaticResource FontMono}">
+                                        <ComboBoxItem Content="Full Diagnostic" IsSelected="True"/>
+                                        <ComboBoxItem Content="Barebones / No-Storage"/>
+                                        <ComboBoxItem Content="WinPE / Live USB Mode"/>
+                                        <ComboBoxItem Content="AC-Only / No Battery"/>
+                                        <ComboBoxItem Content="Quick Component Audit"/>
+                                    </ComboBox>
+                                </StackPanel>
+                                <StackPanel Grid.Column="1" Margin="4,0,0,0">
+                                    <TextBlock Text="EXTERNAL VENDOR (IF OUTSOURCED)" Style="{StaticResource TextBadgeMono}" Foreground="{StaticResource BrushTextVioletSubdued}" Margin="0,0,0,4"/>
+                                    <TextBox x:Name="TxtExternalVendor" Background="#161B22" Foreground="#D2A8FF" BorderBrush="#2D333B" Padding="8,6" FontFamily="{StaticResource FontMono}"/>
+                                </StackPanel>
+                            </Grid>
+
+                            <!-- Row: Missing Components / Hardware Flags -->
+                            <StackPanel>
+                                <TextBlock Text="MISSING COMPONENTS / HARDWARE AUDIT FLAGS" Style="{StaticResource TextBadgeMono}" Foreground="{StaticResource BrushTextVioletSubdued}" Margin="0,0,0,4"/>
+                                <TextBox x:Name="TxtMissingComponents" Background="#161B22" Foreground="#F2CC60" BorderBrush="#2D333B" Padding="8,6" FontFamily="{StaticResource FontMono}" ToolTip="e.g. SSD, Battery, Stylus, RAM Cover"/>
+                            </StackPanel>
+                        </StackPanel>
+                    </Border>
+
+                    <!-- Group 4: Custody, Provenance & Dates -->
+                    <Border Background="#12161E" BorderBrush="#232936" BorderThickness="1" CornerRadius="8" Padding="12" Margin="0,0,0,12">
+                        <StackPanel>
+                            <TextBlock Text="4. PROVENANCE, CUSTODY &amp; DATES" FontFamily="{StaticResource FontMono}" FontWeight="Bold" FontSize="11" Foreground="#A78BFA" Margin="0,0,0,8"/>
                             
                             <!-- Row: Technician & In Date -->
                             <Grid Margin="0,0,0,8">
@@ -245,7 +322,7 @@
                                     <ColumnDefinition Width="*"/>
                                 </Grid.ColumnDefinitions>
                                 <StackPanel Grid.Column="0" Margin="0,0,4,0">
-                                    <TextBlock Text="TECHNICIAN NAME OR ID" Style="{StaticResource TextBadgeMono}" Foreground="{StaticResource BrushTextVioletSubdued}" Margin="0,0,0,4"/>
+                                    <TextBlock Text="OPERATING TECHNICIAN (STATION)" Style="{StaticResource TextBadgeMono}" Foreground="{StaticResource BrushTextVioletSubdued}" Margin="0,0,0,4"/>
                                     <TextBox x:Name="TxtTechnician" Text="TECH-01" Background="#161B22" Foreground="#FFFFFF" BorderBrush="#2D333B" Padding="8,6" FontFamily="{StaticResource FontMono}"/>
                                 </StackPanel>
                                 <StackPanel Grid.Column="1" Margin="4,0,0,0">
@@ -277,10 +354,10 @@
                         </StackPanel>
                     </Border>
 
-                    <!-- Group 4: Remarks -->
+                    <!-- Group 5: Remarks -->
                     <Border Background="#12161E" BorderBrush="#232936" BorderThickness="1" CornerRadius="8" Padding="12" Margin="0,0,0,8">
                         <StackPanel>
-                            <TextBlock Text="4. REMARKS &amp; AUDIT NOTES" FontFamily="{StaticResource FontMono}" FontWeight="Bold" FontSize="11" Foreground="#F59E0B" Margin="0,0,0,8"/>
+                            <TextBlock Text="5. REMARKS &amp; AUDIT NOTES" FontFamily="{StaticResource FontMono}" FontWeight="Bold" FontSize="11" Foreground="#F59E0B" Margin="0,0,0,8"/>
                             <TextBox x:Name="TxtRemarks" Text="SuperAutoMater Certified Nominal" Background="#161B22" Foreground="#FFFFFF" BorderBrush="#2D333B" Padding="8,6" FontFamily="{StaticResource FontMono}"/>
                         </StackPanel>
                     </Border>

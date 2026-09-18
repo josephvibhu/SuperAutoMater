@@ -991,8 +991,12 @@ namespace SuperAutoMater.Wpf.Views
                     ViewModel.Grade = rep.CalculatedGrade;
                     ShowFeedback($"Express QC Passed: {rep.PassedCount}/{rep.TotalCount} Subsystems Certified ({rep.CalculatedGrade}) ✓", "⚡", "#3FB950");
 
+                    var techProfile = TechnicianProfileService.Instance.CurrentProfile;
+                    string activeQcTech = !string.IsNullOrWhiteSpace(rep.TechnicianName) ? rep.TechnicianName : techProfile.Name;
+
                     OfflineLedgerService.Instance.SaveRecord(new QcAuditRecord
                     {
+                        Tag = ViewModel.AssetTag,
                         Serial_Number = ViewModel.Serial,
                         Model = ViewModel.Model,
                         Physical_Grade = rep.CalculatedGrade,
@@ -1002,8 +1006,27 @@ namespace SuperAutoMater.Wpf.Views
                         Storage_Details = ViewModel.PrimaryDriveModel,
                         Battery_Health = ViewModel.BatteryIntegrityBadge,
                         GPU_Model = ViewModel.GpuName,
-                        Technician_Notes = $"Express QC: {rep.PassedCount}/{rep.TotalCount} Subsystems Nominal. {rep.SummaryText}"
+                        Technician = activeQcTech,
+                        QC_Tech = activeQcTech,
+                        QC_Profile = rep.ProfileUsed.ToString(),
+                        Assigned_To = ViewModel.AssignedTo,
+                        Intake_Tech = ViewModel.IntakeTechnician,
+                        Service_Tech = ViewModel.ServiceTechnician,
+                        Missing_Components = ViewModel.MissingComponents,
+                        Technician_Notes = $"Express QC [{rep.ProfileUsed}]: {rep.PassedCount}/{rep.TotalCount} Subsystems Nominal. {rep.SummaryText}"
                     });
+
+                    try
+                    {
+                        var localStore = new QcRunStore();
+                        var existing = localStore.FindAssetBySerialOrTag(!string.IsNullOrWhiteSpace(ViewModel.AssetTag) ? ViewModel.AssetTag : ViewModel.Serial);
+                        if (existing != null)
+                        {
+                            localStore.UpdateAssetAttribution(existing.AssetId, qcTech: activeQcTech);
+                        }
+                    }
+                    catch { }
+
 
                     if (runner.CloudDispatchRequested)
                     {
@@ -1087,6 +1110,14 @@ namespace SuperAutoMater.Wpf.Views
                         Battery_Health = rec.Battery_Health.ToString(),
                         Storage_Health = rec.Storage_Health,
                         Technician = rec.Technician,
+                        Assigned_To = rec.Assigned_To,
+                        Intake_Tech = rec.Intake_Tech,
+                        Service_Tech = rec.Service_Tech,
+                        QC_Tech = rec.QC_Tech,
+                        Approval_Tech = rec.Approval_Tech,
+                        Missing_Components = rec.Missing_Components,
+                        External_Vendor = rec.External_Vendor,
+                        QC_Profile = rec.QC_Profile,
                         In_Date = rec.In_Date,
                         Supplier = rec.Supplier,
                         Out_Date = rec.Out_Date,

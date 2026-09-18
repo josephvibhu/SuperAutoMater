@@ -196,6 +196,7 @@ namespace SuperAutoMater.Wpf.Services
         public long DesignCapacityMwh { get; set; } = 48004;
         public long FullChargeCapacityMwh { get; set; } = 31466;
         public long RemainingCapacityMwh { get; set; } = 31466;
+        public long CurrentCapacityMwh => FullChargeCapacityMwh;
         public long DesignCapacityMah { get; set; } = 3897;
         public long FullChargeCapacityMah { get; set; } = 2554;
         public long RemainingCapacityMah { get; set; } = 2554;

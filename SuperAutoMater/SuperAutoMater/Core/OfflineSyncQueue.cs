@@ -167,6 +167,14 @@ namespace SuperAutoMater
                             Physical_Grade   = record.Physical_Grade,
                             Remarks          = record.Remarks,
                             Technician       = record.Technician,
+                            Assigned_To      = record.Assigned_To,
+                            Intake_Tech      = record.Intake_Tech,
+                            Service_Tech     = record.Service_Tech,
+                            QC_Tech          = record.QC_Tech,
+                            Approval_Tech    = record.Approval_Tech,
+                            Missing_Components = record.Missing_Components,
+                            External_Vendor  = record.External_Vendor,
+                            QC_Profile       = record.QC_Profile,
                             In_Date          = record.In_Date,
                             Supplier         = record.Supplier,
                             Out_Date         = record.Out_Date,
@@ -175,6 +183,7 @@ namespace SuperAutoMater
                             Shelf_Location   = record.Shelf_Location,
                             Timestamp        = record.Timestamp
                         });
+
 
                         var req = new HttpRequestMessage(HttpMethod.Post, webhookUrl)
                         {
@@ -379,11 +388,20 @@ namespace SuperAutoMater
         public string Remarks { get; set; } = "";
         public string Shelf_Location { get; set; } = "";
         public string Technician { get; set; } = "TECH-01"; // Technician Name or ID
+        public string Assigned_To { get; set; } = "";
+        public string Intake_Tech { get; set; } = "";
+        public string Service_Tech { get; set; } = "";
+        public string QC_Tech { get; set; } = "";
+        public string Approval_Tech { get; set; } = "";
+        public string Missing_Components { get; set; } = "";
+        public string External_Vendor { get; set; } = "";
+        public string QC_Profile { get; set; } = "Full Diagnostic";
         public string In_Date { get; set; } = "";
         public string Supplier { get; set; } = "";
         public string Out_Date { get; set; } = "";
         public string Customer { get; set; } = "";
         public string Timestamp { get; set; } = "";
+
         public DateTime QueuedAt { get; set; } = DateTime.Now;
     }
 }
