@@ -308,12 +308,38 @@
             <!-- MAIN BENTO TELEMETRY ARENA (Col 4-12) -->
             <Grid Grid.Column="1">
                 <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto"/> <!-- Recognized Asset Banner -->
                     <RowDefinition Height="Auto"/> <!-- Top 4 Bento Metric Tiles -->
                     <RowDefinition Height="*"/>    <!-- Main Interactive Arena (KB Matrix + USB/Cloud) -->
                 </Grid.RowDefinitions>
 
+                <!-- Row 0: Cloud/LAN Recognized Device Banner -->
+                <Border Grid.Row="0" Background="#161B22" BorderBrush="#388BFD" BorderThickness="1" CornerRadius="8" Padding="12,6" Margin="0,0,0,8">
+                    <Border.Style>
+                        <Style TargetType="Border">
+                            <Setter Property="Visibility" Value="Collapsed"/>
+                            <Style.Triggers>
+                                <DataTrigger Binding="{Binding IsRecognizedAsset}" Value="True">
+                                    <Setter Property="Visibility" Value="Visible"/>
+                                </DataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </Border.Style>
+                    <DockPanel LastChildFill="False">
+                        <StackPanel Orientation="Horizontal" DockPanel.Dock="Left" VerticalAlignment="Center">
+                            <TextBlock Text="⚡ " FontSize="12" VerticalAlignment="Center"/>
+                            <TextBlock Text="{Binding RecognizedAssetBanner}" Foreground="#58A6FF" FontFamily="{StaticResource FontMono}" FontWeight="Bold" FontSize="11" VerticalAlignment="Center"/>
+                        </StackPanel>
+                        <StackPanel Orientation="Horizontal" DockPanel.Dock="Right" VerticalAlignment="Center">
+                            <Border Background="#1F324D" BorderBrush="#388BFD" BorderThickness="1" CornerRadius="4" Padding="6,2">
+                                <TextBlock Text="AUTO-FILLED FROM FLEET DB" Foreground="#79B8FF" FontFamily="{StaticResource FontMono}" FontWeight="Bold" FontSize="9"/>
+                            </Border>
+                        </StackPanel>
+                    </DockPanel>
+                </Border>
+
                 <!-- Top 4 Bento Metric Tiles -->
-                <Grid Grid.Row="0" Margin="0,0,0,10">
+                <Grid Grid.Row="1" Margin="0,0,0,10">
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="*"/>
                         <ColumnDefinition Width="*"/>
@@ -323,13 +349,29 @@
 
                     <controls:BentoCard Grid.Column="0" Title="CHASSIS IDENTITY" SubtitleBadge="{Binding Manufacturer}" Margin="0,0,6,0">
                         <StackPanel Margin="0,4,0,0">
-                            <TextBlock Text="{Binding Model}" Style="{StaticResource TextCardValueLarge}" TextTrimming="CharacterEllipsis"/>
+                            <DockPanel LastChildFill="False">
+                                <TextBlock DockPanel.Dock="Left" Text="{Binding Model}" Style="{StaticResource TextCardValueLarge}" TextTrimming="CharacterEllipsis" MaxWidth="150"/>
+                                <Border DockPanel.Dock="Right" Background="#161B22" BorderBrush="#388BFD" BorderThickness="1" CornerRadius="4" Padding="4,1" VerticalAlignment="Center">
+                                    <TextBlock Text="{Binding AssetTag, TargetNullValue='TAG PENDING'}" Foreground="#58A6FF" FontFamily="{StaticResource FontMono}" FontWeight="Bold" FontSize="9"/>
+                                </Border>
+                            </DockPanel>
                             <DockPanel LastChildFill="False" Margin="0,6,0,0">
-                                <StackPanel Orientation="Horizontal" DockPanel.Dock="Left">
+                                <StackPanel Orientation="Horizontal" DockPanel.Dock="Left" VerticalAlignment="Center">
                                     <TextBlock Text="SN: " Style="{StaticResource TextCardSubtle}"/>
-                                    <TextBlock Text="{Binding Serial}" FontWeight="Bold" Style="{StaticResource TextCardSubtle}" Foreground="{StaticResource BrushTextWhite}"/>
+                                    <TextBlock Text="{Binding Serial}" FontWeight="Bold" Foreground="{StaticResource BrushTextWhite}">
+                                        <TextBlock.Style>
+                                            <Style TargetType="TextBlock" BasedOn="{StaticResource TextCardSubtle}">
+                                                <Style.Triggers>
+                                                    <DataTrigger Binding="{Binding IsSerialMissing}" Value="True">
+                                                        <Setter Property="Text" Value="[NO SERIAL]"/>
+                                                        <Setter Property="Foreground" Value="#F85149"/>
+                                                    </DataTrigger>
+                                                </Style.Triggers>
+                                            </Style>
+                                        </TextBlock.Style>
+                                    </TextBlock>
                                 </StackPanel>
-                                <Border DockPanel.Dock="Right" Background="#1E10B981" BorderBrush="#34D399" BorderThickness="1" CornerRadius="8" Padding="6,1">
+                                <Border DockPanel.Dock="Right" Background="#1E10B981" BorderBrush="#34D399" BorderThickness="1" CornerRadius="8" Padding="6,1" VerticalAlignment="Center">
                                     <TextBlock Text="{Binding Grade}" Style="{StaticResource TextBadgeMono}" Foreground="{StaticResource BrushTextEmerald}" FontWeight="Bold"/>
                                 </Border>
                             </DockPanel>

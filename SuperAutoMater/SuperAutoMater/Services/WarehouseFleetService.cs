@@ -78,6 +78,8 @@ namespace SuperAutoMater.Wpf.Services
         public ObservableCollection<FleetBenchNode> OnlineBenches { get; } =
             new ObservableCollection<FleetBenchNode>();
 
+        public string SuperManagerUrl { get; private set; }
+        public event Action<string> SuperManagerDiscovered;
         public event Action FleetUpdated;
 
         private WarehouseFleetService() { }
@@ -981,6 +983,20 @@ namespace SuperAutoMater.Wpf.Services
 
                     using var doc = JsonDocument.Parse(json);
                     var root = doc.RootElement;
+
+                    if (root.TryGetProperty("type", out var typeProp) && typeProp.GetString() == "supermanager")
+                    {
+                        string mgrIp = root.GetProperty("ip").GetString();
+                        int mgrPort = root.GetProperty("port").GetInt32();
+                        string url = $"http://{mgrIp}:{mgrPort}";
+                        if (SuperManagerUrl != url)
+                        {
+                            SuperManagerUrl = url;
+                            AppLogger.Info("Discovery", $"Discovered SuperManager Fleet Server at {url}");
+                            SuperManagerDiscovered?.Invoke(url);
+                        }
+                        continue;
+                    }
 
                     string id = root.GetProperty("id").GetString();
                     string ip = root.GetProperty("ip").GetString();

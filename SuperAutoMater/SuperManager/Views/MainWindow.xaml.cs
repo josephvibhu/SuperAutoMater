@@ -81,6 +81,11 @@ namespace SuperManager.Views
             ViewModel.WipBoard.ExecuteIntake();
         }
 
+        private void BtnAutoTag_Click(object sender, RoutedEventArgs e)
+        {
+            ViewModel.WipBoard.AutoGenerateTag();
+        }
+
         private void BtnShowQr_Click(object sender, RoutedEventArgs e)
         {
             try

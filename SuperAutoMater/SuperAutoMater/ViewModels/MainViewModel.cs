@@ -91,6 +91,43 @@ namespace SuperAutoMater.Wpf.ViewModels
         public string Manufacturer => _hw.SystemIdentity?.Manufacturer ?? "Generic";
         public string Model => _hw.SystemIdentity?.Model ?? "Detecting Chassis...";
         public string Serial => _hw.SystemIdentity?.Serial ?? "Detecting...";
+        public bool IsSerialMissing => _hw.SystemIdentity?.IsSerialMissing ?? false;
+
+        private string _assetTag = "";
+        public string AssetTag
+        {
+            get => !string.IsNullOrEmpty(_assetTag) ? _assetTag : (!string.IsNullOrEmpty(Serial) && Serial != "Detecting..." ? Serial : "TAG-PENDING");
+            set { _assetTag = value; OnPropertyChanged(); OnPropertyChanged(nameof(RefurbReportPreviewText)); OnPropertyChanged(nameof(ECommerceListingText)); }
+        }
+
+        private string _assignedTechnician = "";
+        public string AssignedTechnician
+        {
+            get => _assignedTechnician;
+            set { _assignedTechnician = value; OnPropertyChanged(); }
+        }
+
+        private string _missingComponentsWarning = "";
+        public string MissingComponentsWarning
+        {
+            get => _missingComponentsWarning;
+            set { _missingComponentsWarning = value; OnPropertyChanged(); }
+        }
+
+        private string _recognizedAssetBanner = "";
+        public string RecognizedAssetBanner
+        {
+            get => _recognizedAssetBanner;
+            set { _recognizedAssetBanner = value; OnPropertyChanged(); }
+        }
+
+        private bool _isRecognizedAsset = false;
+        public bool IsRecognizedAsset
+        {
+            get => _isRecognizedAsset;
+            set { _isRecognizedAsset = value; OnPropertyChanged(); }
+        }
+
         public string Grade
         {
             get => _hw.SystemIdentity?.Grade ?? "GRADE PENDING";
@@ -727,6 +764,18 @@ namespace SuperAutoMater.Wpf.ViewModels
                 });
             };
 
+            // Wire automatic asset auto-fill on SuperManager discovery
+            WarehouseFleetService.Instance.SuperManagerDiscovered += url =>
+            {
+                System.Windows.Application.Current?.Dispatcher.InvokeAsync(async () =>
+                {
+                    if (!IsRecognizedAsset)
+                    {
+                        await CheckAndAutoFillAssetAsync();
+                    }
+                });
+            };
+
             // Initial PnP Yellow-Bang Device Driver Audit
             _ = RefreshDriverAuditAsync();
         }
@@ -795,12 +844,16 @@ namespace SuperAutoMater.Wpf.ViewModels
             UpdateTestApplicability();
             SyncCollections();
 
+            // Check if device already exists in the system (Local SQLite or SuperManager LAN) to auto-fill asset tag & prior data
+            await CheckAndAutoFillAssetAsync();
+
             try
             {
                 QcRunOrchestrator.Instance.InitializeRun(new QcRunIdentity
                 {
-                    AssetTag = !string.IsNullOrWhiteSpace(Serial) && Serial != "Detecting..." ? Serial : "",
+                    AssetTag = !string.IsNullOrWhiteSpace(AssetTag) && AssetTag != "TAG-PENDING" ? AssetTag : (!string.IsNullOrWhiteSpace(Serial) && Serial != "Detecting..." ? Serial : ""),
                     SerialNumber = Serial,
+                    AssetUuid = _hw.SystemIdentity?.Uuid ?? "",
                     Model = Model,
                     Technician = TechnicianDisplayBadge,
                     Station = TechnicianStation
@@ -812,6 +865,88 @@ namespace SuperAutoMater.Wpf.ViewModels
             }
 
             OnPropertyChanged("");
+        }
+
+        public async Task CheckAndAutoFillAssetAsync()
+        {
+            try
+            {
+                string serial = _hw.SystemIdentity?.Serial ?? "";
+                string uuid = _hw.SystemIdentity?.Uuid ?? "";
+
+                string query = !string.IsNullOrWhiteSpace(serial) && serial != "Detecting..." ? serial : uuid;
+                if (string.IsNullOrWhiteSpace(query)) return;
+
+                // 1. Check local SQLite store
+                var store = new QcRunStore();
+                var localAsset = store.FindAssetByAnyIdentifier(query);
+
+                // 2. If not found locally, query SuperManager LAN endpoint
+                if (localAsset == null)
+                {
+                    bool hasKnownUrl = !string.IsNullOrEmpty(WarehouseFleetService.Instance.SuperManagerUrl);
+                    string mgrUrl = hasKnownUrl ? WarehouseFleetService.Instance.SuperManagerUrl : "http://127.0.0.1:9000";
+
+                    try
+                    {
+                        using var http = new System.Net.Http.HttpClient { Timeout = TimeSpan.FromMilliseconds(hasKnownUrl ? 1500 : 400) };
+                        var resp = await http.GetAsync($"{mgrUrl}/api/asset/lookup?q={Uri.EscapeDataString(query)}");
+                        if (resp.IsSuccessStatusCode)
+                        {
+                            string json = await resp.Content.ReadAsStringAsync();
+                            using var doc = System.Text.Json.JsonDocument.Parse(json);
+                            if (doc.RootElement.TryGetProperty("found", out var foundProp) && foundProp.GetBoolean())
+                            {
+                                var a = doc.RootElement.GetProperty("asset");
+                                localAsset = new AssetWipRecord
+                                {
+                                    AssetId = a.GetProperty("assetId").GetString(),
+                                    AssetTag = a.GetProperty("assetTag").GetString(),
+                                    SerialNumber = a.GetProperty("serialNumber").GetString(),
+                                    Model = a.GetProperty("model").GetString(),
+                                    CurrentLocation = a.GetProperty("currentLocation").GetString(),
+                                    AssignedTo = a.GetProperty("assignedTo").GetString(),
+                                    MissingComponents = a.GetProperty("missingComponents").GetString(),
+                                    LatestRunGrade = a.GetProperty("latestRunGrade").GetString(),
+                                    LatestRunStatus = a.GetProperty("latestRunStatus").GetString(),
+                                    WorkInProgress = a.GetProperty("workInProgress").GetString(),
+                                    Supplier = a.GetProperty("supplier").GetString(),
+                                    Customer = a.GetProperty("customer").GetString(),
+                                    Remarks = a.GetProperty("remarks").GetString()
+                                };
+                            }
+                        }
+                    }
+                    catch { }
+                }
+
+                if (localAsset != null)
+                {
+                    IsRecognizedAsset = true;
+                    if (!string.IsNullOrWhiteSpace(localAsset.AssetTag))
+                        AssetTag = localAsset.AssetTag;
+                    if (!string.IsNullOrWhiteSpace(localAsset.AssignedTo))
+                        AssignedTechnician = localAsset.AssignedTo;
+                    if (!string.IsNullOrWhiteSpace(localAsset.MissingComponents))
+                        MissingComponentsWarning = localAsset.MissingComponents;
+                    if (!string.IsNullOrWhiteSpace(localAsset.LatestRunGrade) && localAsset.LatestRunGrade != "INSPECT" && localAsset.LatestRunGrade != "GRADE PENDING")
+                        Grade = localAsset.LatestRunGrade;
+
+                    RecognizedAssetBanner = $"RECOGNIZED: Tag {localAsset.AssetTag} · {localAsset.Model} · Bay {localAsset.CurrentLocation} · Assigned: {(!string.IsNullOrEmpty(localAsset.AssignedTo) ? localAsset.AssignedTo : "Floor Pool")}";
+                    AppLogger.Info($"[AutoFill] Recognized asset: Tag={localAsset.AssetTag}, Serial={localAsset.SerialNumber}, AssignedTo={localAsset.AssignedTo}");
+                }
+                else
+                {
+                    if (string.IsNullOrWhiteSpace(_assetTag))
+                    {
+                        _assetTag = !string.IsNullOrWhiteSpace(serial) && serial != "Detecting..." ? serial : "";
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                AppLogger.Warn("CheckAndAutoFillAssetAsync encountered error", ex);
+            }
         }
 
         private void UpdateTestApplicability()

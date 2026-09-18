@@ -22,11 +22,17 @@ namespace SuperAutoMater.Wpf.Core
         {
             if (request == null) throw new ArgumentNullException(nameof(request));
 
-            // Validate that we have at least one valid identity handle
-            if (string.IsNullOrWhiteSpace(request.AssetTag) && string.IsNullOrWhiteSpace(request.SerialNumber))
+            // Validate and support Tag-First Intake when serial number is missing/scratched off
+            if (request.IsSerialMissing || string.IsNullOrWhiteSpace(request.SerialNumber))
             {
-                // Generate a temporary floor intake tag if neither was scanned
-                request.AssetTag = "TAG-" + Guid.NewGuid().ToString("N").Substring(0, 8).ToUpperInvariant();
+                request.IsSerialMissing = true;
+                request.SerialNumber = "";
+            }
+
+            if (string.IsNullOrWhiteSpace(request.AssetTag))
+            {
+                // Generate automated unique floor asset tag
+                request.AssetTag = $"TAG-{DateTime.UtcNow:yyMM}-{Guid.NewGuid().ToString("N").Substring(0, 6).ToUpperInvariant()}";
             }
 
             if (string.IsNullOrWhiteSpace(request.InitialLocation))
@@ -35,8 +41,15 @@ namespace SuperAutoMater.Wpf.Core
             }
 
             string assetId = _store.IntakeAsset(request);
-            AppLogger.Info($"[WarehouseJourney] Intake completed for asset '{assetId}' (Tag: '{request.AssetTag}', Serial: '{request.SerialNumber}')");
+            AppLogger.Info($"[WarehouseJourney] Intake completed for asset '{assetId}' (Tag: '{request.AssetTag}', Serial: '{(request.IsSerialMissing ? "[MISSING]" : request.SerialNumber)}')");
             return assetId;
+        }
+
+        public void AssignTechnician(string assetId, string technician, string actor)
+        {
+            if (string.IsNullOrWhiteSpace(assetId)) throw new ArgumentException("Asset ID is required.", nameof(assetId));
+            _store.AssignAssetTechnician(assetId, technician, actor);
+            AppLogger.Info($"[WarehouseJourney] Asset '{assetId}' assigned to '{technician}' by '{actor}'");
         }
 
         public void MoveAsset(string assetId, string destinationLocation, string actor, string reasonCode = "LOCATION_TRANSFER", bool scanConfirmed = true)
@@ -51,29 +64,42 @@ namespace SuperAutoMater.Wpf.Core
             AppLogger.Info($"[WarehouseJourney] Asset '{assetId}' moved to '{destinationLocation}' by '{actor}'");
         }
 
-        public void HoldAsset(string assetId, string reasonCode, string actor, string notes = null)
+        public void SendToActiveTesting(string assetId, string actor, string notes = null)
         {
             if (string.IsNullOrWhiteSpace(assetId)) throw new ArgumentException("Asset ID is required.", nameof(assetId));
-            if (string.IsNullOrWhiteSpace(reasonCode)) throw new ArgumentException("A hold reason code is required.", nameof(reasonCode));
+            var asset = _store.FindAssetBySerialOrTag(assetId);
+            if (asset == null) throw new InvalidOperationException($"Asset '{assetId}' not found.");
+
+            _store.TransitionAssetQueue(asset.AssetId, AssetQueueStatus.ActiveTesting, "TEST-BENCH", actor, "ACTIVE_TESTING_START", notes ?? "Diagnostic bench testing initiated.");
+            AppLogger.Info($"[WarehouseJourney] Asset '{assetId}' transitioned to ActiveTesting by '{actor}'");
+        }
+
+        public void SendToAwaitingParts(string assetId, string reasonCode, string actor, string missingComponents = null, string notes = null)
+        {
+            if (string.IsNullOrWhiteSpace(assetId)) throw new ArgumentException("Asset ID is required.", nameof(assetId));
+            if (string.IsNullOrWhiteSpace(reasonCode)) throw new ArgumentException("A hold/waiting reason code is required.", nameof(reasonCode));
 
             var asset = _store.FindAssetBySerialOrTag(assetId);
             if (asset == null) throw new InvalidOperationException($"Asset '{assetId}' not found.");
 
-            _store.AbortActiveRunForAsset(asset.AssetId, $"Hold: {reasonCode}");
-            _store.TransitionAssetQueue(asset.AssetId, AssetQueueStatus.Hold, null, actor, reasonCode, notes);
-            AppLogger.Info($"[WarehouseJourney] Asset '{assetId}' placed on Hold by '{actor}'. Reason: {reasonCode}");
+            _store.AbortActiveRunForAsset(asset.AssetId, $"AwaitingParts: {reasonCode}");
+            _store.TransitionAssetQueue(asset.AssetId, AssetQueueStatus.AwaitingParts, "PARTS-HOLD-SHELF", actor, reasonCode, notes ?? missingComponents);
+            AppLogger.Info($"[WarehouseJourney] Asset '{assetId}' placed on AwaitingParts by '{actor}'. Reason: {reasonCode}");
         }
 
-        public void SendToRepair(string assetId, string defectReasonCode, string actor, string notes = null, string photoFilePath = null)
+        public void HoldAsset(string assetId, string reasonCode, string actor, string notes = null)
+            => SendToAwaitingParts(assetId, reasonCode, actor, null, notes);
+
+        public void SendToInHouseRepair(string assetId, string defectReasonCode, string actor, string notes = null, string photoFilePath = null)
         {
             if (string.IsNullOrWhiteSpace(assetId)) throw new ArgumentException("Asset ID is required.", nameof(assetId));
-            if (string.IsNullOrWhiteSpace(defectReasonCode)) throw new ArgumentException("A defect reason code is required to send a unit to repair.", nameof(defectReasonCode));
+            if (string.IsNullOrWhiteSpace(defectReasonCode)) throw new ArgumentException("A defect reason code is required to route to in-house repair.", nameof(defectReasonCode));
 
             var asset = _store.FindAssetBySerialOrTag(assetId);
             if (asset == null) throw new InvalidOperationException($"Asset '{assetId}' not found.");
 
             _store.AbortActiveRunForAsset(asset.AssetId, $"Repair: {defectReasonCode}");
-            _store.TransitionAssetQueue(asset.AssetId, AssetQueueStatus.Repair, "REPAIR-BENCH", actor, defectReasonCode, notes);
+            _store.TransitionAssetQueue(asset.AssetId, AssetQueueStatus.InHouseRepair, "REPAIR-BENCH", actor, defectReasonCode, notes);
 
             if (!string.IsNullOrWhiteSpace(photoFilePath) && File.Exists(photoFilePath))
             {
@@ -81,7 +107,23 @@ namespace SuperAutoMater.Wpf.Core
                 evidenceService.StoreEvidenceFile(asset.AssetId, asset.LatestRunId, "DEFECT_PHOTO", photoFilePath, "Photo captured upon repair routing.");
             }
 
-            AppLogger.Info($"[WarehouseJourney] Asset '{assetId}' routed to Repair. Defect: {defectReasonCode} by '{actor}'");
+            AppLogger.Info($"[WarehouseJourney] Asset '{assetId}' routed to InHouseRepair. Defect: {defectReasonCode} by '{actor}'");
+        }
+
+        public void SendToRepair(string assetId, string defectReasonCode, string actor, string notes = null, string photoFilePath = null)
+            => SendToInHouseRepair(assetId, defectReasonCode, actor, notes, photoFilePath);
+
+        public void SendToExternalIcRepair(string assetId, string vendorName, string defectNotes, string actor)
+        {
+            if (string.IsNullOrWhiteSpace(assetId)) throw new ArgumentException("Asset ID is required.", nameof(assetId));
+            if (string.IsNullOrWhiteSpace(vendorName)) throw new ArgumentException("External repair partner/vendor name is required.", nameof(vendorName));
+
+            var asset = _store.FindAssetBySerialOrTag(assetId);
+            if (asset == null) throw new InvalidOperationException($"Asset '{assetId}' not found.");
+
+            _store.AbortActiveRunForAsset(asset.AssetId, $"ExternalIC: {defectNotes}");
+            _store.TransitionAssetQueue(asset.AssetId, AssetQueueStatus.AdvancedIcExternal, "EXTERNAL-VENDOR", actor, "ADVANCED_IC_EXTERNAL", defectNotes, true, vendorName);
+            AppLogger.Info($"[WarehouseJourney] Asset '{assetId}' sent to external IC partner '{vendorName}' by '{actor}'");
         }
 
         public void SendToRetest(string assetId, string actor, string notes = null)
@@ -91,7 +133,7 @@ namespace SuperAutoMater.Wpf.Core
             var asset = _store.FindAssetBySerialOrTag(assetId);
             if (asset == null) throw new InvalidOperationException($"Asset '{assetId}' not found.");
 
-            _store.TransitionAssetQueue(asset.AssetId, AssetQueueStatus.Retest, "TEST-BENCH-STAGING", actor, "REPAIR_COMPLETED", notes ?? "Repairs completed, retest queued.");
+            _store.TransitionAssetQueue(asset.AssetId, AssetQueueStatus.ReadyForRetest, "TEST-BENCH-STAGING", actor, "REPAIR_COMPLETED", notes ?? "Repairs completed, retest queued.");
             AppLogger.Info($"[WarehouseJourney] Asset '{assetId}' routed to Retest by '{actor}'");
         }
 
@@ -99,11 +141,60 @@ namespace SuperAutoMater.Wpf.Core
         /// Strict Release Gate: verifies that the asset's latest QC run is completed,
         /// has an authentic SHA-256 verification seal, and contains no failing tests.
         /// </summary>
+        public void ReleaseToSale(string assetId, string actor, string releaseLocation = "DISPATCH-RTS", string notes = null)
+        {
+            VerifyReleaseGate(assetId, out var asset, out var runSummary);
+            _store.TransitionAssetQueue(asset.AssetId, AssetQueueStatus.ReadyForSale, releaseLocation, actor, "QC_VERIFIED_PASSED", notes ?? $"Verified {runSummary.Grade} release for sale.", true, null, "RTS");
+            AppLogger.Info($"[WarehouseJourney] Asset '{assetId}' approved for ReadyForSale (RTS) by '{actor}'. Grade: {runSummary.Grade}, Hash: {runSummary.VerificationHash}");
+        }
+
         public void ReleaseAsset(string assetId, string actor, string releaseLocation = "DISPATCH-STAGING")
+            => ReleaseToSale(assetId, actor, releaseLocation);
+
+        public void ReleaseToRental(string assetId, string actor, string releaseLocation = "DISPATCH-RFR", string notes = null)
+        {
+            VerifyReleaseGate(assetId, out var asset, out var runSummary);
+            _store.TransitionAssetQueue(asset.AssetId, AssetQueueStatus.ReadyForRental, releaseLocation, actor, "QC_VERIFIED_PASSED", notes ?? $"Verified {runSummary.Grade} release for rental.", true, null, "RFR");
+            AppLogger.Info($"[WarehouseJourney] Asset '{assetId}' approved for ReadyForRental (RFR) by '{actor}'. Grade: {runSummary.Grade}, Hash: {runSummary.VerificationHash}");
+        }
+
+        public void ReleaseToDemo(string assetId, string actor, string releaseLocation = "DEMO-SHELF", string notes = null)
+        {
+            var asset = _store.FindAssetBySerialOrTag(assetId);
+            if (asset == null) throw new InvalidOperationException($"Asset '{assetId}' not found.");
+
+            _store.TransitionAssetQueue(asset.AssetId, AssetQueueStatus.DemoStock, releaseLocation, actor, "DEMO_STAGE", notes ?? "Staged as demonstration / test stock.", true, null, "DEMO");
+            AppLogger.Info($"[WarehouseJourney] Asset '{assetId}' staged as DemoStock by '{actor}'.");
+        }
+
+        public void ReleaseToScrap(string assetId, string approvedReasonCode, string supervisorActor, string notes = null)
+        {
+            if (string.IsNullOrWhiteSpace(assetId)) throw new ArgumentException("Asset ID is required.", nameof(assetId));
+            if (string.IsNullOrWhiteSpace(approvedReasonCode))
+            {
+                throw new InvalidOperationException("Asset disposal / scrap harvesting requires an approved reason code (e.g. BEYOND_ECONOMIC_REPAIR, BOARD_CORROSION).");
+            }
+            if (string.IsNullOrWhiteSpace(supervisorActor))
+            {
+                throw new InvalidOperationException("Asset scrap harvesting requires supervisor / manager authorization.");
+            }
+
+            var asset = _store.FindAssetBySerialOrTag(assetId);
+            if (asset == null) throw new InvalidOperationException($"Asset '{assetId}' not found.");
+
+            _store.AbortActiveRunForAsset(asset.AssetId, $"Scrap: {approvedReasonCode}");
+            _store.TransitionAssetQueue(asset.AssetId, AssetQueueStatus.ScrapHarvest, "SCRAP-HARVEST-BAY", supervisorActor, approvedReasonCode, notes ?? "Asset harvested for components and decommissioned.", true, null, "SCRAP");
+            AppLogger.Info($"[WarehouseJourney] Asset '{assetId}' routed to ScrapHarvest by supervisor '{supervisorActor}'. Reason: {approvedReasonCode}");
+        }
+
+        public void DisposeAsset(string assetId, string approvedReasonCode, string supervisorActor, string notes = null)
+            => ReleaseToScrap(assetId, approvedReasonCode, supervisorActor, notes);
+
+        private void VerifyReleaseGate(string assetId, out AssetWipRecord asset, out QcRunSummary runSummary)
         {
             if (string.IsNullOrWhiteSpace(assetId)) throw new ArgumentException("Asset ID is required.", nameof(assetId));
 
-            var asset = _store.FindAssetBySerialOrTag(assetId);
+            asset = _store.FindAssetBySerialOrTag(assetId);
             if (asset == null) throw new InvalidOperationException($"Asset '{assetId}' not found.");
 
             if (string.IsNullOrWhiteSpace(asset.LatestRunId))
@@ -111,7 +202,7 @@ namespace SuperAutoMater.Wpf.Core
                 throw new InvalidOperationException($"Release Rejected: Asset '{assetId}' has never undergone a diagnostic QC run.");
             }
 
-            var runSummary = _store.GetRunSummary(asset.LatestRunId);
+            runSummary = _store.GetRunSummary(asset.LatestRunId);
             if (runSummary == null)
             {
                 throw new InvalidOperationException($"Release Rejected: Could not retrieve QC run data for run '{asset.LatestRunId}'.");
@@ -133,29 +224,6 @@ namespace SuperAutoMater.Wpf.Core
             {
                 throw new InvalidOperationException($"Release Rejected: QC run '{runSummary.RunId}' contains {unresolvedFails} unresolved failed test(s). All tests must pass or be formally overridden before release.");
             }
-
-            _store.TransitionAssetQueue(asset.AssetId, AssetQueueStatus.ReadyForRelease, releaseLocation, actor, "QC_VERIFIED_PASSED", $"Verified {runSummary.Grade} release.");
-            AppLogger.Info($"[WarehouseJourney] Asset '{assetId}' successfully approved for Release by '{actor}'. Grade: {runSummary.Grade}, Hash: {runSummary.VerificationHash}");
-        }
-
-        public void DisposeAsset(string assetId, string approvedReasonCode, string supervisorActor, string notes = null)
-        {
-            if (string.IsNullOrWhiteSpace(assetId)) throw new ArgumentException("Asset ID is required.", nameof(assetId));
-            if (string.IsNullOrWhiteSpace(approvedReasonCode))
-            {
-                throw new InvalidOperationException("Asset disposal requires a valid, approved disposal reason code (e.g. BEYOND_ECONOMIC_REPAIR, BATTERY_SWELL_HAZARD).");
-            }
-            if (string.IsNullOrWhiteSpace(supervisorActor))
-            {
-                throw new InvalidOperationException("Asset disposal requires explicit supervisor / manager authorization.");
-            }
-
-            var asset = _store.FindAssetBySerialOrTag(assetId);
-            if (asset == null) throw new InvalidOperationException($"Asset '{assetId}' not found.");
-
-            _store.AbortActiveRunForAsset(asset.AssetId, $"Disposed: {approvedReasonCode}");
-            _store.TransitionAssetQueue(asset.AssetId, AssetQueueStatus.Disposed, "EWASTE-DISPOSAL", supervisorActor, approvedReasonCode, notes ?? "Asset decommissioned and staged for disposal.");
-            AppLogger.Info($"[WarehouseJourney] Asset '{assetId}' disposed by supervisor '{supervisorActor}'. Reason: {approvedReasonCode}");
         }
 
         public Dictionary<AssetQueueStatus, List<AssetWipRecord>> GetWipBoard()

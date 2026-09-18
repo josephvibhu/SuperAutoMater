@@ -17,6 +17,8 @@ namespace SuperAutoMater.Wpf.Services
         public string Manufacturer { get; set; } = "Generic";
         public string Model { get; set; } = "Detecting Chassis...";
         public string Serial { get; set; } = "Detecting...";
+        public string Uuid { get; set; } = "";
+        public bool IsSerialMissing { get; set; } = false;
         public string BiosVersion { get; set; } = "";
         public string Grade { get; set; } = "GRADE PENDING";
     }
@@ -348,6 +350,42 @@ namespace SuperAutoMater.Wpf.Services
                         break;
                     }
                 }
+
+                // Probe Motherboard UUID & Product Identifying Number
+                using (var csp = new ManagementObjectSearcher("SELECT UUID, IdentifyingNumber FROM Win32_ComputerSystemProduct"))
+                using (var col = csp.Get())
+                {
+                    foreach (ManagementObject obj in col)
+                    {
+                        using (obj)
+                        {
+                            string uuid = obj["UUID"]?.ToString()?.Trim();
+                            string ident = obj["IdentifyingNumber"]?.ToString()?.Trim();
+                            if (!string.IsNullOrEmpty(uuid) && uuid != "FFFFFFFF-FFFF-FFFF-FFFF-FFFFFFFFFFFF" && uuid != "00000000-0000-0000-0000-000000000000")
+                            {
+                                SystemIdentity.Uuid = uuid;
+                            }
+                            if (string.IsNullOrEmpty(SystemIdentity.Serial) || SystemIdentity.Serial == "Detecting...")
+                            {
+                                if (!string.IsNullOrEmpty(ident)) SystemIdentity.Serial = ident;
+                            }
+                        }
+                        break;
+                    }
+                }
+
+                // Check if serial is missing or generic
+                bool isGeneric = Core.QcRunStore.IsGenericSerial(SystemIdentity.Serial);
+                if (isGeneric || string.IsNullOrWhiteSpace(SystemIdentity.Serial))
+                {
+                    SystemIdentity.IsSerialMissing = true;
+                    SystemIdentity.Serial = "";
+                }
+                else
+                {
+                    SystemIdentity.IsSerialMissing = false;
+                }
+
                 _systemIdentityProbed = true;
             }
             catch { }

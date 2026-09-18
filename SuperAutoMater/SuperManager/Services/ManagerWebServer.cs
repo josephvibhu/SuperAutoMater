@@ -147,7 +147,7 @@ namespace SuperManager.Services
                         return;
                     }
 
-                    if (path.StartsWith("/api/"))
+                    if (path.StartsWith("/api/") && path != "/api/asset/lookup" && path != "/api/ping")
                     {
                         bool isAuthorized = IsAuthorized(requestText, rawUrl);
                         if (!isAuthorized)
@@ -170,7 +170,59 @@ namespace SuperManager.Services
                     byte[] body;
                     string contentType;
 
-                    if (path == "/api/wip")
+                    if (path == "/api/asset/lookup")
+                    {
+                        string query = ExtractQueryParam(rawUrl, "q");
+                        if (string.IsNullOrWhiteSpace(query))
+                            query = ExtractQueryParam(rawUrl, "serial");
+                        if (string.IsNullOrWhiteSpace(query))
+                            query = ExtractQueryParam(rawUrl, "tag");
+
+                        var store = new QcRunStore();
+                        var asset = !string.IsNullOrWhiteSpace(query) ? store.FindAssetByAnyIdentifier(query) : null;
+                        if (asset != null)
+                        {
+                            var result = new
+                            {
+                                found = true,
+                                asset = new
+                                {
+                                    assetId = asset.AssetId,
+                                    assetTag = asset.AssetTag,
+                                    serialNumber = asset.SerialNumber,
+                                    isSerialMissing = asset.IsSerialMissing,
+                                    model = asset.Model,
+                                    currentLocation = asset.CurrentLocation,
+                                    lifecycleQueue = asset.LifecycleQueue.ToString(),
+                                    assignedTo = asset.AssignedTo,
+                                    intakeTechnician = asset.IntakeTechnician,
+                                    serviceTechnician = asset.ServiceTechnician,
+                                    qcTechnician = asset.QcTechnician,
+                                    approvalTechnician = asset.ApprovalTechnician,
+                                    missingComponents = asset.MissingComponents,
+                                    externalVendor = asset.ExternalVendor,
+                                    commercialDisposition = asset.CommercialDisposition,
+                                    storageHealth = asset.StorageHealth,
+                                    workInProgress = asset.WorkInProgress,
+                                    supplier = asset.Supplier,
+                                    customer = asset.Customer,
+                                    inDate = asset.InDate,
+                                    outDate = asset.OutDate,
+                                    remarks = asset.Remarks,
+                                    latestRunGrade = asset.LatestRunGrade,
+                                    latestRunStatus = asset.LatestRunStatus
+                                }
+                            };
+                            string json = JsonSerializer.Serialize(result, new JsonSerializerOptions { WriteIndented = true });
+                            body = Encoding.UTF8.GetBytes(json);
+                        }
+                        else
+                        {
+                            body = Encoding.UTF8.GetBytes("{\"found\":false}");
+                        }
+                        contentType = "application/json; charset=utf-8";
+                    }
+                    else if (path == "/api/wip")
                     {
                         var journeyService = new WarehouseJourneyService();
                         var board = journeyService.GetWipBoard();

@@ -32,6 +32,9 @@ namespace SuperManager.Services
 
         private FleetDiscoveryService() { }
 
+        private UdpClient _udpBroadcaster;
+        private Timer _serverBeaconTimer;
+
         public void Start()
         {
             if (_cts != null) return;
@@ -44,10 +47,16 @@ namespace SuperManager.Services
                 _udpReceiver.ExclusiveAddressUse = false;
                 _udpReceiver.Client.Bind(new IPEndPoint(IPAddress.Any, UDP_PORT));
 
+                _udpBroadcaster = new UdpClient();
+                _udpBroadcaster.EnableBroadcast = true;
+
                 Task.Run(ReceiveBeaconsAsync, _cts.Token);
 
                 // Run periodic heartbeat and cleanup timer every 2 seconds
                 _heartbeatTimer = new Timer(HeartbeatCheck, null, TimeSpan.FromSeconds(2), TimeSpan.FromSeconds(2));
+
+                // Broadcast SuperManager announcement beacon on LAN every 3 seconds
+                _serverBeaconTimer = new Timer(BroadcastManagerBeacon, null, TimeSpan.FromSeconds(1), TimeSpan.FromSeconds(3));
             }
             catch (Exception ex)
             {
@@ -62,9 +71,33 @@ namespace SuperManager.Services
                 _cts?.Cancel();
                 _heartbeatTimer?.Dispose();
                 _heartbeatTimer = null;
+                _serverBeaconTimer?.Dispose();
+                _serverBeaconTimer = null;
+                _udpBroadcaster?.Close();
+                _udpBroadcaster = null;
                 _udpReceiver?.Close();
                 _udpReceiver = null;
                 _cts = null;
+            }
+            catch { }
+        }
+
+        private void BroadcastManagerBeacon(object state)
+        {
+            try
+            {
+                if (_udpBroadcaster == null) return;
+                var beacon = new
+                {
+                    type = "supermanager",
+                    host = Environment.MachineName,
+                    ip = ManagerWebServer.Instance.LocalIpAddress,
+                    port = ManagerWebServer.Instance.Port
+                };
+                string json = JsonSerializer.Serialize(beacon);
+                byte[] bytes = Encoding.UTF8.GetBytes(json);
+                var endpoint = new IPEndPoint(IPAddress.Broadcast, UDP_PORT);
+                _udpBroadcaster.Send(bytes, bytes.Length, endpoint);
             }
             catch { }
         }
@@ -80,6 +113,11 @@ namespace SuperManager.Services
 
                     using var doc = JsonDocument.Parse(json);
                     var root = doc.RootElement;
+
+                    if (root.TryGetProperty("type", out var typeProp) && typeProp.GetString() == "supermanager")
+                    {
+                        continue; // Ignore server's own broadcasts
+                    }
 
                     string id = root.GetProperty("id").GetString();
                     string ip = root.GetProperty("ip").GetString();

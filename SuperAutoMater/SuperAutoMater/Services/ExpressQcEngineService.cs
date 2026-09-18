@@ -672,6 +672,15 @@ namespace SuperAutoMater.Wpf.Services
                 try
                 {
                     var drive = vm?.ActiveDrive ?? HardwareDiagnosticsService.Instance.PrimaryDrive;
+                    if (drive == null || drive.CapacityBytes == 0 || (vm?.MissingComponentsWarning != null && vm.MissingComponentsWarning.IndexOf("No SSD", StringComparison.OrdinalIgnoreCase) >= 0))
+                    {
+                        res.Status = ExpressTestStatus.Passed;
+                        res.Headline = "⏸️ NO INTERNAL SSD · AWAITING DRIVE";
+                        res.Detail = "Barebones / Raw intake unit operating without primary SSD. S.M.A.R.T. speed test bypassed.";
+                        res.MetricValue = "AWAITING SSD";
+                        return;
+                    }
+
                     int health = drive?.HdsHealth ?? 100;
                     int badSectors = drive?.SmartBadSectors ?? 0;
                     string model = drive?.ShortModel ?? "NVMe SSD";
@@ -836,6 +845,15 @@ namespace SuperAutoMater.Wpf.Services
                 {
                     var hw = HardwareDiagnosticsService.Instance;
                     var bat = hw.BatteryTelemetry;
+
+                    if (bat == null || !bat.IsPresent || (vm?.MissingComponentsWarning != null && vm.MissingComponentsWarning.IndexOf("No Battery", StringComparison.OrdinalIgnoreCase) >= 0))
+                    {
+                        res.Status = ExpressTestStatus.Passed;
+                        res.Headline = "⚡ AC-ONLY · NO BATTERY INSTALLED";
+                        res.Detail = "Unit operating on AC adapter power (Battery omitted or not installed).";
+                        res.MetricValue = "AC ONLY";
+                        return;
+                    }
 
                     int charge = vm?.BatteryCharge ?? 100;
                     int health = hw.BatteryTelemetry?.HealthPercent ?? 100;

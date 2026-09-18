@@ -118,17 +118,34 @@ namespace SuperAutoMater.Wpf.Core
     }
 
     /// <summary>
-    /// Seven-state warehouse lifecycle queue.
+    /// Ten-state real-world warehouse lifecycle queue taxonomy.
     /// </summary>
     public enum AssetQueueStatus
     {
-        ReadyForTest,
-        InTest,
-        Hold,
-        Repair,
-        Retest,
-        ReadyForRelease,
-        Disposed
+        // Zone 1: Intake & Testing
+        IntakeStaging = 0,
+        ActiveTesting = 1,
+        ReadyForRetest = 2,
+
+        // Zone 2: Triage & Repair
+        AwaitingParts = 3,
+        InHouseRepair = 4,
+        AdvancedIcExternal = 5,
+
+        // Zone 3: Commercial Release
+        ReadyForSale = 6,      // RTS (Ready to Sell)
+        ReadyForRental = 7,    // RFR (Ready for Rental)
+        DemoStock = 8,         // Demo / Client Evaluation
+        ScrapHarvest = 9,      // Beyond Economic Repair / Harvesting
+
+        // Backward compatibility aliases
+        ReadyForTest = IntakeStaging,
+        InTest = ActiveTesting,
+        Hold = AwaitingParts,
+        Repair = InHouseRepair,
+        Retest = ReadyForRetest,
+        ReadyForRelease = ReadyForSale,
+        Disposed = ScrapHarvest
     }
 
     /// <summary>
@@ -145,14 +162,76 @@ namespace SuperAutoMater.Wpf.Core
     }
 
     /// <summary>
-    /// Power adapter and charging accessories intake confirmation.
+    /// Charger presence verified during intake inspection.
     /// </summary>
-    public enum ChargerConfirmationStatus
+    public enum ChargerPresenceStatus
     {
-        OemChargerPresent,
-        ThirdPartyCharger,
-        NoChargerMissing,
-        UsbCPowerDeliveryBenchTested
+        OriginalOemIncluded,
+        CompatibleIncluded,
+        NoChargerMissing
+    }
+
+    /// <summary>
+    /// Intake submission payload.
+    /// </summary>
+    public sealed class AssetIntakeRequest
+    {
+        public string SerialNumber { get; set; } = "";
+        public string AssetTag { get; set; } = "";
+        public string AssetUuid { get; set; } = "";
+        public string Model { get; set; } = "";
+        public string IntakeBatchId { get; set; } = "";
+        public IntakeSourceStream SourceStream { get; set; } = IntakeSourceStream.Other;
+        public ChargerPresenceStatus ChargerStatus { get; set; } = ChargerPresenceStatus.NoChargerMissing;
+        public string InitialLocation { get; set; } = "INTAKE-STAGING";
+        public string TestProfileId { get; set; } = "standard-refurb-v1";
+        public string Technician { get; set; } = "";
+        public string Notes { get; set; } = "";
+        public bool IsSerialMissing { get; set; } = false;
+        public string Supplier { get; set; } = "";
+        public string MissingComponents { get; set; } = "";
+        public string AssignedTo { get; set; } = "";
+    }
+
+
+
+    /// <summary>
+    /// Live WIP record representing an asset on the floor with its current queue, location, and attribution.
+    /// </summary>
+    public sealed class AssetWipRecord
+    {
+        public string AssetId { get; set; } = "";
+        public string SerialNumber { get; set; } = "";
+        public string AssetTag { get; set; } = "";
+        public string Model { get; set; } = "";
+        public string CurrentLocation { get; set; } = "";
+        public AssetQueueStatus LifecycleQueue { get; set; } = AssetQueueStatus.IntakeStaging;
+        public string IntakeBatchId { get; set; } = "";
+        public string SourceStream { get; set; } = "";
+        public string ChargerStatus { get; set; } = "";
+        public string TestProfileId { get; set; } = "";
+        public string LatestRunId { get; set; } = "";
+        public string LatestRunGrade { get; set; } = "";
+        public string LatestRunStatus { get; set; } = "";
+        public string LatestVerificationHash { get; set; } = "";
+        public int StorageHealth { get; set; } = 100;
+        public string WorkInProgress { get; set; } = "All Okay";
+        public string Supplier { get; set; } = "";
+        public string Customer { get; set; } = "";
+        public string InDate { get; set; } = "";
+        public string OutDate { get; set; } = "";
+        public string Remarks { get; set; } = "";
+        public bool IsSerialMissing { get; set; } = false;
+        public string AssignedTo { get; set; } = "";
+        public string IntakeTechnician { get; set; } = "";
+        public string ServiceTechnician { get; set; } = "";
+        public string QcTechnician { get; set; } = "";
+        public string ApprovalTechnician { get; set; } = "";
+        public string MissingComponents { get; set; } = "";
+        public string ExternalVendor { get; set; } = "";
+        public string CommercialDisposition { get; set; } = "";
+        public DateTimeOffset CreatedAtUtc { get; set; }
+        public DateTimeOffset UpdatedAtUtc { get; set; }
     }
 
     /// <summary>
@@ -171,24 +250,6 @@ namespace SuperAutoMater.Wpf.Core
     }
 
     /// <summary>
-    /// Scan-first intake parameters for newly arrived assets.
-    /// </summary>
-    public sealed class AssetIntakeRequest
-    {
-        public string AssetTag { get; set; } = "";
-        public string SerialNumber { get; set; } = "";
-        public string AssetUuid { get; set; } = "";
-        public string Model { get; set; } = "";
-        public string IntakeBatchId { get; set; } = "";
-        public IntakeSourceStream SourceStream { get; set; } = IntakeSourceStream.TradeIn;
-        public string InitialLocation { get; set; } = "INTAKE-STAGING";
-        public ChargerConfirmationStatus ChargerStatus { get; set; } = ChargerConfirmationStatus.NoChargerMissing;
-        public string TestProfileId { get; set; } = "standard-refurb-v1";
-        public string Technician { get; set; } = "OPERATOR";
-        public string Notes { get; set; } = "";
-    }
-
-    /// <summary>
     /// Append-only custody and location audit record.
     /// </summary>
     public sealed class CustodyEventRecord
@@ -203,36 +264,6 @@ namespace SuperAutoMater.Wpf.Core
         public string Notes { get; set; } = "";
         public bool ScanConfirmed { get; set; } = true;
         public DateTimeOffset RecordedAtUtc { get; set; } = DateTimeOffset.UtcNow;
-    }
-
-    /// <summary>
-    /// Live WIP record representing an asset on the floor with its current queue and location.
-    /// </summary>
-    public sealed class AssetWipRecord
-    {
-        public string AssetId { get; set; } = "";
-        public string SerialNumber { get; set; } = "";
-        public string AssetTag { get; set; } = "";
-        public string Model { get; set; } = "";
-        public string CurrentLocation { get; set; } = "";
-        public AssetQueueStatus LifecycleQueue { get; set; } = AssetQueueStatus.ReadyForTest;
-        public string IntakeBatchId { get; set; } = "";
-        public string SourceStream { get; set; } = "";
-        public string ChargerStatus { get; set; } = "";
-        public string TestProfileId { get; set; } = "";
-        public string LatestRunId { get; set; } = "";
-        public string LatestRunGrade { get; set; } = "";
-        public string LatestRunStatus { get; set; } = "";
-        public string LatestVerificationHash { get; set; } = "";
-        public int StorageHealth { get; set; } = 100;
-        public string WorkInProgress { get; set; } = "All Okay";
-        public string Supplier { get; set; } = "";
-        public string Customer { get; set; } = "";
-        public string InDate { get; set; } = "";
-        public string OutDate { get; set; } = "";
-        public string Remarks { get; set; } = "";
-        public DateTimeOffset CreatedAtUtc { get; set; }
-        public DateTimeOffset UpdatedAtUtc { get; set; }
     }
 
     /// <summary>

@@ -267,6 +267,19 @@ VALUES
 ");
 
                 Execute(connection, "INSERT OR IGNORE INTO schema_migrations(version, applied_at_utc) VALUES(5, CURRENT_TIMESTAMP);");
+
+                // Migration 6: International Depot OS - Missing Serial, 10-Queue Workflow, Soft Assignments & Credits
+                AddColumnIfNotExists(connection, "assets", "is_serial_missing", "INTEGER NOT NULL DEFAULT 0");
+                AddColumnIfNotExists(connection, "assets", "assigned_to", "TEXT NULL");
+                AddColumnIfNotExists(connection, "assets", "intake_technician", "TEXT NULL");
+                AddColumnIfNotExists(connection, "assets", "service_technician", "TEXT NULL");
+                AddColumnIfNotExists(connection, "assets", "qc_technician", "TEXT NULL");
+                AddColumnIfNotExists(connection, "assets", "approval_technician", "TEXT NULL");
+                AddColumnIfNotExists(connection, "assets", "missing_components", "TEXT NULL");
+                AddColumnIfNotExists(connection, "assets", "external_vendor", "TEXT NULL");
+                AddColumnIfNotExists(connection, "assets", "commercial_disposition", "TEXT NULL");
+
+                Execute(connection, "INSERT OR IGNORE INTO schema_migrations(version, applied_at_utc) VALUES(6, CURRENT_TIMESTAMP);");
             }
         }
 
@@ -881,12 +894,17 @@ VALUES($id, $type, $agg, $key, $payload, $now);";
                 {
                     cmd.Transaction = transaction;
                     cmd.CommandText = @"UPDATE assets SET 
-                        lifecycle_queue = 'ReadyForTest',
+                        lifecycle_queue = 'IntakeStaging',
                         intake_batch_id = $batch,
                         source_stream = $source,
                         current_location = $loc,
                         charger_status = $charger,
                         test_profile_id = $profile,
+                        is_serial_missing = $isMissing,
+                        intake_technician = $intakeTech,
+                        assigned_to = COALESCE(NULLIF($assignedTo, ''), assigned_to),
+                        supplier = COALESCE(NULLIF($supplier, ''), supplier),
+                        missing_components = $missingComponents,
                         updated_at_utc = $updated
                         WHERE id = $id;";
                     cmd.Parameters.AddWithValue("$batch", req.IntakeBatchId ?? "");
@@ -894,6 +912,11 @@ VALUES($id, $type, $agg, $key, $payload, $now);";
                     cmd.Parameters.AddWithValue("$loc", string.IsNullOrWhiteSpace(req.InitialLocation) ? "INTAKE-STAGING" : req.InitialLocation);
                     cmd.Parameters.AddWithValue("$charger", req.ChargerStatus.ToString());
                     cmd.Parameters.AddWithValue("$profile", string.IsNullOrWhiteSpace(req.TestProfileId) ? "standard-refurb-v1" : req.TestProfileId);
+                    cmd.Parameters.AddWithValue("$isMissing", (req.IsSerialMissing || string.IsNullOrWhiteSpace(req.SerialNumber)) ? 1 : 0);
+                    cmd.Parameters.AddWithValue("$intakeTech", req.Technician ?? "");
+                    cmd.Parameters.AddWithValue("$assignedTo", !string.IsNullOrWhiteSpace(req.AssignedTo) ? req.AssignedTo : (req.Technician ?? ""));
+                    cmd.Parameters.AddWithValue("$supplier", req.Supplier ?? "");
+                    cmd.Parameters.AddWithValue("$missingComponents", req.MissingComponents ?? "");
                     cmd.Parameters.AddWithValue("$updated", now);
                     cmd.Parameters.AddWithValue("$id", assetId);
                     cmd.ExecuteNonQuery();
@@ -972,7 +995,7 @@ VALUES($id, $assetId, $type, $loc, $actor, $reason, $batch, $notes, $scan, $reco
             }
         }
 
-        public void TransitionAssetQueue(string assetId, AssetQueueStatus targetQueue, string location, string actor, string reasonCode = null, string notes = null, bool scanConfirmed = true)
+        public void TransitionAssetQueue(string assetId, AssetQueueStatus targetQueue, string location, string actor, string reasonCode = null, string notes = null, bool scanConfirmed = true, string externalVendor = null, string commercialDisposition = null, string assignedTo = null)
         {
             if (string.IsNullOrWhiteSpace(assetId)) throw new ArgumentException("Asset ID is required.", nameof(assetId));
             lock (_gate)
@@ -981,17 +1004,27 @@ VALUES($id, $assetId, $type, $loc, $actor, $reason, $batch, $notes, $scan, $reco
                 using var transaction = connection.BeginTransaction();
                 string now = UtcNow();
 
-                // Update asset queue and optional location
+                // Update asset queue, location, external vendor, commercial disposition, and credit technicians by role
                 using (var cmd = connection.CreateCommand())
                 {
                     cmd.Transaction = transaction;
                     cmd.CommandText = @"UPDATE assets SET 
                         lifecycle_queue=$queue,
                         current_location=COALESCE(NULLIF($loc, ''), current_location),
+                        external_vendor=COALESCE(NULLIF($vendor, ''), external_vendor),
+                        commercial_disposition=COALESCE(NULLIF($disp, ''), commercial_disposition),
+                        assigned_to=COALESCE(NULLIF($assigned, ''), assigned_to),
+                        service_technician=CASE WHEN $queue IN ('InHouseRepair', 'AdvancedIcExternal', 'Repair') THEN COALESCE(NULLIF($actor, ''), service_technician) ELSE service_technician END,
+                        qc_technician=CASE WHEN $queue IN ('ActiveTesting', 'ReadyForRetest', 'InTest', 'Retest') THEN COALESCE(NULLIF($actor, ''), qc_technician) ELSE qc_technician END,
+                        approval_technician=CASE WHEN $queue IN ('ReadyForSale', 'ReadyForRental', 'DemoStock', 'ScrapHarvest', 'ReadyForRelease', 'Disposed') THEN COALESCE(NULLIF($actor, ''), approval_technician) ELSE approval_technician END,
                         updated_at_utc=$now
                         WHERE id=$id;";
                     cmd.Parameters.AddWithValue("$queue", targetQueue.ToString());
                     cmd.Parameters.AddWithValue("$loc", location ?? "");
+                    cmd.Parameters.AddWithValue("$vendor", externalVendor ?? "");
+                    cmd.Parameters.AddWithValue("$disp", commercialDisposition ?? "");
+                    cmd.Parameters.AddWithValue("$assigned", assignedTo ?? "");
+                    cmd.Parameters.AddWithValue("$actor", actor ?? "");
                     cmd.Parameters.AddWithValue("$now", now);
                     cmd.Parameters.AddWithValue("$id", assetId);
                     cmd.ExecuteNonQuery();
@@ -999,13 +1032,16 @@ VALUES($id, $assetId, $type, $loc, $actor, $reason, $batch, $notes, $scan, $reco
 
                 CustodyEventType eventType = targetQueue switch
                 {
-                    AssetQueueStatus.ReadyForTest => CustodyEventType.Move,
-                    AssetQueueStatus.InTest => CustodyEventType.Move,
-                    AssetQueueStatus.Hold => CustodyEventType.Hold,
-                    AssetQueueStatus.Repair => CustodyEventType.RepairStart,
-                    AssetQueueStatus.Retest => CustodyEventType.RetestQueued,
-                    AssetQueueStatus.ReadyForRelease => CustodyEventType.ReleaseStaged,
-                    AssetQueueStatus.Disposed => CustodyEventType.Disposed,
+                    AssetQueueStatus.IntakeStaging => CustodyEventType.Move,
+                    AssetQueueStatus.ActiveTesting => CustodyEventType.Move,
+                    AssetQueueStatus.AwaitingParts => CustodyEventType.Hold,
+                    AssetQueueStatus.InHouseRepair => CustodyEventType.RepairStart,
+                    AssetQueueStatus.AdvancedIcExternal => CustodyEventType.Move,
+                    AssetQueueStatus.ReadyForRetest => CustodyEventType.RetestQueued,
+                    AssetQueueStatus.ReadyForSale => CustodyEventType.ReleaseStaged,
+                    AssetQueueStatus.ReadyForRental => CustodyEventType.ReleaseStaged,
+                    AssetQueueStatus.DemoStock => CustodyEventType.ReleaseStaged,
+                    AssetQueueStatus.ScrapHarvest => CustodyEventType.Disposed,
                     _ => CustodyEventType.Move
                 };
 
@@ -1035,6 +1071,47 @@ VALUES($id, $assetId, $type, $loc, $actor, $reason, '', $notes, $scan, $recorded
             }
         }
 
+        public void AssignAssetTechnician(string assetId, string technician, string actor = null)
+        {
+            if (string.IsNullOrWhiteSpace(assetId)) throw new ArgumentException("Asset ID is required.", nameof(assetId));
+            lock (_gate)
+            {
+                using var connection = Open();
+                using var transaction = connection.BeginTransaction();
+                string now = UtcNow();
+
+                using (var cmd = connection.CreateCommand())
+                {
+                    cmd.Transaction = transaction;
+                    cmd.CommandText = "UPDATE assets SET assigned_to = $tech, updated_at_utc = $now WHERE id = $id;";
+                    cmd.Parameters.AddWithValue("$tech", technician ?? "");
+                    cmd.Parameters.AddWithValue("$now", now);
+                    cmd.Parameters.AddWithValue("$id", assetId);
+                    cmd.ExecuteNonQuery();
+                }
+
+                string eventId = Guid.NewGuid().ToString("N");
+                using (var cmdCustody = connection.CreateCommand())
+                {
+                    cmdCustody.Transaction = transaction;
+                    cmdCustody.CommandText = @"INSERT INTO custody_events(id, asset_id, event_type, location, actor, reason_code, batch_id, notes, scan_confirmed, recorded_at_utc)
+VALUES($id, $assetId, 'Move', '', $actor, 'TECHNICIAN_ASSIGNMENT', '', $notes, 1, $recorded);";
+                    cmdCustody.Parameters.AddWithValue("$id", eventId);
+                    cmdCustody.Parameters.AddWithValue("$assetId", assetId);
+                    cmdCustody.Parameters.AddWithValue("$actor", string.IsNullOrWhiteSpace(actor) ? (technician ?? "SUPERVISOR") : actor);
+                    cmdCustody.Parameters.AddWithValue("$notes", $"Assigned to technician {technician}");
+                    cmdCustody.Parameters.AddWithValue("$recorded", now);
+                    cmdCustody.ExecuteNonQuery();
+                }
+
+                AddOutboxEvent(connection, transaction, "AssetTechnicianAssigned", assetId,
+                    "{\"assetId\":\"" + assetId + "\",\"technician\":\"" + EscapeJson(technician) + "\"}", now);
+
+                transaction.Commit();
+                AppLogger.Info($"Asset {assetId} soft-assigned to technician {technician}");
+            }
+        }
+
         public AssetWipRecord FindAssetBySerialOrTag(string identifier)
         {
             if (string.IsNullOrWhiteSpace(identifier)) return null;
@@ -1048,7 +1125,10 @@ SELECT a.id, a.serial_number, a.asset_tag, a.model, a.current_location, a.lifecy
        a.created_at_utc, a.updated_at_utc,
        r.id AS run_id, r.grade AS run_grade, r.status AS run_status, r.verification_hash AS run_hash,
        COALESCE(a.storage_health, 100), COALESCE(a.work_in_progress, 'All Okay'), COALESCE(a.supplier, ''),
-       COALESCE(a.customer, ''), COALESCE(a.in_date, ''), COALESCE(a.out_date, ''), COALESCE(a.remarks, '')
+       COALESCE(a.customer, ''), COALESCE(a.in_date, ''), COALESCE(a.out_date, ''), COALESCE(a.remarks, ''),
+       COALESCE(a.is_serial_missing, 0), COALESCE(a.assigned_to, ''), COALESCE(a.intake_technician, ''),
+       COALESCE(a.service_technician, ''), COALESCE(a.qc_technician, ''), COALESCE(a.approval_technician, ''),
+       COALESCE(a.missing_components, ''), COALESCE(a.external_vendor, ''), COALESCE(a.commercial_disposition, '')
 FROM assets a
 LEFT JOIN qc_runs r ON r.asset_id = a.id AND r.started_at_utc = (SELECT MAX(started_at_utc) FROM qc_runs WHERE asset_id = a.id)
 WHERE (a.id = $id OR a.serial_number = $id COLLATE NOCASE OR a.asset_tag = $id COLLATE NOCASE OR a.asset_uuid = $id)
@@ -1058,6 +1138,11 @@ LIMIT 1;";
                 if (!reader.Read()) return null;
                 return ReadAssetWipRecord(reader);
             }
+        }
+
+        public AssetWipRecord FindAssetByAnyIdentifier(string query)
+        {
+            return FindAssetBySerialOrTag(query);
         }
 
         public AssetWipRecord GetAssetById(string assetId)
@@ -1078,7 +1163,10 @@ SELECT a.id, a.serial_number, a.asset_tag, a.model, a.current_location, a.lifecy
        a.created_at_utc, a.updated_at_utc,
        r.id AS run_id, r.grade AS run_grade, r.status AS run_status, r.verification_hash AS run_hash,
        COALESCE(a.storage_health, 100), COALESCE(a.work_in_progress, 'All Okay'), COALESCE(a.supplier, ''),
-       COALESCE(a.customer, ''), COALESCE(a.in_date, ''), COALESCE(a.out_date, ''), COALESCE(a.remarks, '')
+       COALESCE(a.customer, ''), COALESCE(a.in_date, ''), COALESCE(a.out_date, ''), COALESCE(a.remarks, ''),
+       COALESCE(a.is_serial_missing, 0), COALESCE(a.assigned_to, ''), COALESCE(a.intake_technician, ''),
+       COALESCE(a.service_technician, ''), COALESCE(a.qc_technician, ''), COALESCE(a.approval_technician, ''),
+       COALESCE(a.missing_components, ''), COALESCE(a.external_vendor, ''), COALESCE(a.commercial_disposition, '')
 FROM assets a
 LEFT JOIN qc_runs r ON r.asset_id = a.id AND r.started_at_utc = (SELECT MAX(started_at_utc) FROM qc_runs WHERE asset_id = a.id)
 WHERE a.lifecycle_queue = $queue
@@ -1106,7 +1194,10 @@ SELECT a.id, a.serial_number, a.asset_tag, a.model, a.current_location, a.lifecy
        a.created_at_utc, a.updated_at_utc,
        r.id AS run_id, r.grade AS run_grade, r.status AS run_status, r.verification_hash AS run_hash,
        COALESCE(a.storage_health, 100), COALESCE(a.work_in_progress, 'All Okay'), COALESCE(a.supplier, ''),
-       COALESCE(a.customer, ''), COALESCE(a.in_date, ''), COALESCE(a.out_date, ''), COALESCE(a.remarks, '')
+       COALESCE(a.customer, ''), COALESCE(a.in_date, ''), COALESCE(a.out_date, ''), COALESCE(a.remarks, ''),
+       COALESCE(a.is_serial_missing, 0), COALESCE(a.assigned_to, ''), COALESCE(a.intake_technician, ''),
+       COALESCE(a.service_technician, ''), COALESCE(a.qc_technician, ''), COALESCE(a.approval_technician, ''),
+       COALESCE(a.missing_components, ''), COALESCE(a.external_vendor, ''), COALESCE(a.commercial_disposition, '')
 FROM assets a
 LEFT JOIN qc_runs r ON r.asset_id = a.id AND r.started_at_utc = (SELECT MAX(started_at_utc) FROM qc_runs WHERE asset_id = a.id)
 ORDER BY a.updated_at_utc DESC;";
@@ -1213,7 +1304,7 @@ FROM custody_events WHERE asset_id=$assetId ORDER BY recorded_at_utc ASC;";
 
         private static AssetWipRecord ReadAssetWipRecord(SqliteDataReader reader)
         {
-            Enum.TryParse<AssetQueueStatus>(reader.IsDBNull(5) ? "ReadyForTest" : reader.GetString(5), out var q);
+            Enum.TryParse<AssetQueueStatus>(reader.IsDBNull(5) ? "IntakeStaging" : reader.GetString(5), out var q);
             int fc = reader.FieldCount;
             return new AssetWipRecord
             {
@@ -1239,7 +1330,16 @@ FROM custody_events WHERE asset_id=$assetId ORDER BY recorded_at_utc ASC;";
                 Customer = fc > 19 && !reader.IsDBNull(19) ? reader.GetString(19) : "",
                 InDate = fc > 20 && !reader.IsDBNull(20) ? reader.GetString(20) : "",
                 OutDate = fc > 21 && !reader.IsDBNull(21) ? reader.GetString(21) : "",
-                Remarks = fc > 22 && !reader.IsDBNull(22) ? reader.GetString(22) : ""
+                Remarks = fc > 22 && !reader.IsDBNull(22) ? reader.GetString(22) : "",
+                IsSerialMissing = fc > 23 && !reader.IsDBNull(23) && reader.GetInt32(23) == 1,
+                AssignedTo = fc > 24 && !reader.IsDBNull(24) ? reader.GetString(24) : "",
+                IntakeTechnician = fc > 25 && !reader.IsDBNull(25) ? reader.GetString(25) : "",
+                ServiceTechnician = fc > 26 && !reader.IsDBNull(26) ? reader.GetString(26) : "",
+                QcTechnician = fc > 27 && !reader.IsDBNull(27) ? reader.GetString(27) : "",
+                ApprovalTechnician = fc > 28 && !reader.IsDBNull(28) ? reader.GetString(28) : "",
+                MissingComponents = fc > 29 && !reader.IsDBNull(29) ? reader.GetString(29) : "",
+                ExternalVendor = fc > 30 && !reader.IsDBNull(30) ? reader.GetString(30) : "",
+                CommercialDisposition = fc > 31 && !reader.IsDBNull(31) ? reader.GetString(31) : ""
             };
         }
 
@@ -1326,7 +1426,7 @@ FROM custody_events WHERE asset_id=$assetId ORDER BY recorded_at_utc ASC;";
                 {
                     using var update = connection.CreateCommand();
                     update.Transaction = transaction;
-                    update.CommandText = "UPDATE assets SET asset_tag=$tag, model=$model, asset_uuid=$uuid, serial_confidence='Authoritative', updated_at_utc=$updated WHERE id=$id;";
+                    update.CommandText = "UPDATE assets SET asset_tag=COALESCE(NULLIF($tag, ''), asset_tag), model=COALESCE(NULLIF($model, ''), model), asset_uuid=COALESCE(NULLIF($uuid, ''), asset_uuid), serial_confidence='Authoritative', updated_at_utc=$updated WHERE id=$id;";
                     update.Parameters.AddWithValue("$tag", NormalizeIdentity(identity.AssetTag));
                     update.Parameters.AddWithValue("$model", identity.Model ?? "");
                     update.Parameters.AddWithValue("$uuid", assetUuid);
@@ -1336,7 +1436,32 @@ FROM custody_events WHERE asset_id=$assetId ORDER BY recorded_at_utc ASC;";
                     return found;
                 }
             }
-            // 2. If fallback/generic serial, match by asset_uuid
+
+            // 2. If we have an Asset Tag, match by asset_tag (critical for tag-first intake where serial is missing or scratched)
+            string tagNormalized = NormalizeIdentity(identity.AssetTag);
+            if (!string.IsNullOrEmpty(tagNormalized))
+            {
+                using var findTag = connection.CreateCommand();
+                findTag.Transaction = transaction;
+                findTag.CommandText = "SELECT id FROM assets WHERE asset_tag=$tag COLLATE NOCASE LIMIT 1;";
+                findTag.Parameters.AddWithValue("$tag", tagNormalized);
+                var found = findTag.ExecuteScalar() as string;
+                if (!string.IsNullOrEmpty(found))
+                {
+                    using var update = connection.CreateCommand();
+                    update.Transaction = transaction;
+                    update.CommandText = "UPDATE assets SET serial_number=COALESCE(NULLIF($serial, ''), serial_number), model=COALESCE(NULLIF($model, ''), model), asset_uuid=COALESCE(NULLIF($uuid, ''), asset_uuid), updated_at_utc=$updated WHERE id=$id;";
+                    update.Parameters.AddWithValue("$serial", string.IsNullOrEmpty(serial) ? (object)DBNull.Value : serial);
+                    update.Parameters.AddWithValue("$model", identity.Model ?? "");
+                    update.Parameters.AddWithValue("$uuid", assetUuid);
+                    update.Parameters.AddWithValue("$updated", now);
+                    update.Parameters.AddWithValue("$id", found);
+                    update.ExecuteNonQuery();
+                    return found;
+                }
+            }
+
+            // 3. If fallback/generic serial, match by asset_uuid
             else if (!string.IsNullOrEmpty(assetUuid))
             {
                 using var findUuid = connection.CreateCommand();
@@ -1348,9 +1473,10 @@ FROM custody_events WHERE asset_id=$assetId ORDER BY recorded_at_utc ASC;";
                 {
                     using var update = connection.CreateCommand();
                     update.Transaction = transaction;
-                    update.CommandText = "UPDATE assets SET asset_tag=$tag, model=$model, updated_at_utc=$updated WHERE id=$id;";
-                    update.Parameters.AddWithValue("$tag", NormalizeIdentity(identity.AssetTag));
+                    update.CommandText = "UPDATE assets SET asset_tag=COALESCE(NULLIF($tag, ''), asset_tag), model=COALESCE(NULLIF($model, ''), model), serial_number=COALESCE(NULLIF($serial, ''), serial_number), updated_at_utc=$updated WHERE id=$id;";
+                    update.Parameters.AddWithValue("$tag", tagNormalized);
                     update.Parameters.AddWithValue("$model", identity.Model ?? "");
+                    update.Parameters.AddWithValue("$serial", string.IsNullOrEmpty(serial) ? (object)DBNull.Value : serial);
                     update.Parameters.AddWithValue("$updated", now);
                     update.Parameters.AddWithValue("$id", found);
                     update.ExecuteNonQuery();
@@ -1358,19 +1484,20 @@ FROM custody_events WHERE asset_id=$assetId ORDER BY recorded_at_utc ASC;";
                 }
             }
 
-            // 3. Create new asset
+            // 4. Create new asset
             var id = Guid.NewGuid().ToString("N");
             using var insert = connection.CreateCommand();
             insert.Transaction = transaction;
-            insert.CommandText = @"INSERT INTO assets(id, serial_number, asset_tag, model, asset_uuid, serial_confidence, serial_source, created_at_utc, updated_at_utc)
-VALUES($id, $serial, $tag, $model, $uuid, $conf, $src, $created, $updated);";
+            insert.CommandText = @"INSERT INTO assets(id, serial_number, asset_tag, model, asset_uuid, serial_confidence, serial_source, is_serial_missing, created_at_utc, updated_at_utc)
+VALUES($id, $serial, $tag, $model, $uuid, $conf, $src, $isMissing, $created, $updated);";
             insert.Parameters.AddWithValue("$id", id);
             insert.Parameters.AddWithValue("$serial", string.IsNullOrEmpty(serial) ? (object)DBNull.Value : serial);
-            insert.Parameters.AddWithValue("$tag", NormalizeIdentity(identity.AssetTag));
+            insert.Parameters.AddWithValue("$tag", tagNormalized);
             insert.Parameters.AddWithValue("$model", identity.Model ?? "");
             insert.Parameters.AddWithValue("$uuid", assetUuid);
             insert.Parameters.AddWithValue("$conf", identity.Confidence.ToString());
             insert.Parameters.AddWithValue("$src", identity.IdentifierSource ?? "Win32_BIOS");
+            insert.Parameters.AddWithValue("$isMissing", string.IsNullOrEmpty(serial) ? 1 : 0);
             insert.Parameters.AddWithValue("$created", now);
             insert.Parameters.AddWithValue("$updated", now);
             insert.ExecuteNonQuery();
