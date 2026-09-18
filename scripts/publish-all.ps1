@@ -1,6 +1,6 @@
 param(
-    [string]$ClientVersion = "1.6.9",
-    [string]$ServerVersion = "1.6.9"
+    [string]$ClientVersion = "1.6.10",
+    [string]$ServerVersion = "1.6.10"
 )
 
 $ErrorActionPreference = "Stop"

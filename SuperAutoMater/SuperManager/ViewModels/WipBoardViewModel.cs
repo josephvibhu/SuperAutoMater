@@ -4,6 +4,7 @@ using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.Linq;
 using System.Runtime.CompilerServices;
+using System.Threading.Tasks;
 using SuperAutoMater.Core;
 using SuperAutoMater.Wpf.Core;
 
@@ -143,45 +144,62 @@ namespace SuperManager.ViewModels
 
         public void RefreshBoard()
         {
-            try
+            Task.Run(() =>
             {
-                var board = _warehouseService.GetWipBoard();
-                UpdateLane(IntakeStagingLane, board[AssetQueueStatus.IntakeStaging]);
-                UpdateLane(ActiveTestingLane, board[AssetQueueStatus.ActiveTesting]);
-                UpdateLane(ReadyForRetestLane, board[AssetQueueStatus.ReadyForRetest]);
-                UpdateLane(AwaitingPartsLane, board[AssetQueueStatus.AwaitingParts]);
-                UpdateLane(InHouseRepairLane, board[AssetQueueStatus.InHouseRepair]);
-                UpdateLane(AdvancedIcExternalLane, board[AssetQueueStatus.AdvancedIcExternal]);
-                UpdateLane(ReadyForSaleLane, board[AssetQueueStatus.ReadyForSale]);
-                UpdateLane(ReadyForRentalLane, board[AssetQueueStatus.ReadyForRental]);
-                UpdateLane(DemoStockLane, board[AssetQueueStatus.DemoStock]);
-                UpdateLane(ScrapHarvestLane, board[AssetQueueStatus.ScrapHarvest]);
-
-                TotalAssets = IntakeStagingLane.Count + ActiveTestingLane.Count + ReadyForRetestLane.Count +
-                              AwaitingPartsLane.Count + InHouseRepairLane.Count + AdvancedIcExternalLane.Count +
-                              ReadyForSaleLane.Count + ReadyForRentalLane.Count + DemoStockLane.Count + ScrapHarvestLane.Count;
-
-                // Load Depot OS operational KPIs & Aging WIP
-                var kpi = _store.GetDepotKpis();
-                KpiSummary = kpi;
-                FirstTimePassRate = kpi.FirstTimePassRatePercent;
-                DailyThroughput = kpi.DailyThroughput;
-                ActiveExceptionsCount = kpi.ActiveExceptionsCount;
-                OldestWipAgeDisplay = kpi.OldestWipUnitAgeHours < 24
-                    ? $"{Math.Round(kpi.OldestWipUnitAgeHours, 1)}h"
-                    : $"{Math.Round(kpi.OldestWipUnitAgeHours / 24.0, 1)}d";
-
-                var aging = _store.GetAgingWip(10);
-                TenOldestWipUnits.Clear();
-                foreach (var unit in aging)
+                try
                 {
-                    TenOldestWipUnits.Add(unit);
+                    var board = _warehouseService.GetWipBoard();
+                    var kpi = _store.GetDepotKpis();
+                    var aging = _store.GetAgingWip(10);
+
+                    System.Windows.Application.Current?.Dispatcher?.InvokeAsync(() =>
+                    {
+                        try
+                        {
+                            UpdateLane(IntakeStagingLane, board[AssetQueueStatus.IntakeStaging]);
+                            UpdateLane(ActiveTestingLane, board[AssetQueueStatus.ActiveTesting]);
+                            UpdateLane(ReadyForRetestLane, board[AssetQueueStatus.ReadyForRetest]);
+                            UpdateLane(AwaitingPartsLane, board[AssetQueueStatus.AwaitingParts]);
+                            UpdateLane(InHouseRepairLane, board[AssetQueueStatus.InHouseRepair]);
+                            UpdateLane(AdvancedIcExternalLane, board[AssetQueueStatus.AdvancedIcExternal]);
+                            UpdateLane(ReadyForSaleLane, board[AssetQueueStatus.ReadyForSale]);
+                            UpdateLane(ReadyForRentalLane, board[AssetQueueStatus.ReadyForRental]);
+                            UpdateLane(DemoStockLane, board[AssetQueueStatus.DemoStock]);
+                            UpdateLane(ScrapHarvestLane, board[AssetQueueStatus.ScrapHarvest]);
+
+                            TotalAssets = IntakeStagingLane.Count + ActiveTestingLane.Count + ReadyForRetestLane.Count +
+                                          AwaitingPartsLane.Count + InHouseRepairLane.Count + AdvancedIcExternalLane.Count +
+                                          ReadyForSaleLane.Count + ReadyForRentalLane.Count + DemoStockLane.Count + ScrapHarvestLane.Count;
+
+                            // Load Depot OS operational KPIs & Aging WIP
+                            KpiSummary = kpi;
+                            FirstTimePassRate = kpi.FirstTimePassRatePercent;
+                            DailyThroughput = kpi.DailyThroughput;
+                            ActiveExceptionsCount = kpi.ActiveExceptionsCount;
+                            OldestWipAgeDisplay = kpi.OldestWipUnitAgeHours < 24
+                                ? $"{Math.Round(kpi.OldestWipUnitAgeHours, 1)}h"
+                                : $"{Math.Round(kpi.OldestWipUnitAgeHours / 24.0, 1)}d";
+
+                            TenOldestWipUnits.Clear();
+                            foreach (var unit in aging)
+                            {
+                                TenOldestWipUnits.Add(unit);
+                            }
+                        }
+                        catch (Exception ex)
+                        {
+                            ActionMessage = $"UI update failed: {ex.Message}";
+                        }
+                    });
                 }
-            }
-            catch (Exception ex)
-            {
-                ActionMessage = $"Refresh failed: {ex.Message}";
-            }
+                catch (Exception ex)
+                {
+                    System.Windows.Application.Current?.Dispatcher?.InvokeAsync(() =>
+                    {
+                        ActionMessage = $"Refresh failed: {ex.Message}";
+                    });
+                }
+            });
         }
 
         private void UpdateLane(ObservableCollection<AssetWipRecord> collection, List<AssetWipRecord> items)

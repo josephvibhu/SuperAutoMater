@@ -828,6 +828,7 @@ namespace SuperAutoMater.Wpf.Views
                     DriverIntegritySummary = ViewModel.MissingDriversSummary,
                     ThermalDissipationVerdict = ThermalProfilerService.Instance.GetCurrentResult().ConditionSummary,
                     RamTopologySummary = ViewModel.RamChannelBadge,
+                    RamHealthScoreSummary = ViewModel.RamHealthBadge,
                     RadiatorAirflowSummary = ViewModel.ThermalDecayVerdict,
                     WebcamOpticsSummary = ViewModel.WebcamOpticsBadge,
                     CloudAuditUrl = GoogleSheetsDispatcher.DefaultSheetsUrl

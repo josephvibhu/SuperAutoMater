@@ -166,6 +166,27 @@ namespace SuperAutoMater.Wpf.ViewModels
             }
         }
 
+        private string _supplier = "";
+        public string Supplier
+        {
+            get => _supplier;
+            set { _supplier = value; OnPropertyChanged(); OnPropertyChanged(nameof(RefurbReportPreviewText)); }
+        }
+
+        private string _customer = "";
+        public string Customer
+        {
+            get => _customer;
+            set { _customer = value; OnPropertyChanged(); }
+        }
+
+        private string _workInProgress = "";
+        public string WorkInProgress
+        {
+            get => _workInProgress;
+            set { _workInProgress = value; OnPropertyChanged(); }
+        }
+
         // CPU & Thermals
         public string CpuName => _hw.CpuTelemetry?.CpuName ?? "Detecting CPU...";
         public string CoreSummary => _hw.CpuTelemetry?.CoreSummary ?? "Cores: --";
@@ -210,6 +231,14 @@ namespace SuperAutoMater.Wpf.ViewModels
         public string RamChannelAccentHex => _hw.MemoryStorage?.Topology?.AccentHex ?? "#D29922";
         public SolidColorBrush RamChannelBorderBrush => new SolidColorBrush((Color)ColorConverter.ConvertFromString(RamChannelAccentHex));
         public bool IsSingleChannelBottleneck => _hw.MemoryStorage?.Topology?.IsSingleChannelBottleneck ?? false;
+
+        // RAM Health & Degradation Prediction Engine
+        public int RamHealthScore => RamHealthPredictorService.Instance.LastAssessment?.HealthScore ?? 100;
+        public string RamHealthBadge => RamHealthPredictorService.Instance.LastAssessment?.SummaryBadge ?? "100% HEALTH (NOMINAL)";
+        public string RamHealthAccentHex => RamHealthPredictorService.Instance.LastAssessment?.AccentHex ?? "#3FB950";
+        public string RamDegradationDisplay => RamHealthPredictorService.Instance.LastAssessment != null
+            ? $"{RamHealthPredictorService.Instance.LastAssessment.HealthScore}% · {RamHealthPredictorService.Instance.LastAssessment.Recommendation}"
+            : "Nominal 0 Bit-Flips";
 
         // Thermal Cool-Down Decay & Airflow (2A)
         public string ThermalDecayVerdict => ThermalProfilerService.Instance.GetCurrentResult().RadiatorAirflowVerdict;
@@ -677,7 +706,7 @@ namespace SuperAutoMater.Wpf.ViewModels
                 }
                 sb.AppendLine($"CPU:         {CpuName}");
                 sb.AppendLine($"CORES/FREQ:  {CoreSummary} · {ClockSummary}");
-                sb.AppendLine($"MEMORY:      {RamSummary} [{RamChannelBadge}]");
+                sb.AppendLine($"MEMORY:      {RamSummary} [{RamHealthBadge} · {RamChannelBadge}]");
                 sb.AppendLine($"STORAGE:     {PrimaryDriveModel} ({StorageSummary})");
                 sb.AppendLine($"DRIVE SMART: {HealthBadge} · 0 Bad Sectors");
                 sb.AppendLine($"SSD TBW:     {TbwDisplaySummary}");
@@ -708,7 +737,7 @@ namespace SuperAutoMater.Wpf.ViewModels
                 sb.AppendLine($"★ [{Grade}] {Manufacturer} {Model} Refurbished Business Laptop");
                 sb.AppendLine($"• Condition: {Grade} ({CosmeticDefectsSummary})");
                 sb.AppendLine($"• Processor: {CpuName} ({CoreSummary})");
-                sb.AppendLine($"• RAM: {RamSummary} ({RamChannelBadge})");
+                sb.AppendLine($"• RAM: {RamSummary} ({RamHealthBadge} · {RamChannelBadge})");
                 sb.AppendLine($"• Storage: {PrimaryDriveModel} ({StorageSummary}) - {HealthBadge} (TBW: {TbwWrittenTb:F1}TB / {TbwRatedEnduranceTb}TBW)");
                 sb.AppendLine($"• Battery: {BatteryIntegrityBadge} ({BatteryWearSummary} · {BatteryCellTopology})");
                 sb.AppendLine($"• Graphics: {GpuName} ({GpuVram})");
@@ -906,6 +935,7 @@ namespace SuperAutoMater.Wpf.ViewModels
                 // 1. Check local SQLite store
                 var store = new QcRunStore();
                 var localAsset = store.FindAssetByAnyIdentifier(query);
+                string sourceTag = "LOCAL";
 
                 // 2. If not found locally, query SuperManager LAN endpoint
                 if (localAsset == null)
@@ -940,10 +970,71 @@ namespace SuperAutoMater.Wpf.ViewModels
                                     Customer = a.GetProperty("customer").GetString(),
                                     Remarks = a.GetProperty("remarks").GetString()
                                 };
+                                sourceTag = "LAN";
+
+                                // Cache in local SQLite store
+                                try
+                                {
+                                    store.SaveItamRecord(new AssetQueueRecord
+                                    {
+                                        Tag = localAsset.AssetTag,
+                                        Serial_Number = localAsset.SerialNumber,
+                                        Model = localAsset.Model,
+                                        Physical_Grade = localAsset.LatestRunGrade,
+                                        Status = localAsset.LatestRunStatus,
+                                        Work_In_Progress = localAsset.WorkInProgress,
+                                        Technician = localAsset.AssignedTo,
+                                        Supplier = localAsset.Supplier,
+                                        Customer = localAsset.Customer,
+                                        Remarks = localAsset.Remarks
+                                    });
+                                }
+                                catch { }
                             }
                         }
                     }
                     catch { }
+                }
+
+                // 3. If still not found, query Cloud Google Sheets webhook (Tier-3 Cloud Telemetry Recall)
+                if (localAsset == null)
+                {
+                    try
+                    {
+                        var sheetRecord = await OfflineSyncQueue.Instance.QueryRemoteSheetAsync(query);
+                        if (sheetRecord != null && (!string.IsNullOrWhiteSpace(sheetRecord.Tag) || !string.IsNullOrWhiteSpace(sheetRecord.Serial_Number)))
+                        {
+                            // Cache into local SQLite
+                            try
+                            {
+                                store.SaveItamRecord(sheetRecord);
+                            }
+                            catch { }
+
+                            string resolvedTag = !string.IsNullOrWhiteSpace(sheetRecord.Tag) ? sheetRecord.Tag : (!string.IsNullOrWhiteSpace(sheetRecord.Asset_Tag) ? sheetRecord.Asset_Tag : query);
+                            localAsset = new AssetWipRecord
+                            {
+                                AssetId = Guid.NewGuid().ToString(),
+                                AssetTag = resolvedTag,
+                                SerialNumber = !string.IsNullOrWhiteSpace(sheetRecord.Serial_Number) ? sheetRecord.Serial_Number : serial,
+                                Model = !string.IsNullOrWhiteSpace(sheetRecord.Model) ? sheetRecord.Model : (_hw.SystemIdentity?.Model ?? ""),
+                                CurrentLocation = "Cloud Intake",
+                                AssignedTo = sheetRecord.Technician,
+                                MissingComponents = !string.IsNullOrWhiteSpace(sheetRecord.Work_In_Progress) && sheetRecord.Work_In_Progress != "All Okay" ? sheetRecord.Work_In_Progress : "",
+                                LatestRunGrade = sheetRecord.Physical_Grade,
+                                LatestRunStatus = sheetRecord.Status,
+                                WorkInProgress = sheetRecord.Work_In_Progress,
+                                Supplier = sheetRecord.Supplier,
+                                Customer = sheetRecord.Customer,
+                                Remarks = sheetRecord.Remarks
+                            };
+                            sourceTag = "CLOUD";
+                        }
+                    }
+                    catch (Exception cloudEx)
+                    {
+                        AppLogger.Warn($"Cloud asset lookup error for {query}: {cloudEx.Message}");
+                    }
                 }
 
                 if (localAsset != null)
@@ -957,9 +1048,27 @@ namespace SuperAutoMater.Wpf.ViewModels
                         MissingComponentsWarning = localAsset.MissingComponents;
                     if (!string.IsNullOrWhiteSpace(localAsset.LatestRunGrade) && localAsset.LatestRunGrade != "INSPECT" && localAsset.LatestRunGrade != "GRADE PENDING")
                         Grade = localAsset.LatestRunGrade;
+                    if (!string.IsNullOrWhiteSpace(localAsset.Supplier))
+                        Supplier = localAsset.Supplier;
+                    if (!string.IsNullOrWhiteSpace(localAsset.Customer))
+                        Customer = localAsset.Customer;
+                    if (!string.IsNullOrWhiteSpace(localAsset.WorkInProgress))
+                        WorkInProgress = localAsset.WorkInProgress;
 
-                    RecognizedAssetBanner = $"RECOGNIZED: Tag {localAsset.AssetTag} · {localAsset.Model} · Bay {localAsset.CurrentLocation} · Assigned: {(!string.IsNullOrEmpty(localAsset.AssignedTo) ? localAsset.AssignedTo : "Floor Pool")}";
-                    AppLogger.Info($"[AutoFill] Recognized asset: Tag={localAsset.AssetTag}, Serial={localAsset.SerialNumber}, AssignedTo={localAsset.AssignedTo}");
+                    if (sourceTag == "CLOUD")
+                    {
+                        RecognizedAssetBanner = $"☁ CLOUD SYNCHRONIZED: Tag {localAsset.AssetTag} · Status: {localAsset.LatestRunStatus} · Supplier: {(!string.IsNullOrEmpty(localAsset.Supplier) ? localAsset.Supplier : "N/A")} · Tech: {(!string.IsNullOrEmpty(localAsset.AssignedTo) ? localAsset.AssignedTo : "Floor Pool")}";
+                    }
+                    else if (sourceTag == "LAN")
+                    {
+                        RecognizedAssetBanner = $"🌐 FLEET SYNCED: Tag {localAsset.AssetTag} · {localAsset.Model} · Bay {localAsset.CurrentLocation} · Assigned: {(!string.IsNullOrEmpty(localAsset.AssignedTo) ? localAsset.AssignedTo : "Floor Pool")}";
+                    }
+                    else
+                    {
+                        RecognizedAssetBanner = $"RECOGNIZED: Tag {localAsset.AssetTag} · {localAsset.Model} · Bay {localAsset.CurrentLocation} · Assigned: {(!string.IsNullOrEmpty(localAsset.AssignedTo) ? localAsset.AssignedTo : "Floor Pool")}";
+                    }
+
+                    AppLogger.Info($"[AutoFill] {sourceTag} asset recognized: Tag={localAsset.AssetTag}, Serial={localAsset.SerialNumber}, AssignedTo={localAsset.AssignedTo}");
                 }
                 else
                 {

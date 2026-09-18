@@ -288,25 +288,30 @@ namespace SuperAutoMater.Wpf.Services
 
         public async Task InitializeAsync()
         {
-            var tasks = new Task[]
+            // Tier-1 (Core Identity & Topology): Ultra-fast, completes in <80ms for instant UI display
+            var tier1Tasks = new Task[]
             {
                 Task.Run(ProbeSystemIdentity),
                 Task.Run(ProbeCpu),
-                Task.Run(ProbeGpu),
                 Task.Run(ProbeMemory),
-                Task.Run(ProbeStorage),
-                Task.Run(ProbeBattery),
-                Task.Run(ProbeNetwork),
                 Task.Run(ProbeTouchscreen)
             };
 
-            // Fast non-blocking startup: wait up to 250ms for initial UI hydration, then let background tasks update
-            var allTasks = Task.WhenAll(tasks);
-            await Task.WhenAny(allTasks, Task.Delay(250));
+            // Tier-2 (Extended Peripherals & Network): Secondary WMI & external process probes
+            var tier2Tasks = new Task[]
+            {
+                Task.Run(ProbeGpu),
+                Task.Run(ProbeStorage),
+                Task.Run(ProbeBattery),
+                Task.Run(ProbeNetwork)
+            };
+
+            // Fast UI hydration: wait up to 120ms for Tier-1 to populate initial window
+            await Task.WhenAny(Task.WhenAll(tier1Tasks), Task.Delay(120));
             TelemetryUpdated?.Invoke();
 
-            // Background continuation ensures slower probes (like Bluetooth or detailed battery) update cleanly
-            _ = allTasks.ContinueWith(_ =>
+            // Background continuation ensures secondary hardware details hydrate cleanly without blocking
+            _ = Task.WhenAll(tier2Tasks).ContinueWith(_ =>
             {
                 TelemetryUpdated?.Invoke();
             });
@@ -1135,7 +1140,7 @@ namespace SuperAutoMater.Wpf.Services
                 using (var p = Process.Start(psi))
                 {
                     string output = p?.StandardOutput.ReadToEnd();
-                    p?.WaitForExit(1000);
+                    p?.WaitForExit(350);
 
                     if (!string.IsNullOrWhiteSpace(output))
                     {
@@ -1170,7 +1175,7 @@ namespace SuperAutoMater.Wpf.Services
                     }
                 }
 
-                // 2. Query Gateway IP and Ping Latency
+                // 2. Query Gateway IP and Fast Ping Latency (150ms timeout)
                 try
                 {
                     var activeNic = NetworkInterface.GetAllNetworkInterfaces()
@@ -1185,7 +1190,7 @@ namespace SuperAutoMater.Wpf.Services
                         {
                             NetworkTelemetry.GatewayIp = gw.Address.ToString();
                             using var ping = new Ping();
-                            var reply = ping.Send(gw.Address, 350);
+                            var reply = ping.Send(gw.Address, 150);
                             if (reply.Status == IPStatus.Success)
                             {
                                 NetworkTelemetry.PingLatencyMs = (int)reply.RoundtripTime;
@@ -1195,29 +1200,33 @@ namespace SuperAutoMater.Wpf.Services
                 }
                 catch { }
 
-                // 3. Probe Bluetooth Controller
-                try
+                // 3. Probe Bluetooth Controller in detached thread to prevent registry query lag
+                _ = Task.Run(() =>
                 {
-                    using (var searcher = new ManagementObjectSearcher("SELECT Name, Status, PNPDeviceID FROM Win32_PnPEntity WHERE PNPClass = 'Bluetooth'"))
-                    using (var col = searcher.Get())
+                    try
                     {
-                        foreach (ManagementObject bt in col)
+                        using (var searcher = new ManagementObjectSearcher("SELECT Name, Status, PNPDeviceID FROM Win32_PnPEntity WHERE PNPClass = 'Bluetooth'"))
+                        using (var col = searcher.Get())
                         {
-                            using (bt)
+                            foreach (ManagementObject bt in col)
                             {
-                                string name = bt["Name"]?.ToString()?.Trim();
-                                if (!string.IsNullOrEmpty(name) && !name.Contains("Enumerator") && !name.Contains("Device"))
+                                using (bt)
                                 {
-                                    NetworkTelemetry.BluetoothControllerName = name;
-                                    NetworkTelemetry.BluetoothStatus = "ONLINE · Host Transceiver Operational";
-                                    NetworkTelemetry.IsBluetoothActive = true;
-                                    break;
+                                    string name = bt["Name"]?.ToString()?.Trim();
+                                    if (!string.IsNullOrEmpty(name) && !name.Contains("Enumerator") && !name.Contains("Device"))
+                                    {
+                                        NetworkTelemetry.BluetoothControllerName = name;
+                                        NetworkTelemetry.BluetoothStatus = "ONLINE · Host Transceiver Operational";
+                                        NetworkTelemetry.IsBluetoothActive = true;
+                                        break;
+                                    }
                                 }
                             }
                         }
+                        TelemetryUpdated?.Invoke();
                     }
-                }
-                catch { }
+                    catch { }
+                });
             }
             catch { }
         }

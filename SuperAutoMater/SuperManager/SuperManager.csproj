@@ -9,9 +9,9 @@
 		<AssemblyName>SuperManager</AssemblyName>
 		<Product>SuperManager — Warehouse Fleet Server &amp; Cockpit</Product>
 		<Company>SuperAutoMater Fleet Systems</Company>
-		<Version>1.6.9</Version>
-		<AssemblyVersion>1.6.9.0</AssemblyVersion>
-		<FileVersion>1.6.9.0</FileVersion>
+		<Version>1.6.10</Version>
+		<AssemblyVersion>1.6.10.0</AssemblyVersion>
+		<FileVersion>1.6.10.0</FileVersion>
 		<ApplicationIcon>app.ico</ApplicationIcon>
 		<NoWarn>NU1701;WFO1000;NU1903</NoWarn>
 

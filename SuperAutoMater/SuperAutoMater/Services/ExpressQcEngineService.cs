@@ -918,14 +918,14 @@ namespace SuperAutoMater.Wpf.Services
         // ====================================================================
         private async Task TestCpuRamAsync(ExpressSubsystemResult res, CancellationToken token)
         {
-            await Task.Run(() =>
+            try
             {
-                try
-                {
-                    int cores = Environment.ProcessorCount;
-                    var sw = Stopwatch.StartNew();
+                int cores = Environment.ProcessorCount;
+                var sw = Stopwatch.StartNew();
 
-                    // Multi-core parallel math workload
+                // Multi-core parallel math workload (CPU stress)
+                await Task.Run(() =>
+                {
                     Parallel.For(0, cores, new ParallelOptions { MaxDegreeOfParallelism = cores }, i =>
                     {
                         long val = 1234567;
@@ -934,59 +934,46 @@ namespace SuperAutoMater.Wpf.Services
                             val = (val ^ (k * 1103515245L + 12345)) & 0x7FFFFFFF;
                         }
                     });
+                }, token);
 
-                    // 64MB RAM bit-flip test (walking-ones and walking-zeros)
-                    int ramTestBytes = 64 * 1024 * 1024;
-                    byte[] memBuf = new byte[ramTestBytes];
-                    bool bitFlipError = false;
+                // Comprehensive RAM health & degradation prediction engine
+                var ramAssessment = await RamHealthPredictorService.Instance.AssessRamHealthAsync(token);
 
-                    // Pass 1: 0xAA (10101010)
-                    Array.Fill(memBuf, (byte)0xAA);
-                    for (int i = 0; i < memBuf.Length; i += 4096)
-                    {
-                        if (memBuf[i] != 0xAA) { bitFlipError = true; break; }
-                    }
+                int temp = HardwareDiagnosticsService.Instance.CpuTelemetry?.TemperatureC ?? 48;
+                res.MetricValue = $"{cores} Cores · {ramAssessment.HealthScore}% RAM · {temp}°C";
 
-                    // Pass 2: 0x55 (01010101)
-                    Array.Fill(memBuf, (byte)0x55);
-                    for (int i = 0; i < memBuf.Length; i += 4096)
-                    {
-                        if (memBuf[i] != 0x55) { bitFlipError = true; break; }
-                    }
-
-                    memBuf = null;
-                    GC.Collect(1, GCCollectionMode.Optimized);
-
-                    int temp = HardwareDiagnosticsService.Instance.CpuTelemetry?.TemperatureC ?? 48;
-                    res.MetricValue = $"{cores} Cores · {temp}°C";
-
-                    if (bitFlipError)
-                    {
-                        res.Status = ExpressTestStatus.Failed;
-                        res.Headline = "✕ RAM MEMORY CELL CORRUPTION DETECTED";
-                        res.Detail = "Hardware memory cell bit-flip verification failed (RAM replacement required).";
-                    }
-                    else if (temp > 92)
-                    {
-                        res.Status = ExpressTestStatus.Warning;
-                        res.Headline = "⚠ THERMAL THROTTLING DETECTED";
-                        res.Detail = $"CPU multi-core compute nominal, but temperature spiked to {temp}°C (Repaste recommended).";
-                    }
-                    else
-                    {
-                        res.Status = ExpressTestStatus.Passed;
-                        res.Headline = "✓ CPU & MEMORY CERTIFIED NOMINAL";
-                        res.Detail = $"{cores} Logical Threads verified with 0 bit-flip errors ({temp}°C nominal).";
-                    }
-                }
-                catch (Exception ex)
+                if (ramAssessment.BitFlipErrors > 0)
                 {
                     res.Status = ExpressTestStatus.Failed;
-                    res.Headline = "✕ CPU/RAM PROBE ERROR";
-                    res.Detail = ex.Message;
-                    res.MetricValue = "Error";
+                    res.Headline = $"✕ RAM CELL CORRUPTION ({ramAssessment.BitFlipErrors} Bit-Flips)";
+                    res.Detail = $"Hardware DRAM cell bit-flip retention verification failed! {ramAssessment.Recommendation}";
                 }
-            }, token);
+                else if (temp > 92)
+                {
+                    res.Status = ExpressTestStatus.Warning;
+                    res.Headline = "⚠ THERMAL THROTTLING DETECTED";
+                    res.Detail = $"CPU multi-core nominal, but temperature spiked to {temp}°C. RAM Health: {ramAssessment.HealthScore}% ({ramAssessment.DegradationState}).";
+                }
+                else if (ramAssessment.DegradationState == RamDegradationState.ModerateDegradation)
+                {
+                    res.Status = ExpressTestStatus.Warning;
+                    res.Headline = $"⚠ RAM TOPOLOGY CONSTRAINT ({ramAssessment.HealthScore}% HEALTH)";
+                    res.Detail = $"{cores} Logical Threads nominal ({temp}°C). RAM: {ramAssessment.TopologySummary}. {ramAssessment.Recommendation}";
+                }
+                else
+                {
+                    res.Status = ExpressTestStatus.Passed;
+                    res.Headline = $"✓ CPU & RAM CERTIFIED NOMINAL ({ramAssessment.HealthScore}% HEALTH)";
+                    res.Detail = $"{cores} Logical Threads verified with 0 bit-flips ({temp}°C nominal). Bandwidth: {ramAssessment.BandwidthMBps:0} MB/s · {ramAssessment.TopologySummary}.";
+                }
+            }
+            catch (Exception ex)
+            {
+                res.Status = ExpressTestStatus.Failed;
+                res.Headline = "✕ CPU/RAM PROBE ERROR";
+                res.Detail = $"Failed to execute CPU & RAM stress audit: {ex.Message}";
+                res.MetricValue = "Error";
+            }
         }
 
         // ====================================================================

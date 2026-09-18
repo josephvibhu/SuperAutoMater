@@ -34,6 +34,7 @@ namespace SuperAutoMater.Wpf.Services
         public string DriverIntegritySummary { get; set; } = "0 Missing Drivers";
         public string ThermalDissipationVerdict { get; set; } = "Nominal";
         public string RamTopologySummary { get; set; } = "";
+        public string RamHealthScoreSummary { get; set; } = "";
         public string RadiatorAirflowSummary { get; set; } = "";
         public string WebcamOpticsSummary { get; set; } = "";
         public string TechnicianName { get; set; } = "QC Station #1";
@@ -243,7 +244,14 @@ namespace SuperAutoMater.Wpf.Services
                 DrawKeyValue(contentSb, 40, 610, "BIOS REVISION:", d.BiosVersion);
 
                 DrawKeyValue(contentSb, 40, 592, "PROCESSOR ARCH:", d.CpuModel);
-                DrawKeyValue(contentSb, 40, 574, "MEMORY CONFIG:", string.IsNullOrEmpty(d.RamTopologySummary) ? d.RamDetails : $"{d.RamDetails} [{d.RamTopologySummary}]");
+                string memDisplay = d.RamDetails;
+                if (!string.IsNullOrEmpty(d.RamHealthScoreSummary) && !string.IsNullOrEmpty(d.RamTopologySummary))
+                    memDisplay = $"{d.RamDetails} [{d.RamHealthScoreSummary} · {d.RamTopologySummary}]";
+                else if (!string.IsNullOrEmpty(d.RamHealthScoreSummary))
+                    memDisplay = $"{d.RamDetails} [{d.RamHealthScoreSummary}]";
+                else if (!string.IsNullOrEmpty(d.RamTopologySummary))
+                    memDisplay = $"{d.RamDetails} [{d.RamTopologySummary}]";
+                DrawKeyValue(contentSb, 40, 574, "MEMORY CONFIG:", memDisplay);
 
                 // Hardware Subsystems Card: MEASURED SENSOR TELEMETRY
                 contentSb.Append("q 0.09 0.12 0.18 rg 28 412 556 130 re f Q\n");
