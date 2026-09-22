@@ -51,23 +51,24 @@ public sealed class JwtService
     {
         try
         {
-            var key       = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(_secret));
-            var handler   = new JwtSecurityTokenHandler();
+            var key     = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(_secret));
+            var handler = new JwtSecurityTokenHandler();
+            handler.InboundClaimTypeMap.Clear();
+
             var principal = handler.ValidateToken(token, new TokenValidationParameters
             {
-                ValidateIssuer           = true,
-                ValidIssuer              = "velox-api",
-                ValidateAudience         = true,
-                ValidAudience            = "velox-clients",
+                ValidateIssuer           = false,
+                ValidateAudience         = false,
                 ValidateLifetime         = true,
                 IssuerSigningKey         = key,
                 ValidateIssuerSigningKey = true,
-                ClockSkew                = TimeSpan.FromSeconds(30)
+                ClockSkew                = TimeSpan.FromSeconds(60)
             }, out _);
             return principal;
         }
-        catch
+        catch (Exception ex)
         {
+            Console.WriteLine($"[JwtService] Token validation failed: {ex.Message}");
             return null;
         }
     }

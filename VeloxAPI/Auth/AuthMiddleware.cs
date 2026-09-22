@@ -93,16 +93,26 @@ public sealed class JwtMiddleware(RequestDelegate next)
             var principal = jwt.Validate(token);
             if (principal != null)
             {
-                ctx.Items["EmployeeId"] = principal.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value
-                                       ?? principal.FindFirst(System.IdentityModel.Tokens.Jwt.JwtRegisteredClaimNames.Sub)?.Value
-                                       ?? principal.FindFirst("sub")?.Value;
-                ctx.Items["TenantId"]   = ctx.Items.ContainsKey("TenantId")
-                    ? ctx.Items["TenantId"]
-                    : principal.FindFirst("tid")?.Value;
-                ctx.Items["Role"]       = principal.FindFirst("role")?.Value;
-                ctx.Items["Name"]       = principal.FindFirst(System.Security.Claims.ClaimTypes.Name)?.Value
-                                       ?? principal.FindFirst(System.IdentityModel.Tokens.Jwt.JwtRegisteredClaimNames.Name)?.Value
-                                       ?? principal.FindFirst("name")?.Value;
+                var empId = principal.FindFirst("sub")?.Value
+                         ?? principal.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
+                if (!string.IsNullOrWhiteSpace(empId))
+                {
+                    ctx.Items["EmployeeId"] = empId;
+                }
+
+                var tid = principal.FindFirst("tid")?.Value
+                       ?? (ctx.Items.TryGetValue("TenantId", out var t) ? t as string : null);
+                if (!string.IsNullOrWhiteSpace(tid))
+                {
+                    ctx.Items["TenantId"] = tid;
+                }
+
+                var role = principal.FindFirst("role")?.Value;
+                if (!string.IsNullOrWhiteSpace(role)) ctx.Items["Role"] = role;
+
+                var name = principal.FindFirst("name")?.Value
+                        ?? principal.FindFirst(System.Security.Claims.ClaimTypes.Name)?.Value;
+                if (!string.IsNullOrWhiteSpace(name)) ctx.Items["Name"] = name;
             }
         }
         await next(ctx);
