@@ -3,4 +3,5 @@
   <Project Path="VeloxAPI.Tests/VeloxAPI.Tests.csproj" />
   <Project Path="VeloxAPI/VeloxAPI.csproj" />
   <Project Path="VeloxBench/VeloxBench.csproj" />
+  <Project Path="VeloxManager/VeloxManager.csproj" />
 </Solution>
