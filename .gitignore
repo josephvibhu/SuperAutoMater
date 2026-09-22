@@ -1,0 +1,22 @@
+## .NET Core
+bin/
+obj/
+*.user
+*.userosscache
+*.suo
+*.userprefs
+*.db-shm
+*.db-wal
+velox.db
+test_*.db
+
+## IDE
+.vs/
+.idea/
+.vscode/
+
+## Releases & Logs
+**/Releases/
+[Rr]eleases/
+*.log
+.env

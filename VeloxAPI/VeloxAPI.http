@@ -1,0 +1,6 @@
+@VeloxAPI_HostAddress = http://localhost:5199
+
+GET {{VeloxAPI_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###
