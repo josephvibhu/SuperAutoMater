@@ -169,22 +169,70 @@ public class MainViewModel : INotifyPropertyChanged
         set { _qcOverallStatus = value; OnPropertyChanged(); }
     }
 
-    // ── Commands ─────────────────────────────────────────────────────────────
+    // ── Recognized Asset & Pipeline Selection ───────────────────────────────
+    public bool IsRecognizedAsset => !string.IsNullOrEmpty(Serial) && Serial != "Detecting...";
+    public string RecognizedAssetBanner => $"CHASSIS DETECTED: {Manufacturer} {Model} (S/N: {Serial})";
+
+    private ExpressSubsystemResult? _selectedSubsystem;
+    public ExpressSubsystemResult? SelectedSubsystem
+    {
+        get => _selectedSubsystem;
+        set
+        {
+            _selectedSubsystem = value;
+            foreach (var s in Subsystems)
+            {
+                s.IsSelected = (s == value);
+            }
+            OnPropertyChanged();
+        }
+    }
+
     public ICommand RunQcCommand { get; }
+    public ICommand RunSingleSubsystemCommand { get; }
     public ICommand GeneratePdfCommand { get; }
     public ICommand RefreshHardwareCommand { get; }
+    public ICommand PassQcAndPushCloudCommand { get; }
 
     public MainViewModel()
     {
         _instance = this;
 
         RunQcCommand = new RelayCommand(async _ => await RunExpressQcAsync());
+        RunSingleSubsystemCommand = new RelayCommand(async key => await RunSingleSubsystemAsync(key as string));
         GeneratePdfCommand = new RelayCommand(_ => GeneratePdfCertificate());
         RefreshHardwareCommand = new RelayCommand(async _ => await InitializeHardwareAsync());
+        PassQcAndPushCloudCommand = new RelayCommand(async _ => await PassQcAndPushCloudAsync());
+
+        InitializeDefaultSubsystems();
 
         _sync.ConnectivityChanged += UpdateConnectivityBadges;
 
         _ = InitializeHardwareAsync();
+    }
+
+    public void InitializeDefaultSubsystems()
+    {
+        Subsystems.Clear();
+        string[] keys = { "Camera", "Mic", "Speaker", "Storage", "CpuRam", "Battery", "Display", "Network" };
+        string[] names = { "Webcam Optics", "Mic Array", "Stereo Speakers", "Storage NVMe", "CPU & RAM", "Battery Power", "Display VSync", "Wi-Fi & Network" };
+        string[] icons = { "📷", "🎤", "🔊", "💾", "⚡", "🔋", "🖥", "📶" };
+        string[] hotkeys = { "[F1]", "[F2]", "[F3]", "[F4]", "[F6]", "[F7]", "[F8]", "[F9]" };
+
+        for (int i = 0; i < keys.Length; i++)
+        {
+            var item = new ExpressSubsystemResult
+            {
+                Key = keys[i],
+                Name = names[i],
+                Icon = icons[i],
+                HotkeyText = hotkeys[i],
+                Status = ExpressTestStatus.Pending,
+                Headline = "Ready for autonomous audit..."
+            };
+            Subsystems.Add(item);
+        }
+        SelectedSubsystem = Subsystems.FirstOrDefault();
     }
 
     private async Task InitializeHardwareAsync()
@@ -296,7 +344,7 @@ public class MainViewModel : INotifyPropertyChanged
     }
 
     // ── Express QC Execution ─────────────────────────────────────────────────
-    private async Task RunExpressQcAsync()
+    public async Task RunExpressQcAsync()
     {
         if (IsQcRunning) return;
         IsQcRunning = true;
@@ -305,29 +353,52 @@ public class MainViewModel : INotifyPropertyChanged
         try
         {
             var engine = ExpressQcEngineService.Instance;
-            Subsystems.Clear();
 
-            // Run automated 8-stage QC
-            var report = await engine.RunFullExpressQcAsync(this);
-            if (report != null)
+            Action<ExpressSubsystemResult> onUpdate = updated =>
             {
-                foreach (var sub in report.Subsystems)
+                Application.Current?.Dispatcher.Invoke(() =>
                 {
-                    Subsystems.Add(sub);
-                }
-
-                QcOverallStatus = report.AllPassed ? "✓ ALL SUBSYSTEMS PASSED" : "⚠ SUBSYSTEM WARNINGS DETECTED";
-
-                // Push completion event to cloud
-                await _sync.PushIntakeOrUpdateAsync(new IntakeRequest
-                {
-                    SerialNumber = Serial,
-                    AssetTag = AssetTag,
-                    Model = Model,
-                    Location = BenchConfigService.Current.BenchName,
-                    Actor = AssignedTechnician,
-                    Notes = $"QC Completed: {QcOverallStatus}"
+                    var existing = Subsystems.FirstOrDefault(s => s.Key == updated.Key);
+                    if (existing != null)
+                    {
+                        existing.Status = updated.Status;
+                        existing.Headline = updated.Headline;
+                        existing.Detail = updated.Detail;
+                        existing.MetricValue = updated.MetricValue;
+                        existing.SnapshotImage = updated.SnapshotImage;
+                        existing.SignalLevel = updated.SignalLevel;
+                    }
+                    if (SelectedSubsystem == null || SelectedSubsystem.Key == updated.Key)
+                    {
+                        SelectedSubsystem = existing;
+                    }
                 });
+            };
+
+            engine.SubsystemUpdated += onUpdate;
+            try
+            {
+                // Run automated 8-stage QC
+                var report = await engine.RunFullExpressQcAsync(this);
+                if (report != null)
+                {
+                    QcOverallStatus = report.AllPassed ? "✓ ALL SUBSYSTEMS PASSED" : "⚠ SUBSYSTEM WARNINGS DETECTED";
+
+                    // Push completion event to cloud
+                    await _sync.PushIntakeOrUpdateAsync(new IntakeRequest
+                    {
+                        SerialNumber = Serial,
+                        AssetTag = AssetTag,
+                        Model = Model,
+                        Location = BenchConfigService.Current.BenchName,
+                        Actor = AssignedTechnician,
+                        Notes = $"QC Completed: {QcOverallStatus} | Grade: {Grade}"
+                    });
+                }
+            }
+            finally
+            {
+                engine.SubsystemUpdated -= onUpdate;
             }
         }
         catch (Exception ex)
@@ -338,6 +409,92 @@ public class MainViewModel : INotifyPropertyChanged
         finally
         {
             IsQcRunning = false;
+        }
+    }
+
+    public async Task RunSingleSubsystemAsync(string? key)
+    {
+        if (IsQcRunning) return;
+        if (string.IsNullOrWhiteSpace(key))
+        {
+            key = SelectedSubsystem?.Key;
+        }
+        if (string.IsNullOrWhiteSpace(key)) return;
+
+        var target = Subsystems.FirstOrDefault(s => string.Equals(s.Key, key, StringComparison.OrdinalIgnoreCase));
+        if (target == null) return;
+
+        SelectedSubsystem = target;
+        IsQcRunning = true;
+        QcOverallStatus = $"TESTING [{target.Name.ToUpperInvariant()}]...";
+
+        try
+        {
+            var engine = ExpressQcEngineService.Instance;
+            Action<ExpressSubsystemResult> onUpdate = updated =>
+            {
+                Application.Current?.Dispatcher.Invoke(() =>
+                {
+                    var existing = Subsystems.FirstOrDefault(s => s.Key == updated.Key);
+                    if (existing != null)
+                    {
+                        existing.Status = updated.Status;
+                        existing.Headline = updated.Headline;
+                        existing.Detail = updated.Detail;
+                        existing.MetricValue = updated.MetricValue;
+                        existing.SnapshotImage = updated.SnapshotImage;
+                        existing.SignalLevel = updated.SignalLevel;
+                    }
+                    if (SelectedSubsystem == null || SelectedSubsystem.Key == updated.Key)
+                    {
+                        SelectedSubsystem = existing;
+                    }
+                });
+            };
+
+            engine.SubsystemUpdated += onUpdate;
+            try
+            {
+                await engine.RunSingleSubsystemAsync(key, this);
+                QcOverallStatus = target.Status == ExpressTestStatus.Passed
+                    ? $"✓ {target.Name.ToUpperInvariant()} PASSED"
+                    : $"⚠ {target.Name.ToUpperInvariant()} {target.StatusBadge}";
+            }
+            finally
+            {
+                engine.SubsystemUpdated -= onUpdate;
+            }
+        }
+        catch (Exception ex)
+        {
+            QcOverallStatus = $"TEST ERROR: {ex.Message}";
+            AppLogger.Error($"Subsystem {key} test failed", ex);
+        }
+        finally
+        {
+            IsQcRunning = false;
+        }
+    }
+
+    public async Task PassQcAndPushCloudAsync()
+    {
+        try
+        {
+            QcOverallStatus = "✓ QC CERTIFIED & PUSHED TO CLOUD";
+            await _sync.PushIntakeOrUpdateAsync(new IntakeRequest
+            {
+                SerialNumber = Serial,
+                AssetTag = AssetTag,
+                Model = Model,
+                Location = BenchConfigService.Current.BenchName,
+                Actor = AssignedTechnician,
+                Notes = $"QC Certified [{QcOverallStatus}] | Grade: {Grade} | Subsystems: {Subsystems.Count(s => s.IsPassed)}/{Subsystems.Count} Passed"
+            });
+            MessageBox.Show($"Chassis {Serial} certified and synchronized to Fleet Cloud DB!", "QC Pushed to Cloud", MessageBoxButton.OK, MessageBoxImage.Information);
+        }
+        catch (Exception ex)
+        {
+            MessageBox.Show($"Failed pushing QC to cloud: {ex.Message}", "Sync Error", MessageBoxButton.OK, MessageBoxImage.Error);
         }
     }
 

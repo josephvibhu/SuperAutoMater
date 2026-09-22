@@ -19,6 +19,8 @@ public class AssetItemViewModel : INotifyPropertyChanged
     public int StorageHealth => Model.StorageHealth ?? 100;
     public string MissingComponents => Model.MissingComponents;
     public string Notes => Model.Notes;
+    public double? PurchasePrice => Model.PurchasePrice;
+    public double? SalePrice => Model.SalePrice;
     public DateTimeOffset UpdatedAt => Model.UpdatedAtUtc;
 
     public LifecycleQueue Status

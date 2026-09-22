@@ -5,12 +5,16 @@
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:conv="clr-namespace:VeloxBench.Converters"
         mc:Ignorable="d"
-        Title="VeloxBench — Precision Diagnostic &amp; Refurbishment Engine" 
-        Height="880" Width="1280"
-        MinHeight="700" MinWidth="1024"
+        Title="VeloxBench — Hardware Diagnostic &amp; QC Cockpit" 
+        Height="720" Width="1200"
+        MinHeight="550" MinWidth="960"
+        WindowState="Maximized"
         WindowStartupLocation="CenterScreen"
         Background="#0A0C10"
         Foreground="#F0F6FC"
+        UseLayoutRounding="True"
+        SnapsToDevicePixels="True"
+        PreviewKeyDown="Window_PreviewKeyDown"
         FontFamily="Segoe UI, -apple-system, BlinkMacSystemFont, Roboto, sans-serif">
 
     <Window.Resources>
@@ -18,14 +22,25 @@
         <conv:InverseBooleanConverter x:Key="InverseBool" />
         <conv:NullToVisibilityConverter x:Key="NullVis" />
 
-        <!-- Card Style -->
-        <Style x:Key="MetricCard" TargetType="Border">
-            <Setter Property="Background" Value="#161B22" />
+        <!-- Metric Chip Style -->
+        <Style x:Key="AvionicsChip" TargetType="Border">
+            <Setter Property="Background" Value="#0D1117" />
             <Setter Property="BorderBrush" Value="#30363D" />
             <Setter Property="BorderThickness" Value="1" />
             <Setter Property="CornerRadius" Value="6" />
-            <Setter Property="Padding" Value="12,10" />
-            <Setter Property="Margin" Value="4" />
+            <Setter Property="Padding" Value="8,4" />
+            <Setter Property="Margin" Value="3,0" />
+            <Setter Property="VerticalAlignment" Value="Center" />
+        </Style>
+
+        <!-- Bento Card Style -->
+        <Style x:Key="BentoCard" TargetType="Border">
+            <Setter Property="Background" Value="#161B22" />
+            <Setter Property="BorderBrush" Value="#30363D" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="CornerRadius" Value="8" />
+            <Setter Property="Padding" Value="14" />
+            <Setter Property="Margin" Value="0,0,0,10" />
         </Style>
 
         <!-- Dark Button Style with Rounded Corners -->
@@ -68,391 +83,629 @@
             <Setter Property="BorderThickness" Value="1" />
             <Setter Property="Padding" Value="8,4" />
             <Setter Property="CaretBrush" Value="#58A6FF" />
-            <Setter Property="FontSize" Value="13" />
+            <Setter Property="FontSize" Value="12" />
         </Style>
 
-        <!-- Dark ComboBox Style -->
+        <!-- ComboBox Toggle Button Template -->
+        <ControlTemplate x:Key="ComboBoxToggleButtonTemplate" TargetType="ToggleButton">
+            <Grid>
+                <Border x:Name="Border" Background="{TemplateBinding Background}" BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="{TemplateBinding BorderThickness}" CornerRadius="6" />
+                <Path x:Name="Arrow" HorizontalAlignment="Right" VerticalAlignment="Center" Margin="0,0,10,0" Fill="#8B949E" Data="M 0 0 L 4 4 L 8 0 Z" />
+            </Grid>
+            <ControlTemplate.Triggers>
+                <Trigger Property="IsMouseOver" Value="True">
+                    <Setter TargetName="Border" Property="BorderBrush" Value="#58A6FF" />
+                    <Setter TargetName="Arrow" Property="Fill" Value="#58A6FF" />
+                </Trigger>
+            </ControlTemplate.Triggers>
+        </ControlTemplate>
+
+        <!-- Dark ComboBox Style (Zero White Patches) -->
         <Style TargetType="ComboBox">
-            <Setter Property="Background" Value="#0D1117" />
+            <Setter Property="Background" Value="#161B22" />
             <Setter Property="Foreground" Value="#F0F6FC" />
             <Setter Property="BorderBrush" Value="#30363D" />
             <Setter Property="BorderThickness" Value="1" />
-            <Setter Property="Padding" Value="6,4" />
+            <Setter Property="Padding" Value="8,4" />
+            <Setter Property="SnapsToDevicePixels" Value="True" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="ComboBox">
+                        <Grid>
+                            <ToggleButton Name="ToggleButton"
+                                          Template="{StaticResource ComboBoxToggleButtonTemplate}"
+                                          Background="{TemplateBinding Background}"
+                                          BorderBrush="{TemplateBinding BorderBrush}"
+                                          BorderThickness="{TemplateBinding BorderThickness}"
+                                          Focusable="False"
+                                          IsChecked="{Binding Path=IsDropDownOpen, Mode=TwoWay, RelativeSource={RelativeSource TemplatedParent}}"
+                                          ClickMode="Press" />
+                            <ContentPresenter Name="ContentSite"
+                                              IsHitTestVisible="False"
+                                              Content="{TemplateBinding SelectionBoxItem}"
+                                              ContentTemplate="{TemplateBinding SelectionBoxItemTemplate}"
+                                              Margin="8,3,28,3"
+                                              VerticalAlignment="Center"
+                                              HorizontalAlignment="Left" />
+                            <Popup Name="Popup"
+                                   Placement="Bottom"
+                                   IsOpen="{TemplateBinding IsDropDownOpen}"
+                                   AllowsTransparency="True"
+                                   Focusable="False"
+                                   PopupAnimation="Slide">
+                                <Grid Name="DropDown"
+                                      SnapsToDevicePixels="True"
+                                      MinWidth="{TemplateBinding ActualWidth}"
+                                      MaxHeight="{TemplateBinding MaxDropDownHeight}">
+                                    <Border Name="DropDownBorder"
+                                            Background="#161B22"
+                                            BorderBrush="#30363D"
+                                            BorderThickness="1"
+                                            CornerRadius="6"
+                                            Margin="0,2,0,2">
+                                        <ScrollViewer Margin="4,4,4,4" SnapsToDevicePixels="True">
+                                            <StackPanel IsItemsHost="True" KeyboardNavigation.DirectionalNavigation="Contained" />
+                                        </ScrollViewer>
+                                    </Border>
+                                </Grid>
+                            </Popup>
+                        </Grid>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <!-- Dark ComboBoxItem Style -->
+        <Style TargetType="ComboBoxItem">
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="Foreground" Value="#F0F6FC" />
+            <Setter Property="Padding" Value="8,5" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="ComboBoxItem">
+                        <Border x:Name="Border" Background="{TemplateBinding Background}" Padding="{TemplateBinding Padding}" CornerRadius="4" Margin="1">
+                            <ContentPresenter />
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsHighlighted" Value="True">
+                                <Setter TargetName="Border" Property="Background" Value="#1F6FEB" />
+                                <Setter Property="Foreground" Value="#FFFFFF" />
+                            </Trigger>
+                            <Trigger Property="IsSelected" Value="True">
+                                <Setter TargetName="Border" Property="Background" Value="#238636" />
+                                <Setter Property="Foreground" Value="#FFFFFF" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
         </Style>
     </Window.Resources>
 
-    <Grid>
+    <Grid Margin="10">
         <Grid.RowDefinitions>
-            <!-- 0: Header & Connectivity -->
+            <!-- 0: Top Avionics Status Bar -->
             <RowDefinition Height="Auto" />
-            <!-- 1: Main Scrollable Content -->
+            <!-- 1: Main Cockpit Workspace -->
             <RowDefinition Height="*" />
             <!-- 2: Bottom Status & Control Bar -->
             <RowDefinition Height="Auto" />
         </Grid.RowDefinitions>
 
-        <!-- ── HEADER BAR ───────────────────────────────────────────────────────── -->
-        <Border Grid.Row="0" Background="#161B22" BorderBrush="#30363D" BorderThickness="0,0,0,1" Padding="16,10">
+        <!-- ═══════════════════════════════════════════════════════════════════════ -->
+        <!-- 1. TOP AVIONICS STATUS BAR                                              -->
+        <!-- ═══════════════════════════════════════════════════════════════════════ -->
+        <Border Grid.Row="0" Background="#161B22" BorderBrush="#30363D" BorderThickness="1" CornerRadius="8" Padding="12,8" Margin="0,0,0,10">
             <Grid>
                 <Grid.ColumnDefinitions>
+                    <!-- Brand & Bay Info -->
                     <ColumnDefinition Width="Auto" />
+                    <!-- Spacer -->
                     <ColumnDefinition Width="*" />
+                    <!-- Telemetry Chips & Express QC Button -->
                     <ColumnDefinition Width="Auto" />
                 </Grid.ColumnDefinitions>
 
-                <!-- Brand Title -->
+                <!-- Left Zone: Brand, Online Dot, Bay, Technician -->
                 <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center">
-                    <TextBlock Text="⚡" FontSize="22" Foreground="#58A6FF" Margin="0,0,8,0" VerticalAlignment="Center" />
-                    <StackPanel>
-                        <StackPanel Orientation="Horizontal">
-                            <TextBlock Text="VELOX" FontWeight="Bold" FontSize="18" Foreground="#58A6FF" />
-                            <TextBlock Text="BENCH" FontWeight="Light" FontSize="18" Foreground="#F0F6FC" Margin="6,0,0,0" />
-                            <Border Background="#21262D" CornerRadius="4" Padding="6,1" Margin="10,0,0,0" VerticalAlignment="Center">
-                                <TextBlock Text="v1.0.0 PROD" FontSize="10" FontWeight="SemiBold" Foreground="#8B949E" />
-                            </Border>
-                        </StackPanel>
-                        <TextBlock Text="Hardware Refurbishment &amp; Express QC Diagnostic Engine" FontSize="11" Foreground="#8B949E" />
+                    <!-- Live Pulsing Dot -->
+                    <Ellipse Width="8" Height="8" Fill="#3FB950" Margin="0,0,8,0" VerticalAlignment="Center" />
+
+                    <!-- Brand Header -->
+                    <TextBlock Text="VELOX" FontWeight="Bold" FontSize="16" Foreground="#58A6FF" VerticalAlignment="Center" />
+                    <TextBlock Text="BENCH" FontWeight="Light" FontSize="16" Foreground="#F0F6FC" Margin="5,0,0,0" VerticalAlignment="Center" />
+
+                    <Border Background="#21262D" BorderBrush="#30363D" BorderThickness="1" CornerRadius="4" Padding="5,1" Margin="8,0,10,0" VerticalAlignment="Center">
+                        <TextBlock Text="v1.0.0" FontSize="9" FontWeight="Bold" Foreground="#8B949E" />
+                    </Border>
+
+                    <Rectangle Width="1" Height="16" Fill="#30363D" Margin="0,0,10,0" VerticalAlignment="Center" />
+
+                    <!-- Bench Online Indicator -->
+                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="0,0,10,0">
+                        <TextBlock Text="● BENCH ONLINE" FontSize="10" FontWeight="Bold" Foreground="#3FB950" Margin="0,0,6,0" />
+                        <TextBlock Text="|" FontSize="10" Foreground="#30363D" Margin="0,0,6,0" />
+                        <TextBlock Text="BENCH-01" FontSize="10" FontWeight="Bold" Foreground="#F0F6FC" />
                     </StackPanel>
+
+                    <!-- Technician Operator Badge Pill -->
+                    <Border Background="#21262D" BorderBrush="#30363D" BorderThickness="1" CornerRadius="5" Padding="8,3" VerticalAlignment="Center" Margin="0,0,8,0">
+                        <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                            <TextBlock Text="👤 " FontSize="10" VerticalAlignment="Center" />
+                            <TextBlock Text="{Binding AssignedTechnician}" FontSize="10" FontWeight="Bold" Foreground="#58A6FF" VerticalAlignment="Center" />
+                        </StackPanel>
+                    </Border>
+
+                    <!-- Cloud / LAN Connectivity Pill -->
+                    <Border Background="#0D1117" BorderBrush="{Binding SyncBannerColor, Converter={StaticResource HexBrush}}" BorderThickness="1" CornerRadius="12" Padding="8,2" VerticalAlignment="Center">
+                        <TextBlock Text="{Binding SyncBanner}" FontSize="10" FontWeight="Bold" Foreground="{Binding SyncBannerColor, Converter={StaticResource HexBrush}}" VerticalAlignment="Center" />
+                    </Border>
                 </StackPanel>
 
-                <!-- Real-Time Hybrid Connectivity Banner -->
-                <Border Grid.Column="1" HorizontalAlignment="Center" VerticalAlignment="Center"
-                        Background="#0D1117" 
-                        BorderBrush="{Binding SyncBannerColor, Converter={StaticResource HexBrush}}"
-                        BorderThickness="1" CornerRadius="20" Padding="16,6">
-                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                        <Ellipse Width="8" Height="8" Margin="0,0,8,0"
-                                 Fill="{Binding SyncBannerColor, Converter={StaticResource HexBrush}}" />
-                        <TextBlock Text="{Binding SyncBanner}" FontWeight="Bold" FontSize="12"
-                                   Foreground="{Binding SyncBannerColor, Converter={StaticResource HexBrush}}" />
-                    </StackPanel>
-                </Border>
-
-                <!-- Action Controls -->
+                <!-- Right Zone: Telemetry Chips & 1-Click Express QC Button -->
                 <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center">
-                    <Button Command="{Binding RefreshHardwareCommand}" Margin="0,0,8,0"
-                            Background="#21262D" Foreground="#F0F6FC" BorderBrush="#30363D" BorderThickness="1"
-                            Padding="12,6" FontWeight="SemiBold" FontSize="12">
+                    <!-- CPU Chip -->
+                    <Border Style="{StaticResource AvionicsChip}" ToolTip="Processor Clock &amp; Load">
                         <StackPanel Orientation="Horizontal">
-                            <TextBlock Text="🔄" Margin="0,0,6,0" />
-                            <TextBlock Text="Probe Hardware" />
+                            <TextBlock Text="⚡ " Foreground="#58A6FF" FontSize="10" />
+                            <TextBlock Text="{Binding CpuClockSummary}" FontWeight="SemiBold" FontSize="10" Foreground="#F0F6FC" Margin="0,0,4,0" />
+                            <TextBlock Text="{Binding CpuUsagePercent, StringFormat='{}{0}%'}" FontSize="10" Foreground="#8B949E" />
                         </StackPanel>
-                    </Button>
+                    </Border>
 
-                    <Button Command="{Binding GeneratePdfCommand}"
-                            Background="#238636" Foreground="#FFFFFF" BorderBrush="#2EA043" BorderThickness="1"
-                            Padding="14,6" FontWeight="Bold" FontSize="12">
+                    <!-- RAM Chip -->
+                    <Border Style="{StaticResource AvionicsChip}" ToolTip="Memory Health &amp; Topology">
                         <StackPanel Orientation="Horizontal">
-                            <TextBlock Text="📄" Margin="0,0,6,0" />
-                            <TextBlock Text="Print Certificate" />
+                            <TextBlock Text="🧠 " Foreground="#3FB950" FontSize="10" />
+                            <TextBlock Text="{Binding RamHealthBadge}" FontWeight="SemiBold" FontSize="10" Foreground="#3FB950" />
+                        </StackPanel>
+                    </Border>
+
+                    <!-- Storage SMART Chip -->
+                    <Border Style="{StaticResource AvionicsChip}" ToolTip="Primary NVMe / SSD SMART Health">
+                        <StackPanel Orientation="Horizontal">
+                            <TextBlock Text="💾 " Foreground="#A371F7" FontSize="10" />
+                            <TextBlock Text="{Binding StorageHealthPercent, StringFormat='{}{0}% SMART'}" FontWeight="SemiBold" FontSize="10" Foreground="#F0F6FC" />
+                        </StackPanel>
+                    </Border>
+
+                    <!-- Battery Chip -->
+                    <Border Style="{StaticResource AvionicsChip}" ToolTip="Battery Power &amp; Degradation">
+                        <StackPanel Orientation="Horizontal">
+                            <TextBlock Text="🔋 " Foreground="#D29922" FontSize="10" />
+                            <TextBlock Text="{Binding BatterySummary}" FontWeight="SemiBold" FontSize="10" Foreground="#F0F6FC" />
+                        </StackPanel>
+                    </Border>
+
+                    <!-- Wi-Fi Chip -->
+                    <Border Style="{StaticResource AvionicsChip}" ToolTip="Network Link Quality">
+                        <StackPanel Orientation="Horizontal">
+                            <TextBlock Text="📶 " Foreground="#58A6FF" FontSize="10" />
+                            <TextBlock Text="{Binding WifiSignal}" FontWeight="SemiBold" FontSize="10" Foreground="#58A6FF" />
+                        </StackPanel>
+                    </Border>
+
+                    <!-- ⚡ 1-CLICK EXPRESS QC (F5) BUTTON -->
+                    <Button Command="{Binding RunQcCommand}" Margin="8,0,0,0"
+                            Background="#238636" Foreground="#FFFFFF" BorderBrush="#2EA043" BorderThickness="1"
+                            Padding="12,6" FontWeight="Bold" FontSize="11" ToolTip="Run Autonomous 8-Subsystem Express Hardware Certification [F5]">
+                        <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                            <TextBlock Text="⚡ 1-CLICK EXPRESS QC " FontWeight="Bold" FontSize="11" Foreground="#FFFFFF" />
+                            <Border Background="#40000000" CornerRadius="3" Padding="4,1">
+                                <TextBlock Text="[F5]" FontSize="10" FontWeight="Bold" Foreground="#7EE787" />
+                            </Border>
                         </StackPanel>
                     </Button>
                 </StackPanel>
             </Grid>
         </Border>
 
-        <!-- ── MAIN CONTENT (SCROLLABLE) ──────────────────────────────────────── -->
-        <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" Padding="16">
-            <StackPanel>
+        <!-- ═══════════════════════════════════════════════════════════════════════ -->
+        <!-- 2. MAIN COCKPIT WORKSPACE (LEFT RAIL + RIGHT BENTO ARENA)              -->
+        <!-- ═══════════════════════════════════════════════════════════════════════ -->
+        <Grid Grid.Row="1">
+            <Grid.ColumnDefinitions>
+                <!-- Left Rail: Diagnostic Pipeline Matrix (~290px) -->
+                <ColumnDefinition Width="290" />
+                <!-- Right Bento Arena -->
+                <ColumnDefinition Width="*" />
+            </Grid.ColumnDefinitions>
 
-                <!-- 1. IDENTIFICATION & WAREHOUSE INTAKE SECTION -->
-                <Border Background="#161B22" BorderBrush="#30363D" BorderThickness="1" CornerRadius="8" Padding="14" Margin="0,0,0,14">
-                    <Grid>
-                        <Grid.RowDefinitions>
-                            <RowDefinition Height="Auto" />
-                            <RowDefinition Height="Auto" />
-                            <RowDefinition Height="Auto" />
-                        </Grid.RowDefinitions>
+            <!-- ── LEFT RAIL: DIAGNOSTIC PIPELINE MATRIX ────────────────────────── -->
+            <Border Grid.Column="0" Background="#161B22" BorderBrush="#30363D" BorderThickness="1" CornerRadius="8" Padding="10" Margin="0,0,10,0">
+                <Grid>
+                    <Grid.RowDefinitions>
+                        <!-- Rail Header -->
+                        <RowDefinition Height="Auto" />
+                        <!-- 8-Subsystem Pipeline Cards List -->
+                        <RowDefinition Height="*" />
+                        <!-- Bottom Action Controls -->
+                        <RowDefinition Height="Auto" />
+                    </Grid.RowDefinitions>
 
-                        <!-- Top row: Barcode / Asset Tag Scan Bar -->
-                        <Grid Grid.Row="0" Margin="0,0,0,12">
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="2*" />
-                                <ColumnDefinition Width="*" />
-                                <ColumnDefinition Width="*" />
-                                <ColumnDefinition Width="*" />
-                            </Grid.ColumnDefinitions>
-
-                            <StackPanel Grid.Column="0" Margin="0,0,12,0">
-                                <TextBlock Text="ASSET TAG / BARCODE SCAN (Auto-Fill &amp; Live Sync)" FontSize="11" FontWeight="Bold" Foreground="#58A6FF" Margin="0,0,0,4" />
-                                <TextBox Text="{Binding AssetTag, UpdateSourceTrigger=PropertyChanged}" 
-                                         FontSize="15" FontWeight="Bold" Foreground="#3FB950"
-                                         Padding="10,6" Background="#0D1117" BorderBrush="#58A6FF" BorderThickness="1.5" />
-                            </StackPanel>
-
-                            <StackPanel Grid.Column="1" Margin="0,0,8,0">
-                                <TextBlock Text="SERIAL NUMBER" FontSize="10" FontWeight="SemiBold" Foreground="#8B949E" Margin="0,0,0,4" />
-                                <Border Background="#0D1117" BorderBrush="#30363D" BorderThickness="1" CornerRadius="4" Padding="8,6">
-                                    <TextBlock Text="{Binding Serial}" FontWeight="Bold" FontSize="13" Foreground="#F0F6FC" TextTrimming="CharacterEllipsis" />
-                                </Border>
-                            </StackPanel>
-
-                            <StackPanel Grid.Column="2" Margin="0,0,8,0">
-                                <TextBlock Text="MODEL / CHASSIS" FontSize="10" FontWeight="SemiBold" Foreground="#8B949E" Margin="0,0,0,4" />
-                                <Border Background="#0D1117" BorderBrush="#30363D" BorderThickness="1" CornerRadius="4" Padding="8,6">
-                                    <TextBlock Text="{Binding Model}" FontWeight="SemiBold" FontSize="12" Foreground="#F0F6FC" TextTrimming="CharacterEllipsis" />
-                                </Border>
-                            </StackPanel>
-
-                            <StackPanel Grid.Column="3">
-                                <TextBlock Text="BIOS / OEM" FontSize="10" FontWeight="SemiBold" Foreground="#8B949E" Margin="0,0,0,4" />
-                                <Border Background="#0D1117" BorderBrush="#30363D" BorderThickness="1" CornerRadius="4" Padding="8,6">
-                                    <TextBlock Text="{Binding BiosVersion}" FontSize="12" Foreground="#8B949E" TextTrimming="CharacterEllipsis" />
-                                </Border>
-                            </StackPanel>
-                        </Grid>
-
-                        <Separator Grid.Row="1" Background="#30363D" Margin="0,0,0,12" />
-
-                        <!-- Operations Attribution (Auto-pushed on change) -->
-                        <Grid Grid.Row="2">
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="*" />
-                                <ColumnDefinition Width="*" />
-                                <ColumnDefinition Width="*" />
-                                <ColumnDefinition Width="140" />
-                                <ColumnDefinition Width="1.5*" />
-                            </Grid.ColumnDefinitions>
-
-                            <StackPanel Grid.Column="0" Margin="0,0,8,0">
-                                <TextBlock Text="ASSIGNED TECHNICIAN" FontSize="10" FontWeight="SemiBold" Foreground="#8B949E" Margin="0,0,0,4" />
-                                <TextBox Text="{Binding AssignedTechnician, UpdateSourceTrigger=PropertyChanged}" />
-                            </StackPanel>
-
-                            <StackPanel Grid.Column="1" Margin="0,0,8,0">
-                                <TextBlock Text="SUPPLIER / SOURCE" FontSize="10" FontWeight="SemiBold" Foreground="#8B949E" Margin="0,0,0,4" />
-                                <TextBox Text="{Binding Supplier, UpdateSourceTrigger=PropertyChanged}" />
-                            </StackPanel>
-
-                            <StackPanel Grid.Column="2" Margin="0,0,8,0">
-                                <TextBlock Text="CUSTOMER / DESTINATION" FontSize="10" FontWeight="SemiBold" Foreground="#8B949E" Margin="0,0,0,4" />
-                                <TextBox Text="{Binding Customer, UpdateSourceTrigger=PropertyChanged}" />
-                            </StackPanel>
-
-                            <StackPanel Grid.Column="3" Margin="0,0,8,0">
-                                <TextBlock Text="COSMETIC GRADE" FontSize="10" FontWeight="SemiBold" Foreground="#8B949E" Margin="0,0,0,4" />
-                                <ComboBox Text="{Binding Grade, UpdateSourceTrigger=PropertyChanged}" IsEditable="True">
-                                    <ComboBoxItem Content="GRADE A" />
-                                    <ComboBoxItem Content="GRADE B" />
-                                    <ComboBoxItem Content="GRADE C" />
-                                    <ComboBoxItem Content="GRADE PENDING" />
-                                    <ComboBoxItem Content="SALVAGE / SCRAP" />
-                                </ComboBox>
-                            </StackPanel>
-
-                            <StackPanel Grid.Column="4">
-                                <TextBlock Text="MISSING COMPONENTS / DEFECT NOTES" FontSize="10" FontWeight="SemiBold" Foreground="#8B949E" Margin="0,0,0,4" />
-                                <TextBox Text="{Binding MissingComponents, UpdateSourceTrigger=PropertyChanged}" />
-                            </StackPanel>
-                        </Grid>
-                    </Grid>
-                </Border>
-
-                <!-- 2. HARDWARE TELEMETRY DECK (5 CARDS) -->
-                <Grid Margin="0,0,0,14">
-                    <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="*" />
-                        <ColumnDefinition Width="*" />
-                        <ColumnDefinition Width="*" />
-                        <ColumnDefinition Width="*" />
-                        <ColumnDefinition Width="*" />
-                    </Grid.ColumnDefinitions>
-
-                    <!-- CPU -->
-                    <Border Grid.Column="0" Style="{StaticResource MetricCard}">
-                        <StackPanel>
-                            <StackPanel Orientation="Horizontal" Margin="0,0,0,6">
-                                <TextBlock Text="⚡" Foreground="#58A6FF" Margin="0,0,4,0" />
-                                <TextBlock Text="PROCESSOR" FontSize="10" FontWeight="Bold" Foreground="#8B949E" />
-                            </StackPanel>
-                            <TextBlock Text="{Binding CpuName}" FontWeight="Bold" FontSize="12" Foreground="#F0F6FC" TextTrimming="CharacterEllipsis" Margin="0,0,0,2" />
-                            <TextBlock Text="{Binding CpuClockSummary}" FontSize="11" Foreground="#58A6FF" Margin="0,0,0,4" />
-                            <StackPanel Orientation="Horizontal">
-                                <TextBlock Text="Load: " FontSize="10" Foreground="#8B949E" />
-                                <TextBlock Text="{Binding CpuUsagePercent, StringFormat='{}{0}%'}" FontSize="10" FontWeight="Bold" Foreground="#F0F6FC" Margin="0,0,8,0" />
-                                <TextBlock Text="Temp: " FontSize="10" Foreground="#8B949E" />
-                                <TextBlock Text="{Binding CpuTempC, StringFormat='{}{0}°C'}" FontSize="10" FontWeight="Bold" Foreground="#D29922" />
-                            </StackPanel>
-                        </StackPanel>
-                    </Border>
-
-                    <!-- RAM -->
-                    <Border Grid.Column="1" Style="{StaticResource MetricCard}">
-                        <StackPanel>
-                            <StackPanel Orientation="Horizontal" Margin="0,0,0,6">
-                                <TextBlock Text="🧠" Foreground="#3FB950" Margin="0,0,4,0" />
-                                <TextBlock Text="MEMORY" FontSize="10" FontWeight="Bold" Foreground="#8B949E" />
-                            </StackPanel>
-                            <TextBlock Text="{Binding RamSummary}" FontWeight="Bold" FontSize="12" Foreground="#F0F6FC" TextTrimming="CharacterEllipsis" Margin="0,0,0,2" />
-                            <Border Background="#21262D" CornerRadius="4" Padding="6,2" HorizontalAlignment="Left" Margin="0,2,0,0">
-                                <TextBlock Text="{Binding RamHealthBadge}" FontSize="10" FontWeight="Bold" Foreground="#3FB950" />
-                            </Border>
-                        </StackPanel>
-                    </Border>
-
-                    <!-- STORAGE -->
-                    <Border Grid.Column="2" Style="{StaticResource MetricCard}">
-                        <StackPanel>
-                            <StackPanel Orientation="Horizontal" Margin="0,0,0,6">
-                                <TextBlock Text="💾" Foreground="#A371F7" Margin="0,0,4,0" />
-                                <TextBlock Text="STORAGE &amp; S.M.A.R.T." FontSize="10" FontWeight="Bold" Foreground="#8B949E" />
-                            </StackPanel>
-                            <TextBlock Text="{Binding StorageSummary}" FontWeight="Bold" FontSize="12" Foreground="#F0F6FC" TextTrimming="CharacterEllipsis" Margin="0,0,0,2" />
-                            <StackPanel Orientation="Horizontal">
-                                <TextBlock Text="SMART Health: " FontSize="10" Foreground="#8B949E" />
-                                <TextBlock Text="{Binding StorageHealthPercent, StringFormat='{}{0}%'}" FontSize="10" FontWeight="Bold" Foreground="#3FB950" />
-                            </StackPanel>
-                        </StackPanel>
-                    </Border>
-
-                    <!-- BATTERY -->
-                    <Border Grid.Column="3" Style="{StaticResource MetricCard}">
-                        <StackPanel>
-                            <StackPanel Orientation="Horizontal" Margin="0,0,0,6">
-                                <TextBlock Text="🔋" Foreground="#D29922" Margin="0,0,4,0" />
-                                <TextBlock Text="BATTERY &amp; POWER" FontSize="10" FontWeight="Bold" Foreground="#8B949E" />
-                            </StackPanel>
-                            <TextBlock Text="{Binding BatterySummary}" FontWeight="Bold" FontSize="12" Foreground="#F0F6FC" TextTrimming="CharacterEllipsis" Margin="0,0,0,2" />
-                            <StackPanel Orientation="Horizontal">
-                                <TextBlock Text="Cycle/Health: " FontSize="10" Foreground="#8B949E" />
-                                <TextBlock Text="{Binding BatteryHealthPercent, StringFormat='{}{0}%'}" FontSize="10" FontWeight="Bold" Foreground="#58A6FF" />
-                            </StackPanel>
-                        </StackPanel>
-                    </Border>
-
-                    <!-- GPU & NETWORK -->
-                    <Border Grid.Column="4" Style="{StaticResource MetricCard}">
-                        <StackPanel>
-                            <StackPanel Orientation="Horizontal" Margin="0,0,0,6">
-                                <TextBlock Text="🎮" Foreground="#F778BA" Margin="0,0,4,0" />
-                                <TextBlock Text="GPU &amp; NETWORK" FontSize="10" FontWeight="Bold" Foreground="#8B949E" />
-                            </StackPanel>
-                            <TextBlock Text="{Binding GpuSummary}" FontWeight="Bold" FontSize="12" Foreground="#F0F6FC" TextTrimming="CharacterEllipsis" Margin="0,0,0,2" />
-                            <TextBlock Text="{Binding WifiSsid, StringFormat='Wi-Fi: {0}'}" FontSize="10" Foreground="#8B949E" TextTrimming="CharacterEllipsis" />
-                        </StackPanel>
-                    </Border>
-                </Grid>
-
-                <!-- 3. AUTOMATED 8-STAGE EXPRESS QC RUNNER & SUBSYSTEM TILES -->
-                <Border Background="#161B22" BorderBrush="#30363D" BorderThickness="1" CornerRadius="8" Padding="14">
-                    <StackPanel>
-                        <!-- Section Header & Start QC Button -->
-                        <Grid Margin="0,0,0,12">
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="*" />
-                                <ColumnDefinition Width="Auto" />
-                            </Grid.ColumnDefinitions>
-
-                            <StackPanel Grid.Column="0">
-                                <TextBlock Text="AUTOMATED 8-STAGE HARDWARE DIAGNOSTIC SUITE" FontSize="12" FontWeight="Bold" Foreground="#F0F6FC" />
-                                <TextBlock Text="Rapid hardware testing: Audio FFT loopback, Camera DirectShow, Storage SMART, Memory bit-flip assessment, Battery degradation, Display VSync jitter."
-                                           FontSize="11" Foreground="#8B949E" Margin="0,2,0,0" />
-                            </StackPanel>
-
-                            <Button Grid.Column="1" Command="{Binding RunQcCommand}"
-                                    IsEnabled="{Binding IsQcRunning, Converter={StaticResource InverseBool}}"
-                                    Background="#1F6FEB" Foreground="#FFFFFF" BorderBrush="#388BFD" BorderThickness="1"
-                                    Padding="18,8" FontWeight="Bold" FontSize="13">
-                                <StackPanel Orientation="Horizontal">
-                                    <TextBlock Text="⚡" Margin="0,0,6,0" />
-                                    <TextBlock Text="RUN FULL EXPRESS QC" />
-                                </StackPanel>
-                            </Button>
-                        </Grid>
-
-                        <!-- Overall QC Banner -->
-                        <Border Background="#0D1117" BorderBrush="#30363D" BorderThickness="1" CornerRadius="6" Padding="12,8" Margin="0,0,0,12">
-                            <Grid>
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="Auto" />
-                                    <ColumnDefinition Width="*" />
-                                </Grid.ColumnDefinitions>
-                                <TextBlock Grid.Column="0" Text="QC OVERALL STATE:" FontWeight="SemiBold" FontSize="11" Foreground="#8B949E" VerticalAlignment="Center" Margin="0,0,10,0" />
-                                <TextBlock Grid.Column="1" Text="{Binding QcOverallStatus}" FontWeight="Bold" FontSize="13" Foreground="#58A6FF" VerticalAlignment="Center" />
-                            </Grid>
+                    <!-- Header -->
+                    <DockPanel Grid.Row="0" Margin="4,2,4,10">
+                        <TextBlock DockPanel.Dock="Left" Text="DIAGNOSTIC PIPELINE" FontSize="11" FontWeight="Bold" Foreground="#8B949E" VerticalAlignment="Center" />
+                        <Border DockPanel.Dock="Right" Background="#21262D" CornerRadius="4" Padding="6,1">
+                            <TextBlock Text="8 SUBSYSTEMS" FontSize="9" FontWeight="Bold" Foreground="#58A6FF" />
                         </Border>
+                    </DockPanel>
 
-                        <!-- Subsystems Card Grid -->
+                    <!-- Subsystem Cards List -->
+                    <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
                         <ItemsControl ItemsSource="{Binding Subsystems}">
-                            <ItemsControl.ItemsPanel>
-                                <ItemsPanelTemplate>
-                                    <UniformGrid Columns="4" />
-                                </ItemsPanelTemplate>
-                            </ItemsControl.ItemsPanel>
                             <ItemsControl.ItemTemplate>
                                 <DataTemplate>
-                                    <Border Background="#0D1117" 
-                                            BorderBrush="{Binding AccentHex, Converter={StaticResource HexBrush}}"
-                                            BorderThickness="1.5" CornerRadius="6" Padding="10" Margin="4">
-                                        <Grid>
-                                            <Grid.RowDefinitions>
-                                                <RowDefinition Height="Auto" />
-                                                <RowDefinition Height="Auto" />
-                                                <RowDefinition Height="*" />
-                                                <RowDefinition Height="Auto" />
-                                            </Grid.RowDefinitions>
+                                    <Border CornerRadius="6" Padding="10,7" Margin="0,0,0,6" Cursor="Hand" MouseLeftButtonUp="SubsystemCard_MouseLeftButtonUp">
+                                        <Border.Style>
+                                            <Style TargetType="Border">
+                                                <Setter Property="Background" Value="#0D1117" />
+                                                <Setter Property="BorderBrush" Value="#30363D" />
+                                                <Setter Property="BorderThickness" Value="1" />
+                                                <Style.Triggers>
+                                                    <!-- Selected Card Indicator -->
+                                                    <DataTrigger Binding="{Binding IsSelected}" Value="True">
+                                                        <Setter Property="BorderBrush" Value="#388BFD" />
+                                                        <Setter Property="BorderThickness" Value="1.5" />
+                                                    </DataTrigger>
+                                                    <!-- Emerald Green on Passed -->
+                                                    <DataTrigger Binding="{Binding IsPassed}" Value="True">
+                                                        <Setter Property="Background" Value="#092315" />
+                                                        <Setter Property="BorderBrush" Value="#238636" />
+                                                    </DataTrigger>
+                                                    <!-- Cyan Glow on Running -->
+                                                    <DataTrigger Binding="{Binding IsRunning}" Value="True">
+                                                        <Setter Property="Background" Value="#0C2D48" />
+                                                        <Setter Property="BorderBrush" Value="#58A6FF" />
+                                                    </DataTrigger>
+                                                </Style.Triggers>
+                                            </Style>
+                                        </Border.Style>
 
-                                            <!-- Subsystem Title & Status Badge -->
-                                            <Grid Grid.Row="0" Margin="0,0,0,6">
-                                                <Grid.ColumnDefinitions>
-                                                    <ColumnDefinition Width="*" />
-                                                    <ColumnDefinition Width="Auto" />
-                                                </Grid.ColumnDefinitions>
-                                                <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center">
-                                                    <TextBlock Text="{Binding Icon}" FontSize="14" Margin="0,0,6,0" VerticalAlignment="Center" />
-                                                    <TextBlock Text="{Binding Name}" FontWeight="Bold" FontSize="12" Foreground="#F0F6FC" VerticalAlignment="Center" />
-                                                </StackPanel>
-                                                <Border Grid.Column="1" 
-                                                        Background="{Binding AccentHex, Converter={StaticResource HexBrush}}" 
-                                                        CornerRadius="4" Padding="6,2">
-                                                    <TextBlock Text="{Binding StatusBadge}" FontWeight="Bold" FontSize="9" Foreground="#FFFFFF" />
-                                                </Border>
-                                            </Grid>
+                                        <DockPanel LastChildFill="False">
+                                            <!-- Status Badge & Icon & Name -->
+                                            <StackPanel Orientation="Horizontal" DockPanel.Dock="Left" VerticalAlignment="Center">
+                                                <TextBlock Text="{Binding StatusBadge}" FontWeight="Bold" FontSize="10" Margin="0,0,6,0">
+                                                    <TextBlock.Style>
+                                                        <Style TargetType="TextBlock">
+                                                            <Setter Property="Foreground" Value="#8B949E" />
+                                                            <Style.Triggers>
+                                                                <DataTrigger Binding="{Binding IsPassed}" Value="True">
+                                                                    <Setter Property="Foreground" Value="#3FB950" />
+                                                                </DataTrigger>
+                                                                <DataTrigger Binding="{Binding IsRunning}" Value="True">
+                                                                    <Setter Property="Foreground" Value="#58A6FF" />
+                                                                </DataTrigger>
+                                                            </Style.Triggers>
+                                                        </Style>
+                                                    </TextBlock.Style>
+                                                </TextBlock>
 
-                                            <!-- Metric Value -->
-                                            <TextBlock Grid.Row="1" Text="{Binding MetricValue}" FontWeight="Bold" FontSize="14" 
-                                                       Foreground="{Binding AccentHex, Converter={StaticResource HexBrush}}" Margin="0,0,0,4" />
+                                                <TextBlock Text="{Binding Icon}" Margin="0,0,6,0" FontSize="11" VerticalAlignment="Center" />
 
-                                            <!-- Headline & Detail -->
-                                            <StackPanel Grid.Row="2" Margin="0,0,0,4">
-                                                <TextBlock Text="{Binding Headline}" FontSize="11" FontWeight="SemiBold" Foreground="#F0F6FC" TextWrapping="Wrap" />
-                                                <TextBlock Text="{Binding Detail}" FontSize="10" Foreground="#8B949E" TextWrapping="Wrap" Margin="0,2,0,0" />
+                                                <TextBlock Text="{Binding Name}" FontWeight="SemiBold" FontSize="11" VerticalAlignment="Center">
+                                                    <TextBlock.Style>
+                                                        <Style TargetType="TextBlock">
+                                                            <Setter Property="Foreground" Value="#F0F6FC" />
+                                                            <Style.Triggers>
+                                                                <DataTrigger Binding="{Binding IsPassed}" Value="True">
+                                                                    <Setter Property="Foreground" Value="#3FB950" />
+                                                                </DataTrigger>
+                                                            </Style.Triggers>
+                                                        </Style>
+                                                    </TextBlock.Style>
+                                                </TextBlock>
                                             </StackPanel>
 
-                                            <!-- Optional Snapshot Image (e.g. Webcam) -->
-                                            <Border Grid.Row="3" Visibility="{Binding SnapshotImage, Converter={StaticResource NullVis}}"
-                                                    BorderBrush="#30363D" BorderThickness="1" CornerRadius="4" Margin="0,4,0,0" MaxHeight="80">
-                                                <Image Source="{Binding SnapshotImage}" Stretch="UniformToFill" />
-                                            </Border>
-                                        </Grid>
+                                            <!-- Hotkey Badge -->
+                                            <TextBlock DockPanel.Dock="Right" Text="{Binding HotkeyText}" FontSize="10" FontWeight="Bold" Foreground="#6E7681" VerticalAlignment="Center" />
+                                        </DockPanel>
                                     </Border>
                                 </DataTemplate>
                             </ItemsControl.ItemTemplate>
                         </ItemsControl>
+                    </ScrollViewer>
+
+                    <!-- Bottom Rail Action Controls -->
+                    <StackPanel Grid.Row="2" Margin="0,10,0,0">
+                        <!-- Print Certificate Button [Ctrl+P] -->
+                        <Button Command="{Binding GeneratePdfCommand}" Margin="0,0,0,8"
+                                Background="#21262D" Foreground="#F0F6FC" BorderBrush="#30363D" Padding="10,8">
+                            <DockPanel LastChildFill="False">
+                                <StackPanel Orientation="Horizontal" DockPanel.Dock="Left" VerticalAlignment="Center">
+                                    <TextBlock Text="🖨 " FontSize="12" VerticalAlignment="Center" />
+                                    <TextBlock Text="PRINT CERTIFICATE" FontWeight="Bold" FontSize="11" Foreground="#F0F6FC" VerticalAlignment="Center" />
+                                </StackPanel>
+                                <TextBlock DockPanel.Dock="Right" Text="[Ctrl+P]" FontSize="10" Foreground="#8B949E" VerticalAlignment="Center" />
+                            </DockPanel>
+                        </Button>
+
+                        <!-- Pass QC & Push Cloud Button [Enter] -->
+                        <Button Command="{Binding PassQcAndPushCloudCommand}"
+                                Background="#238636" Foreground="#FFFFFF" BorderBrush="#2EA043" Padding="12,10">
+                            <DockPanel LastChildFill="False">
+                                <StackPanel Orientation="Horizontal" DockPanel.Dock="Left" VerticalAlignment="Center">
+                                    <TextBlock Text="🔏 " FontSize="13" VerticalAlignment="Center" />
+                                    <TextBlock Text="PASS QC &amp; PUSH CLOUD" FontWeight="Bold" FontSize="11" Foreground="#FFFFFF" VerticalAlignment="Center" />
+                                </StackPanel>
+                                <Border DockPanel.Dock="Right" Background="#40000000" CornerRadius="3" Padding="5,1">
+                                    <TextBlock Text="[Enter]" FontSize="10" FontWeight="Bold" Foreground="#FFFFFF" />
+                                </Border>
+                            </DockPanel>
+                        </Button>
                     </StackPanel>
+                </Grid>
+            </Border>
+
+            <!-- ── RIGHT BENTO ARENA ────────────────────────────────────────────── -->
+            <Grid Grid.Column="1">
+                <Grid.RowDefinitions>
+                    <!-- Auto-filled fleet recognized device banner -->
+                    <RowDefinition Height="Auto" />
+                    <!-- Top Bento Tile: Chassis Specs & Depot Attribution -->
+                    <RowDefinition Height="Auto" />
+                    <!-- Main Bento Tile: Live Diagnostic Telemetry Arena -->
+                    <RowDefinition Height="*" />
+                </Grid.RowDefinitions>
+
+                <!-- Row 0: Cloud/LAN Recognized Device Banner -->
+                <Border Grid.Row="0" Background="#161B22" BorderBrush="#388BFD" BorderThickness="1" CornerRadius="6" Padding="12,6" Margin="0,0,0,8"
+                        Visibility="{Binding IsRecognizedAsset, Converter={StaticResource NullVis}}">
+                    <DockPanel LastChildFill="False">
+                        <StackPanel Orientation="Horizontal" DockPanel.Dock="Left" VerticalAlignment="Center">
+                            <TextBlock Text="⚡ " FontSize="12" Foreground="#58A6FF" VerticalAlignment="Center" />
+                            <TextBlock Text="{Binding RecognizedAssetBanner}" Foreground="#58A6FF" FontWeight="Bold" FontSize="11" VerticalAlignment="Center" />
+                        </StackPanel>
+                        <Border DockPanel.Dock="Right" Background="#1F324D" BorderBrush="#388BFD" BorderThickness="1" CornerRadius="4" Padding="6,2" VerticalAlignment="Center">
+                            <TextBlock Text="AUTO-FILLED FROM FLEET DB" Foreground="#79B8FF" FontWeight="Bold" FontSize="9" />
+                        </Border>
+                    </DockPanel>
                 </Border>
-            </StackPanel>
-        </ScrollViewer>
 
-        <!-- ── FOOTER STATUS BAR ────────────────────────────────────────────────── -->
-        <Border Grid.Row="2" Background="#161B22" BorderBrush="#30363D" BorderThickness="0,1,0,0" Padding="16,8">
-            <Grid>
-                <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="*" />
-                    <ColumnDefinition Width="Auto" />
-                </Grid.ColumnDefinitions>
+                <!-- Row 1: Chassis Specs & Depot Attribution Tile -->
+                <Border Grid.Row="1" Style="{StaticResource BentoCard}">
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <!-- Col 0: Chassis & Hardware Identifiers -->
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="16" />
+                            <!-- Col 1: Depot Operations & Cosmetic Grade -->
+                            <ColumnDefinition Width="*" />
+                        </Grid.ColumnDefinitions>
 
-                <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center">
-                    <TextBlock Text="Depot Platform: " FontSize="11" Foreground="#8B949E" />
-                    <TextBlock Text="Velox Cloud (Railway) + Local WAL Cache" FontSize="11" FontWeight="SemiBold" Foreground="#F0F6FC" Margin="0,0,16,0" />
-                    <TextBlock Text="Automatic Sync: " FontSize="11" Foreground="#8B949E" />
-                    <TextBlock Text="Active (Zero-Click Updates)" FontSize="11" FontWeight="SemiBold" Foreground="#3FB950" />
-                </StackPanel>
+                        <!-- Left Column: Chassis Specs -->
+                        <StackPanel Grid.Column="0">
+                            <TextBlock Text="CHASSIS &amp; HARDWARE IDENTIFICATION" FontSize="11" FontWeight="Bold" Foreground="#58A6FF" Margin="0,0,0,8" />
 
-                <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
-                    <TextBlock Text="VeloxBench 1.0.0 — Velox Depot Operations" FontSize="10" Foreground="#8B949E" />
-                </StackPanel>
+                            <Grid Margin="0,0,0,6">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="8" />
+                                    <ColumnDefinition Width="*" />
+                                </Grid.ColumnDefinitions>
+                                <StackPanel Grid.Column="0">
+                                    <TextBlock Text="SERIAL NUMBER / BARCODE" FontSize="10" FontWeight="SemiBold" Foreground="#8B949E" Margin="0,0,0,3" />
+                                    <TextBox Text="{Binding Serial, Mode=OneWay}" FontWeight="Bold" ToolTip="System Serial Number detected via SMBIOS / WMI" />
+                                </StackPanel>
+                                <StackPanel Grid.Column="2">
+                                    <TextBlock Text="ASSET TAG" FontSize="10" FontWeight="SemiBold" Foreground="#8B949E" Margin="0,0,0,3" />
+                                    <TextBox Text="{Binding AssetTag, UpdateSourceTrigger=PropertyChanged}" ToolTip="Depot Barcode or Tracking Tag" />
+                                </StackPanel>
+                            </Grid>
+
+                            <Grid Margin="0,0,0,6">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="140" />
+                                    <ColumnDefinition Width="8" />
+                                    <ColumnDefinition Width="*" />
+                                </Grid.ColumnDefinitions>
+                                <StackPanel Grid.Column="0">
+                                    <TextBlock Text="MANUFACTURER" FontSize="10" FontWeight="SemiBold" Foreground="#8B949E" Margin="0,0,0,3" />
+                                    <TextBox Text="{Binding Manufacturer, Mode=OneWay}" IsReadOnly="True" />
+                                </StackPanel>
+                                <StackPanel Grid.Column="2">
+                                    <TextBlock Text="MODEL / CHASSIS NAME" FontSize="10" FontWeight="SemiBold" Foreground="#8B949E" Margin="0,0,0,3" />
+                                    <TextBox Text="{Binding Model, Mode=OneWay}" FontWeight="SemiBold" IsReadOnly="True" />
+                                </StackPanel>
+                            </Grid>
+                        </StackPanel>
+
+                        <!-- Right Column: Depot Attribution & Cosmetic Grade -->
+                        <StackPanel Grid.Column="2">
+                            <TextBlock Text="DEPOT OPERATIONS &amp; COSMETIC ATTRIBUTION" FontSize="11" FontWeight="Bold" Foreground="#58A6FF" Margin="0,0,0,8" />
+
+                            <Grid Margin="0,0,0,6">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="8" />
+                                    <ColumnDefinition Width="*" />
+                                </Grid.ColumnDefinitions>
+                                <StackPanel Grid.Column="0">
+                                    <TextBlock Text="COSMETIC GRADE" FontSize="10" FontWeight="SemiBold" Foreground="#8B949E" Margin="0,0,0,3" />
+                                    <ComboBox Text="{Binding Grade, UpdateSourceTrigger=PropertyChanged}" IsEditable="True">
+                                        <ComboBoxItem Content="GRADE A+" IsSelected="True" />
+                                        <ComboBoxItem Content="GRADE A" />
+                                        <ComboBoxItem Content="GRADE B" />
+                                        <ComboBoxItem Content="GRADE C" />
+                                        <ComboBoxItem Content="GRADE D" />
+                                    </ComboBox>
+                                </StackPanel>
+                                <StackPanel Grid.Column="2">
+                                    <TextBlock Text="ASSIGNED OPERATOR" FontSize="10" FontWeight="SemiBold" Foreground="#8B949E" Margin="0,0,0,3" />
+                                    <TextBox Text="{Binding AssignedTechnician, UpdateSourceTrigger=PropertyChanged}" />
+                                </StackPanel>
+                            </Grid>
+
+                            <Grid Margin="0,0,0,6">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="8" />
+                                    <ColumnDefinition Width="*" />
+                                </Grid.ColumnDefinitions>
+                                <StackPanel Grid.Column="0">
+                                    <TextBlock Text="SUPPLIER / SOURCE" FontSize="10" FontWeight="SemiBold" Foreground="#8B949E" Margin="0,0,0,3" />
+                                    <TextBox Text="{Binding Supplier, UpdateSourceTrigger=PropertyChanged}" />
+                                </StackPanel>
+                                <StackPanel Grid.Column="2">
+                                    <TextBlock Text="CUSTOMER / DESTINATION" FontSize="10" FontWeight="SemiBold" Foreground="#8B949E" Margin="0,0,0,3" />
+                                    <TextBox Text="{Binding Customer, UpdateSourceTrigger=PropertyChanged}" />
+                                </StackPanel>
+                            </Grid>
+                        </StackPanel>
+                    </Grid>
+                </Border>
+
+                <!-- Row 2: Live Diagnostic Telemetry Arena -->
+                <Border Grid.Row="2" Style="{StaticResource BentoCard}">
+                    <Grid>
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="*" />
+                        </Grid.RowDefinitions>
+
+                        <!-- Header & Express Status -->
+                        <DockPanel Grid.Row="0" Margin="0,0,0,10">
+                            <StackPanel Orientation="Horizontal" DockPanel.Dock="Left" VerticalAlignment="Center">
+                                <TextBlock Text="LIVE TELEMETRY ARENA" FontSize="11" FontWeight="Bold" Foreground="#F0F6FC" VerticalAlignment="Center" />
+                                <TextBlock Text=" — Real-time sensor feeds, benchmarks &amp; optical captures" FontSize="11" Foreground="#8B949E" VerticalAlignment="Center" />
+                            </StackPanel>
+
+                            <!-- Overall Status Badge -->
+                            <Border DockPanel.Dock="Right" Background="#21262D" BorderBrush="#30363D" BorderThickness="1" CornerRadius="4" Padding="8,3">
+                                <TextBlock Text="{Binding QcOverallStatus}" FontWeight="Bold" FontSize="11" Foreground="#58A6FF" />
+                            </Border>
+                        </DockPanel>
+
+                        <!-- Detail Visual Feed Area -->
+                        <Grid Grid.Row="1">
+                            <Grid.ColumnDefinitions>
+                                <!-- Camera / Optical feed preview -->
+                                <ColumnDefinition Width="260" />
+                                <ColumnDefinition Width="12" />
+                                <!-- Live Telemetry Feed Columns -->
+                                <ColumnDefinition Width="*" />
+                            </Grid.ColumnDefinitions>
+
+                            <!-- Left: Optical Sensor Snapshot / Camera Frame -->
+                            <Border Grid.Column="0" Background="#0D1117" BorderBrush="#30363D" BorderThickness="1" CornerRadius="6" Padding="10">
+                                <Grid>
+                                    <!-- Fallback if no snapshot taken yet -->
+                                    <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center">
+                                        <TextBlock Text="📷" FontSize="36" HorizontalAlignment="Center" Margin="0,0,0,8" Foreground="#8B949E" />
+                                        <TextBlock Text="OPTICAL SENSOR PREVIEW" FontWeight="Bold" FontSize="10" Foreground="#8B949E" HorizontalAlignment="Center" />
+                                        <TextBlock Text="Webcam frame will render here during Express QC audit" FontSize="9" Foreground="#6E7681" TextWrapping="Wrap" TextAlignment="Center" Margin="0,4,0,0" />
+                                    </StackPanel>
+
+                                    <!-- Live Captured Image when available -->
+                                    <Image Source="{Binding SelectedSubsystem.SnapshotImage}" Stretch="Uniform" />
+                                </Grid>
+                            </Border>
+
+                            <!-- Right: Diagnostic Metrics & Active Stage Summary -->
+                            <Border Grid.Column="2" Background="#0D1117" BorderBrush="#30363D" BorderThickness="1" CornerRadius="6" Padding="14">
+                                <ScrollViewer VerticalScrollBarVisibility="Auto">
+                                    <StackPanel>
+                                        <!-- Active Stage Header -->
+                                        <DockPanel LastChildFill="False" Margin="0,0,0,8">
+                                            <StackPanel Orientation="Horizontal" DockPanel.Dock="Left" VerticalAlignment="Center">
+                                                <TextBlock Text="{Binding SelectedSubsystem.Icon}" FontSize="16" Margin="0,0,8,0" VerticalAlignment="Center" />
+                                                <TextBlock Text="{Binding SelectedSubsystem.Name}" FontWeight="Bold" FontSize="14" Foreground="#F0F6FC" VerticalAlignment="Center" />
+                                                <Border Background="#21262D" CornerRadius="4" Padding="6,2" Margin="10,0,0,0" VerticalAlignment="Center">
+                                                    <TextBlock Text="{Binding SelectedSubsystem.StatusBadge}" FontWeight="Bold" FontSize="10" Foreground="{Binding SelectedSubsystem.AccentHex, Converter={StaticResource HexBrush}}" />
+                                                </Border>
+                                            </StackPanel>
+
+                                            <!-- ⚡ RUN SINGLE SUBSYSTEM TEST BUTTON -->
+                                            <Button DockPanel.Dock="Right"
+                                                    Command="{Binding RunSingleSubsystemCommand}"
+                                                    CommandParameter="{Binding SelectedSubsystem.Key}"
+                                                    Background="#21262D" Foreground="#58A6FF" BorderBrush="#30363D" BorderThickness="1"
+                                                    Padding="10,4" FontWeight="Bold" FontSize="11" Cursor="Hand"
+                                                    ToolTip="Run on-demand test for this specific subsystem">
+                                                <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                                    <TextBlock Text="⚡ Run Test " FontWeight="Bold" Foreground="#58A6FF" VerticalAlignment="Center" />
+                                                    <Border Background="#1F324D" CornerRadius="3" Padding="4,1" Margin="2,0,0,0">
+                                                        <TextBlock Text="{Binding SelectedSubsystem.HotkeyText}" FontSize="10" FontWeight="Bold" Foreground="#79B8FF" />
+                                                    </Border>
+                                                </StackPanel>
+                                            </Button>
+                                        </DockPanel>
+
+                                        <TextBlock Text="{Binding SelectedSubsystem.Headline}" FontWeight="SemiBold" FontSize="12" Foreground="#58A6FF" Margin="0,0,0,4" />
+                                        <TextBlock Text="{Binding SelectedSubsystem.Detail}" FontSize="11" Foreground="#8B949E" TextWrapping="Wrap" Margin="0,0,0,12" />
+
+                                        <Separator Background="#21262D" Margin="0,0,0,12" />
+
+                                        <!-- Hardware Subsystem Quick Audit Summary Grid -->
+                                        <UniformGrid Columns="2">
+                                            <!-- CPU & RAM -->
+                                            <Border Background="#161B22" BorderBrush="#30363D" BorderThickness="1" CornerRadius="6" Padding="10" Margin="0,0,6,6">
+                                                <StackPanel>
+                                                    <TextBlock Text="⚡ PROCESSOR &amp; TOPOLOGY" FontSize="10" FontWeight="Bold" Foreground="#58A6FF" Margin="0,0,0,4" />
+                                                    <TextBlock Text="{Binding CpuName}" FontWeight="Bold" FontSize="11" Foreground="#F0F6FC" />
+                                                    <TextBlock Text="{Binding CpuClockSummary}" FontSize="10" Foreground="#8B949E" />
+                                                    <TextBlock Text="{Binding RamSummary}" FontSize="10" Foreground="#3FB950" Margin="0,4,0,0" />
+                                                </StackPanel>
+                                            </Border>
+
+                                            <!-- Storage NVMe -->
+                                            <Border Background="#161B22" BorderBrush="#30363D" BorderThickness="1" CornerRadius="6" Padding="10" Margin="6,0,0,6">
+                                                <StackPanel>
+                                                    <TextBlock Text="💾 NVMe / SSD S.M.A.R.T." FontSize="10" FontWeight="Bold" Foreground="#A371F7" Margin="0,0,0,4" />
+                                                    <TextBlock Text="{Binding StorageSummary}" FontWeight="Bold" FontSize="11" Foreground="#F0F6FC" />
+                                                    <TextBlock Text="{Binding StorageHealthPercent, StringFormat='Wear Level Health: {0}%'}" FontSize="10" Foreground="#3FB950" />
+                                                    <TextBlock Text="Non-destructive sequential I/O tested" FontSize="9" Foreground="#8B949E" Margin="0,4,0,0" />
+                                                </StackPanel>
+                                            </Border>
+
+                                            <!-- Battery Power -->
+                                            <Border Background="#161B22" BorderBrush="#30363D" BorderThickness="1" CornerRadius="6" Padding="10" Margin="0,6,6,0">
+                                                <StackPanel>
+                                                    <TextBlock Text="🔋 BATTERY CHARGE &amp; HEALTH" FontSize="10" FontWeight="Bold" Foreground="#D29922" Margin="0,0,0,4" />
+                                                    <TextBlock Text="{Binding BatterySummary}" FontWeight="Bold" FontSize="11" Foreground="#F0F6FC" />
+                                                    <TextBlock Text="{Binding BatteryHealthPercent, StringFormat='Calculated Capacity: {0}%'}" FontSize="10" Foreground="#58A6FF" />
+                                                </StackPanel>
+                                            </Border>
+
+                                            <!-- Graphics & Wireless -->
+                                            <Border Background="#161B22" BorderBrush="#30363D" BorderThickness="1" CornerRadius="6" Padding="10" Margin="6,6,0,0">
+                                                <StackPanel>
+                                                    <TextBlock Text="🎮 GPU &amp; WIRELESS LINK" FontSize="10" FontWeight="Bold" Foreground="#F778BA" Margin="0,0,0,4" />
+                                                    <TextBlock Text="{Binding GpuSummary}" FontWeight="Bold" FontSize="11" Foreground="#F0F6FC" />
+                                                    <TextBlock Text="{Binding WifiSsid, StringFormat='SSID: {0}'}" FontSize="10" Foreground="#8B949E" />
+                                                </StackPanel>
+                                            </Border>
+                                        </UniformGrid>
+
+                                        <!-- Notes & Missing Components Input -->
+                                        <TextBlock Text="DEFECT &amp; REFURB NOTES" FontSize="10" FontWeight="Bold" Foreground="#8B949E" Margin="0,14,0,4" />
+                                        <TextBox Text="{Binding Notes, UpdateSourceTrigger=PropertyChanged}" Height="50" AcceptsReturn="True" TextWrapping="Wrap" />
+                                    </StackPanel>
+                                </ScrollViewer>
+                            </Border>
+                        </Grid>
+                    </Grid>
+                </Border>
             </Grid>
+        </Grid>
+
+        <!-- ═══════════════════════════════════════════════════════════════════════ -->
+        <!-- 3. BOTTOM STATUS & SHORTCUTS STRIP                                      -->
+        <!-- ═══════════════════════════════════════════════════════════════════════ -->
+        <Border Grid.Row="2" Background="#161B22" BorderBrush="#30363D" BorderThickness="1" CornerRadius="6" Padding="12,6" Margin="0,4,0,0">
+            <DockPanel LastChildFill="False">
+                <StackPanel Orientation="Horizontal" DockPanel.Dock="Left" VerticalAlignment="Center">
+                    <TextBlock Text="STATUS: " FontSize="10" FontWeight="Bold" Foreground="#8B949E" />
+                    <TextBlock Text="{Binding QcOverallStatus}" FontSize="10" FontWeight="Bold" Foreground="#58A6FF" />
+                </StackPanel>
+
+                <StackPanel Orientation="Horizontal" DockPanel.Dock="Right" VerticalAlignment="Center">
+                    <TextBlock Text="HOTKEYS: " FontSize="9" FontWeight="Bold" Foreground="#8B949E" Margin="0,0,6,0" />
+                    <TextBlock Text="[F5] 1-Click Express QC" FontSize="9" FontWeight="SemiBold" Foreground="#7EE787" Margin="0,0,10,0" />
+                    <TextBlock Text="[Ctrl+P] Print Certificate" FontSize="9" FontWeight="SemiBold" Foreground="#F0F6FC" Margin="0,0,10,0" />
+                    <TextBlock Text="[Enter] Pass &amp; Push Cloud" FontSize="9" FontWeight="SemiBold" Foreground="#58A6FF" />
+                </StackPanel>
+            </DockPanel>
         </Border>
     </Grid>
 </Window>

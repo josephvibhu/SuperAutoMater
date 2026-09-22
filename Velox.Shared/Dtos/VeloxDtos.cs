@@ -42,6 +42,7 @@ public sealed class EmployeeDto
     public string Name { get; init; } = "";
     public EmployeeRole Role { get; init; } = EmployeeRole.Technician;
     public bool IsActive { get; init; } = true;
+    public string StationId { get; set; } = "BENCH-01";
     public int WorkloadCount { get; set; }
     public DateTimeOffset CreatedAtUtc { get; init; }
 }
@@ -138,6 +139,7 @@ public sealed class CreateEmployeeRequest
     public string Name { get; init; } = "";
     public string Pin { get; init; } = "";
     public EmployeeRole Role { get; init; } = EmployeeRole.Technician;
+    public string? StationId { get; init; } = "BENCH-01";
 }
 
 public sealed class PatchEmployeeRequest
@@ -146,6 +148,7 @@ public sealed class PatchEmployeeRequest
     public string? Pin { get; init; }
     public EmployeeRole? Role { get; init; }
     public bool? IsActive { get; init; }
+    public string? StationId { get; init; }
 }
 
 public sealed class LoginRequest
@@ -160,5 +163,6 @@ public sealed class LoginResponse
     public string EmployeeId { get; init; } = "";
     public string Name { get; init; } = "";
     public EmployeeRole Role { get; init; }
+    public string StationId { get; init; } = "BENCH-01";
     public DateTimeOffset ExpiresAtUtc { get; init; }
 }

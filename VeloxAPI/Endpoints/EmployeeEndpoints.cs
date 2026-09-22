@@ -33,7 +33,7 @@ public static class EmployeeEndpoints
             if (string.IsNullOrWhiteSpace(req.Pin) || req.Pin.Length < 4)
                 return Results.BadRequest(new { error = "pin must be at least 4 characters." });
 
-            var emp = db.CreateEmployee(tenantId, req.Name, req.Pin, req.Role);
+            var emp = db.CreateEmployee(tenantId, req.Name, req.Pin, req.Role, req.StationId ?? "BENCH-01");
             await sse.BroadcastAsync(SseEventType.EmployeeUpdated, emp);
             return Results.Ok(emp);
         });

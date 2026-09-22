@@ -98,6 +98,7 @@ CREATE TABLE IF NOT EXISTS employees (
     pin_hash       TEXT NOT NULL,
     role           TEXT NOT NULL DEFAULT 'Technician',
     is_active      INTEGER NOT NULL DEFAULT 1,
+    station_id     TEXT NULL DEFAULT 'BENCH-01',
     created_at_utc TEXT NOT NULL,
     FOREIGN KEY(tenant_id) REFERENCES tenants(id)
 );
@@ -153,6 +154,16 @@ CREATE INDEX IF NOT EXISTS ix_events_asset_time ON asset_events(asset_id, record
 
 INSERT OR IGNORE INTO schema_migrations(version, applied_at_utc) VALUES(1, CURRENT_TIMESTAMP);");
 
+            // Migration: ensure station_id exists on employees table
+            try
+            {
+                Exec(conn, "ALTER TABLE employees ADD COLUMN station_id TEXT DEFAULT 'BENCH-01'");
+            }
+            catch
+            {
+                // Column already exists
+            }
+
             // Auto-seed default depot tenant, primary API key, and technician if empty
             using var checkCmd = conn.CreateCommand();
             checkCmd.CommandText = "SELECT COUNT(*) FROM tenants";
@@ -176,7 +187,7 @@ INSERT OR IGNORE INTO schema_migrations(version, applied_at_utc) VALUES(1, CURRE
 
                 var pinHash = PinHash(defaultTenantId, "1234");
                 Exec(conn,
-                    "INSERT INTO employees(id,tenant_id,name,pin_hash,role,is_active,created_at_utc) VALUES(@id,@tid,@name,@ph,@role,1,@ts)",
+                    "INSERT INTO employees(id,tenant_id,name,pin_hash,role,is_active,station_id,created_at_utc) VALUES(@id,@tid,@name,@ph,@role,1,'BENCH-01',@ts)",
                     P("@id", "emp-john-tech-01"), P("@tid", defaultTenantId), P("@name", "John Tech"),
                     P("@ph", pinHash), P("@role", "Technician"), P("@ts", now));
             }
@@ -225,7 +236,7 @@ INSERT OR IGNORE INTO schema_migrations(version, applied_at_utc) VALUES(1, CURRE
 
     // ── Employees ────────────────────────────────────────────────────────────
 
-    public EmployeeDto CreateEmployee(string tenantId, string name, string plainPin, EmployeeRole role)
+    public EmployeeDto CreateEmployee(string tenantId, string name, string plainPin, EmployeeRole role, string stationId = "BENCH-01")
     {
         var emp = new EmployeeDto
         {
@@ -234,15 +245,17 @@ INSERT OR IGNORE INTO schema_migrations(version, applied_at_utc) VALUES(1, CURRE
             Name          = name,
             Role          = role,
             IsActive      = true,
+            StationId     = string.IsNullOrWhiteSpace(stationId) ? "BENCH-01" : stationId,
             CreatedAtUtc  = DateTimeOffset.UtcNow
         };
         lock (_gate)
         {
             using var conn = Open();
             Exec(conn,
-                "INSERT INTO employees(id,tenant_id,name,pin_hash,role,is_active,created_at_utc) VALUES(@id,@tid,@name,@ph,@role,1,@ts)",
+                "INSERT INTO employees(id,tenant_id,name,pin_hash,role,is_active,station_id,created_at_utc) VALUES(@id,@tid,@name,@ph,@role,1,@station,@ts)",
                 P("@id", emp.Id), P("@tid", tenantId), P("@name", name),
                 P("@ph", PinHash(tenantId, plainPin)), P("@role", role.ToString()),
+                P("@station", emp.StationId),
                 P("@ts", Iso(emp.CreatedAtUtc)));
         }
         return emp;
@@ -255,7 +268,7 @@ INSERT OR IGNORE INTO schema_migrations(version, applied_at_utc) VALUES(1, CURRE
         {
             using var conn = Open();
             using var cmd  = conn.CreateCommand();
-            cmd.CommandText = "SELECT id,tenant_id,name,role,is_active,created_at_utc FROM employees WHERE tenant_id=@tid AND name=@name COLLATE NOCASE AND pin_hash=@ph AND is_active=1";
+            cmd.CommandText = "SELECT id,tenant_id,name,role,is_active,station_id,created_at_utc FROM employees WHERE tenant_id=@tid AND name=@name COLLATE NOCASE AND pin_hash=@ph AND is_active=1";
             cmd.Parameters.AddWithValue("@tid", tenantId);
             cmd.Parameters.AddWithValue("@name", name);
             cmd.Parameters.AddWithValue("@ph", hash);
@@ -270,7 +283,7 @@ INSERT OR IGNORE INTO schema_migrations(version, applied_at_utc) VALUES(1, CURRE
         {
             using var conn = Open();
             using var cmd  = conn.CreateCommand();
-            cmd.CommandText = "SELECT id,tenant_id,name,role,is_active,created_at_utc FROM employees WHERE tenant_id=@tid AND id=@id";
+            cmd.CommandText = "SELECT id,tenant_id,name,role,is_active,station_id,created_at_utc FROM employees WHERE tenant_id=@tid AND id=@id";
             cmd.Parameters.AddWithValue("@tid", tenantId);
             cmd.Parameters.AddWithValue("@id", id);
             using var r = cmd.ExecuteReader();
@@ -287,7 +300,7 @@ INSERT OR IGNORE INTO schema_migrations(version, applied_at_utc) VALUES(1, CURRE
         {
             using var conn = Open();
             using var cmd  = conn.CreateCommand();
-            cmd.CommandText = "SELECT id,tenant_id,name,role,is_active,created_at_utc FROM employees WHERE tenant_id=@tid ORDER BY name";
+            cmd.CommandText = "SELECT id,tenant_id,name,role,is_active,station_id,created_at_utc FROM employees WHERE tenant_id=@tid ORDER BY name";
             cmd.Parameters.AddWithValue("@tid", tenantId);
             var list = new List<EmployeeDto>();
             using var r = cmd.ExecuteReader();
@@ -316,10 +329,11 @@ INSERT OR IGNORE INTO schema_migrations(version, applied_at_utc) VALUES(1, CURRE
             var sets = new List<string>();
             var parms = new List<SqliteParameter>();
 
-            if (req.Name != null)    { sets.Add("name=@name");       parms.Add(P("@name", req.Name)); }
-            if (req.Pin != null)     { sets.Add("pin_hash=@ph");     parms.Add(P("@ph", PinHash(tenantId, req.Pin))); }
-            if (req.Role != null)    { sets.Add("role=@role");       parms.Add(P("@role", req.Role.ToString())); }
-            if (req.IsActive != null){ sets.Add("is_active=@act");   parms.Add(P("@act", req.IsActive.Value ? 1 : 0)); }
+            if (req.Name != null)      { sets.Add("name=@name");       parms.Add(P("@name", req.Name)); }
+            if (req.Pin != null)       { sets.Add("pin_hash=@ph");     parms.Add(P("@ph", PinHash(tenantId, req.Pin))); }
+            if (req.Role != null)      { sets.Add("role=@role");       parms.Add(P("@role", req.Role.ToString())); }
+            if (req.IsActive != null)  { sets.Add("is_active=@act");   parms.Add(P("@act", req.IsActive.Value ? 1 : 0)); }
+            if (req.StationId != null) { sets.Add("station_id=@st");   parms.Add(P("@st", req.StationId)); }
 
             if (sets.Count == 0) return true;
 
@@ -698,7 +712,8 @@ INSERT OR IGNORE INTO schema_migrations(version, applied_at_utc) VALUES(1, CURRE
         Name         = r.GetString(2),
         Role         = Enum.TryParse<EmployeeRole>(r.GetString(3), out var role) ? role : EmployeeRole.Technician,
         IsActive     = r.GetInt32(4) == 1,
-        CreatedAtUtc = DateTimeOffset.Parse(r.GetString(5))
+        StationId    = r.IsDBNull(5) ? "BENCH-01" : r.GetString(5),
+        CreatedAtUtc = DateTimeOffset.Parse(r.GetString(6))
     };
 
     private static AssetEventDto MapEvent(SqliteDataReader r) => new()

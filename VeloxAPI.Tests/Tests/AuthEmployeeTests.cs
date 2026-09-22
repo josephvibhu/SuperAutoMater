@@ -162,4 +162,38 @@ public sealed class EmployeeTests : IClassFixture<VeloxApiFactory>
         var body = await jobs.Content.ReadFromJsonAsync<JsonElement>();
         Assert.True(body.GetProperty("count").GetInt32() >= 1);
     }
+
+    [Fact]
+    public async Task CreateEmployee_WithStationId_SetsStation()
+    {
+        var resp = await _client.PostAsJsonAsync("/api/v1/employees",
+            new CreateEmployeeRequest { Name = "Henry", Pin = "5555", Role = EmployeeRole.Technician, StationId = "BENCH-07" });
+        Assert.Equal(HttpStatusCode.OK, resp.StatusCode);
+
+        var emp = await resp.Content.ReadFromJsonAsync<EmployeeDto>();
+        Assert.NotNull(emp);
+        Assert.Equal("HENRY", emp!.Name.ToUpperInvariant());
+        Assert.Equal("BENCH-07", emp.StationId);
+    }
+
+    [Fact]
+    public async Task PatchEmployee_StationAndPin_UpdatesBoth()
+    {
+        var create = await _client.PostAsJsonAsync("/api/v1/employees",
+            new CreateEmployeeRequest { Name = "Ian", Pin = "7777", StationId = "BENCH-01" });
+        var emp = await create.Content.ReadFromJsonAsync<EmployeeDto>();
+
+        var patch = new PatchEmployeeRequest { StationId = "BENCH-99", Pin = "8888" };
+        var patchResp = await _client.PatchAsJsonAsync($"/api/v1/employees/{emp!.Id}", patch);
+        Assert.Equal(HttpStatusCode.OK, patchResp.StatusCode);
+
+        var get = await _client.GetAsync($"/api/v1/employees/{emp.Id}");
+        var updated = await get.Content.ReadFromJsonAsync<EmployeeDto>();
+        Assert.Equal("BENCH-99", updated!.StationId);
+
+        // Verify login with new PIN succeeds
+        var login = await _client.PostAsJsonAsync("/api/v1/auth/login",
+            new LoginRequest { Name = "Ian", Pin = "8888" });
+        Assert.Equal(HttpStatusCode.OK, login.StatusCode);
+    }
 }

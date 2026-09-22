@@ -175,7 +175,7 @@ public class ManagerApiClient
         return new List<EmployeeDto>();
     }
 
-    public async Task<EmployeeDto?> CreateEmployeeAsync(string name, EmployeeRole role, string? pin = null)
+    public async Task<EmployeeDto?> CreateEmployeeAsync(string name, EmployeeRole role, string? pin = null, string stationId = "BENCH-01")
     {
         try
         {
@@ -183,7 +183,8 @@ public class ManagerApiClient
             {
                 Name = name,
                 Role = role,
-                Pin = !string.IsNullOrWhiteSpace(pin) ? pin : "1234"
+                Pin = !string.IsNullOrWhiteSpace(pin) ? pin : "1234",
+                StationId = !string.IsNullOrWhiteSpace(stationId) ? stationId : "BENCH-01"
             };
             var content = new StringContent(JsonSerializer.Serialize(body), Encoding.UTF8, "application/json");
             var res = await _http.PostAsync("api/v1/employees", content);
@@ -195,6 +196,34 @@ public class ManagerApiClient
         }
         catch { }
         return null;
+    }
+
+    public async Task<EmployeeDto?> PatchEmployeeAsync(string id, PatchEmployeeRequest patch)
+    {
+        try
+        {
+            var content = new StringContent(JsonSerializer.Serialize(patch), Encoding.UTF8, "application/json");
+            var res = await _http.PatchAsync($"api/v1/employees/{id}", content);
+            if (res.IsSuccessStatusCode)
+            {
+                var json = await res.Content.ReadAsStringAsync();
+                return JsonSerializer.Deserialize<EmployeeDto>(json, JsonOpts);
+            }
+        }
+        catch { }
+        return null;
+    }
+
+    public async Task<bool> ResetEmployeePinAsync(string id, string newPin)
+    {
+        var updated = await PatchEmployeeAsync(id, new PatchEmployeeRequest { Pin = newPin });
+        return updated != null;
+    }
+
+    public async Task<bool> UpdateEmployeeStationAsync(string id, string stationId)
+    {
+        var updated = await PatchEmployeeAsync(id, new PatchEmployeeRequest { StationId = stationId });
+        return updated != null;
     }
 
     // ── Real-Time Zero-Click SSE Event Stream ──────────────────────────────

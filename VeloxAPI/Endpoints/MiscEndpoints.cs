@@ -27,10 +27,11 @@ public static class AuthEndpoints
 
             return Results.Ok(new LoginResponse
             {
-                Token       = token,
-                EmployeeId  = emp.Id,
-                Name        = emp.Name,
-                Role        = emp.Role,
+                Token        = token,
+                EmployeeId   = emp.Id,
+                Name         = emp.Name,
+                Role         = emp.Role,
+                StationId    = emp.StationId,
                 ExpiresAtUtc = expiresAt
             });
         });

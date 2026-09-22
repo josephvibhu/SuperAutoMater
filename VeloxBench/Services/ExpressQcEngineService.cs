@@ -32,25 +32,63 @@ namespace VeloxBench.Services
         Failed
     }
 
-    public class ExpressSubsystemResult
+    public class ExpressSubsystemResult : System.ComponentModel.INotifyPropertyChanged
     {
-        public string Key { get; set; }
-        public string Name { get; set; }
-        public string Icon { get; set; }
-        public ExpressTestStatus Status { get; set; } = ExpressTestStatus.Pending;
-        public string Headline { get; set; } = "Queued...";
-        public string Detail { get; set; } = "";
-        public string MetricValue { get; set; } = "--";
-        public BitmapSource SnapshotImage { get; set; }
-        public float SignalLevel { get; set; } = 0f;
+        private string _key = "";
+        public string Key { get => _key; set { _key = value; OnPropertyChanged(); } }
+
+        private string _name = "";
+        public string Name { get => _name; set { _name = value; OnPropertyChanged(); } }
+
+        private string _icon = "";
+        public string Icon { get => _icon; set { _icon = value; OnPropertyChanged(); } }
+
+        private string _hotkeyText = "";
+        public string HotkeyText { get => _hotkeyText; set { _hotkeyText = value; OnPropertyChanged(); } }
+
+        private ExpressTestStatus _status = ExpressTestStatus.Pending;
+        public ExpressTestStatus Status
+        {
+            get => _status;
+            set
+            {
+                _status = value;
+                OnPropertyChanged();
+                OnPropertyChanged(nameof(StatusBadge));
+                OnPropertyChanged(nameof(AccentHex));
+                OnPropertyChanged(nameof(IsPassed));
+                OnPropertyChanged(nameof(IsRunning));
+            }
+        }
+
+        private string _headline = "Queued...";
+        public string Headline { get => _headline; set { _headline = value; OnPropertyChanged(); } }
+
+        private string _detail = "";
+        public string Detail { get => _detail; set { _detail = value; OnPropertyChanged(); } }
+
+        private string _metricValue = "--";
+        public string MetricValue { get => _metricValue; set { _metricValue = value; OnPropertyChanged(); } }
+
+        private BitmapSource? _snapshotImage;
+        public BitmapSource? SnapshotImage { get => _snapshotImage; set { _snapshotImage = value; OnPropertyChanged(); } }
+
+        private float _signalLevel = 0f;
+        public float SignalLevel { get => _signalLevel; set { _signalLevel = value; OnPropertyChanged(); } }
+
+        private bool _isSelected;
+        public bool IsSelected { get => _isSelected; set { _isSelected = value; OnPropertyChanged(); } }
+
+        public bool IsPassed => Status == ExpressTestStatus.Passed;
+        public bool IsRunning => Status == ExpressTestStatus.Running;
 
         public string StatusBadge => Status switch
         {
-            ExpressTestStatus.Passed => "✓ NOMINAL",
-            ExpressTestStatus.Warning => "⚠ WARNING",
-            ExpressTestStatus.Failed => "✕ FAILED",
-            ExpressTestStatus.Running => "⚡ TESTING...",
-            _ => "● QUEUED"
+            ExpressTestStatus.Passed => "[PASS]",
+            ExpressTestStatus.Warning => "[WARN]",
+            ExpressTestStatus.Failed => "[FAIL]",
+            ExpressTestStatus.Running => "[RUN]",
+            _ => "[--]"
         };
 
         public string AccentHex => Status switch
@@ -61,6 +99,10 @@ namespace VeloxBench.Services
             ExpressTestStatus.Running => "#58A6FF",
             _ => "#8B949E"
         };
+
+        public event System.ComponentModel.PropertyChangedEventHandler? PropertyChanged;
+        protected void OnPropertyChanged([System.Runtime.CompilerServices.CallerMemberName] string? name = null) =>
+            PropertyChanged?.Invoke(this, new System.ComponentModel.PropertyChangedEventArgs(name));
     }
 
     public enum QcProfile
@@ -135,6 +177,7 @@ namespace VeloxBench.Services
             string[] keys = { "Camera", "Mic", "Speaker", "Storage", "CpuRam", "Battery", "Display", "Network" };
             string[] names = { "Webcam Optics", "Mic Array", "Stereo Speakers", "Storage NVMe", "CPU & RAM", "Battery Power", "Display VSync", "Wi-Fi & Bluetooth" };
             string[] icons = { "📷", "🎤", "🔊", "💾", "⚡", "🔋", "🖥", "📶" };
+            string[] hotkeys = { "[F1]", "[F2]", "[F3]", "[F4]", "[F6]", "[F7]", "[F8]", "[F9]" };
 
             for (int i = 0; i < keys.Length; i++)
             {
@@ -143,6 +186,7 @@ namespace VeloxBench.Services
                     Key = keys[i],
                     Name = names[i],
                     Icon = icons[i],
+                    HotkeyText = hotkeys[i],
                     Status = ExpressTestStatus.Pending,
                     Headline = "Queued for automated audit..."
                 };
@@ -405,6 +449,74 @@ namespace VeloxBench.Services
             }
         }
 
+        public async Task RunSingleSubsystemAsync(string key, MainViewModel vm, CancellationToken token = default)
+        {
+            if (vm == null || string.IsNullOrWhiteSpace(key)) return;
+            var sub = vm.Subsystems.FirstOrDefault(s => string.Equals(s.Key, key, StringComparison.OrdinalIgnoreCase));
+            if (sub == null) return;
+
+            sub.Status = ExpressTestStatus.Running;
+            sub.Headline = "Executing on-demand subsystem diagnostic...";
+            SubsystemUpdated?.Invoke(sub);
+
+            try
+            {
+                switch (key.ToLowerInvariant())
+                {
+                    case "camera":
+                        ReportProgress(20, "Auditing webcam sensor, optical lens & frame capture...");
+                        await TestCameraAsync(sub, token);
+                        break;
+                    case "mic":
+                        ReportProgress(30, "Sampling microphone array transduction & noise floor...");
+                        await TestMicrophoneAsync(sub, token);
+                        break;
+                    case "speaker":
+                        ReportProgress(40, "Playing calibrated acoustic chirp sweep & loopback...");
+                        await TestSpeakerLoopbackAsync(sub, token);
+                        break;
+                    case "storage":
+                        ReportProgress(50, "Benchmarking storage S.M.A.R.T. & I/O throughput...");
+                        await TestStorageAsync(sub, vm, token);
+                        break;
+                    case "cpuram":
+                        ReportProgress(60, "Executing CPU multi-core & RAM cell audit...");
+                        await TestCpuRamAsync(sub, token);
+                        break;
+                    case "battery":
+                        ReportProgress(70, "Auditing battery degradation, mWh capacity & AC flow...");
+                        await TestBatteryAsync(sub, vm, token);
+                        break;
+                    case "display":
+                        ReportProgress(80, "Profiling display VSync refresh rate & jitter...");
+                        await TestDisplayAsync(sub, token);
+                        break;
+                    case "network":
+                        ReportProgress(90, "Verifying Wi-Fi adapter, gateway routing & BT...");
+                        await TestNetworkAsync(sub, vm, token);
+                        break;
+                    default:
+                        sub.Status = ExpressTestStatus.Warning;
+                        sub.Headline = $"Unknown subsystem: {key}";
+                        break;
+                }
+            }
+            catch (OperationCanceledException)
+            {
+                sub.Status = ExpressTestStatus.Warning;
+                sub.Headline = "Subsystem test aborted";
+            }
+            catch (Exception ex)
+            {
+                sub.Status = ExpressTestStatus.Failed;
+                sub.Headline = "Subsystem test exception";
+                sub.Detail = ex.Message;
+            }
+            finally
+            {
+                SubsystemUpdated?.Invoke(sub);
+            }
+        }
 
         public void Cancel()
         {

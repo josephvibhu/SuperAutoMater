@@ -6,8 +6,9 @@
         xmlns:conv="clr-namespace:VeloxManager.Converters"
         mc:Ignorable="d"
         Title="VeloxManager — Asset Inventory &amp; Fleet Operations Cockpit" 
-        Height="900" Width="1400"
-        MinHeight="750" MinWidth="1100"
+        Height="720" Width="1200"
+        MinHeight="550" MinWidth="960"
+        WindowState="Maximized"
         WindowStartupLocation="CenterScreen"
         Background="#0A0C10"
         Foreground="#F0F6FC"
@@ -16,6 +17,10 @@
     <Window.Resources>
         <conv:HexToBrushConverter x:Key="HexBrush" />
         <conv:NullToVisibilityConverter x:Key="NullVis" />
+        <conv:BoolToColorBrushConverter x:Key="BoolColor" />
+        <conv:BoolToStatusTextConverter x:Key="BoolStatus" />
+        <conv:InvoiceTypeToBrushConverter x:Key="InvTypeBrush" />
+        <conv:InvoiceTypeToStringConverter x:Key="InvTypeString" />
 
         <!-- Metric Box Style -->
         <Style x:Key="HeaderMetric" TargetType="Border">
@@ -65,13 +70,161 @@
             <Setter Property="FontSize" Value="13" />
         </Style>
 
-        <!-- Dark ComboBox -->
+        <!-- ComboBox Toggle Button Template -->
+        <ControlTemplate x:Key="ComboBoxToggleButtonTemplate" TargetType="ToggleButton">
+            <Grid>
+                <Border x:Name="Border" Background="{TemplateBinding Background}" BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="{TemplateBinding BorderThickness}" CornerRadius="6" />
+                <Path x:Name="Arrow" HorizontalAlignment="Right" VerticalAlignment="Center" Margin="0,0,10,0" Fill="#8B949E" Data="M 0 0 L 4 4 L 8 0 Z" />
+            </Grid>
+            <ControlTemplate.Triggers>
+                <Trigger Property="IsMouseOver" Value="True">
+                    <Setter TargetName="Border" Property="BorderBrush" Value="#58A6FF" />
+                    <Setter TargetName="Arrow" Property="Fill" Value="#58A6FF" />
+                </Trigger>
+            </ControlTemplate.Triggers>
+        </ControlTemplate>
+
+        <!-- Dark ComboBox Style -->
         <Style TargetType="ComboBox">
-            <Setter Property="Background" Value="#0D1117" />
+            <Setter Property="Background" Value="#161B22" />
             <Setter Property="Foreground" Value="#F0F6FC" />
             <Setter Property="BorderBrush" Value="#30363D" />
             <Setter Property="BorderThickness" Value="1" />
-            <Setter Property="Padding" Value="6,4" />
+            <Setter Property="Padding" Value="8,5" />
+            <Setter Property="SnapsToDevicePixels" Value="True" />
+            <Setter Property="ScrollViewer.HorizontalScrollBarVisibility" Value="Auto" />
+            <Setter Property="ScrollViewer.VerticalScrollBarVisibility" Value="Auto" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="ComboBox">
+                        <Grid>
+                            <ToggleButton Name="ToggleButton"
+                                          Template="{StaticResource ComboBoxToggleButtonTemplate}"
+                                          Background="{TemplateBinding Background}"
+                                          BorderBrush="{TemplateBinding BorderBrush}"
+                                          BorderThickness="{TemplateBinding BorderThickness}"
+                                          Focusable="False"
+                                          IsChecked="{Binding Path=IsDropDownOpen, Mode=TwoWay, RelativeSource={RelativeSource TemplatedParent}}"
+                                          ClickMode="Press" />
+                            <ContentPresenter Name="ContentSite"
+                                              IsHitTestVisible="False"
+                                              Content="{TemplateBinding SelectionBoxItem}"
+                                              ContentTemplate="{TemplateBinding SelectionBoxItemTemplate}"
+                                              Margin="8,3,28,3"
+                                              VerticalAlignment="Center"
+                                              HorizontalAlignment="Left" />
+                            <Popup Name="Popup"
+                                   Placement="Bottom"
+                                   IsOpen="{TemplateBinding IsDropDownOpen}"
+                                   AllowsTransparency="True"
+                                   Focusable="False"
+                                   PopupAnimation="Slide">
+                                <Grid Name="DropDown"
+                                      SnapsToDevicePixels="True"
+                                      MinWidth="{TemplateBinding ActualWidth}"
+                                      MaxHeight="{TemplateBinding MaxDropDownHeight}">
+                                    <Border Name="DropDownBorder"
+                                            Background="#161B22"
+                                            BorderBrush="#30363D"
+                                            BorderThickness="1"
+                                            CornerRadius="6"
+                                            Margin="0,2,0,2">
+                                        <ScrollViewer Margin="4,4,4,4" SnapsToDevicePixels="True">
+                                            <StackPanel IsItemsHost="True" KeyboardNavigation.DirectionalNavigation="Contained" />
+                                        </ScrollViewer>
+                                    </Border>
+                                </Grid>
+                            </Popup>
+                        </Grid>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <!-- Dark ComboBoxItem Style -->
+        <Style TargetType="ComboBoxItem">
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="Foreground" Value="#F0F6FC" />
+            <Setter Property="Padding" Value="8,5" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="ComboBoxItem">
+                        <Border x:Name="Border" Background="{TemplateBinding Background}" Padding="{TemplateBinding Padding}" CornerRadius="4" Margin="1">
+                            <ContentPresenter />
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsHighlighted" Value="True">
+                                <Setter TargetName="Border" Property="Background" Value="#1F6FEB" />
+                                <Setter Property="Foreground" Value="#FFFFFF" />
+                            </Trigger>
+                            <Trigger Property="IsSelected" Value="True">
+                                <Setter TargetName="Border" Property="Background" Value="#238636" />
+                                <Setter Property="Foreground" Value="#FFFFFF" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <!-- Dark DataGrid Column Header Style (Eradicates Windows Aero White Header) -->
+        <Style TargetType="DataGridColumnHeader">
+            <Setter Property="Background" Value="#161B22" />
+            <Setter Property="Foreground" Value="#8B949E" />
+            <Setter Property="FontWeight" Value="SemiBold" />
+            <Setter Property="FontSize" Value="11" />
+            <Setter Property="Padding" Value="10,8" />
+            <Setter Property="BorderBrush" Value="#30363D" />
+            <Setter Property="BorderThickness" Value="0,0,1,1" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="DataGridColumnHeader">
+                        <Border Background="{TemplateBinding Background}"
+                                BorderBrush="{TemplateBinding BorderBrush}"
+                                BorderThickness="{TemplateBinding BorderThickness}"
+                                Padding="{TemplateBinding Padding}">
+                            <ContentPresenter HorizontalAlignment="Left" VerticalAlignment="Center" />
+                        </Border>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <!-- Dark DataGrid Row Style -->
+        <Style TargetType="DataGridRow">
+            <Setter Property="Background" Value="#0D1117" />
+            <Setter Property="Foreground" Value="#F0F6FC" />
+            <Setter Property="BorderThickness" Value="0" />
+            <Style.Triggers>
+                <Trigger Property="IsSelected" Value="True">
+                    <Setter Property="Background" Value="#1F6FEB" />
+                    <Setter Property="Foreground" Value="#FFFFFF" />
+                </Trigger>
+                <Trigger Property="IsMouseOver" Value="True">
+                    <Setter Property="Background" Value="#21262D" />
+                </Trigger>
+            </Style.Triggers>
+        </Style>
+
+        <!-- Dark DataGrid Cell Style -->
+        <Style TargetType="DataGridCell">
+            <Setter Property="Padding" Value="8,6" />
+            <Setter Property="Foreground" Value="{Binding RelativeSource={RelativeSource AncestorType=DataGridRow}, Path=Foreground}" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="DataGridCell">
+                        <Border Background="{TemplateBinding Background}" BorderThickness="0" Padding="{TemplateBinding Padding}">
+                            <ContentPresenter VerticalAlignment="Center" />
+                        </Border>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+            <Style.Triggers>
+                <Trigger Property="IsSelected" Value="True">
+                    <Setter Property="Background" Value="#1F6FEB" />
+                    <Setter Property="Foreground" Value="#FFFFFF" />
+                </Trigger>
+            </Style.Triggers>
         </Style>
 
         <!-- Dark TabControl Style -->
@@ -253,17 +406,6 @@
                                   HeadersVisibility="Column"
                                   SelectionMode="Single">
 
-                            <DataGrid.ColumnHeaderStyle>
-                                <Style TargetType="DataGridColumnHeader">
-                                    <Setter Property="Background" Value="#161B22" />
-                                    <Setter Property="Foreground" Value="#8B949E" />
-                                    <Setter Property="FontWeight" Value="SemiBold" />
-                                    <Setter Property="FontSize" Value="11" />
-                                    <Setter Property="Padding" Value="10,8" />
-                                    <Setter Property="BorderBrush" Value="#30363D" />
-                                    <Setter Property="BorderThickness" Value="0,0,0,1" />
-                                </Style>
-                            </DataGrid.ColumnHeaderStyle>
 
                             <DataGrid.Columns>
                                 <!-- Serial Number -->
@@ -415,7 +557,7 @@
                 <Grid Margin="16">
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="*" />
-                        <ColumnDefinition Width="340" />
+                        <ColumnDefinition Width="380" />
                     </Grid.ColumnDefinitions>
 
                     <!-- Employee List -->
@@ -426,41 +568,127 @@
                                 <RowDefinition Height="*" />
                             </Grid.RowDefinitions>
 
-                            <TextBlock Grid.Row="0" Text="DEPOT TECHNICIANS &amp; BENCH OPERATORS" FontSize="13" FontWeight="Bold" Foreground="#F0F6FC" Margin="0,0,0,10" />
+                            <DockPanel Grid.Row="0" Margin="0,0,0,10">
+                                <TextBlock Text="DEPOT TECHNICIANS &amp; BENCH OPERATORS" FontSize="13" FontWeight="Bold" Foreground="#F0F6FC" VerticalAlignment="Center" />
+                                <TextBlock Text="Select a technician to reset PIN or modify assigned bench" FontSize="11" Foreground="#8B949E" HorizontalAlignment="Right" VerticalAlignment="Center" />
+                            </DockPanel>
 
-                            <DataGrid Grid.Row="1" ItemsSource="{Binding Employees}" AutoGenerateColumns="False" IsReadOnly="True"
+                            <DataGrid Grid.Row="1" ItemsSource="{Binding Employees}" SelectedItem="{Binding SelectedEmployeeForEdit}"
+                                      AutoGenerateColumns="False" IsReadOnly="True"
                                       Background="#0D1117" RowBackground="#0D1117" AlternatingRowBackground="#161B22" Foreground="#F0F6FC" BorderThickness="0">
                                 <DataGrid.Columns>
                                     <DataGridTextColumn Header="ID" Binding="{Binding Id}" Width="120" />
-                                    <DataGridTextColumn Header="NAME" Binding="{Binding Name}" FontWeight="Bold" Width="180" />
-                                    <DataGridTextColumn Header="ROLE" Binding="{Binding Role}" Width="120" />
-                                    <DataGridTextColumn Header="STATION" Binding="{Binding StationId}" Width="120" />
+                                    <DataGridTextColumn Header="NAME" Binding="{Binding Name}" FontWeight="Bold" Width="160" />
+                                    <DataGridTextColumn Header="ROLE" Binding="{Binding Role}" Width="110" />
+                                    <DataGridTemplateColumn Header="STATION" Width="110">
+                                        <DataGridTemplateColumn.CellTemplate>
+                                            <DataTemplate>
+                                                <Border Background="#21262D" BorderBrush="#30363D" BorderThickness="1" CornerRadius="4" Padding="6,2" HorizontalAlignment="Left">
+                                                    <TextBlock Text="{Binding StationId}" FontWeight="Bold" FontSize="10" Foreground="#58A6FF" />
+                                                </Border>
+                                            </DataTemplate>
+                                        </DataGridTemplateColumn.CellTemplate>
+                                    </DataGridTemplateColumn>
+                                    <DataGridTemplateColumn Header="STATUS" Width="90">
+                                        <DataGridTemplateColumn.CellTemplate>
+                                            <DataTemplate>
+                                                <Border Background="{Binding IsActive, Converter={StaticResource BoolColor}}" CornerRadius="4" Padding="6,2" HorizontalAlignment="Left">
+                                                    <TextBlock Text="{Binding IsActive, Converter={StaticResource BoolStatus}}" FontWeight="Bold" FontSize="10" Foreground="#FFFFFF" />
+                                                </Border>
+                                            </DataTemplate>
+                                        </DataGridTemplateColumn.CellTemplate>
+                                    </DataGridTemplateColumn>
+                                    <DataGridTextColumn Header="ASSIGNED WORK" Binding="{Binding WorkloadCount, StringFormat='{}{0} assets'}" Width="110" />
                                     <DataGridTextColumn Header="CREATED" Binding="{Binding CreatedAtUtc, StringFormat='{}{0:yyyy-MM-dd HH:mm}'}" Width="*" />
                                 </DataGrid.Columns>
                             </DataGrid>
                         </Grid>
                     </Border>
 
-                    <!-- Register Technician Form -->
-                    <Border Grid.Column="1" Background="#161B22" BorderBrush="#30363D" BorderThickness="1" CornerRadius="8" Padding="14">
+                    <!-- Right Column: Registration & Active Technician Management -->
+                    <ScrollViewer Grid.Column="1" VerticalScrollBarVisibility="Auto">
                         <StackPanel>
-                            <TextBlock Text="REGISTER NEW TECHNICIAN" FontSize="12" FontWeight="Bold" Foreground="#58A6FF" Margin="0,0,0,12" />
+                            <!-- Register Technician Card -->
+                            <Border Background="#161B22" BorderBrush="#30363D" BorderThickness="1" CornerRadius="8" Padding="14" Margin="0,0,0,12">
+                                <StackPanel>
+                                    <TextBlock Text="REGISTER NEW TECHNICIAN" FontSize="12" FontWeight="Bold" Foreground="#58A6FF" Margin="0,0,0,12" />
 
-                            <TextBlock Text="FULL NAME" FontSize="10" FontWeight="SemiBold" Foreground="#8B949E" Margin="0,0,0,4" />
-                            <TextBox Text="{Binding NewEmployeeName, UpdateSourceTrigger=PropertyChanged}" Margin="0,0,0,10" />
+                                    <TextBlock Text="FULL NAME" FontSize="10" FontWeight="SemiBold" Foreground="#8B949E" Margin="0,0,0,4" />
+                                    <TextBox Text="{Binding NewEmployeeName, UpdateSourceTrigger=PropertyChanged}" Margin="0,0,0,10" />
 
-                            <TextBlock Text="SECURITY ROLE" FontSize="10" FontWeight="SemiBold" Foreground="#8B949E" Margin="0,0,0,4" />
-                            <ComboBox Text="{Binding NewEmployeeRole, UpdateSourceTrigger=PropertyChanged}" Margin="0,0,0,14" IsEditable="True">
-                                <ComboBoxItem Content="Technician" IsSelected="True" />
-                                <ComboBoxItem Content="Supervisor" />
-                                <ComboBoxItem Content="WarehouseManager" />
-                                <ComboBoxItem Content="Administrator" />
-                            </ComboBox>
+                                    <Grid Margin="0,0,0,10">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="8" />
+                                            <ColumnDefinition Width="*" />
+                                        </Grid.ColumnDefinitions>
+                                        <StackPanel Grid.Column="0">
+                                            <TextBlock Text="STATION PIN" FontSize="10" FontWeight="SemiBold" Foreground="#8B949E" Margin="0,0,0,4" />
+                                            <TextBox Text="{Binding NewEmployeePin, UpdateSourceTrigger=PropertyChanged}" ToolTip="4+ digit PIN for bench and mobile PWA login" />
+                                        </StackPanel>
+                                        <StackPanel Grid.Column="2">
+                                            <TextBlock Text="STATION / BENCH ID" FontSize="10" FontWeight="SemiBold" Foreground="#8B949E" Margin="0,0,0,4" />
+                                            <TextBox Text="{Binding NewEmployeeStationId, UpdateSourceTrigger=PropertyChanged}" ToolTip="Assigned hardware bench (e.g. BENCH-01)" />
+                                        </StackPanel>
+                                    </Grid>
 
-                            <Button Content="+ Register Employee" Command="{Binding CreateEmployeeCommand}"
-                                    Background="#238636" Foreground="#FFF" BorderBrush="#2EA043" FontWeight="Bold" Padding="12,8" />
+                                    <TextBlock Text="SECURITY ROLE" FontSize="10" FontWeight="SemiBold" Foreground="#8B949E" Margin="0,0,0,4" />
+                                    <ComboBox Text="{Binding NewEmployeeRole, UpdateSourceTrigger=PropertyChanged}" Margin="0,0,0,14" IsEditable="True">
+                                        <ComboBoxItem Content="Technician" IsSelected="True" />
+                                        <ComboBoxItem Content="Supervisor" />
+                                        <ComboBoxItem Content="WarehouseManager" />
+                                        <ComboBoxItem Content="Administrator" />
+                                    </ComboBox>
+
+                                    <Button Content="+ Register Technician" Command="{Binding CreateEmployeeCommand}"
+                                            Background="#238636" Foreground="#FFF" BorderBrush="#2EA043" FontWeight="Bold" Padding="12,8" />
+                                </StackPanel>
+                            </Border>
+
+                            <!-- Selected Technician Management Card -->
+                            <Border Background="#161B22" BorderBrush="#388BFD" BorderThickness="1" CornerRadius="8" Padding="14"
+                                    Visibility="{Binding HasSelectedEmployeeForEdit, Converter={StaticResource NullVis}}">
+                                <StackPanel>
+                                    <TextBlock Text="MANAGE SELECTED OPERATOR" FontSize="12" FontWeight="Bold" Foreground="#58A6FF" Margin="0,0,0,4" />
+                                    <StackPanel Orientation="Horizontal" Margin="0,0,0,12">
+                                        <TextBlock Text="{Binding SelectedEmployeeForEdit.Name}" FontWeight="Bold" FontSize="13" Foreground="#FFFFFF" />
+                                        <TextBlock Text=" — " Foreground="#8B949E" />
+                                        <TextBlock Text="{Binding SelectedEmployeeForEdit.Role}" Foreground="#8B949E" />
+                                    </StackPanel>
+
+                                    <!-- Reset PIN -->
+                                    <TextBlock Text="NEW STATION PIN" FontSize="10" FontWeight="SemiBold" Foreground="#8B949E" Margin="0,0,0,4" />
+                                    <Grid Margin="0,0,0,10">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="8" />
+                                            <ColumnDefinition Width="Auto" />
+                                        </Grid.ColumnDefinitions>
+                                        <TextBox Grid.Column="0" Text="{Binding EditEmployeePin, UpdateSourceTrigger=PropertyChanged}" />
+                                        <Button Grid.Column="2" Content="🔑 Reset PIN" Command="{Binding ResetEmployeePinCommand}"
+                                                Background="#21262D" Foreground="#58A6FF" BorderBrush="#30363D" FontWeight="Bold" Padding="10,6" />
+                                    </Grid>
+
+                                    <!-- Modify Station ID -->
+                                    <TextBlock Text="ASSIGN BENCH / STATION ID" FontSize="10" FontWeight="SemiBold" Foreground="#8B949E" Margin="0,0,0,4" />
+                                    <Grid Margin="0,0,0,12">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="8" />
+                                            <ColumnDefinition Width="Auto" />
+                                        </Grid.ColumnDefinitions>
+                                        <TextBox Grid.Column="0" Text="{Binding EditEmployeeStationId, UpdateSourceTrigger=PropertyChanged}" />
+                                        <Button Grid.Column="2" Content="🏷 Update Station" Command="{Binding UpdateEmployeeStationCommand}"
+                                                Background="#21262D" Foreground="#F0F6FC" BorderBrush="#30363D" FontWeight="Bold" Padding="10,6" />
+                                    </Grid>
+
+                                    <!-- Toggle Active -->
+                                    <Button Content="⏻ Toggle Active / Inactive Status" Command="{Binding ToggleEmployeeActiveCommand}"
+                                            Background="#21262D" Foreground="#D29922" BorderBrush="#30363D" FontWeight="SemiBold" Padding="10,7" />
+                                </StackPanel>
+                            </Border>
                         </StackPanel>
-                    </Border>
+                    </ScrollViewer>
                 </Grid>
             </TabItem>
 
@@ -471,7 +699,7 @@
                 <Grid Margin="16">
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="*" />
-                        <ColumnDefinition Width="380" />
+                        <ColumnDefinition Width="400" />
                     </Grid.ColumnDefinitions>
 
                     <!-- Generated Invoices List -->
@@ -482,18 +710,27 @@
                                 <RowDefinition Height="*" />
                             </Grid.RowDefinitions>
 
-                            <TextBlock Grid.Row="0" Text="GENERATED INVOICES &amp; BILLS" FontSize="13" FontWeight="Bold" Foreground="#F0F6FC" Margin="0,0,0,10" />
+                            <TextBlock Grid.Row="0" Text="GENERATED COMMERCIAL INVOICES &amp; BILLS" FontSize="13" FontWeight="Bold" Foreground="#F0F6FC" Margin="0,0,0,10" />
 
                             <DataGrid Grid.Row="1" ItemsSource="{Binding Invoices}" AutoGenerateColumns="False" IsReadOnly="True"
                                       Background="#0D1117" RowBackground="#0D1117" AlternatingRowBackground="#161B22" Foreground="#F0F6FC" BorderThickness="0">
                                 <DataGrid.Columns>
-                                    <DataGridTextColumn Header="INVOICE #" Binding="{Binding InvoiceNumber}" FontWeight="Bold" Width="160" />
-                                    <DataGridTextColumn Header="DATE" Binding="{Binding CreatedAt, StringFormat='{}{0:yyyy-MM-dd}'}" Width="100" />
-                                    <DataGridTextColumn Header="CLIENT / SUPPLIER" Binding="{Binding PartyName}" Width="*" />
-                                    <DataGridTextColumn Header="SUBTOTAL" Binding="{Binding SubTotal, StringFormat='{}{0:C}'}" Width="100" />
-                                    <DataGridTextColumn Header="TAX" Binding="{Binding TaxAmount, StringFormat='{}{0:C}'}" Width="90" />
-                                    <DataGridTextColumn Header="TOTAL" Binding="{Binding TotalAmount, StringFormat='{}{0:C}'}" FontWeight="Bold" Width="100" />
-                                    <DataGridTemplateColumn Header="ACTIONS" Width="100">
+                                    <DataGridTextColumn Header="INVOICE #" Binding="{Binding InvoiceNumber}" FontWeight="Bold" Width="150" />
+                                    <DataGridTemplateColumn Header="TYPE" Width="100">
+                                        <DataGridTemplateColumn.CellTemplate>
+                                            <DataTemplate>
+                                                <Border Background="{Binding Type, Converter={StaticResource InvTypeBrush}}" CornerRadius="4" Padding="6,2" HorizontalAlignment="Left" Margin="4,2">
+                                                    <TextBlock Text="{Binding Type, Converter={StaticResource InvTypeString}}" FontWeight="Bold" FontSize="10" Foreground="#FFFFFF" />
+                                                </Border>
+                                            </DataTemplate>
+                                        </DataGridTemplateColumn.CellTemplate>
+                                    </DataGridTemplateColumn>
+                                    <DataGridTextColumn Header="DATE" Binding="{Binding CreatedAt, StringFormat='{}{0:yyyy-MM-dd}'}" Width="95" />
+                                    <DataGridTextColumn Header="PARTY / CLIENT / SUPPLIER" Binding="{Binding PartyName}" Width="*" />
+                                    <DataGridTextColumn Header="SUBTOTAL" Binding="{Binding SubTotal, StringFormat='{}{0:C}'}" Width="90" />
+                                    <DataGridTextColumn Header="TAX" Binding="{Binding TaxAmount, StringFormat='{}{0:C}'}" Width="80" />
+                                    <DataGridTextColumn Header="TOTAL" Binding="{Binding TotalAmount, StringFormat='{}{0:C}'}" FontWeight="Bold" Width="95" />
+                                    <DataGridTemplateColumn Header="ACTIONS" Width="90">
                                         <DataGridTemplateColumn.CellTemplate>
                                             <DataTemplate>
                                                 <Button Content="📄 Preview" Command="{Binding DataContext.PreviewInvoiceCommand, RelativeSource={RelativeSource AncestorType=Window}}" CommandParameter="{Binding}"
@@ -508,21 +745,52 @@
 
                     <!-- Invoice Generator Panel -->
                     <Border Grid.Column="1" Background="#161B22" BorderBrush="#30363D" BorderThickness="1" CornerRadius="8" Padding="14">
-                        <StackPanel>
-                            <TextBlock Text="CREATE SALES TAX BILL" FontSize="12" FontWeight="Bold" Foreground="#58A6FF" Margin="0,0,0,12" />
+                        <ScrollViewer VerticalScrollBarVisibility="Auto">
+                            <StackPanel>
+                                <TextBlock Text="COMMERCIAL BILLING SUITE" FontSize="12" FontWeight="Bold" Foreground="#58A6FF" Margin="0,0,0,12" />
 
-                            <TextBlock Text="CUSTOMER / CLIENT NAME" FontSize="10" FontWeight="SemiBold" Foreground="#8B949E" Margin="0,0,0,4" />
-                            <TextBox Text="{Binding NewInvoiceParty, UpdateSourceTrigger=PropertyChanged}" Margin="0,0,0,10" />
+                                <TextBlock Text="DOCUMENT TYPE" FontSize="10" FontWeight="SemiBold" Foreground="#8B949E" Margin="0,0,0,4" />
+                                <ComboBox Text="{Binding SelectedInvoiceTypeString, UpdateSourceTrigger=PropertyChanged}" Margin="0,0,0,10" IsReadOnly="True">
+                                    <ComboBoxItem Content="Sales Tax Invoice" IsSelected="True" />
+                                    <ComboBoxItem Content="Purchase Inward Bill" />
+                                </ComboBox>
 
-                            <TextBlock Text="TAX RATE (%)" FontSize="10" FontWeight="SemiBold" Foreground="#8B949E" Margin="0,0,0,4" />
-                            <TextBox Text="{Binding NewInvoiceTax, UpdateSourceTrigger=PropertyChanged}" Margin="0,0,0,14" />
+                                <TextBlock Text="{Binding InvoicePartyLabel}" FontSize="10" FontWeight="SemiBold" Foreground="#8B949E" Margin="0,0,0,4" />
+                                <TextBox Text="{Binding NewInvoiceParty, UpdateSourceTrigger=PropertyChanged}" Margin="0,0,0,10" />
 
-                            <TextBlock Text="Generate bill for the currently selected asset in the Inventory tab, or click below to bundle all available 'Ready For Sale' stock into an instant invoice."
-                                       FontSize="11" Foreground="#8B949E" TextWrapping="Wrap" Margin="0,0,0,14" />
+                                <Grid Margin="0,0,0,10">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="8" />
+                                        <ColumnDefinition Width="*" />
+                                    </Grid.ColumnDefinitions>
 
-                            <Button Content="🧾 Generate &amp; Open Sales Bill" Command="{Binding GenerateInvoiceCommand}"
-                                    Background="#238636" Foreground="#FFF" BorderBrush="#2EA043" FontWeight="Bold" Padding="14,10" FontSize="12" />
-                        </StackPanel>
+                                    <StackPanel Grid.Column="0">
+                                        <TextBlock Text="{Binding InvoicePriceLabel}" FontSize="10" FontWeight="SemiBold" Foreground="#8B949E" Margin="0,0,0,4" />
+                                        <TextBox Text="{Binding NewInvoiceUnitPrice, UpdateSourceTrigger=PropertyChanged}" />
+                                    </StackPanel>
+
+                                    <StackPanel Grid.Column="2">
+                                        <TextBlock Text="TAX RATE (%)" FontSize="10" FontWeight="SemiBold" Foreground="#8B949E" Margin="0,0,0,4" />
+                                        <TextBox Text="{Binding NewInvoiceTax, UpdateSourceTrigger=PropertyChanged}" />
+                                    </StackPanel>
+                                </Grid>
+
+                                <TextBlock Text="MEMO / TERMS &amp; CONDITIONS" FontSize="10" FontWeight="SemiBold" Foreground="#8B949E" Margin="0,0,0,4" />
+                                <TextBox Text="{Binding NewInvoiceNotes, UpdateSourceTrigger=PropertyChanged}" Margin="0,0,0,12" />
+
+                                <CheckBox Content="Mark invoiced unit(s) as SOLD"
+                                          IsChecked="{Binding MarkAsSoldOnInvoice}"
+                                          Visibility="{Binding IsSalesInvoice, Converter={StaticResource NullVis}}"
+                                          Foreground="#3FB950" FontWeight="SemiBold" Margin="0,0,0,14" />
+
+                                <TextBlock Text="Billing will be generated for the currently selected unit in the Inventory tab, or bundles top inventory units if none are selected."
+                                           FontSize="11" Foreground="#8B949E" TextWrapping="Wrap" Margin="0,0,0,14" />
+
+                                <Button Content="{Binding GenerateInvoiceButtonText}" Command="{Binding GenerateInvoiceCommand}"
+                                        Background="#238636" Foreground="#FFF" BorderBrush="#2EA043" FontWeight="Bold" Padding="14,10" FontSize="12" />
+                            </StackPanel>
+                        </ScrollViewer>
                     </Border>
                 </Grid>
             </TabItem>
