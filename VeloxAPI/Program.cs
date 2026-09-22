@@ -40,6 +40,8 @@ var app = builder.Build();
 app.Services.GetRequiredService<VeloxDb>().Initialize();
 
 // ── Middleware ────────────────────────────────────────────────────────────────
+app.UseDefaultFiles();
+app.UseStaticFiles();
 app.UseCors();
 app.UseMiddleware<ApiKeyMiddleware>();
 app.UseMiddleware<JwtMiddleware>();

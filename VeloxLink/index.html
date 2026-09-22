@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta name="theme-color" content="#0d1117">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <title>VeloxLink — Technician Companion</title>
+  <link rel="stylesheet" href="style.css">
+  <link rel="manifest" href="manifest.json">
+</head>
+<body>
+  <!-- Header Bar -->
+  <header class="app-header">
+    <div class="brand">
+      <span class="bolt">⚡</span>
+      <span class="brand-name">VELOX<strong>LINK</strong></span>
+      <span class="version-tag">DEPOT OPS</span>
+    </div>
+    <div id="user-pill" class="user-pill hidden">
+      <span id="user-name-display" class="user-name">Technician</span>
+      <button id="logout-btn" class="btn-logout" title="Sign Out">✕</button>
+    </div>
+  </header>
+
+  <!-- Main Container -->
+  <main class="app-container">
+
+    <!-- ── LOGIN SCREEN ─────────────────────────────────────────────────────── -->
+    <section id="login-view" class="view">
+      <div class="card login-card">
+        <div class="login-header">
+          <div class="login-icon">⚡</div>
+          <h2>Technician Sign In</h2>
+          <p>Access your assigned refurbishing tasks &amp; bench queue</p>
+        </div>
+
+        <form id="login-form">
+          <div class="form-group">
+            <label for="emp-name">Technician Name</label>
+            <input type="text" id="emp-name" placeholder="e.g. John Tech" required autocomplete="username">
+          </div>
+
+          <div class="form-group">
+            <label for="emp-pin">Station PIN</label>
+            <input type="password" id="emp-pin" placeholder="••••" maxlength="8" required pattern="[0-9]*" inputmode="numeric" autocomplete="current-password">
+          </div>
+
+          <div class="form-group">
+            <label for="api-key-input">Depot Access Key</label>
+            <input type="text" id="api-key-input" placeholder="vx-..." value="vx-2fe1479ad70dffd3017a0aa8c67b1c270fc9dd00bb9d4bdf">
+          </div>
+
+          <button type="submit" id="btn-login" class="btn btn-primary btn-block">Sign In to Workstation</button>
+          <div id="login-error" class="error-msg hidden"></div>
+        </form>
+      </div>
+    </section>
+
+    <!-- ── JOB QUEUE SCREEN ─────────────────────────────────────────────────── -->
+    <section id="jobs-view" class="view hidden">
+      <!-- Toolbar -->
+      <div class="queue-toolbar">
+        <div>
+          <h2>My Active Queue</h2>
+          <span id="queue-subtitle" class="subtitle">Fetching assigned tasks...</span>
+        </div>
+        <button id="btn-refresh" class="btn btn-outline" title="Refresh Queue">🔄</button>
+      </div>
+
+      <!-- Search Filter -->
+      <div class="search-box">
+        <input type="text" id="job-search" placeholder="Search serial, tag, or model...">
+      </div>
+
+      <!-- Jobs Feed -->
+      <div id="jobs-list" class="jobs-list">
+        <!-- Rendered dynamically -->
+      </div>
+
+      <!-- Empty State -->
+      <div id="empty-state" class="empty-state hidden">
+        <div class="empty-icon">✓</div>
+        <h3>All Caught Up!</h3>
+        <p>No active refurbishment tasks assigned to you right now. New dispatches from VeloxManager will appear here automatically.</p>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- Status / Action Modal -->
+  <div id="action-modal" class="modal hidden">
+    <div class="modal-backdrop"></div>
+    <div class="modal-content">
+      <div class="modal-header">
+        <h3 id="modal-title">Update Unit Status</h3>
+        <button id="modal-close" class="btn-close">✕</button>
+      </div>
+      <div class="modal-body">
+        <p id="modal-subtitle">Serial: ...</p>
+        
+        <label>Set Lifecycle Stage:</label>
+        <div class="status-grid">
+          <button class="btn-status" data-status="ActiveTesting">⚡ Active Testing</button>
+          <button class="btn-status" data-status="ExternalRepair">🔧 In Repair</button>
+          <button class="btn-status" data-status="AwaitingParts">📦 Awaiting Parts</button>
+          <button class="btn-status" data-status="ReadyForSale">✓ Ready For Sale</button>
+        </div>
+
+        <label for="modal-notes" style="margin-top: 14px; display:block;">Add Work Log / Defect Notes:</label>
+        <textarea id="modal-notes" rows="3" placeholder="Enter findings, parts replaced, or inspection comments..."></textarea>
+      </div>
+      <div class="modal-footer">
+        <button id="modal-cancel" class="btn btn-outline">Cancel</button>
+        <button id="modal-save" class="btn btn-primary">Save &amp; Push</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>

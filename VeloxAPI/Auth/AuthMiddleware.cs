@@ -33,6 +33,13 @@ public sealed class ApiKeyMiddleware(RequestDelegate next)
             }
         }
 
+        // Static files and UI routes bypass API key requirement
+        if (!path.StartsWith("/api", StringComparison.OrdinalIgnoreCase))
+        {
+            await next(ctx);
+            return;
+        }
+
         // Unauthenticated routes (admin routes enforce X-Admin-Secret internally)
         if (path == "/health" ||
             path.StartsWith("/api/v1/auth", StringComparison.OrdinalIgnoreCase) ||
@@ -42,16 +49,11 @@ public sealed class ApiKeyMiddleware(RequestDelegate next)
             return;
         }
 
-        // SSE stream accepts both API key and JWT
+        // SSE stream and employee operations accept JWT
         var authHeader = ctx.Request.Headers["Authorization"].FirstOrDefault();
-        if (path.StartsWith("/api/v1/events", StringComparison.OrdinalIgnoreCase) && authHeader != null)
-        {
-            await next(ctx);
-            return;
-        }
-
-        // Employee-facing endpoints accept JWT (checked by JwtMiddleware downstream)
-        if (path.StartsWith("/api/v1/jobs", StringComparison.OrdinalIgnoreCase) && authHeader != null)
+        if ((path.StartsWith("/api/v1/events", StringComparison.OrdinalIgnoreCase) ||
+             path.StartsWith("/api/v1/jobs", StringComparison.OrdinalIgnoreCase) ||
+             path.StartsWith("/api/v1/assets", StringComparison.OrdinalIgnoreCase)) && authHeader != null)
         {
             await next(ctx);
             return;
