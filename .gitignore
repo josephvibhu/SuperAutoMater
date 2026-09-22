@@ -20,3 +20,5 @@ test_*.db
 [Rr]eleases/
 *.log
 .env
+config.production.json
+*.tmp
