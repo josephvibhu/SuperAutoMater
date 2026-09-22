@@ -152,6 +152,34 @@ CREATE TABLE IF NOT EXISTS asset_events (
 CREATE INDEX IF NOT EXISTS ix_events_asset_time ON asset_events(asset_id, recorded_at_utc);
 
 INSERT OR IGNORE INTO schema_migrations(version, applied_at_utc) VALUES(1, CURRENT_TIMESTAMP);");
+
+            // Auto-seed default depot tenant, primary API key, and technician if empty
+            using var checkCmd = conn.CreateCommand();
+            checkCmd.CommandText = "SELECT COUNT(*) FROM tenants";
+            var tenantCount = Convert.ToInt64(checkCmd.ExecuteScalar());
+            if (tenantCount == 0)
+            {
+                var defaultTenantId = "ten-d2428a4cb3da";
+                var defaultKey = "vx-2fe1479ad70dffd3017a0aa8c67b1c270fc9dd00bb9d4bdf";
+                var keyHash = Sha256(defaultKey);
+                var now = Iso(DateTimeOffset.UtcNow);
+
+                Exec(conn,
+                    "INSERT INTO tenants(id,name,site_code,created_at_utc) VALUES(@id,@name,@site,@ts)",
+                    P("@id", defaultTenantId), P("@name", "Velox Main Depot"),
+                    P("@site", "MAIN"), P("@ts", now));
+
+                Exec(conn,
+                    "INSERT INTO api_keys(id,tenant_id,key_hash,label,created_at_utc) VALUES(@id,@tid,@kh,@lbl,@ts)",
+                    P("@id", "key-default-001"), P("@tid", defaultTenantId), P("@kh", keyHash),
+                    P("@lbl", "primary"), P("@ts", now));
+
+                var pinHash = PinHash(defaultTenantId, "1234");
+                Exec(conn,
+                    "INSERT INTO employees(id,tenant_id,name,pin_hash,role,is_active,created_at_utc) VALUES(@id,@tid,@name,@ph,@role,1,@ts)",
+                    P("@id", "emp-john-tech-01"), P("@tid", defaultTenantId), P("@name", "John Tech"),
+                    P("@ph", pinHash), P("@role", "Technician"), P("@ts", now));
+            }
         }
     }
 
