@@ -30,7 +30,9 @@ public class ManagerApiClient
     public static ManagerApiClient Instance => _instance ??= new ManagerApiClient();
 
     private readonly HttpClient _http;
+    private readonly HttpClient _sseHttp;
     private CancellationTokenSource? _sseCts;
+    private CancellationTokenSource? _healthCts;
 
     public event Action<string>? AssetUpdated;
     public event Action<bool>? CloudConnectionChanged;
@@ -48,18 +50,52 @@ public class ManagerApiClient
         {
             Timeout = TimeSpan.FromSeconds(10)
         };
+        _sseHttp = new HttpClient
+        {
+            Timeout = Timeout.InfiniteTimeSpan
+        };
         ConfigureClient();
+        StartPeriodicHealthCheck();
     }
 
     public void ConfigureClient()
     {
         var cfg = ManagerConfigService.Current;
         var baseUrl = cfg.ApiUrl.TrimEnd('/');
+        
         _http.BaseAddress = new Uri(baseUrl + "/");
         _http.DefaultRequestHeaders.Clear();
         _http.DefaultRequestHeaders.Add("X-Velox-Api-Key", cfg.ApiKey);
         _http.DefaultRequestHeaders.Add("X-API-Key", cfg.ApiKey);
         _http.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
+
+        _sseHttp.BaseAddress = new Uri(baseUrl + "/");
+        _sseHttp.DefaultRequestHeaders.Clear();
+        _sseHttp.DefaultRequestHeaders.Add("X-Velox-Api-Key", cfg.ApiKey);
+        _sseHttp.DefaultRequestHeaders.Add("X-API-Key", cfg.ApiKey);
+    }
+
+    private void StartPeriodicHealthCheck()
+    {
+        _healthCts?.Cancel();
+        _healthCts = new CancellationTokenSource();
+        var token = _healthCts.Token;
+
+        Task.Run(async () =>
+        {
+            while (!token.IsCancellationRequested)
+            {
+                await CheckHealthAsync();
+                try
+                {
+                    await Task.Delay(20000, token);
+                }
+                catch (OperationCanceledException)
+                {
+                    break;
+                }
+            }
+        }, token);
     }
 
     public async Task<bool> CheckHealthAsync()
@@ -122,15 +158,23 @@ public class ManagerApiClient
 
     public async Task<bool> UpdateAssetStatusAsync(string assetId, LifecycleQueue newStatus, string? notes = null, string? actor = null)
     {
+        return await PatchAssetAsync(assetId, new PatchAssetRequest
+        {
+            LifecycleQueue = newStatus,
+            Notes = notes,
+            Actor = actor ?? ManagerConfigService.Current.ManagerName
+        });
+    }
+
+    public async Task<bool> PatchAssetAsync(string assetId, PatchAssetRequest patch)
+    {
         try
         {
-            var patch = new PatchAssetRequest
+            if (string.IsNullOrWhiteSpace(patch.Actor))
             {
-                LifecycleQueue = newStatus,
-                Notes = notes,
-                Actor = actor ?? ManagerConfigService.Current.ManagerName
-            };
-            var content = new StringContent(JsonSerializer.Serialize(patch), Encoding.UTF8, "application/json");
+                patch.Actor = ManagerConfigService.Current.ManagerName;
+            }
+            var content = new StringContent(JsonSerializer.Serialize(patch, JsonOpts), Encoding.UTF8, "application/json");
             var res = await _http.PatchAsync($"api/v1/assets/{assetId}", content);
             return res.IsSuccessStatusCode;
         }
@@ -239,10 +283,10 @@ public class ManagerApiClient
             {
                 try
                 {
-                    using var request = new HttpRequestMessage(HttpMethod.Get, "api/v1/events");
+                    using var request = new HttpRequestMessage(HttpMethod.Get, "api/v1/events/stream");
                     request.Headers.Accept.Add(new MediaTypeWithQualityHeaderValue("text/event-stream"));
 
-                    using var response = await _http.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, token);
+                    using var response = await _sseHttp.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, token);
                     if (response.IsSuccessStatusCode)
                     {
                         IsConnected = true;
@@ -264,11 +308,6 @@ public class ManagerApiClient
                             }
                         }
                     }
-                    else
-                    {
-                        IsConnected = false;
-                        CloudConnectionChanged?.Invoke(false);
-                    }
                 }
                 catch (OperationCanceledException)
                 {
@@ -276,12 +315,19 @@ public class ManagerApiClient
                 }
                 catch
                 {
-                    IsConnected = false;
-                    CloudConnectionChanged?.Invoke(false);
+                    // If SSE disconnects, let background health check monitor connectivity
+                    // and re-establish in 3 seconds
                 }
 
                 // Wait before reconnecting
-                await Task.Delay(3000, token);
+                try
+                {
+                    await Task.Delay(3000, token);
+                }
+                catch (OperationCanceledException)
+                {
+                    break;
+                }
             }
         }, token);
     }

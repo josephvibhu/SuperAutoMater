@@ -15,6 +15,7 @@ using Velox.Shared.Dtos;
 using Velox.Shared.Models;
 using VeloxBench.Core;
 using VeloxBench.Services;
+using VeloxBench.Controls;
 
 namespace VeloxBench.ViewModels;
 
@@ -490,11 +491,11 @@ public class MainViewModel : INotifyPropertyChanged
                 Actor = AssignedTechnician,
                 Notes = $"QC Certified [{QcOverallStatus}] | Grade: {Grade} | Subsystems: {Subsystems.Count(s => s.IsPassed)}/{Subsystems.Count} Passed"
             });
-            MessageBox.Show($"Chassis {Serial} certified and synchronized to Fleet Cloud DB!", "QC Pushed to Cloud", MessageBoxButton.OK, MessageBoxImage.Information);
+            VeloxMessageBox.Show($"Chassis {Serial} certified and synchronized to Fleet Cloud DB!", "QC Pushed to Cloud", MessageBoxButton.OK, MessageBoxImage.Information);
         }
         catch (Exception ex)
         {
-            MessageBox.Show($"Failed pushing QC to cloud: {ex.Message}", "Sync Error", MessageBoxButton.OK, MessageBoxImage.Error);
+            VeloxMessageBox.Show($"Failed pushing QC to cloud: {ex.Message}", "Sync Error", MessageBoxButton.OK, MessageBoxImage.Error);
         }
     }
 
@@ -526,13 +527,13 @@ public class MainViewModel : INotifyPropertyChanged
 
             PdfCertificateService.Instance.GenerateCertificate(certData, outFile);
 
-            MessageBox.Show($"Certificate successfully generated:\n{outFile}", "Velox QC Certificate", MessageBoxButton.OK, MessageBoxImage.Information);
+            VeloxMessageBox.Show($"Certificate successfully generated:\n{outFile}", "Velox QC Certificate", MessageBoxButton.OK, MessageBoxImage.Information);
             Process.Start(new ProcessStartInfo(outFile) { UseShellExecute = true });
         }
         catch (Exception ex)
         {
             AppLogger.Error("Failed generating PDF certificate", ex);
-            MessageBox.Show($"Certificate generation failed: {ex.Message}", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
+            VeloxMessageBox.Show($"Certificate generation failed: {ex.Message}", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
         }
     }
 

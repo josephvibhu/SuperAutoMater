@@ -1,9 +1,16 @@
+using System.Text.Json.Serialization;
 using VeloxAPI.Auth;
 using VeloxAPI.Data;
 using VeloxAPI.Endpoints;
 using VeloxAPI.Realtime;
 
 var builder = WebApplication.CreateBuilder(args);
+
+// ── JSON Options ──────────────────────────────────────────────────────────────
+builder.Services.ConfigureHttpJsonOptions(options =>
+{
+    options.SerializerOptions.Converters.Add(new JsonStringEnumConverter());
+});
 
 // ── Configuration ─────────────────────────────────────────────────────────────
 // Env vars take priority; appsettings.json is fallback

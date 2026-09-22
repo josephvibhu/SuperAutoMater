@@ -370,14 +370,25 @@
 
                             <StackPanel Grid.Column="0" Orientation="Horizontal">
                                 <TextBlock Text="🔍" FontSize="14" Foreground="#8B949E" VerticalAlignment="Center" Margin="0,0,8,0" />
-                                <TextBox Text="{Binding SearchText, UpdateSourceTrigger=PropertyChanged}" Width="360"
+                                <TextBox Text="{Binding SearchText, UpdateSourceTrigger=PropertyChanged}" Width="280"
                                          FontSize="13" Padding="8,5" Background="#0D1117" BorderBrush="#30363D" BorderThickness="1"
                                          ToolTip="Search by Serial Number, Asset Tag, Model, Assigned Tech, Supplier, or Customer..." />
                             </StackPanel>
 
                             <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
-                                <TextBlock Text="Filter:" FontSize="11" FontWeight="SemiBold" Foreground="#8B949E" VerticalAlignment="Center" Margin="0,0,8,0" />
-                                <ComboBox Text="{Binding StatusFilter, UpdateSourceTrigger=PropertyChanged}" Width="160" IsReadOnly="True">
+                                <TextBlock Text="Category:" FontSize="11" FontWeight="SemiBold" Foreground="#8B949E" VerticalAlignment="Center" Margin="0,0,6,0" />
+                                <ComboBox Text="{Binding CategoryFilter, UpdateSourceTrigger=PropertyChanged}" Width="135" Margin="0,0,10,0" IsReadOnly="True">
+                                    <ComboBoxItem Content="ALL" IsSelected="True" />
+                                    <ComboBoxItem Content="LAPTOPS" />
+                                    <ComboBoxItem Content="RAM" />
+                                    <ComboBoxItem Content="STORAGE" />
+                                    <ComboBoxItem Content="CHARGERS" />
+                                    <ComboBoxItem Content="PERIPHERALS" />
+                                    <ComboBoxItem Content="REPAIR SPARES" />
+                                </ComboBox>
+
+                                <TextBlock Text="Status:" FontSize="11" FontWeight="SemiBold" Foreground="#8B949E" VerticalAlignment="Center" Margin="0,0,6,0" />
+                                <ComboBox Text="{Binding StatusFilter, UpdateSourceTrigger=PropertyChanged}" Width="140" IsReadOnly="True">
                                     <ComboBoxItem Content="ALL" IsSelected="True" />
                                     <ComboBoxItem Content="READY_FOR_SALE" />
                                     <ComboBoxItem Content="WIP" />
@@ -406,19 +417,35 @@
                                   HeadersVisibility="Column"
                                   SelectionMode="Single">
 
-
                             <DataGrid.Columns>
+                                <!-- Category Pill -->
+                                <DataGridTemplateColumn Header="CATEGORY" Width="120">
+                                    <DataGridTemplateColumn.CellTemplate>
+                                        <DataTemplate>
+                                            <Border Background="#21262D" CornerRadius="4" Padding="6,2" HorizontalAlignment="Left" Margin="4,2">
+                                                <StackPanel Orientation="Horizontal">
+                                                    <TextBlock Text="{Binding CategoryIcon}" Margin="0,0,4,0" FontSize="11" />
+                                                    <TextBlock Text="{Binding CategoryBadge}" FontWeight="Bold" FontSize="10" Foreground="{Binding CategoryColorHex, Converter={StaticResource HexBrush}}" />
+                                                </StackPanel>
+                                            </Border>
+                                        </DataTemplate>
+                                    </DataGridTemplateColumn.CellTemplate>
+                                </DataGridTemplateColumn>
+
                                 <!-- Serial Number -->
-                                <DataGridTextColumn Header="SERIAL NUMBER" Binding="{Binding SerialNumber}" FontWeight="Bold" Width="140" />
+                                <DataGridTextColumn Header="SERIAL / PART #" Binding="{Binding SerialNumber}" FontWeight="Bold" Width="130" />
 
                                 <!-- Asset Tag -->
-                                <DataGridTextColumn Header="ASSET TAG" Binding="{Binding AssetTag}" Width="120" />
+                                <DataGridTextColumn Header="TAG" Binding="{Binding AssetTag}" Width="100" />
 
                                 <!-- Model -->
-                                <DataGridTextColumn Header="MODEL / SPECS" Binding="{Binding ModelName}" Width="*" />
+                                <DataGridTextColumn Header="MODEL / DESCRIPTION" Binding="{Binding ModelName}" Width="*" />
+
+                                <!-- Stock / Qty -->
+                                <DataGridTextColumn Header="STOCK" Binding="{Binding QuantityDisplay}" FontWeight="SemiBold" Width="75" />
 
                                 <!-- Status Pill -->
-                                <DataGridTemplateColumn Header="STATUS" Width="130">
+                                <DataGridTemplateColumn Header="STATUS" Width="120">
                                     <DataGridTemplateColumn.CellTemplate>
                                         <DataTemplate>
                                             <Border Background="{Binding StatusColorHex, Converter={StaticResource HexBrush}}" CornerRadius="4" Padding="6,2" HorizontalAlignment="Left" Margin="4,2">
@@ -429,7 +456,7 @@
                                 </DataGridTemplateColumn>
 
                                 <!-- Grade -->
-                                <DataGridTemplateColumn Header="GRADE" Width="90">
+                                <DataGridTemplateColumn Header="GRADE" Width="85">
                                     <DataGridTemplateColumn.CellTemplate>
                                         <DataTemplate>
                                             <Border Background="#21262D" CornerRadius="4" Padding="6,2" HorizontalAlignment="Left" Margin="4,2">
@@ -457,70 +484,133 @@
                         </DataGrid>
                     </Border>
 
-                    <!-- Right Side Asset Inspector & Action Panel -->
-                    <Border Grid.Row="1" Grid.Column="1" Background="#161B22" BorderBrush="#30363D" BorderThickness="1" CornerRadius="8" Padding="14">
-                        <Grid>
-                            <!-- Empty state if no asset selected -->
-                            <TextBlock Text="Select an asset from the inventory to inspect details, dispatch to technician, or update status."
-                                       Foreground="#8B949E" FontSize="12" TextWrapping="Wrap" HorizontalAlignment="Center" VerticalAlignment="Center" TextAlignment="Center"
-                                       Visibility="{Binding HasSelectedAsset, Converter={StaticResource NullVis}, ConverterParameter=invert}" />
+                    <!-- Right Side Tabbed Inspector & Quick Stock Intake Panel -->
+                    <Border Grid.Row="1" Grid.Column="1" Background="#161B22" BorderBrush="#30363D" BorderThickness="1" CornerRadius="8" Padding="12">
+                        <TabControl Background="Transparent" BorderThickness="0">
+                            <!-- TAB 0A: ASSET INSPECTOR -->
+                            <TabItem Header="🔍 INSPECTOR" FontSize="11" Padding="10,5">
+                                <Grid Margin="0,10,0,0">
+                                    <!-- Empty state if no asset selected -->
+                                    <TextBlock Text="Select an asset from the inventory to inspect details, dispatch to technician, or update status."
+                                               Foreground="#8B949E" FontSize="12" TextWrapping="Wrap" HorizontalAlignment="Center" VerticalAlignment="Center" TextAlignment="Center"
+                                               Visibility="{Binding HasSelectedAsset, Converter={StaticResource NullVis}, ConverterParameter=invert}" />
 
-                            <!-- Active Asset Inspector -->
-                            <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled"
-                                          Visibility="{Binding HasSelectedAsset, Converter={StaticResource NullVis}}">
-                                <StackPanel>
-                                    <TextBlock Text="ASSET INSPECTOR" FontSize="12" FontWeight="Bold" Foreground="#58A6FF" Margin="0,0,0,8" />
-
-                                    <!-- Asset Identity Card -->
-                                    <Border Background="#0D1117" BorderBrush="#30363D" BorderThickness="1" CornerRadius="6" Padding="10" Margin="0,0,0,10">
+                                    <!-- Active Asset Inspector -->
+                                    <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled"
+                                                  Visibility="{Binding HasSelectedAsset, Converter={StaticResource NullVis}}">
                                         <StackPanel>
-                                            <TextBlock Text="{Binding SelectedAsset.ModelName}" FontWeight="Bold" FontSize="13" Foreground="#F0F6FC" TextWrapping="Wrap" />
-                                            <TextBlock Text="{Binding SelectedAsset.SerialNumber, StringFormat='Serial: {0}'}" FontSize="11" Foreground="#8B949E" Margin="0,2,0,0" />
-                                            <TextBlock Text="{Binding SelectedAsset.AssetTag, StringFormat='Tag: {0}'}" FontSize="11" Foreground="#58A6FF" Margin="0,2,0,0" />
-                                            <TextBlock Text="{Binding SelectedAsset.CurrentLocation, StringFormat='Location: {0}'}" FontSize="11" Foreground="#8B949E" Margin="0,2,0,0" />
-                                        </StackPanel>
-                                    </Border>
+                                            <!-- Asset Identity Card -->
+                                            <Border Background="#0D1117" BorderBrush="#30363D" BorderThickness="1" CornerRadius="6" Padding="10" Margin="0,0,0,10">
+                                                <StackPanel>
+                                                    <StackPanel Orientation="Horizontal" Margin="0,0,0,4">
+                                                        <TextBlock Text="{Binding SelectedAsset.CategoryIcon}" FontSize="13" Margin="0,0,4,0" />
+                                                        <TextBlock Text="{Binding SelectedAsset.CategoryBadge}" FontWeight="Bold" FontSize="10" Foreground="{Binding SelectedAsset.CategoryColorHex, Converter={StaticResource HexBrush}}" VerticalAlignment="Center" />
+                                                        <TextBlock Text=" • " Foreground="#8B949E" />
+                                                        <TextBlock Text="{Binding SelectedAsset.QuantityDisplay}" FontSize="11" Foreground="#3FB950" FontWeight="Bold" VerticalAlignment="Center" />
+                                                    </StackPanel>
+                                                    <TextBlock Text="{Binding SelectedAsset.ModelName}" FontWeight="Bold" FontSize="13" Foreground="#F0F6FC" TextWrapping="Wrap" />
+                                                    <TextBlock Text="{Binding SelectedAsset.SerialNumber, StringFormat='Serial/Part: {0}'}" FontSize="11" Foreground="#8B949E" Margin="0,2,0,0" />
+                                                    <TextBlock Text="{Binding SelectedAsset.AssetTag, StringFormat='Tag: {0}'}" FontSize="11" Foreground="#58A6FF" Margin="0,2,0,0" />
+                                                    <TextBlock Text="{Binding SelectedAsset.CurrentLocation, StringFormat='Location: {0}'}" FontSize="11" Foreground="#8B949E" Margin="0,2,0,0" />
+                                                </StackPanel>
+                                            </Border>
 
-                                    <!-- One-Click Lifecycle Actions -->
-                                    <TextBlock Text="QUICK STATUS MUTATION" FontSize="11" FontWeight="Bold" Foreground="#8B949E" Margin="0,0,0,6" />
-                                    <UniformGrid Columns="2" Margin="0,0,0,10">
-                                        <Button Content="READY FOR SALE" Command="{Binding UpdateStatusCommand}" CommandParameter="ReadyForSale" 
-                                                Background="#238636" Foreground="#FFF" BorderBrush="#2EA043" Margin="2" Padding="6,6" FontSize="10" FontWeight="Bold" />
-                                        <Button Content="ACTIVE TESTING" Command="{Binding UpdateStatusCommand}" CommandParameter="ActiveTesting" 
-                                                Background="#1F6FEB" Foreground="#FFF" BorderBrush="#388BFD" Margin="2" Padding="6,6" FontSize="10" FontWeight="Bold" />
-                                        <Button Content="IN REPAIR" Command="{Binding UpdateStatusCommand}" CommandParameter="InHouseRepair" 
-                                                Background="#9E6A03" Foreground="#FFF" BorderBrush="#BB8009" Margin="2" Padding="6,6" FontSize="10" FontWeight="Bold" />
-                                        <Button Content="AWAITING PARTS" Command="{Binding UpdateStatusCommand}" CommandParameter="AwaitingParts" 
-                                                Background="#6E40C9" Foreground="#FFF" BorderBrush="#8957E5" Margin="2" Padding="6,6" FontSize="10" FontWeight="Bold" />
-                                        <Button Content="MARK SOLD" Command="{Binding UpdateStatusCommand}" CommandParameter="Sold" 
-                                                Background="#30363D" Foreground="#8B949E" BorderBrush="#484F58" Margin="2" Padding="6,6" FontSize="10" FontWeight="Bold" />
-                                        <Button Content="SCRAP / SALVAGE" Command="{Binding UpdateStatusCommand}" CommandParameter="ScrapHarvest" 
-                                                Background="#DA3633" Foreground="#FFF" BorderBrush="#F85149" Margin="2" Padding="6,6" FontSize="10" FontWeight="Bold" />
-                                    </UniformGrid>
+                                            <!-- One-Click Lifecycle Actions -->
+                                            <TextBlock Text="QUICK STATUS MUTATION" FontSize="11" FontWeight="Bold" Foreground="#8B949E" Margin="0,0,0,6" />
+                                            <UniformGrid Columns="2" Margin="0,0,0,10">
+                                                <Button Content="READY FOR SALE" Command="{Binding UpdateStatusCommand}" CommandParameter="ReadyForSale" 
+                                                        Background="#238636" Foreground="#FFF" BorderBrush="#2EA043" Margin="2" Padding="6,6" FontSize="10" FontWeight="Bold" />
+                                                <Button Content="ACTIVE TESTING" Command="{Binding UpdateStatusCommand}" CommandParameter="ActiveTesting" 
+                                                        Background="#1F6FEB" Foreground="#FFF" BorderBrush="#388BFD" Margin="2" Padding="6,6" FontSize="10" FontWeight="Bold" />
+                                                <Button Content="IN REPAIR" Command="{Binding UpdateStatusCommand}" CommandParameter="InHouseRepair" 
+                                                        Background="#9E6A03" Foreground="#FFF" BorderBrush="#BB8009" Margin="2" Padding="6,6" FontSize="10" FontWeight="Bold" />
+                                                <Button Content="AWAITING PARTS" Command="{Binding UpdateStatusCommand}" CommandParameter="AwaitingParts" 
+                                                        Background="#6E40C9" Foreground="#FFF" BorderBrush="#8957E5" Margin="2" Padding="6,6" FontSize="10" FontWeight="Bold" />
+                                                <Button Content="MARK SOLD" Command="{Binding UpdateStatusCommand}" CommandParameter="Sold" 
+                                                        Background="#30363D" Foreground="#8B949E" BorderBrush="#484F58" Margin="2" Padding="6,6" FontSize="10" FontWeight="Bold" />
+                                                <Button Content="SCRAP / SALVAGE" Command="{Binding UpdateStatusCommand}" CommandParameter="ScrapHarvest" 
+                                                        Background="#DA3633" Foreground="#FFF" BorderBrush="#F85149" Margin="2" Padding="6,6" FontSize="10" FontWeight="Bold" />
+                                            </UniformGrid>
 
-                                    <!-- Technician Job Dispatch -->
-                                    <TextBlock Text="DISPATCH TO TECHNICIAN" FontSize="11" FontWeight="Bold" Foreground="#8B949E" Margin="0,0,0,6" />
-                                    <Border Background="#0D1117" BorderBrush="#30363D" BorderThickness="1" CornerRadius="6" Padding="10" Margin="0,0,0,10">
-                                        <StackPanel>
-                                            <ComboBox ItemsSource="{Binding Employees}" SelectedItem="{Binding SelectedEmployee}" DisplayMemberPath="Name" Margin="0,0,0,8" />
-                                            <Button Content="⚡ Assign Job to Technician" Command="{Binding AssignToEmployeeCommand}"
-                                                    Background="#1F6FEB" Foreground="#FFF" BorderBrush="#388BFD" FontWeight="Bold" Padding="10,6" FontSize="11" />
-                                        </StackPanel>
-                                    </Border>
+                                            <!-- Technician Job Dispatch -->
+                                            <TextBlock Text="DISPATCH TO TECHNICIAN" FontSize="11" FontWeight="Bold" Foreground="#8B949E" Margin="0,0,0,6" />
+                                            <Border Background="#0D1117" BorderBrush="#30363D" BorderThickness="1" CornerRadius="6" Padding="10" Margin="0,0,0,10">
+                                                <StackPanel>
+                                                    <ComboBox ItemsSource="{Binding Employees}" SelectedItem="{Binding SelectedEmployee}" DisplayMemberPath="Name" Margin="0,0,0,8" />
+                                                    <Button Content="⚡ Assign Job to Technician" Command="{Binding AssignToEmployeeCommand}"
+                                                            Background="#1F6FEB" Foreground="#FFF" BorderBrush="#388BFD" FontWeight="Bold" Padding="10,6" FontSize="11" />
+                                                </StackPanel>
+                                            </Border>
 
-                                    <!-- Commercial Details -->
-                                    <TextBlock Text="ATTRIBUTION &amp; NOTES" FontSize="11" FontWeight="Bold" Foreground="#8B949E" Margin="0,0,0,6" />
-                                    <Border Background="#0D1117" BorderBrush="#30363D" BorderThickness="1" CornerRadius="6" Padding="10">
-                                        <StackPanel>
-                                            <TextBlock Text="{Binding SelectedAsset.Supplier, StringFormat='Supplier: {0}'}" FontSize="11" Foreground="#8B949E" />
-                                            <TextBlock Text="{Binding SelectedAsset.Customer, StringFormat='Customer: {0}'}" FontSize="11" Foreground="#8B949E" Margin="0,2,0,0" />
-                                            <TextBlock Text="{Binding SelectedAsset.MissingComponents, StringFormat='Defects: {0}'}" FontSize="11" Foreground="#D29922" Margin="0,2,0,0" TextWrapping="Wrap" />
-                                            <TextBlock Text="{Binding SelectedAsset.Notes, StringFormat='Notes: {0}'}" FontSize="11" Foreground="#8B949E" Margin="0,4,0,0" TextWrapping="Wrap" />
+                                            <!-- Commercial Details -->
+                                            <TextBlock Text="ATTRIBUTION &amp; NOTES" FontSize="11" FontWeight="Bold" Foreground="#8B949E" Margin="0,0,0,6" />
+                                            <Border Background="#0D1117" BorderBrush="#30363D" BorderThickness="1" CornerRadius="6" Padding="10">
+                                                <StackPanel>
+                                                    <TextBlock Text="{Binding SelectedAsset.Supplier, StringFormat='Supplier: {0}'}" FontSize="11" Foreground="#8B949E" />
+                                                    <TextBlock Text="{Binding SelectedAsset.Customer, StringFormat='Customer: {0}'}" FontSize="11" Foreground="#8B949E" Margin="0,2,0,0" />
+                                                    <TextBlock Text="{Binding SelectedAsset.MissingComponents, StringFormat='Defects: {0}'}" FontSize="11" Foreground="#D29922" Margin="0,2,0,0" TextWrapping="Wrap" />
+                                                    <TextBlock Text="{Binding SelectedAsset.Notes, StringFormat='Notes: {0}'}" FontSize="11" Foreground="#8B949E" Margin="0,4,0,0" TextWrapping="Wrap" />
+                                                </StackPanel>
+                                            </Border>
                                         </StackPanel>
-                                    </Border>
-                                </StackPanel>
-                            </ScrollViewer>
-                        </Grid>
+                                    </ScrollViewer>
+                                </Grid>
+                            </TabItem>
+
+                            <!-- TAB 0B: QUICK STOCK INTAKE (PARTS, RAM, SSD, CHARGERS, SPARES) -->
+                            <TabItem Header="⚡ QUICK INTAKE" FontSize="11" Padding="10,5">
+                                <ScrollViewer VerticalScrollBarVisibility="Auto" Margin="0,10,0,0">
+                                    <StackPanel>
+                                        <TextBlock Text="INTAKE STOCK / HARDWARE" FontSize="12" FontWeight="Bold" Foreground="#58A6FF" Margin="0,0,0,4" />
+                                        <TextBlock Text="Add Laptops, RAM, SSDs, Chargers, or Spares to Depot Cloud DB" FontSize="11" Foreground="#8B949E" Margin="0,0,0,10" />
+
+                                        <TextBlock Text="HARDWARE CATEGORY" FontSize="10" FontWeight="SemiBold" Foreground="#8B949E" Margin="0,0,0,4" />
+                                        <ComboBox ItemsSource="{Binding QuickIntakeCategories}" SelectedItem="{Binding QuickIntakeCategory}" Margin="0,0,0,8" />
+
+                                        <TextBlock Text="MODEL / DESCRIPTION" FontSize="10" FontWeight="SemiBold" Foreground="#8B949E" Margin="0,0,0,4" />
+                                        <TextBox Text="{Binding QuickIntakeModel, UpdateSourceTrigger=PropertyChanged}" ToolTip="e.g. Samsung 8GB DDR4 3200MHz, Crucial 512GB NVMe, 65W USB-C" Margin="0,0,0,8" />
+
+                                        <Grid Margin="0,0,0,8">
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="*" />
+                                                <ColumnDefinition Width="8" />
+                                                <ColumnDefinition Width="90" />
+                                            </Grid.ColumnDefinitions>
+                                            <StackPanel Grid.Column="0">
+                                                <TextBlock Text="SERIAL / PART # (OPTIONAL)" FontSize="10" FontWeight="SemiBold" Foreground="#8B949E" Margin="0,0,0,4" />
+                                                <TextBox Text="{Binding QuickIntakeSerial, UpdateSourceTrigger=PropertyChanged}" ToolTip="Leave empty to auto-generate" />
+                                            </StackPanel>
+                                            <StackPanel Grid.Column="2">
+                                                <TextBlock Text="QUANTITY" FontSize="10" FontWeight="SemiBold" Foreground="#8B949E" Margin="0,0,0,4" />
+                                                <TextBox Text="{Binding QuickIntakeQuantity, UpdateSourceTrigger=PropertyChanged}" />
+                                            </StackPanel>
+                                        </Grid>
+
+                                        <Grid Margin="0,0,0,8">
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="*" />
+                                                <ColumnDefinition Width="8" />
+                                                <ColumnDefinition Width="*" />
+                                            </Grid.ColumnDefinitions>
+                                            <StackPanel Grid.Column="0">
+                                                <TextBlock Text="UNIT COST (₹)" FontSize="10" FontWeight="SemiBold" Foreground="#8B949E" Margin="0,0,0,4" />
+                                                <TextBox Text="{Binding QuickIntakePurchasePrice, UpdateSourceTrigger=PropertyChanged}" />
+                                            </StackPanel>
+                                            <StackPanel Grid.Column="2">
+                                                <TextBlock Text="SALE PRICE (₹)" FontSize="10" FontWeight="SemiBold" Foreground="#8B949E" Margin="0,0,0,4" />
+                                                <TextBox Text="{Binding QuickIntakeSalePrice, UpdateSourceTrigger=PropertyChanged}" />
+                                            </StackPanel>
+                                        </Grid>
+
+                                        <TextBlock Text="MEMO / SOURCE NOTES" FontSize="10" FontWeight="SemiBold" Foreground="#8B949E" Margin="0,0,0,4" />
+                                        <TextBox Text="{Binding QuickIntakeNotes, UpdateSourceTrigger=PropertyChanged}" Margin="0,0,0,12" />
+
+                                        <Button Content="📥 Intake Stock to Inventory" Command="{Binding QuickIntakeCommand}"
+                                                Background="#238636" Foreground="#FFF" BorderBrush="#2EA043" FontWeight="Bold" Padding="12,8" FontSize="11" />
+                                    </StackPanel>
+                                </ScrollViewer>
+                            </TabItem>
+                        </TabControl>
                     </Border>
                 </Grid>
             </TabItem>
@@ -693,102 +783,278 @@
             </TabItem>
 
             <!-- ═══════════════════════════════════════════════════════════════════ -->
-            <!-- TAB 3: BILLING & INVOICING (SALES BILL & PURCHASE BILL)             -->
+            <!-- TAB 3: BILLING & INVOICING (VYAPAR-STYLE REFURBISHMENT SUITE)        -->
             <!-- ═══════════════════════════════════════════════════════════════════ -->
             <TabItem Header="🧾 BILLING &amp; INVOICES">
                 <Grid Margin="16">
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="*" />
-                        <ColumnDefinition Width="400" />
+                        <ColumnDefinition Width="420" />
                     </Grid.ColumnDefinitions>
 
-                    <!-- Generated Invoices List -->
-                    <Border Grid.Column="0" Background="#161B22" BorderBrush="#30363D" BorderThickness="1" CornerRadius="8" Padding="14" Margin="0,0,12,0">
-                        <Grid>
-                            <Grid.RowDefinitions>
-                                <RowDefinition Height="Auto" />
-                                <RowDefinition Height="*" />
-                            </Grid.RowDefinitions>
+                    <!-- Left: Invoice Draft Table + Settlement + History -->
+                    <Grid Grid.Column="0" Margin="0,0,12,0">
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="1.2*" />
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="*" />
+                        </Grid.RowDefinitions>
 
-                            <TextBlock Grid.Row="0" Text="GENERATED COMMERCIAL INVOICES &amp; BILLS" FontSize="13" FontWeight="Bold" Foreground="#F0F6FC" Margin="0,0,0,10" />
+                        <!-- Box 1: Current Invoice Draft -->
+                        <Border Grid.Row="0" Background="#161B22" BorderBrush="#30363D" BorderThickness="1" CornerRadius="8" Padding="14" Margin="0,0,0,10">
+                            <Grid>
+                                <Grid.RowDefinitions>
+                                    <RowDefinition Height="Auto" />
+                                    <RowDefinition Height="*" />
+                                </Grid.RowDefinitions>
 
-                            <DataGrid Grid.Row="1" ItemsSource="{Binding Invoices}" AutoGenerateColumns="False" IsReadOnly="True"
-                                      Background="#0D1117" RowBackground="#0D1117" AlternatingRowBackground="#161B22" Foreground="#F0F6FC" BorderThickness="0">
-                                <DataGrid.Columns>
-                                    <DataGridTextColumn Header="INVOICE #" Binding="{Binding InvoiceNumber}" FontWeight="Bold" Width="150" />
-                                    <DataGridTemplateColumn Header="TYPE" Width="100">
-                                        <DataGridTemplateColumn.CellTemplate>
-                                            <DataTemplate>
-                                                <Border Background="{Binding Type, Converter={StaticResource InvTypeBrush}}" CornerRadius="4" Padding="6,2" HorizontalAlignment="Left" Margin="4,2">
-                                                    <TextBlock Text="{Binding Type, Converter={StaticResource InvTypeString}}" FontWeight="Bold" FontSize="10" Foreground="#FFFFFF" />
-                                                </Border>
-                                            </DataTemplate>
-                                        </DataGridTemplateColumn.CellTemplate>
-                                    </DataGridTemplateColumn>
-                                    <DataGridTextColumn Header="DATE" Binding="{Binding CreatedAt, StringFormat='{}{0:yyyy-MM-dd}'}" Width="95" />
-                                    <DataGridTextColumn Header="PARTY / CLIENT / SUPPLIER" Binding="{Binding PartyName}" Width="*" />
-                                    <DataGridTextColumn Header="SUBTOTAL" Binding="{Binding SubTotal, StringFormat='{}{0:C}'}" Width="90" />
-                                    <DataGridTextColumn Header="TAX" Binding="{Binding TaxAmount, StringFormat='{}{0:C}'}" Width="80" />
-                                    <DataGridTextColumn Header="TOTAL" Binding="{Binding TotalAmount, StringFormat='{}{0:C}'}" FontWeight="Bold" Width="95" />
-                                    <DataGridTemplateColumn Header="ACTIONS" Width="90">
-                                        <DataGridTemplateColumn.CellTemplate>
-                                            <DataTemplate>
-                                                <Button Content="📄 Preview" Command="{Binding DataContext.PreviewInvoiceCommand, RelativeSource={RelativeSource AncestorType=Window}}" CommandParameter="{Binding}"
-                                                        Background="#21262D" Foreground="#58A6FF" BorderBrush="#30363D" Padding="6,2" FontSize="10" FontWeight="SemiBold" />
-                                            </DataTemplate>
-                                        </DataGridTemplateColumn.CellTemplate>
-                                    </DataGridTemplateColumn>
-                                </DataGrid.Columns>
-                            </DataGrid>
-                        </Grid>
-                    </Border>
+                                <DockPanel Grid.Row="0" Margin="0,0,0,10">
+                                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                        <TextBlock Text="⚡ ACTIVE INVOICE DRAFT" FontSize="13" FontWeight="Bold" Foreground="#F0F6FC" />
+                                        <Border Background="#21262D" CornerRadius="4" Padding="6,2" Margin="10,0,0,0">
+                                            <TextBlock Text="{Binding CurrentInvoiceItems.Count, StringFormat='{}{0} line items'}" FontSize="11" Foreground="#58A6FF" FontWeight="Bold" />
+                                        </Border>
+                                    </StackPanel>
 
-                    <!-- Invoice Generator Panel -->
+                                    <Button DockPanel.Dock="Right" Content="🗑 Clear Draft" Command="{Binding ClearInvoiceDraftCommand}"
+                                            Background="#21262D" Foreground="#F85149" BorderBrush="#30363D" Padding="8,4" FontSize="11" FontWeight="SemiBold" HorizontalAlignment="Right" />
+                                </DockPanel>
+
+                                <!-- Draft Items DataGrid -->
+                                <DataGrid Grid.Row="1" ItemsSource="{Binding CurrentInvoiceItems}" AutoGenerateColumns="False" IsReadOnly="True"
+                                          Background="#0D1117" RowBackground="#0D1117" AlternatingRowBackground="#161B22" Foreground="#F0F6FC" BorderThickness="0">
+                                    <DataGrid.Columns>
+                                        <DataGridTextColumn Header="#" Binding="{Binding LineNumber}" Width="35" />
+                                        <DataGridTemplateColumn Header="TYPE" Width="105">
+                                            <DataGridTemplateColumn.CellTemplate>
+                                                <DataTemplate>
+                                                    <Border Background="{Binding BadgeColorHex, Converter={StaticResource HexBrush}}" CornerRadius="4" Padding="6,2" HorizontalAlignment="Left">
+                                                        <TextBlock Text="{Binding ItemBadge}" FontWeight="Bold" FontSize="9" Foreground="#FFFFFF" />
+                                                    </Border>
+                                                </DataTemplate>
+                                            </DataGridTemplateColumn.CellTemplate>
+                                        </DataGridTemplateColumn>
+                                        <DataGridTextColumn Header="ITEM / SPECIFICATION" Binding="{Binding Model}" FontWeight="SemiBold" Width="*" />
+                                        <DataGridTextColumn Header="SERIAL / REF" Binding="{Binding SerialNumber}" Width="105" />
+                                        <DataGridTextColumn Header="QTY" Binding="{Binding Quantity}" Width="45" />
+                                        <DataGridTextColumn Header="RATE" Binding="{Binding UnitPrice, StringFormat='₹{0:N2}'}" Width="85" />
+                                        <DataGridTextColumn Header="TOTAL" Binding="{Binding LineTotal, StringFormat='₹{0:N2}'}" FontWeight="Bold" Width="90" />
+                                        <DataGridTemplateColumn Header="" Width="45">
+                                            <DataGridTemplateColumn.CellTemplate>
+                                                <DataTemplate>
+                                                    <Button Content="✕" Command="{Binding DataContext.RemoveInvoiceItemCommand, RelativeSource={RelativeSource AncestorType=Window}}" CommandParameter="{Binding}"
+                                                            Background="Transparent" Foreground="#F85149" BorderThickness="0" FontWeight="Bold" Cursor="Hand" ToolTip="Remove Item" />
+                                                </DataTemplate>
+                                            </DataGridTemplateColumn.CellTemplate>
+                                        </DataGridTemplateColumn>
+                                    </DataGrid.Columns>
+                                </DataGrid>
+                            </Grid>
+                        </Border>
+
+                        <!-- Box 2: Customer Attributions & Grand Total Settlement -->
+                        <Border Grid.Row="1" Background="#161B22" BorderBrush="#30363D" BorderThickness="1" CornerRadius="8" Padding="14" Margin="0,0,0,10">
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="14" />
+                                    <ColumnDefinition Width="260" />
+                                </Grid.ColumnDefinitions>
+
+                                <!-- Customer Details -->
+                                <StackPanel Grid.Column="0">
+                                    <TextBlock Text="CUSTOMER &amp; SETTLEMENT DETAILS" FontSize="11" FontWeight="Bold" Foreground="#58A6FF" Margin="0,0,0,8" />
+                                    <Grid Margin="0,0,0,6">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="8" />
+                                            <ColumnDefinition Width="140" />
+                                        </Grid.ColumnDefinitions>
+                                        <TextBox Grid.Column="0" Text="{Binding DraftPartyName, UpdateSourceTrigger=PropertyChanged}" ToolTip="Customer Name" />
+                                        <TextBox Grid.Column="2" Text="{Binding DraftPartyPhone, UpdateSourceTrigger=PropertyChanged}" ToolTip="Phone / Mobile" />
+                                    </Grid>
+                                    <Grid Margin="0,0,0,6">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="8" />
+                                            <ColumnDefinition Width="140" />
+                                        </Grid.ColumnDefinitions>
+                                        <TextBox Grid.Column="0" Text="{Binding DraftPartyAddress, UpdateSourceTrigger=PropertyChanged}" ToolTip="Billing Address" />
+                                        <TextBox Grid.Column="2" Text="{Binding DraftPaymentMode, UpdateSourceTrigger=PropertyChanged}" ToolTip="Payment Mode (UPI/Cash/Bank/Card)" />
+                                    </Grid>
+                                    <TextBox Text="{Binding DraftNotes, UpdateSourceTrigger=PropertyChanged}" ToolTip="Warranty &amp; Terms Memo" />
+                                </StackPanel>
+
+                                <!-- Calculations & Finalize Button -->
+                                <Border Grid.Column="2" Background="#0D1117" BorderBrush="#30363D" BorderThickness="1" CornerRadius="6" Padding="12">
+                                    <StackPanel>
+                                        <DockPanel Margin="0,0,0,4">
+                                            <TextBlock Text="Subtotal:" FontSize="11" Foreground="#8B949E" />
+                                            <TextBlock Text="{Binding DraftSubTotal, StringFormat='₹{0:N2}'}" FontSize="11" FontWeight="SemiBold" Foreground="#F0F6FC" HorizontalAlignment="Right" />
+                                        </DockPanel>
+                                        <DockPanel Margin="0,0,0,4">
+                                            <StackPanel Orientation="Horizontal">
+                                                <TextBlock Text="GST (" FontSize="11" Foreground="#8B949E" />
+                                                <TextBox Text="{Binding DraftTaxPercent, UpdateSourceTrigger=PropertyChanged}" Width="30" FontSize="11" Padding="2,0" Background="#161B22" BorderBrush="#30363D" Foreground="#58A6FF" HorizontalContentAlignment="Center" />
+                                                <TextBlock Text="%):" FontSize="11" Foreground="#8B949E" />
+                                            </StackPanel>
+                                            <TextBlock Text="{Binding DraftTaxAmount, StringFormat='₹{0:N2}'}" FontSize="11" FontWeight="SemiBold" Foreground="#F0F6FC" HorizontalAlignment="Right" />
+                                        </DockPanel>
+                                        <Border BorderBrush="#30363D" BorderThickness="0,1,0,0" Margin="0,4,0,6" />
+                                        <DockPanel Margin="0,0,0,8">
+                                            <TextBlock Text="TOTAL:" FontWeight="Bold" FontSize="12" Foreground="#F0F6FC" VerticalAlignment="Center" />
+                                            <TextBlock Text="{Binding DraftGrandTotal, StringFormat='₹{0:N2}'}" FontWeight="Bold" FontSize="18" Foreground="#3FB950" HorizontalAlignment="Right" />
+                                        </DockPanel>
+
+                                        <CheckBox Content="Deduct stock / Mark unit SOLD" IsChecked="{Binding MarkAsSoldOnInvoice}" Foreground="#3FB950" FontWeight="SemiBold" FontSize="10" Margin="0,0,0,8" />
+
+                                        <Button Content="{Binding GenerateInvoiceButtonText}" Command="{Binding GenerateInvoiceCommand}"
+                                                Background="#238636" Foreground="#FFFFFF" BorderBrush="#2EA043" FontWeight="Bold" Padding="10,8" FontSize="12" />
+                                    </StackPanel>
+                                </Border>
+                            </Grid>
+                        </Border>
+
+                        <!-- Box 3: Generated History -->
+                        <Border Grid.Row="2" Background="#161B22" BorderBrush="#30363D" BorderThickness="1" CornerRadius="8" Padding="12">
+                            <Grid>
+                                <Grid.RowDefinitions>
+                                    <RowDefinition Height="Auto" />
+                                    <RowDefinition Height="*" />
+                                </Grid.RowDefinitions>
+                                <TextBlock Grid.Row="0" Text="PREVIOUS GENERATED INVOICES &amp; BILLS" FontSize="11" FontWeight="Bold" Foreground="#8B949E" Margin="0,0,0,8" />
+                                <DataGrid Grid.Row="1" ItemsSource="{Binding Invoices}" AutoGenerateColumns="False" IsReadOnly="True"
+                                          Background="#0D1117" RowBackground="#0D1117" AlternatingRowBackground="#161B22" Foreground="#F0F6FC" BorderThickness="0">
+                                    <DataGrid.Columns>
+                                        <DataGridTextColumn Header="INVOICE #" Binding="{Binding InvoiceNumber}" FontWeight="Bold" Width="130" />
+                                        <DataGridTemplateColumn Header="TYPE" Width="85">
+                                            <DataGridTemplateColumn.CellTemplate>
+                                                <DataTemplate>
+                                                    <Border Background="{Binding Type, Converter={StaticResource InvTypeBrush}}" CornerRadius="4" Padding="4,2" HorizontalAlignment="Left">
+                                                        <TextBlock Text="{Binding Type, Converter={StaticResource InvTypeString}}" FontWeight="Bold" FontSize="9" Foreground="#FFFFFF" />
+                                                    </Border>
+                                                </DataTemplate>
+                                            </DataGridTemplateColumn.CellTemplate>
+                                        </DataGridTemplateColumn>
+                                        <DataGridTextColumn Header="DATE" Binding="{Binding CreatedAt, StringFormat='{}{0:yyyy-MM-dd}'}" Width="85" />
+                                        <DataGridTextColumn Header="PARTY" Binding="{Binding PartyName}" Width="*" />
+                                        <DataGridTextColumn Header="TOTAL" Binding="{Binding TotalAmount, StringFormat='₹{0:N2}'}" FontWeight="Bold" Width="95" />
+                                        <DataGridTemplateColumn Header="" Width="70">
+                                            <DataGridTemplateColumn.CellTemplate>
+                                                <DataTemplate>
+                                                    <Button Content="📄 Preview" Command="{Binding DataContext.PreviewInvoiceCommand, RelativeSource={RelativeSource AncestorType=Window}}" CommandParameter="{Binding}"
+                                                            Background="#21262D" Foreground="#58A6FF" BorderBrush="#30363D" Padding="4,2" FontSize="10" FontWeight="SemiBold" />
+                                                </DataTemplate>
+                                            </DataGridTemplateColumn.CellTemplate>
+                                        </DataGridTemplateColumn>
+                                    </DataGrid.Columns>
+                                </DataGrid>
+                            </Grid>
+                        </Border>
+                    </Grid>
+
+                    <!-- Right Column: Refurbishment Component Selector (Vyapar Style) -->
                     <Border Grid.Column="1" Background="#161B22" BorderBrush="#30363D" BorderThickness="1" CornerRadius="8" Padding="14">
                         <ScrollViewer VerticalScrollBarVisibility="Auto">
                             <StackPanel>
-                                <TextBlock Text="COMMERCIAL BILLING SUITE" FontSize="12" FontWeight="Bold" Foreground="#58A6FF" Margin="0,0,0,12" />
+                                <TextBlock Text="HARDWARE MODIFICATION &amp; STOCK SELECTOR" FontSize="12" FontWeight="Bold" Foreground="#58A6FF" Margin="0,0,0,12" />
 
-                                <TextBlock Text="DOCUMENT TYPE" FontSize="10" FontWeight="SemiBold" Foreground="#8B949E" Margin="0,0,0,4" />
-                                <ComboBox Text="{Binding SelectedInvoiceTypeString, UpdateSourceTrigger=PropertyChanged}" Margin="0,0,0,10" IsReadOnly="True">
-                                    <ComboBoxItem Content="Sales Tax Invoice" IsSelected="True" />
-                                    <ComboBoxItem Content="Purchase Inward Bill" />
-                                </ComboBox>
+                                <!-- SECTION 1: BASE MACHINE -->
+                                <Border Background="#0D1117" BorderBrush="#30363D" BorderThickness="1" CornerRadius="6" Padding="12" Margin="0,0,0,12">
+                                    <StackPanel>
+                                        <TextBlock Text="1. SELECT BASE MACHINE (CHASSIS / UNIT)" FontSize="11" FontWeight="Bold" Foreground="#F0F6FC" Margin="0,0,0,6" />
+                                        <TextBlock Text="Pick a tested base laptop/desktop from stock:" FontSize="10" Foreground="#8B949E" Margin="0,0,0,6" />
 
-                                <TextBlock Text="{Binding InvoicePartyLabel}" FontSize="10" FontWeight="SemiBold" Foreground="#8B949E" Margin="0,0,0,4" />
-                                <TextBox Text="{Binding NewInvoiceParty, UpdateSourceTrigger=PropertyChanged}" Margin="0,0,0,10" />
+                                        <ComboBox ItemsSource="{Binding AvailableBaseUnits}" SelectedItem="{Binding SelectedInvoiceBaseAsset}" Margin="0,0,0,8">
+                                            <ComboBox.ItemTemplate>
+                                                <DataTemplate>
+                                                    <StackPanel Orientation="Horizontal">
+                                                        <TextBlock Text="{Binding SerialNumber}" FontWeight="Bold" Foreground="#58A6FF" Margin="0,0,8,0" />
+                                                        <TextBlock Text="{Binding ModelName}" Foreground="#F0F6FC" Margin="0,0,8,0" />
+                                                        <TextBlock Text="{Binding SalePrice, StringFormat='(₹{0:N0})'}" Foreground="#3FB950" FontWeight="SemiBold" />
+                                                    </StackPanel>
+                                                </DataTemplate>
+                                            </ComboBox.ItemTemplate>
+                                        </ComboBox>
 
-                                <Grid Margin="0,0,0,10">
-                                    <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="*" />
-                                        <ColumnDefinition Width="8" />
-                                        <ColumnDefinition Width="*" />
-                                    </Grid.ColumnDefinitions>
-
-                                    <StackPanel Grid.Column="0">
-                                        <TextBlock Text="{Binding InvoicePriceLabel}" FontSize="10" FontWeight="SemiBold" Foreground="#8B949E" Margin="0,0,0,4" />
-                                        <TextBox Text="{Binding NewInvoiceUnitPrice, UpdateSourceTrigger=PropertyChanged}" />
+                                        <Button Content="➕ Attach Base Unit to Invoice" Command="{Binding AddBaseToDraftCommand}"
+                                                Background="#1F6FEB" Foreground="#FFF" BorderBrush="#388BFD" FontWeight="Bold" Padding="10,6" FontSize="11" />
                                     </StackPanel>
+                                </Border>
 
-                                    <StackPanel Grid.Column="2">
-                                        <TextBlock Text="TAX RATE (%)" FontSize="10" FontWeight="SemiBold" Foreground="#8B949E" Margin="0,0,0,4" />
-                                        <TextBox Text="{Binding NewInvoiceTax, UpdateSourceTrigger=PropertyChanged}" />
+                                <!-- SECTION 2: COMPONENT UPGRADES / DEGRADES / SPARES -->
+                                <Border Background="#0D1117" BorderBrush="#30363D" BorderThickness="1" CornerRadius="6" Padding="12" Margin="0,0,0,12">
+                                    <StackPanel>
+                                        <TextBlock Text="2. ATTACH COMPONENT / UPGRADE / SPARE" FontSize="11" FontWeight="Bold" Foreground="#F0F6FC" Margin="0,0,0,6" />
+                                        <TextBlock Text="Select from live inventory (RAM, SSD, Charger, Peripheral, Spare):" FontSize="10" Foreground="#8B949E" Margin="0,0,0,6" />
+
+                                        <ComboBox ItemsSource="{Binding ComponentStock}" SelectedItem="{Binding SelectedComponentForInvoice}" Margin="0,0,0,8">
+                                            <ComboBox.ItemTemplate>
+                                                <DataTemplate>
+                                                    <StackPanel Orientation="Horizontal">
+                                                        <TextBlock Text="{Binding CategoryIcon}" Margin="0,0,4,0" />
+                                                        <TextBlock Text="{Binding ModelName}" FontWeight="SemiBold" Foreground="#F0F6FC" Margin="0,0,8,0" />
+                                                        <TextBlock Text="{Binding Quantity, StringFormat='Stock: {0}'}" Foreground="#D29922" Margin="0,0,8,0" FontSize="10" />
+                                                        <TextBlock Text="{Binding SalePrice, StringFormat='₹{0:N0}'}" Foreground="#3FB950" FontWeight="Bold" />
+                                                    </StackPanel>
+                                                </DataTemplate>
+                                            </ComboBox.ItemTemplate>
+                                        </ComboBox>
+
+                                        <TextBlock Text="ACTION / MODIFICATION TYPE" FontSize="10" FontWeight="SemiBold" Foreground="#8B949E" Margin="0,0,0,4" />
+                                        <ComboBox ItemsSource="{Binding ComponentActionOptions}" SelectedItem="{Binding SelectedComponentAction}" Margin="0,0,0,8" />
+
+                                        <Grid Margin="0,0,0,8">
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="80" />
+                                                <ColumnDefinition Width="8" />
+                                                <ColumnDefinition Width="*" />
+                                            </Grid.ColumnDefinitions>
+                                            <StackPanel Grid.Column="0">
+                                                <TextBlock Text="QTY" FontSize="10" FontWeight="SemiBold" Foreground="#8B949E" Margin="0,0,0,4" />
+                                                <TextBox Text="{Binding ComponentItemQty, UpdateSourceTrigger=PropertyChanged}" />
+                                            </StackPanel>
+                                            <StackPanel Grid.Column="2">
+                                                <TextBlock Text="RATE / PRICE (₹)" FontSize="10" FontWeight="SemiBold" Foreground="#8B949E" Margin="0,0,0,4" />
+                                                <TextBox Text="{Binding ComponentItemPrice, UpdateSourceTrigger=PropertyChanged}" />
+                                            </StackPanel>
+                                        </Grid>
+
+                                        <TextBlock Text="CUSTOM LINE SPEC / NOTE" FontSize="10" FontWeight="SemiBold" Foreground="#8B949E" Margin="0,0,0,4" />
+                                        <TextBox Text="{Binding ComponentItemNote, UpdateSourceTrigger=PropertyChanged}" Margin="0,0,0,10" />
+
+                                        <Button Content="➕ Attach Component to Invoice" Command="{Binding AddComponentToDraftCommand}"
+                                                Background="#238636" Foreground="#FFF" BorderBrush="#2EA043" FontWeight="Bold" Padding="10,6" FontSize="11" />
                                     </StackPanel>
-                                </Grid>
+                                </Border>
 
-                                <TextBlock Text="MEMO / TERMS &amp; CONDITIONS" FontSize="10" FontWeight="SemiBold" Foreground="#8B949E" Margin="0,0,0,4" />
-                                <TextBox Text="{Binding NewInvoiceNotes, UpdateSourceTrigger=PropertyChanged}" Margin="0,0,0,12" />
+                                <!-- SECTION 3: CUSTOM ITEM / LABOR / DISCOUNT -->
+                                <Border Background="#0D1117" BorderBrush="#30363D" BorderThickness="1" CornerRadius="6" Padding="12">
+                                    <StackPanel>
+                                        <TextBlock Text="3. CUSTOM SERVICE / LABOR / DISCOUNT" FontSize="11" FontWeight="Bold" Foreground="#F0F6FC" Margin="0,0,0,6" />
+                                        <TextBlock Text="Description (e.g. Deep Clean &amp; Repaste, or -₹500 Discount):" FontSize="10" Foreground="#8B949E" Margin="0,0,0,4" />
+                                        <TextBox Text="{Binding CustomLineDesc, UpdateSourceTrigger=PropertyChanged}" Margin="0,0,0,8" />
 
-                                <CheckBox Content="Mark invoiced unit(s) as SOLD"
-                                          IsChecked="{Binding MarkAsSoldOnInvoice}"
-                                          Visibility="{Binding IsSalesInvoice, Converter={StaticResource NullVis}}"
-                                          Foreground="#3FB950" FontWeight="SemiBold" Margin="0,0,0,14" />
+                                        <Grid Margin="0,0,0,10">
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="80" />
+                                                <ColumnDefinition Width="8" />
+                                                <ColumnDefinition Width="*" />
+                                            </Grid.ColumnDefinitions>
+                                            <StackPanel Grid.Column="0">
+                                                <TextBlock Text="QTY" FontSize="10" FontWeight="SemiBold" Foreground="#8B949E" Margin="0,0,0,4" />
+                                                <TextBox Text="{Binding CustomLineQty, UpdateSourceTrigger=PropertyChanged}" />
+                                            </StackPanel>
+                                            <StackPanel Grid.Column="2">
+                                                <TextBlock Text="PRICE / DEDUCTION (₹)" FontSize="10" FontWeight="SemiBold" Foreground="#8B949E" Margin="0,0,0,4" />
+                                                <TextBox Text="{Binding CustomLinePrice, UpdateSourceTrigger=PropertyChanged}" ToolTip="Use negative numbers for discounts" />
+                                            </StackPanel>
+                                        </Grid>
 
-                                <TextBlock Text="Billing will be generated for the currently selected unit in the Inventory tab, or bundles top inventory units if none are selected."
-                                           FontSize="11" Foreground="#8B949E" TextWrapping="Wrap" Margin="0,0,0,14" />
-
-                                <Button Content="{Binding GenerateInvoiceButtonText}" Command="{Binding GenerateInvoiceCommand}"
-                                        Background="#238636" Foreground="#FFF" BorderBrush="#2EA043" FontWeight="Bold" Padding="14,10" FontSize="12" />
+                                        <Button Content="➕ Add Service / Custom Line" Command="{Binding AddCustomLineItemCommand}"
+                                                Background="#21262D" Foreground="#F0F6FC" BorderBrush="#30363D" FontWeight="Bold" Padding="10,6" FontSize="11" />
+                                    </StackPanel>
+                                </Border>
                             </StackPanel>
                         </ScrollViewer>
                     </Border>

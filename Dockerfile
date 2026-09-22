@@ -24,6 +24,11 @@ WORKDIR /app
 ENV VELOX_DB_PATH=/data
 RUN mkdir -p /data
 
+# Low-memory GC configuration for Railway container hosting (Workstation GC ~40-60MB)
+ENV DOTNET_gcServer=0
+ENV DOTNET_GCHeapHardLimitPercent=30
+ENV DOTNET_EnableWriteXorExecute=0
+
 COPY --from=build /app/publish .
 
 EXPOSE 8080

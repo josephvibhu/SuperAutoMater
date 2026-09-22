@@ -293,7 +293,15 @@
         body: JSON.stringify(payload)
       });
 
-      if (!res.ok) throw new Error('Status update failed');
+      if (!res.ok) {
+        let errDetail = 'Status update failed';
+        try {
+          const errData = await res.json();
+          if (errData.error) errDetail = errData.error;
+          else if (errData.title) errDetail = errData.title;
+        } catch (_) {}
+        throw new Error(errDetail);
+      }
 
       closeModal();
       await fetchJobs(true);

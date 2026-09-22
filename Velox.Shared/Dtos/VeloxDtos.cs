@@ -14,6 +14,8 @@ public sealed class AssetDto
     public string Model { get; init; } = "";
     public string CurrentLocation { get; set; } = "";
     public LifecycleQueue LifecycleQueue { get; set; } = LifecycleQueue.IntakeStaging;
+    public AssetCategory Category { get; set; } = AssetCategory.Laptop;
+    public int Quantity { get; set; } = 1;
     public AssetGrade Grade { get; set; } = AssetGrade.Unknown;
     public string Supplier { get; set; } = "";
     public string Customer { get; set; } = "";
@@ -89,34 +91,40 @@ public sealed class SseEventDto
 
 public sealed class IntakeRequest
 {
-    public string? SerialNumber { get; init; }
-    public string? AssetTag { get; init; }
-    public string? AssetUuid { get; init; }
-    public string? Model { get; init; }
-    public string? Location { get; init; }
-    public string? Supplier { get; init; }
-    public string? Actor { get; init; }
-    public string? Notes { get; init; }
-    public string? InDate { get; init; }
+    public string? SerialNumber { get; set; }
+    public string? AssetTag { get; set; }
+    public string? AssetUuid { get; set; }
+    public string? Model { get; set; }
+    public AssetCategory? Category { get; set; }
+    public int? Quantity { get; set; }
+    public double? PurchasePrice { get; set; }
+    public double? SalePrice { get; set; }
+    public string? Location { get; set; }
+    public string? Supplier { get; set; }
+    public string? Actor { get; set; }
+    public string? Notes { get; set; }
+    public string? InDate { get; set; }
 }
 
 public sealed class PatchAssetRequest
 {
-    public string? CurrentLocation { get; init; }
-    public LifecycleQueue? LifecycleQueue { get; init; }
-    public AssetGrade? Grade { get; init; }
-    public string? Supplier { get; init; }
-    public string? Customer { get; init; }
-    public string? MissingComponents { get; init; }
-    public string? CosmeticGrade { get; init; }
-    public int? BatteryHealth { get; init; }
-    public int? StorageHealth { get; init; }
-    public string? Notes { get; init; }
-    public string? InDate { get; init; }
-    public string? OutDate { get; init; }
-    public double? PurchasePrice { get; init; }
-    public double? SalePrice { get; init; }
-    public string? Actor { get; init; }
+    public string? CurrentLocation { get; set; }
+    public LifecycleQueue? LifecycleQueue { get; set; }
+    public AssetCategory? Category { get; set; }
+    public int? Quantity { get; set; }
+    public AssetGrade? Grade { get; set; }
+    public string? Supplier { get; set; }
+    public string? Customer { get; set; }
+    public string? MissingComponents { get; set; }
+    public string? CosmeticGrade { get; set; }
+    public int? BatteryHealth { get; set; }
+    public int? StorageHealth { get; set; }
+    public string? Notes { get; set; }
+    public string? InDate { get; set; }
+    public string? OutDate { get; set; }
+    public double? PurchasePrice { get; set; }
+    public double? SalePrice { get; set; }
+    public string? Actor { get; set; }
 }
 
 public sealed class AppendEventRequest

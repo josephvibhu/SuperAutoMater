@@ -23,6 +23,78 @@ public class AssetItemViewModel : INotifyPropertyChanged
     public double? SalePrice => Model.SalePrice;
     public DateTimeOffset UpdatedAt => Model.UpdatedAtUtc;
 
+    public AssetCategory Category
+    {
+        get => Model.Category;
+        set
+        {
+            if (Model.Category != value)
+            {
+                Model.Category = value;
+                OnPropertyChanged();
+                OnPropertyChanged(nameof(CategoryBadge));
+                OnPropertyChanged(nameof(CategoryIcon));
+                OnPropertyChanged(nameof(CategoryColorHex));
+            }
+        }
+    }
+
+    public int Quantity
+    {
+        get => Model.Quantity <= 0 ? 1 : Model.Quantity;
+        set
+        {
+            if (Model.Quantity != value)
+            {
+                Model.Quantity = value;
+                OnPropertyChanged();
+                OnPropertyChanged(nameof(QuantityDisplay));
+            }
+        }
+    }
+
+    public string QuantityDisplay => Category switch
+    {
+        AssetCategory.Laptop or AssetCategory.Desktop => "1 unit",
+        _ => $"{Quantity} pcs"
+    };
+
+    public string CategoryIcon => Category switch
+    {
+        AssetCategory.Laptop => "💻",
+        AssetCategory.Desktop => "🖥️",
+        AssetCategory.RAM => "🧠",
+        AssetCategory.Storage => "💾",
+        AssetCategory.Charger => "🔌",
+        AssetCategory.Peripheral => "🖱️",
+        AssetCategory.RepairSpare => "🔧",
+        _ => "📦"
+    };
+
+    public string CategoryBadge => Category switch
+    {
+        AssetCategory.Laptop => "LAPTOP",
+        AssetCategory.Desktop => "DESKTOP",
+        AssetCategory.RAM => "RAM",
+        AssetCategory.Storage => "STORAGE",
+        AssetCategory.Charger => "CHARGER",
+        AssetCategory.Peripheral => "PERIPHERAL",
+        AssetCategory.RepairSpare => "SPARE PART",
+        _ => Category.ToString().ToUpperInvariant()
+    };
+
+    public string CategoryColorHex => Category switch
+    {
+        AssetCategory.Laptop => "#58A6FF",
+        AssetCategory.Desktop => "#79C0FF",
+        AssetCategory.RAM => "#D2A8FF",
+        AssetCategory.Storage => "#FFA657",
+        AssetCategory.Charger => "#7EE787",
+        AssetCategory.Peripheral => "#FF7B72",
+        AssetCategory.RepairSpare => "#F2CC60",
+        _ => "#8B949E"
+    };
+
     public LifecycleQueue Status
     {
         get => Model.LifecycleQueue;

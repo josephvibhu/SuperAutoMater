@@ -164,6 +164,18 @@ INSERT OR IGNORE INTO schema_migrations(version, applied_at_utc) VALUES(1, CURRE
                 // Column already exists
             }
 
+            // Migration: ensure category and quantity exist on assets table
+            try
+            {
+                Exec(conn, "ALTER TABLE assets ADD COLUMN category TEXT DEFAULT 'Laptop'");
+            }
+            catch { }
+            try
+            {
+                Exec(conn, "ALTER TABLE assets ADD COLUMN quantity INTEGER DEFAULT 1");
+            }
+            catch { }
+
             // Auto-seed default depot tenant, primary API key, and technician if empty
             using var checkCmd = conn.CreateCommand();
             checkCmd.CommandText = "SELECT COUNT(*) FROM tenants";
@@ -368,6 +380,10 @@ INSERT OR IGNORE INTO schema_migrations(version, applied_at_utc) VALUES(1, CURRE
                 if (!string.IsNullOrWhiteSpace(req.Location)) { sets.Add("current_location=@loc"); parms.Add(P("@loc", req.Location)); }
                 if (!string.IsNullOrWhiteSpace(req.Supplier)) { sets.Add("supplier=@sup");  parms.Add(P("@sup", req.Supplier)); }
                 if (!string.IsNullOrWhiteSpace(req.InDate))   { sets.Add("in_date=@ind");   parms.Add(P("@ind", req.InDate)); }
+                if (req.Category.HasValue)                    { sets.Add("category=@cat");  parms.Add(P("@cat", req.Category.Value.ToString())); }
+                if (req.Quantity.HasValue)                    { sets.Add("quantity=@qty");  parms.Add(P("@qty", req.Quantity.Value)); }
+                if (req.PurchasePrice.HasValue)               { sets.Add("purchase_price=@pur"); parms.Add(P("@pur", req.PurchasePrice.Value)); }
+                if (req.SalePrice.HasValue)                   { sets.Add("sale_price=@sal");     parms.Add(P("@sal", req.SalePrice.Value)); }
                 parms.Add(P("@tid", tenantId)); parms.Add(P("@id", existing.Id));
                 Exec(conn, $"UPDATE assets SET {string.Join(",", sets)} WHERE tenant_id=@tid AND id=@id", [.. parms]);
                 return GetAssetById(tenantId, existing.Id, conn)!;
@@ -375,13 +391,19 @@ INSERT OR IGNORE INTO schema_migrations(version, applied_at_utc) VALUES(1, CURRE
 
             // New asset
             var assetId = "ast-" + NewId();
-            Exec(conn, @"INSERT INTO assets(id,tenant_id,serial_number,asset_tag,asset_uuid,model,current_location,lifecycle_queue,grade,supplier,in_date,created_at_utc,updated_at_utc)
-                         VALUES(@id,@tid,@sn,@tag,@uuid,@model,@loc,'IntakeStaging','Unknown',@sup,@ind,@ts,@ts)",
+            var cat = req.Category?.ToString() ?? "Laptop";
+            var qty = req.Quantity ?? 1;
+            Exec(conn, @"INSERT INTO assets(id,tenant_id,serial_number,asset_tag,asset_uuid,model,category,quantity,purchase_price,sale_price,current_location,lifecycle_queue,grade,supplier,in_date,created_at_utc,updated_at_utc)
+                         VALUES(@id,@tid,@sn,@tag,@uuid,@model,@cat,@qty,@pur,@sal,@loc,'IntakeStaging','Unknown',@sup,@ind,@ts,@ts)",
                 P("@id", assetId), P("@tid", tenantId),
                 P("@sn",   req.SerialNumber ?? (object)DBNull.Value),
                 P("@tag",  req.AssetTag     ?? (object)DBNull.Value),
                 P("@uuid", req.AssetUuid    ?? (object)DBNull.Value),
                 P("@model",req.Model        ?? (object)DBNull.Value),
+                P("@cat",  cat),
+                P("@qty",  qty),
+                P("@pur",  req.PurchasePrice ?? (object)DBNull.Value),
+                P("@sal",  req.SalePrice     ?? (object)DBNull.Value),
                 P("@loc",  req.Location     ?? (object)DBNull.Value),
                 P("@sup",  req.Supplier     ?? (object)DBNull.Value),
                 P("@ind",  req.InDate       ?? (object)DBNull.Value),
@@ -506,6 +528,8 @@ INSERT OR IGNORE INTO schema_migrations(version, applied_at_utc) VALUES(1, CURRE
             if (req.OutDate           != null) { sets.Add("out_date=@outd");             parms.Add(P("@outd",  req.OutDate)); }
             if (req.PurchasePrice     != null) { sets.Add("purchase_price=@pp");         parms.Add(P("@pp",    req.PurchasePrice.Value)); }
             if (req.SalePrice         != null) { sets.Add("sale_price=@sp");             parms.Add(P("@sp",    req.SalePrice.Value)); }
+            if (req.Category          != null) { sets.Add("category=@cat");               parms.Add(P("@cat",   req.Category.Value.ToString())); }
+            if (req.Quantity          != null) { sets.Add("quantity=@qty");               parms.Add(P("@qty",   req.Quantity.Value)); }
 
             parms.Add(P("@tid", tenantId));
             parms.Add(P("@id", id));
@@ -665,7 +689,8 @@ INSERT OR IGNORE INTO schema_migrations(version, applied_at_utc) VALUES(1, CURRE
                 a.cosmetic_grade, a.battery_health, a.storage_health, a.notes, a.in_date,
                 a.out_date, a.created_at_utc, a.updated_at_utc,
                 e.name as emp_name,
-                (SELECT event_type FROM asset_events WHERE asset_id=a.id ORDER BY recorded_at_utc DESC LIMIT 1) as latest_event
+                (SELECT event_type FROM asset_events WHERE asset_id=a.id ORDER BY recorded_at_utc DESC LIMIT 1) as latest_event,
+                a.category, a.quantity
             FROM assets a
             LEFT JOIN employees e ON e.id = a.assigned_employee_id
             {where}";
@@ -703,6 +728,8 @@ INSERT OR IGNORE INTO schema_migrations(version, applied_at_utc) VALUES(1, CURRE
         UpdatedAtUtc       = DateTimeOffset.Parse(r.GetString(22)),
         AssignedEmployeeName = r.IsDBNull(23) ? "" : r.GetString(23),
         LatestEventType    = r.IsDBNull(24) ? "" : r.GetString(24),
+        Category           = r.FieldCount > 25 && !r.IsDBNull(25) && Enum.TryParse<AssetCategory>(r.GetString(25), true, out var c) ? c : AssetCategory.Laptop,
+        Quantity           = r.FieldCount > 26 && !r.IsDBNull(26) ? r.GetInt32(26) : 1,
     };
 
     private static EmployeeDto MapEmployee(SqliteDataReader r) => new()

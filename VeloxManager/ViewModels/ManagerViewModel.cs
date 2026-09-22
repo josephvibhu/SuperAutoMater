@@ -11,6 +11,7 @@ using System.Windows;
 using System.Windows.Input;
 using Velox.Shared.Dtos;
 using Velox.Shared.Models;
+using VeloxManager.Controls;
 using VeloxManager.Services;
 
 namespace VeloxManager.ViewModels;
@@ -37,6 +38,11 @@ public class ManagerViewModel : INotifyPropertyChanged
     public ObservableCollection<EmployeeDto> Employees { get; } = new();
     public ObservableCollection<string> LiveActivityFeed { get; } = new();
     public ObservableCollection<Invoice> Invoices { get; } = new();
+
+    // Vyapar Stock Collections for Invoicing
+    public ObservableCollection<AssetItemViewModel> AvailableBaseUnits { get; } = new();
+    public ObservableCollection<AssetItemViewModel> ComponentStock { get; } = new();
+    public ObservableCollection<InvoiceItem> CurrentInvoiceItems { get; } = new();
 
     // ── Active Selection ───────────────────────────────────────────────────────
     private AssetItemViewModel? _selectedAsset;
@@ -91,6 +97,76 @@ public class ManagerViewModel : INotifyPropertyChanged
         }
     }
 
+    private string _categoryFilter = "ALL";
+    public string CategoryFilter
+    {
+        get => _categoryFilter;
+        set
+        {
+            if (_categoryFilter != value)
+            {
+                _categoryFilter = value;
+                OnPropertyChanged();
+                ApplyFilter();
+            }
+        }
+    }
+
+    // ── Quick Intake Form Fields ────────────────────────────────────────────────
+    public ObservableCollection<string> QuickIntakeCategories { get; } = new()
+    {
+        "Laptop", "Desktop", "RAM", "Storage", "Charger", "Peripheral", "RepairSpare"
+    };
+
+    private string _quickIntakeCategory = "Laptop";
+    public string QuickIntakeCategory
+    {
+        get => _quickIntakeCategory;
+        set { _quickIntakeCategory = value; OnPropertyChanged(); }
+    }
+
+    private string _quickIntakeModel = "";
+    public string QuickIntakeModel
+    {
+        get => _quickIntakeModel;
+        set { _quickIntakeModel = value; OnPropertyChanged(); }
+    }
+
+    private string _quickIntakeSerial = "";
+    public string QuickIntakeSerial
+    {
+        get => _quickIntakeSerial;
+        set { _quickIntakeSerial = value; OnPropertyChanged(); }
+    }
+
+    private int _quickIntakeQuantity = 1;
+    public int QuickIntakeQuantity
+    {
+        get => _quickIntakeQuantity;
+        set { _quickIntakeQuantity = value; OnPropertyChanged(); }
+    }
+
+    private double _quickIntakePurchasePrice = 0;
+    public double QuickIntakePurchasePrice
+    {
+        get => _quickIntakePurchasePrice;
+        set { _quickIntakePurchasePrice = value; OnPropertyChanged(); }
+    }
+
+    private double _quickIntakeSalePrice = 0;
+    public double QuickIntakeSalePrice
+    {
+        get => _quickIntakeSalePrice;
+        set { _quickIntakeSalePrice = value; OnPropertyChanged(); }
+    }
+
+    private string _quickIntakeNotes = "";
+    public string QuickIntakeNotes
+    {
+        get => _quickIntakeNotes;
+        set { _quickIntakeNotes = value; OnPropertyChanged(); }
+    }
+
     // ── Metrics & Badges ───────────────────────────────────────────────────────
     public int TotalAssetsCount => Assets.Count;
     public int WipCount => Assets.Count(a => a.Status != LifecycleQueue.ReadyForSale && a.Status != LifecycleQueue.Sold);
@@ -103,7 +179,7 @@ public class ManagerViewModel : INotifyPropertyChanged
     public string LanStatusText => _lan.IsRunning ? $"🌐 LAN MIRROR (Port {ManagerConfigService.Current.LanPort})" : "LAN SERVER INACTIVE";
     public string LanStatusColor => _lan.IsRunning ? "#58A6FF" : "#8B949E";
 
-    // ── Invoicing Form Fields ───────────────────────────────────────────────────
+    // ── Invoicing Form Fields & Vyapar Suite ─────────────────────────────────────
     private InvoiceType _selectedInvoiceType = InvoiceType.SalesInvoice;
     public InvoiceType SelectedInvoiceType
     {
@@ -117,9 +193,7 @@ public class ManagerViewModel : INotifyPropertyChanged
                 OnPropertyChanged(nameof(SelectedInvoiceTypeString));
                 OnPropertyChanged(nameof(IsSalesInvoice));
                 OnPropertyChanged(nameof(InvoicePartyLabel));
-                OnPropertyChanged(nameof(InvoicePriceLabel));
                 OnPropertyChanged(nameof(GenerateInvoiceButtonText));
-                AutoFillInvoiceDetailsFromSelectedAsset();
             }
         }
     }
@@ -135,28 +209,54 @@ public class ManagerViewModel : INotifyPropertyChanged
 
     public bool IsSalesInvoice => SelectedInvoiceType == InvoiceType.SalesInvoice;
     public string InvoicePartyLabel => IsSalesInvoice ? "CUSTOMER / CLIENT NAME" : "SUPPLIER / VENDOR NAME";
-    public string InvoicePriceLabel => IsSalesInvoice ? "UNIT SALE PRICE ($)" : "UNIT PURCHASE COST ($)";
-    public string GenerateInvoiceButtonText => IsSalesInvoice ? "🧾 Generate & Open Sales Bill" : "📥 Generate & Open Purchase Bill";
+    public string GenerateInvoiceButtonText => IsSalesInvoice ? "🧾 Finalize & Print Tax Invoice" : "📥 Finalize & Print Inward Bill";
 
-    private string _newInvoiceParty = "Acme Corp Refurbishments";
-    public string NewInvoiceParty
+    // Customer / Party Details
+    private string _draftPartyName = "Walk-in Retail Client";
+    public string DraftPartyName
     {
-        get => _newInvoiceParty;
-        set { _newInvoiceParty = value; OnPropertyChanged(); }
+        get => _draftPartyName;
+        set { _draftPartyName = value; OnPropertyChanged(); }
     }
 
-    private decimal _newInvoiceUnitPrice = 450.00m;
-    public decimal NewInvoiceUnitPrice
+    private string _draftPartyPhone = "";
+    public string DraftPartyPhone
     {
-        get => _newInvoiceUnitPrice;
-        set { _newInvoiceUnitPrice = value; OnPropertyChanged(); }
+        get => _draftPartyPhone;
+        set { _draftPartyPhone = value; OnPropertyChanged(); }
     }
 
-    private decimal _newInvoiceTax = 18m;
-    public decimal NewInvoiceTax
+    private string _draftPartyAddress = "Retail Depot Counter";
+    public string DraftPartyAddress
     {
-        get => _newInvoiceTax;
-        set { _newInvoiceTax = value; OnPropertyChanged(); }
+        get => _draftPartyAddress;
+        set { _draftPartyAddress = value; OnPropertyChanged(); }
+    }
+
+    private string _draftPaymentMode = "UPI / Cash / Card";
+    public string DraftPaymentMode
+    {
+        get => _draftPaymentMode;
+        set { _draftPaymentMode = value; OnPropertyChanged(); }
+    }
+
+    private decimal _draftTaxPercent = 18m;
+    public decimal DraftTaxPercent
+    {
+        get => _draftTaxPercent;
+        set
+        {
+            _draftTaxPercent = value;
+            OnPropertyChanged();
+            RecalculateDraftTotals();
+        }
+    }
+
+    private string _draftNotes = "Certified Refurbished Hardware. 30 Days Depot Warranty Included.";
+    public string DraftNotes
+    {
+        get => _draftNotes;
+        set { _draftNotes = value; OnPropertyChanged(); }
     }
 
     private bool _markAsSoldOnInvoice = true;
@@ -166,33 +266,119 @@ public class ManagerViewModel : INotifyPropertyChanged
         set { _markAsSoldOnInvoice = value; OnPropertyChanged(); }
     }
 
-    private string _newInvoiceNotes = "Certified Refurbished Hardware. Net 30 days.";
-    public string NewInvoiceNotes
+    // Totals
+    public decimal DraftSubTotal => CurrentInvoiceItems.Sum(i => i.LineTotal);
+    public decimal DraftTaxAmount => Math.Round(DraftSubTotal * (DraftTaxPercent / 100m), 2);
+    public decimal DraftGrandTotal => DraftSubTotal + DraftTaxAmount;
+
+    public void RecalculateDraftTotals()
     {
-        get => _newInvoiceNotes;
-        set { _newInvoiceNotes = value; OnPropertyChanged(); }
+        OnPropertyChanged(nameof(DraftSubTotal));
+        OnPropertyChanged(nameof(DraftTaxAmount));
+        OnPropertyChanged(nameof(DraftGrandTotal));
+    }
+
+    // Base Machine Picker for Invoice
+    private AssetItemViewModel? _selectedInvoiceBaseAsset;
+    public AssetItemViewModel? SelectedInvoiceBaseAsset
+    {
+        get => _selectedInvoiceBaseAsset;
+        set { _selectedInvoiceBaseAsset = value; OnPropertyChanged(); }
+    }
+
+    // Component Picker for Invoicing
+    private AssetItemViewModel? _selectedComponentForInvoice;
+    public AssetItemViewModel? SelectedComponentForInvoice
+    {
+        get => _selectedComponentForInvoice;
+        set
+        {
+            _selectedComponentForInvoice = value;
+            OnPropertyChanged();
+            if (value != null)
+            {
+                ComponentItemPrice = IsSalesInvoice
+                    ? (decimal)(value.SalePrice ?? 0)
+                    : (decimal)(value.PurchasePrice ?? 0);
+                ComponentItemNote = $"{value.CategoryBadge}: {value.ModelName}";
+            }
+        }
+    }
+
+    public ObservableCollection<string> ComponentActionOptions { get; } = new()
+    {
+        "Upgrade (+)",
+        "Downgrade / Deduction (-)",
+        "Bundled / Included (₹0)",
+        "Replacement Spare Part"
+    };
+
+    private string _selectedComponentAction = "Upgrade (+)";
+    public string SelectedComponentAction
+    {
+        get => _selectedComponentAction;
+        set
+        {
+            _selectedComponentAction = value;
+            OnPropertyChanged();
+            if (value != null && value.Contains("Included"))
+            {
+                ComponentItemPrice = 0m;
+            }
+        }
+    }
+
+    private int _componentItemQty = 1;
+    public int ComponentItemQty
+    {
+        get => _componentItemQty;
+        set { _componentItemQty = value <= 0 ? 1 : value; OnPropertyChanged(); }
+    }
+
+    private decimal _componentItemPrice = 0m;
+    public decimal ComponentItemPrice
+    {
+        get => _componentItemPrice;
+        set { _componentItemPrice = value; OnPropertyChanged(); }
+    }
+
+    private string _componentItemNote = "";
+    public string ComponentItemNote
+    {
+        get => _componentItemNote;
+        set { _componentItemNote = value; OnPropertyChanged(); }
+    }
+
+    // Ad-hoc Custom Item
+    private string _customLineDesc = "";
+    public string CustomLineDesc
+    {
+        get => _customLineDesc;
+        set { _customLineDesc = value; OnPropertyChanged(); }
+    }
+
+    private int _customLineQty = 1;
+    public int CustomLineQty
+    {
+        get => _customLineQty;
+        set { _customLineQty = value; OnPropertyChanged(); }
+    }
+
+    private decimal _customLinePrice = 0m;
+    public decimal CustomLinePrice
+    {
+        get => _customLinePrice;
+        set { _customLinePrice = value; OnPropertyChanged(); }
     }
 
     private void AutoFillInvoiceDetailsFromSelectedAsset()
     {
         if (SelectedAsset == null) return;
-
-        if (IsSalesInvoice)
-        {
-            if (!string.IsNullOrWhiteSpace(SelectedAsset.Customer))
-                NewInvoiceParty = SelectedAsset.Customer;
-            if (SelectedAsset.SalePrice.HasValue && SelectedAsset.SalePrice.Value > 0)
-                NewInvoiceUnitPrice = (decimal)SelectedAsset.SalePrice.Value;
-            NewInvoiceNotes = "Certified Refurbished Hardware. Net 30 days.";
-        }
-        else
-        {
-            if (!string.IsNullOrWhiteSpace(SelectedAsset.Supplier))
-                NewInvoiceParty = SelectedAsset.Supplier;
-            if (SelectedAsset.PurchasePrice.HasValue && SelectedAsset.PurchasePrice.Value > 0)
-                NewInvoiceUnitPrice = (decimal)SelectedAsset.PurchasePrice.Value;
-            NewInvoiceNotes = "Inward depot inventory acquisition. Received in good order.";
-        }
+        SelectedInvoiceBaseAsset = SelectedAsset;
+        if (!string.IsNullOrWhiteSpace(SelectedAsset.Customer) && IsSalesInvoice)
+            DraftPartyName = SelectedAsset.Customer;
+        else if (!string.IsNullOrWhiteSpace(SelectedAsset.Supplier) && !IsSalesInvoice)
+            DraftPartyName = SelectedAsset.Supplier;
     }
 
     // ── New Employee Form Fields ────────────────────────────────────────────────
@@ -264,6 +450,12 @@ public class ManagerViewModel : INotifyPropertyChanged
     public ICommand ResetEmployeePinCommand { get; }
     public ICommand UpdateEmployeeStationCommand { get; }
     public ICommand ToggleEmployeeActiveCommand { get; }
+    public ICommand QuickIntakeCommand { get; }
+    public ICommand AddBaseToDraftCommand { get; }
+    public ICommand AddComponentToDraftCommand { get; }
+    public ICommand AddCustomLineItemCommand { get; }
+    public ICommand RemoveInvoiceItemCommand { get; }
+    public ICommand ClearInvoiceDraftCommand { get; }
     public ICommand GenerateInvoiceCommand { get; }
     public ICommand PreviewInvoiceCommand { get; }
     public ICommand ToggleLanServerCommand { get; }
@@ -279,6 +471,12 @@ public class ManagerViewModel : INotifyPropertyChanged
         ResetEmployeePinCommand = new RelayCommand(async _ => await ResetSelectedEmployeePinAsync());
         UpdateEmployeeStationCommand = new RelayCommand(async _ => await UpdateSelectedEmployeeStationAsync());
         ToggleEmployeeActiveCommand = new RelayCommand(async _ => await ToggleSelectedEmployeeActiveAsync());
+        QuickIntakeCommand = new RelayCommand(async _ => await QuickIntakeStockAsync());
+        AddBaseToDraftCommand = new RelayCommand(_ => AddBaseMachineToInvoice());
+        AddComponentToDraftCommand = new RelayCommand(_ => AddComponentToInvoice());
+        AddCustomLineItemCommand = new RelayCommand(_ => AddCustomLineItem());
+        RemoveInvoiceItemCommand = new RelayCommand(p => RemoveInvoiceItem(p as InvoiceItem));
+        ClearInvoiceDraftCommand = new RelayCommand(_ => ClearInvoiceDraft());
         GenerateInvoiceCommand = new RelayCommand(async _ => await GenerateInvoiceForSelectedAssetsAsync());
         PreviewInvoiceCommand = new RelayCommand(p => PreviewInvoice(p as Invoice));
         ToggleLanServerCommand = new RelayCommand(_ => ToggleLanServer());
@@ -313,16 +511,12 @@ public class ManagerViewModel : INotifyPropertyChanged
             });
         };
 
-        // Start LAN mirror server if enabled
         if (ManagerConfigService.Current.EnableLanServer)
         {
             _lan.Start(ManagerConfigService.Current.LanPort);
         }
 
-        // Start SSE stream
         _api.StartRealtimeEvents();
-
-        // Initial Data Load
         _ = LoadAssetsAndEmployeesAsync();
     }
 
@@ -336,9 +530,28 @@ public class ManagerViewModel : INotifyPropertyChanged
             Application.Current?.Dispatcher.Invoke(() =>
             {
                 Assets.Clear();
+                AvailableBaseUnits.Clear();
+                ComponentStock.Clear();
+
                 foreach (var a in rawAssets)
                 {
-                    Assets.Add(new AssetItemViewModel(a));
+                    var vm = new AssetItemViewModel(a);
+                    Assets.Add(vm);
+
+                    if (vm.Category == AssetCategory.Laptop || vm.Category == AssetCategory.Desktop)
+                    {
+                        if (vm.Status != LifecycleQueue.Sold && vm.Status != LifecycleQueue.Disposed)
+                        {
+                            AvailableBaseUnits.Add(vm);
+                        }
+                    }
+                    else
+                    {
+                        if (vm.Quantity > 0 && vm.Status != LifecycleQueue.Sold && vm.Status != LifecycleQueue.Disposed)
+                        {
+                            ComponentStock.Add(vm);
+                        }
+                    }
                 }
 
                 Employees.Clear();
@@ -361,6 +574,22 @@ public class ManagerViewModel : INotifyPropertyChanged
 
         foreach (var item in Assets)
         {
+            // Category check
+            if (CategoryFilter != "ALL")
+            {
+                var matchesCategory = CategoryFilter switch
+                {
+                    "LAPTOPS" => item.Category == AssetCategory.Laptop || item.Category == AssetCategory.Desktop,
+                    "RAM" => item.Category == AssetCategory.RAM,
+                    "STORAGE" => item.Category == AssetCategory.Storage,
+                    "CHARGERS" => item.Category == AssetCategory.Charger,
+                    "PERIPHERALS" => item.Category == AssetCategory.Peripheral,
+                    "REPAIR SPARES" => item.Category == AssetCategory.RepairSpare,
+                    _ => true
+                };
+                if (!matchesCategory) continue;
+            }
+
             // Status check
             if (StatusFilter != "ALL")
             {
@@ -398,6 +627,287 @@ public class ManagerViewModel : INotifyPropertyChanged
         OnPropertyChanged(nameof(CloudStatusColor));
     }
 
+    // ── Quick Stock Intake ───────────────────────────────────────────────────────
+    public async Task QuickIntakeStockAsync()
+    {
+        if (string.IsNullOrWhiteSpace(QuickIntakeModel))
+        {
+            VeloxMessageBox.Show("Please enter a Model Description or Name for the stock item.", "Validation Error", MessageBoxButton.OK, MessageBoxImage.Warning);
+            return;
+        }
+
+        var parsedCategory = Enum.TryParse<AssetCategory>(QuickIntakeCategory, true, out var cat) ? cat : AssetCategory.Laptop;
+        var qty = QuickIntakeQuantity <= 0 ? 1 : QuickIntakeQuantity;
+
+        var serial = !string.IsNullOrWhiteSpace(QuickIntakeSerial)
+            ? QuickIntakeSerial.Trim().ToUpperInvariant()
+            : $"{parsedCategory.ToString().ToUpperInvariant()[..3]}-{DateTime.UtcNow:yyMMdd}-{new Random().Next(1000, 9999)}";
+
+        var tag = $"TAG-{new Random().Next(100000, 999999)}";
+
+        var req = new IntakeRequest
+        {
+            SerialNumber = serial,
+            AssetTag = tag,
+            Model = QuickIntakeModel.Trim(),
+            Category = parsedCategory,
+            Quantity = qty,
+            PurchasePrice = QuickIntakePurchasePrice > 0 ? QuickIntakePurchasePrice : null,
+            SalePrice = QuickIntakeSalePrice > 0 ? QuickIntakeSalePrice : null,
+            Notes = string.IsNullOrWhiteSpace(QuickIntakeNotes) ? $"Batch intake via VeloxManager ({parsedCategory})" : QuickIntakeNotes.Trim(),
+            Actor = ManagerConfigService.Current.ManagerName,
+            Location = "MAIN-DEPOT"
+        };
+
+        var created = await _api.IntakeAssetAsync(req);
+        if (created != null)
+        {
+            LiveActivityFeed.Insert(0, $"[{DateTime.Now:HH:mm:ss}] Intaked {qty}x {parsedCategory}: {created.Model} ({serial})");
+            VeloxMessageBox.Show($"Successfully intaked into stock:\n• {qty}x {parsedCategory}: {created.Model}\n• Identifier: {serial}\n• Unit Sale Price: ₹{QuickIntakeSalePrice:N2}", "Stock Intaked", MessageBoxButton.OK, MessageBoxImage.Information);
+
+            QuickIntakeModel = "";
+            QuickIntakeSerial = "";
+            QuickIntakeQuantity = 1;
+            QuickIntakePurchasePrice = 0;
+            QuickIntakeSalePrice = 0;
+            QuickIntakeNotes = "";
+
+            await LoadAssetsAndEmployeesAsync();
+        }
+        else
+        {
+            VeloxMessageBox.Show("Failed to intake item to cloud inventory. Please check cloud connection.", "Intake Error", MessageBoxButton.OK, MessageBoxImage.Error);
+        }
+    }
+
+    // ── Vyapar Refurbishment Billing Actions ─────────────────────────────────────
+    public void AddBaseMachineToInvoice()
+    {
+        var target = SelectedInvoiceBaseAsset ?? SelectedAsset;
+        if (target == null)
+        {
+            VeloxMessageBox.Show("Please select a base machine from the available stock list.", "No Machine Selected", MessageBoxButton.OK, MessageBoxImage.Warning);
+            return;
+        }
+
+        var unitPrice = (decimal)(target.SalePrice ?? (IsSalesInvoice ? 350.0 : 250.0));
+
+        // Check if already in items
+        if (CurrentInvoiceItems.Any(i => i.AssetId == target.Id))
+        {
+            VeloxMessageBox.Show($"Unit {target.SerialNumber} is already added to this invoice draft.", "Already Added", MessageBoxButton.OK, MessageBoxImage.Information);
+            return;
+        }
+
+        var item = new InvoiceItem
+        {
+            LineNumber = CurrentInvoiceItems.Count + 1,
+            AssetId = target.Id,
+            SerialNumber = target.SerialNumber,
+            Model = target.ModelName,
+            Grade = target.GradeBadge,
+            Description = $"Refurbished Unit (Disk Health: {target.StorageHealth}%)",
+            ItemCategory = InvoiceItemCategory.BaseMachine,
+            UnitPrice = unitPrice,
+            Quantity = 1
+        };
+
+        CurrentInvoiceItems.Add(item);
+        RecalculateDraftTotals();
+        LiveActivityFeed.Insert(0, $"[{DateTime.Now:HH:mm:ss}] Added Base Machine: {target.SerialNumber} to invoice draft");
+    }
+
+    public void AddComponentToInvoice()
+    {
+        if (SelectedComponentForInvoice == null)
+        {
+            VeloxMessageBox.Show("Please select a component (RAM, Storage, Charger, Peripheral, Spare) from the stock list.", "No Component Selected", MessageBoxButton.OK, MessageBoxImage.Warning);
+            return;
+        }
+
+        var cat = SelectedComponentForInvoice.Category switch
+        {
+            AssetCategory.RAM => InvoiceItemCategory.RamUpgrade,
+            AssetCategory.Storage => SelectedComponentAction.Contains("Downgrade") ? InvoiceItemCategory.StorageDowngrade : InvoiceItemCategory.StorageUpgrade,
+            AssetCategory.Charger => InvoiceItemCategory.Charger,
+            AssetCategory.Peripheral => InvoiceItemCategory.Peripheral,
+            AssetCategory.RepairSpare => InvoiceItemCategory.SparePart,
+            _ => InvoiceItemCategory.CustomLaborOrDiscount
+        };
+
+        var price = ComponentItemPrice;
+        if (SelectedComponentAction.Contains("Downgrade"))
+        {
+            price = -Math.Abs(price); // Negative line total for deduction!
+        }
+        else if (SelectedComponentAction.Contains("Included"))
+        {
+            price = 0m;
+        }
+
+        var item = new InvoiceItem
+        {
+            LineNumber = CurrentInvoiceItems.Count + 1,
+            AssetId = SelectedComponentForInvoice.Id,
+            SerialNumber = SelectedComponentForInvoice.SerialNumber,
+            Model = SelectedComponentForInvoice.ModelName,
+            Grade = SelectedComponentForInvoice.GradeBadge,
+            Description = string.IsNullOrWhiteSpace(ComponentItemNote) ? $"{SelectedComponentForInvoice.CategoryBadge} Refurbishment Component" : ComponentItemNote.Trim(),
+            ItemCategory = cat,
+            UnitPrice = price,
+            Quantity = ComponentItemQty <= 0 ? 1 : ComponentItemQty
+        };
+
+        CurrentInvoiceItems.Add(item);
+        RecalculateDraftTotals();
+        LiveActivityFeed.Insert(0, $"[{DateTime.Now:HH:mm:ss}] Attached {item.Quantity}x {item.Model} to invoice draft");
+    }
+
+    public void AddCustomLineItem()
+    {
+        if (string.IsNullOrWhiteSpace(CustomLineDesc))
+        {
+            VeloxMessageBox.Show("Please enter a description for the custom item or labor fee.", "Validation Error", MessageBoxButton.OK, MessageBoxImage.Warning);
+            return;
+        }
+
+        var item = new InvoiceItem
+        {
+            LineNumber = CurrentInvoiceItems.Count + 1,
+            AssetId = "",
+            SerialNumber = "—",
+            Model = CustomLineDesc.Trim(),
+            Grade = "N/A",
+            Description = "Custom Line Item / Labor / Refurbishment Service",
+            ItemCategory = InvoiceItemCategory.CustomLaborOrDiscount,
+            UnitPrice = CustomLinePrice,
+            Quantity = CustomLineQty <= 0 ? 1 : CustomLineQty
+        };
+
+        CurrentInvoiceItems.Add(item);
+        RecalculateDraftTotals();
+
+        CustomLineDesc = "";
+        CustomLineQty = 1;
+        CustomLinePrice = 0m;
+    }
+
+    public void RemoveInvoiceItem(InvoiceItem? item)
+    {
+        if (item == null) return;
+        CurrentInvoiceItems.Remove(item);
+
+        int line = 1;
+        foreach (var it in CurrentInvoiceItems)
+        {
+            it.LineNumber = line++;
+        }
+        RecalculateDraftTotals();
+    }
+
+    public void ClearInvoiceDraft()
+    {
+        CurrentInvoiceItems.Clear();
+        RecalculateDraftTotals();
+    }
+
+    public async Task GenerateInvoiceForSelectedAssetsAsync()
+    {
+        // If current items list is empty, try falling back to currently selected asset
+        if (CurrentInvoiceItems.Count == 0 && SelectedAsset != null)
+        {
+            AddBaseMachineToInvoice();
+        }
+
+        if (CurrentInvoiceItems.Count == 0)
+        {
+            VeloxMessageBox.Show("No items added to invoice draft.\nPlease select a base machine or add components to proceed.", "Empty Invoice", MessageBoxButton.OK, MessageBoxImage.Warning);
+            return;
+        }
+
+        var inv = new Invoice
+        {
+            Type = SelectedInvoiceType,
+            PartyName = string.IsNullOrWhiteSpace(DraftPartyName) ? (IsSalesInvoice ? "Walk-in Retail Client" : "Hardware Vendor") : DraftPartyName.Trim(),
+            PartyPhone = DraftPartyPhone?.Trim() ?? "",
+            PartyEmail = DraftPartyAddress?.Trim() ?? "",
+            PartyAddress = DraftPartyAddress?.Trim() ?? "Counter Sale",
+            PaymentMode = DraftPaymentMode,
+            TaxPercent = DraftTaxPercent,
+            Notes = string.IsNullOrWhiteSpace(DraftNotes) ? "Certified Refurbished Hardware. 30 Days Depot Warranty Included." : DraftNotes.Trim(),
+            Items = CurrentInvoiceItems.ToList()
+        };
+
+        Invoices.Insert(0, inv);
+        PreviewInvoice(inv);
+        LiveActivityFeed.Insert(0, $"[{DateTime.Now:HH:mm:ss}] Generated {inv.Type} #{inv.InvoiceNumber} for {inv.PartyName} (Total: ₹{inv.TotalAmount:N2})");
+
+        // Automatically update asset lifecycle and decrement stock if sales invoice
+        if (IsSalesInvoice && MarkAsSoldOnInvoice)
+        {
+            foreach (var item in inv.Items)
+            {
+                if (string.IsNullOrWhiteSpace(item.AssetId)) continue;
+
+                var asset = Assets.FirstOrDefault(a => a.Id == item.AssetId);
+                if (asset == null) continue;
+
+                if (item.ItemCategory == InvoiceItemCategory.BaseMachine || asset.Category == AssetCategory.Laptop || asset.Category == AssetCategory.Desktop)
+                {
+                    var success = await _api.UpdateAssetStatusAsync(asset.Id, LifecycleQueue.Sold, $"Sold via Invoice #{inv.InvoiceNumber}");
+                    if (success)
+                    {
+                        asset.Status = LifecycleQueue.Sold;
+                        LiveActivityFeed.Insert(0, $"[{DateTime.Now:HH:mm:ss}] Asset {asset.SerialNumber} updated to SOLD via Invoice #{inv.InvoiceNumber}");
+                    }
+                }
+                else
+                {
+                    // Component stock decrement
+                    var remQty = Math.Max(0, asset.Quantity - item.Quantity);
+                    var newStatus = remQty == 0 ? LifecycleQueue.Sold : asset.Status;
+                    var success = await _api.PatchAssetAsync(asset.Id, new PatchAssetRequest
+                    {
+                        Quantity = remQty,
+                        LifecycleQueue = newStatus,
+                        Notes = $"{asset.Notes} | Consumed {item.Quantity} in Invoice #{inv.InvoiceNumber}"
+                    });
+
+                    if (success)
+                    {
+                        asset.Quantity = remQty;
+                        asset.Status = newStatus;
+                        LiveActivityFeed.Insert(0, $"[{DateTime.Now:HH:mm:ss}] Stock adjusted for {asset.ModelName}: -{item.Quantity} (Remaining: {remQty})");
+                    }
+                }
+            }
+
+            await LoadAssetsAndEmployeesAsync();
+        }
+
+        VeloxMessageBox.Show($"Commercial Invoice #{inv.InvoiceNumber} generated successfully!\nGrand Total: ₹{inv.TotalAmount:N2}\nAll consumed inventory stock has been adjusted.", "Invoice Generated", MessageBoxButton.OK, MessageBoxImage.Information);
+
+        ClearInvoiceDraft();
+    }
+
+    public void PreviewInvoice(Invoice? inv)
+    {
+        if (inv == null) return;
+
+        try
+        {
+            var html = InvoiceService.GenerateHtml(inv);
+            var tempFile = Path.Combine(Path.GetTempPath(), $"{inv.InvoiceNumber}.html");
+            File.WriteAllText(tempFile, html);
+            Process.Start(new ProcessStartInfo(tempFile) { UseShellExecute = true });
+        }
+        catch (Exception ex)
+        {
+            VeloxMessageBox.Show($"Could not open invoice preview: {ex.Message}", "Velox Invoice Error", MessageBoxButton.OK, MessageBoxImage.Error);
+        }
+    }
+
+    // ── Asset Status Mutation ──────────────────────────────────────────────────
     public async Task UpdateSelectedAssetStatusAsync(string? newStatusStr)
     {
         if (SelectedAsset == null || string.IsNullOrWhiteSpace(newStatusStr)) return;
@@ -426,6 +936,7 @@ public class ManagerViewModel : INotifyPropertyChanged
         }
     }
 
+    // ── Employee Management ────────────────────────────────────────────────────
     public async Task CreateNewEmployeeAsync()
     {
         if (string.IsNullOrWhiteSpace(NewEmployeeName)) return;
@@ -441,6 +952,7 @@ public class ManagerViewModel : INotifyPropertyChanged
             NewEmployeeName = "";
             NewEmployeePin = "1234";
             LiveActivityFeed.Insert(0, $"[{DateTime.Now:HH:mm:ss}] New technician created: {emp.Name} (PIN: {pin}, Station: {emp.StationId})");
+            VeloxMessageBox.Show($"Technician {emp.Name} registered successfully with Station ID: {emp.StationId}", "Technician Created", MessageBoxButton.OK, MessageBoxImage.Information);
         }
     }
 
@@ -450,7 +962,7 @@ public class ManagerViewModel : INotifyPropertyChanged
         var newPin = !string.IsNullOrWhiteSpace(pinOverride) ? pinOverride.Trim() : (!string.IsNullOrWhiteSpace(EditEmployeePin) ? EditEmployeePin.Trim() : "1234");
         if (newPin.Length < 4)
         {
-            MessageBox.Show("PIN must be at least 4 digits.", "Invalid PIN", MessageBoxButton.OK, MessageBoxImage.Warning);
+            VeloxMessageBox.Show("PIN must be at least 4 digits.", "Invalid PIN", MessageBoxButton.OK, MessageBoxImage.Warning);
             return;
         }
 
@@ -459,7 +971,7 @@ public class ManagerViewModel : INotifyPropertyChanged
         {
             LiveActivityFeed.Insert(0, $"[{DateTime.Now:HH:mm:ss}] Station PIN updated for {SelectedEmployeeForEdit.Name} (PIN: {newPin})");
             EditEmployeePin = "";
-            MessageBox.Show($"Station PIN successfully updated for {SelectedEmployeeForEdit.Name} to: {newPin}", "PIN Updated", MessageBoxButton.OK, MessageBoxImage.Information);
+            VeloxMessageBox.Show($"Station PIN successfully updated for {SelectedEmployeeForEdit.Name} to: {newPin}", "PIN Updated", MessageBoxButton.OK, MessageBoxImage.Information);
         }
     }
 
@@ -472,6 +984,7 @@ public class ManagerViewModel : INotifyPropertyChanged
         {
             SelectedEmployeeForEdit.StationId = newStation;
             LiveActivityFeed.Insert(0, $"[{DateTime.Now:HH:mm:ss}] Station updated for {SelectedEmployeeForEdit.Name} to {newStation}");
+            VeloxMessageBox.Show($"Station successfully assigned: {newStation}", "Station Updated", MessageBoxButton.OK, MessageBoxImage.Information);
             await LoadAssetsAndEmployeesAsync();
         }
     }
@@ -485,113 +998,6 @@ public class ManagerViewModel : INotifyPropertyChanged
         {
             LiveActivityFeed.Insert(0, $"[{DateTime.Now:HH:mm:ss}] {SelectedEmployeeForEdit.Name} status toggled: {(newStatus ? "ACTIVE" : "INACTIVE")}");
             await LoadAssetsAndEmployeesAsync();
-        }
-    }
-
-    public async Task GenerateInvoiceForSelectedAssetsAsync()
-    {
-        var inv = new Invoice
-        {
-            Type = SelectedInvoiceType,
-            PartyName = string.IsNullOrWhiteSpace(NewInvoiceParty)
-                ? (IsSalesInvoice ? "Customer / Retail Client" : "Inward Hardware Supplier")
-                : NewInvoiceParty.Trim(),
-            TaxPercent = NewInvoiceTax,
-            Notes = string.IsNullOrWhiteSpace(NewInvoiceNotes)
-                ? (IsSalesInvoice ? "Thank you for your business. Certified Refurbished Hardware. Net 30." : "Depot inward inventory acquisition.")
-                : NewInvoiceNotes.Trim()
-        };
-
-        var unitPrice = NewInvoiceUnitPrice > 0 ? NewInvoiceUnitPrice : 450.00m;
-        var affectedAssets = new List<AssetItemViewModel>();
-
-        if (SelectedAsset != null)
-        {
-            inv.Items.Add(new InvoiceItem
-            {
-                LineNumber = 1,
-                AssetId = SelectedAsset.Id,
-                SerialNumber = SelectedAsset.SerialNumber,
-                Model = SelectedAsset.ModelName,
-                Grade = SelectedAsset.GradeBadge,
-                Description = $"Certified Hardware (Disk Health: {SelectedAsset.StorageHealth}%)",
-                UnitPrice = unitPrice,
-                Quantity = 1
-            });
-            affectedAssets.Add(SelectedAsset);
-        }
-        else
-        {
-            // If no single asset selected, bundle candidate units
-            var candidates = IsSalesInvoice
-                ? Assets.Where(a => a.Status == LifecycleQueue.ReadyForSale).Take(5).ToList()
-                : Assets.Take(5).ToList();
-
-            int line = 1;
-            foreach (var u in candidates)
-            {
-                var price = IsSalesInvoice
-                    ? (u.SalePrice.HasValue && u.SalePrice.Value > 0 ? (decimal)u.SalePrice.Value : unitPrice)
-                    : (u.PurchasePrice.HasValue && u.PurchasePrice.Value > 0 ? (decimal)u.PurchasePrice.Value : unitPrice);
-
-                inv.Items.Add(new InvoiceItem
-                {
-                    LineNumber = line++,
-                    AssetId = u.Id,
-                    SerialNumber = u.SerialNumber,
-                    Model = u.ModelName,
-                    Grade = u.GradeBadge,
-                    Description = "Certified Refurbished Hardware Unit",
-                    UnitPrice = price,
-                    Quantity = 1
-                });
-                affectedAssets.Add(u);
-            }
-        }
-
-        if (inv.Items.Count == 0)
-        {
-            MessageBox.Show("No eligible assets available to generate invoice.", "Velox Billing", MessageBoxButton.OK, MessageBoxImage.Warning);
-            return;
-        }
-
-        Invoices.Insert(0, inv);
-        PreviewInvoice(inv);
-        LiveActivityFeed.Insert(0, $"[{DateTime.Now:HH:mm:ss}] Generated {inv.Type} #{inv.InvoiceNumber} for {inv.PartyName} (Total: ${inv.TotalAmount:N2})");
-
-        // Automatically update asset lifecycle to SOLD if sales invoice with flag checked
-        if (IsSalesInvoice && MarkAsSoldOnInvoice)
-        {
-            foreach (var asset in affectedAssets)
-            {
-                if (asset.Status != LifecycleQueue.Sold)
-                {
-                    var success = await _api.UpdateAssetStatusAsync(asset.Id, LifecycleQueue.Sold, $"Sold via Invoice #{inv.InvoiceNumber}");
-                    if (success)
-                    {
-                        asset.Status = LifecycleQueue.Sold;
-                        LiveActivityFeed.Insert(0, $"[{DateTime.Now:HH:mm:ss}] Asset {asset.SerialNumber} updated to SOLD via Invoice #{inv.InvoiceNumber}");
-                    }
-                }
-            }
-            RefreshMetrics();
-        }
-    }
-
-    public void PreviewInvoice(Invoice? inv)
-    {
-        if (inv == null) return;
-
-        try
-        {
-            var html = InvoiceService.GenerateHtml(inv);
-            var tempFile = Path.Combine(Path.GetTempPath(), $"{inv.InvoiceNumber}.html");
-            File.WriteAllText(tempFile, html);
-            Process.Start(new ProcessStartInfo(tempFile) { UseShellExecute = true });
-        }
-        catch (Exception ex)
-        {
-            MessageBox.Show($"Could not open invoice preview: {ex.Message}", "Velox Invoice Error", MessageBoxButton.OK, MessageBoxImage.Error);
         }
     }
 

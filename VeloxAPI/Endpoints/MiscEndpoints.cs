@@ -42,8 +42,11 @@ public static class SseEndpoints
 {
     public static void MapSseEndpoints(this IEndpointRouteBuilder app)
     {
-        // GET /api/v1/events/stream — SSE long-poll, accepts API key OR JWT
-        app.MapGet("/api/v1/events/stream", async (HttpContext ctx, VeloxAPI.Realtime.SseHub sse) =>
+        // GET /api/v1/events and /api/v1/events/stream — SSE long-poll, accepts API key OR JWT
+        app.MapGet("/api/v1/events/stream", HandleSse);
+        app.MapGet("/api/v1/events", HandleSse);
+
+        static async Task HandleSse(HttpContext ctx, VeloxAPI.Realtime.SseHub sse)
         {
             var tenantId = ctx.TenantId() ?? ctx.Items["TenantId"] as string;
             if (tenantId == null)
@@ -53,7 +56,7 @@ public static class SseEndpoints
                 return;
             }
             await sse.ServeAsync(ctx, ctx.RequestAborted);
-        });
+        }
     }
 }
 

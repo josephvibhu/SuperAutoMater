@@ -1,5 +1,8 @@
+using System.Text.Json.Serialization;
+
 namespace Velox.Shared.Models;
 
+[JsonConverter(typeof(JsonStringEnumConverter))]
 public enum LifecycleQueue
 {
     IntakeStaging,
@@ -12,6 +15,7 @@ public enum LifecycleQueue
     OnHold
 }
 
+[JsonConverter(typeof(JsonStringEnumConverter))]
 public enum AssetGrade
 {
     Unknown,
@@ -22,6 +26,7 @@ public enum AssetGrade
     ForParts
 }
 
+[JsonConverter(typeof(JsonStringEnumConverter))]
 public enum EmployeeRole
 {
     Technician,
@@ -29,6 +34,7 @@ public enum EmployeeRole
     Owner
 }
 
+[JsonConverter(typeof(JsonStringEnumConverter))]
 public enum SseEventType
 {
     AssetUpdated,
@@ -36,3 +42,16 @@ public enum SseEventType
     AssetEventAdded,
     EmployeeUpdated
 }
+
+[JsonConverter(typeof(JsonStringEnumConverter))]
+public enum AssetCategory
+{
+    Laptop,
+    Desktop,
+    RAM,
+    Storage,
+    Charger,
+    Peripheral,
+    RepairSpare
+}
+
