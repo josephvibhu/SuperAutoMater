@@ -33,8 +33,10 @@ public sealed class ApiKeyMiddleware(RequestDelegate next)
             }
         }
 
-        // Unauthenticated routes
-        if (path == "/health" || path.StartsWith("/api/v1/auth", StringComparison.OrdinalIgnoreCase))
+        // Unauthenticated routes (admin routes enforce X-Admin-Secret internally)
+        if (path == "/health" ||
+            path.StartsWith("/api/v1/auth", StringComparison.OrdinalIgnoreCase) ||
+            path.StartsWith("/api/v1/admin", StringComparison.OrdinalIgnoreCase))
         {
             await next(ctx);
             return;
