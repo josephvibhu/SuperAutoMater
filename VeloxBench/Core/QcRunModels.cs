@@ -1,0 +1,377 @@
+using System;
+using System.Collections.Generic;
+
+namespace VeloxBench.Core
+{
+    /// <summary>
+    /// Lifecycle state of a QC run.
+    /// </summary>
+    public enum QcRunStatus
+    {
+        InProgress,
+        Completed,
+        Aborted
+    }
+
+    /// <summary>
+    /// The persisted state of a diagnostic result. Do not use a successful-looking
+    /// default for measurements that were not collected.
+    /// </summary>
+    public enum QcTestStatus
+    {
+        NotStarted,
+        Running,
+        Passed,
+        Failed,
+        NotApplicable,
+        Skipped,
+        ManualOverride
+    }
+
+    /// <summary>
+    /// Confidence level in the extracted asset identifier.
+    /// </summary>
+    public enum AssetIdentifierConfidence
+    {
+        Authoritative,
+        Fallback
+    }
+
+    public sealed class AssetIdentifier
+    {
+        public string AssetTag { get; set; } = "";
+        public string SerialNumber { get; set; } = "";
+        public string AssetUuid { get; set; } = "";
+        public string Source { get; set; } = "Win32_BIOS";
+        public AssetIdentifierConfidence Confidence { get; set; } = AssetIdentifierConfidence.Authoritative;
+    }
+
+    public sealed class QcRunIdentity
+    {
+        public string AssetTag { get; set; } = "";
+        public string SerialNumber { get; set; } = "";
+        public string AssetUuid { get; set; } = "";
+        public string Model { get; set; } = "";
+        public string Technician { get; set; } = "";
+        public string Station { get; set; } = "";
+        public string PolicyVersion { get; set; } = "default-v1";
+        public AssetIdentifierConfidence Confidence { get; set; } = AssetIdentifierConfidence.Authoritative;
+        public string IdentifierSource { get; set; } = "Win32_BIOS";
+    }
+
+    public sealed class QcOverride
+    {
+        public string Id { get; set; } = Guid.NewGuid().ToString("N");
+        public string RunId { get; set; } = "";
+        public string TestKey { get; set; } = "";
+        public string Actor { get; set; } = "";
+        public string Reason { get; set; } = "";
+        public string Approver { get; set; } = "";
+        public DateTimeOffset RecordedAtUtc { get; set; } = DateTimeOffset.UtcNow;
+    }
+
+    public sealed class QcEvidence
+    {
+        public string Id { get; set; } = Guid.NewGuid().ToString("N");
+        public string RunId { get; set; } = "";
+        public string TestKey { get; set; } = "";
+        public string EvidenceType { get; set; } = "Log";
+        public string FilePath { get; set; } = "";
+        public string FileHash { get; set; } = "";
+        public string MetadataJson { get; set; } = "";
+        public DateTimeOffset RecordedAtUtc { get; set; } = DateTimeOffset.UtcNow;
+    }
+
+    public sealed class QcTestResultRecord
+    {
+        public string TestKey { get; set; } = "";
+        public string TestName { get; set; } = "";
+        public QcTestStatus Status { get; set; }
+        public bool IsAutomated { get; set; }
+        public string MetricsJson { get; set; } = "";
+        public string OverrideReason { get; set; } = "";
+        public string ApprovedBy { get; set; } = "";
+        public DateTimeOffset RecordedAtUtc { get; set; } = DateTimeOffset.UtcNow;
+    }
+
+    /// <summary>
+    /// Immutable record of an entire QC run including results, overrides, and verification hash.
+    /// </summary>
+    public sealed class QcRunSummary
+    {
+        public string RunId { get; set; } = "";
+        public string AssetId { get; set; } = "";
+        public string SerialNumber { get; set; } = "";
+        public string AssetTag { get; set; } = "";
+        public string Model { get; set; } = "";
+        public string Technician { get; set; } = "";
+        public string Station { get; set; } = "";
+        public string PolicyVersion { get; set; } = "";
+        public QcRunStatus Status { get; set; }
+        public string Grade { get; set; } = "PENDING";
+        public string VerificationHash { get; set; } = "";
+        public DateTimeOffset StartedAtUtc { get; set; }
+        public DateTimeOffset? CompletedAtUtc { get; set; }
+        public List<QcTestResultRecord> Results { get; set; } = new List<QcTestResultRecord>();
+        public List<QcOverride> Overrides { get; set; } = new List<QcOverride>();
+        public List<QcEvidence> EvidenceItems { get; set; } = new List<QcEvidence>();
+    }
+
+    /// <summary>
+    /// Ten-state real-world warehouse lifecycle queue taxonomy.
+    /// </summary>
+    public enum AssetQueueStatus
+    {
+        // Zone 1: Intake & Testing
+        IntakeStaging = 0,
+        ActiveTesting = 1,
+        ReadyForRetest = 2,
+
+        // Zone 2: Triage & Repair
+        AwaitingParts = 3,
+        InHouseRepair = 4,
+        AdvancedIcExternal = 5,
+
+        // Zone 3: Commercial Release
+        ReadyForSale = 6,      // RTS (Ready to Sell)
+        ReadyForRental = 7,    // RFR (Ready for Rental)
+        DemoStock = 8,         // Demo / Client Evaluation
+        ScrapHarvest = 9,      // Beyond Economic Repair / Harvesting
+
+        // Backward compatibility aliases
+        ReadyForTest = IntakeStaging,
+        InTest = ActiveTesting,
+        Hold = AwaitingParts,
+        Repair = InHouseRepair,
+        Retest = ReadyForRetest,
+        ReadyForRelease = ReadyForSale,
+        Disposed = ScrapHarvest
+    }
+
+    /// <summary>
+    /// Source stream for intake batching.
+    /// </summary>
+    public enum IntakeSourceStream
+    {
+        LeaseReturn,
+        TradeIn,
+        OfficeDecommission,
+        EWasteRecycle,
+        WarrantyRMA,
+        Other
+    }
+
+    /// <summary>
+    /// Charger presence verified during intake inspection.
+    /// </summary>
+    public enum ChargerPresenceStatus
+    {
+        OriginalOemIncluded,
+        CompatibleIncluded,
+        NoChargerMissing
+    }
+
+    /// <summary>
+    /// Intake submission payload.
+    /// </summary>
+    public sealed class AssetIntakeRequest
+    {
+        public string SerialNumber { get; set; } = "";
+        public string AssetTag { get; set; } = "";
+        public string AssetUuid { get; set; } = "";
+        public string Model { get; set; } = "";
+        public string IntakeBatchId { get; set; } = "";
+        public IntakeSourceStream SourceStream { get; set; } = IntakeSourceStream.Other;
+        public ChargerPresenceStatus ChargerStatus { get; set; } = ChargerPresenceStatus.NoChargerMissing;
+        public string InitialLocation { get; set; } = "INTAKE-STAGING";
+        public string TestProfileId { get; set; } = "standard-refurb-v1";
+        public string Technician { get; set; } = "";
+        public string Notes { get; set; } = "";
+        public bool IsSerialMissing { get; set; } = false;
+        public string Supplier { get; set; } = "";
+        public string MissingComponents { get; set; } = "";
+        public string AssignedTo { get; set; } = "";
+    }
+
+
+
+    /// <summary>
+    /// Live WIP record representing an asset on the floor with its current queue, location, and attribution.
+    /// </summary>
+    public sealed class AssetWipRecord
+    {
+        public string AssetId { get; set; } = "";
+        public string SerialNumber { get; set; } = "";
+        public string AssetTag { get; set; } = "";
+        public string Model { get; set; } = "";
+        public string CurrentLocation { get; set; } = "";
+        public AssetQueueStatus LifecycleQueue { get; set; } = AssetQueueStatus.IntakeStaging;
+        public string IntakeBatchId { get; set; } = "";
+        public string SourceStream { get; set; } = "";
+        public string ChargerStatus { get; set; } = "";
+        public string TestProfileId { get; set; } = "";
+        public string LatestRunId { get; set; } = "";
+        public string LatestRunGrade { get; set; } = "";
+        public string LatestRunStatus { get; set; } = "";
+        public string LatestVerificationHash { get; set; } = "";
+        public int StorageHealth { get; set; } = 100;
+        public string WorkInProgress { get; set; } = "All Okay";
+        public string Supplier { get; set; } = "";
+        public string Customer { get; set; } = "";
+        public string InDate { get; set; } = "";
+        public string OutDate { get; set; } = "";
+        public string Remarks { get; set; } = "";
+        public bool IsSerialMissing { get; set; } = false;
+        public string AssignedTo { get; set; } = "";
+        public string IntakeTechnician { get; set; } = "";
+        public string ServiceTechnician { get; set; } = "";
+        public string QcTechnician { get; set; } = "";
+        public string ApprovalTechnician { get; set; } = "";
+        public string MissingComponents { get; set; } = "";
+        public string ExternalVendor { get; set; } = "";
+        public string CommercialDisposition { get; set; } = "";
+        public DateTimeOffset CreatedAtUtc { get; set; }
+        public DateTimeOffset UpdatedAtUtc { get; set; }
+    }
+
+    /// <summary>
+    /// Audit-tracked custody lifecycle transitions.
+    /// </summary>
+    public enum CustodyEventType
+    {
+        Receive,
+        Move,
+        Hold,
+        RepairStart,
+        RepairComplete,
+        RetestQueued,
+        ReleaseStaged,
+        Disposed
+    }
+
+    /// <summary>
+    /// Append-only custody and location audit record.
+    /// </summary>
+    public sealed class CustodyEventRecord
+    {
+        public string Id { get; set; } = Guid.NewGuid().ToString("N");
+        public string AssetId { get; set; } = "";
+        public CustodyEventType EventType { get; set; } = CustodyEventType.Receive;
+        public string Location { get; set; } = "";
+        public string Actor { get; set; } = "";
+        public string ReasonCode { get; set; } = "";
+        public string BatchId { get; set; } = "";
+        public string Notes { get; set; } = "";
+        public bool ScanConfirmed { get; set; } = true;
+        public DateTimeOffset RecordedAtUtc { get; set; } = DateTimeOffset.UtcNow;
+    }
+
+    /// <summary>
+    /// Complete historical device journey combining intake, QC runs, overrides, photos, and custody events.
+    /// </summary>
+    public sealed class AssetJourneySummary
+    {
+        public AssetWipRecord Asset { get; set; }
+        public List<QcRunSummary> Runs { get; set; } = new List<QcRunSummary>();
+        public List<CustodyEventRecord> CustodyEvents { get; set; } = new List<CustodyEventRecord>();
+        public List<QcEvidence> EvidenceItems { get; set; } = new List<QcEvidence>();
+    }
+
+    /// <summary>
+    /// Five canonical Depot OS security roles.
+    /// </summary>
+    public enum DepotRole
+    {
+        Technician,
+        Supervisor,
+        WarehouseManager,
+        Viewer,
+        Administrator
+    }
+
+    /// <summary>
+    /// User identity and assigned role for depot operations.
+    /// </summary>
+    public sealed class DepotUserRecord
+    {
+        public string Id { get; set; } = Guid.NewGuid().ToString("N");
+        public string Username { get; set; } = "";
+        public string FullName { get; set; } = "";
+        public DepotRole Role { get; set; } = DepotRole.Technician;
+        public string PinOrTokenHash { get; set; } = "";
+        public bool IsActive { get; set; } = true;
+        public DateTimeOffset CreatedAtUtc { get; set; } = DateTimeOffset.UtcNow;
+    }
+
+    /// <summary>
+    /// Tamper-evident immutable audit log entry for administrative and mutation actions.
+    /// </summary>
+    public sealed class AuditLogRecord
+    {
+        public string Id { get; set; } = Guid.NewGuid().ToString("N");
+        public string Actor { get; set; } = "";
+        public string Role { get; set; } = "";
+        public string Action { get; set; } = "";
+        public string EntityType { get; set; } = "";
+        public string EntityId { get; set; } = "";
+        public string DetailsJson { get; set; } = "";
+        public DateTimeOffset TimestampUtc { get; set; } = DateTimeOffset.UtcNow;
+    }
+
+    /// <summary>
+    /// Aging WIP unit with queue dwell duration and diagnosed defect blockers.
+    /// </summary>
+    public sealed class AgingWipUnit
+    {
+        public string AssetId { get; set; } = "";
+        public string SerialNumber { get; set; } = "";
+        public string AssetTag { get; set; } = "";
+        public string Model { get; set; } = "";
+        public AssetQueueStatus LifecycleQueue { get; set; } = AssetQueueStatus.Hold;
+        public string CurrentLocation { get; set; } = "";
+        public string WorkInProgressDefect { get; set; } = "";
+        public double DwellHours { get; set; }
+        public double DwellDays => Math.Round(DwellHours / 24.0, 1);
+        public string DwellDisplay => DwellHours < 24 ? $"{Math.Round(DwellHours, 1)}h" : $"{DwellDays}d";
+        public string PrimaryBlocker { get; set; } = "";
+        public string Technician { get; set; } = "";
+        public DateTimeOffset CreatedAtUtc { get; set; }
+        public DateTimeOffset UpdatedAtUtc { get; set; }
+    }
+
+    /// <summary>
+    /// Depot OS operational KPI summary calculated from canonical SQLite data.
+    /// </summary>
+    public sealed class DepotKpiSummary
+    {
+        public int DailyThroughput { get; set; }
+        public int WeeklyThroughput { get; set; }
+        public int TotalWipUnits { get; set; }
+        public double FirstTimePassRatePercent { get; set; }
+        public int FirstTimePassNumerator { get; set; }
+        public int FirstTimePassDenominator { get; set; }
+        public double AverageCycleTimeMinutes { get; set; }
+        public int ActiveExceptionsCount { get; set; }
+        public double OldestWipUnitAgeHours { get; set; }
+        public Dictionary<string, int> RetestReasons { get; set; } = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+        public int ActiveBenchConcurrency { get; set; }
+    }
+
+    /// <summary>
+    /// Inbound or outbound integration manifest audit record.
+    /// </summary>
+    public sealed class IntegrationManifestRecord
+    {
+        public string Id { get; set; } = Guid.NewGuid().ToString("N");
+        public string Direction { get; set; } = "Inbound"; // Inbound or Outbound
+        public string ConnectorType { get; set; } = "ITAM_CSV";
+        public string BatchId { get; set; } = "";
+        public int TotalItems { get; set; }
+        public int AcceptedItems { get; set; }
+        public int QuarantinedItems { get; set; }
+        public string Signature { get; set; } = "";
+        public string ManifestJson { get; set; } = "{}";
+        public DateTimeOffset CreatedAtUtc { get; set; } = DateTimeOffset.UtcNow;
+    }
+}
+

@@ -1,0 +1,59 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+	<PropertyGroup>
+		<OutputType>WinExe</OutputType>
+		<TargetFramework>net10.0-windows</TargetFramework>
+		<Nullable>enable</Nullable>
+		<UseWPF>true</UseWPF>
+		<UseWindowsForms>true</UseWindowsForms>
+		<AssemblyName>VeloxBench</AssemblyName>
+		<Product>VeloxBench — Precision Diagnostic &amp; Refurbishment Engine</Product>
+		<Company>Velox Depot Systems</Company>
+		<Version>1.0.0</Version>
+		<AssemblyVersion>1.0.0.0</AssemblyVersion>
+		<FileVersion>1.0.0.0</FileVersion>
+		<ApplicationIcon>app.ico</ApplicationIcon>
+		<NoWarn>NU1701;WFO1000;NU1903</NoWarn>
+
+		<!-- Standalone single EXE publish settings -->
+		<PublishSingleFile>true</PublishSingleFile>
+		<SelfContained>true</SelfContained>
+		<PublishReadyToRun>true</PublishReadyToRun>
+		<PublishReadyToRunComposite>true</PublishReadyToRunComposite>
+		<EnableCompressionInSingleFile>false</EnableCompressionInSingleFile>
+		<TieredCompilation>true</TieredCompilation>
+		<Optimize>true</Optimize>
+		<IncludeNativeLibrariesForSelfExtract>true</IncludeNativeLibrariesForSelfExtract>
+		<SatelliteResourceLanguages>en</SatelliteResourceLanguages>
+		<ExcludeSatelliteAssemblies>true</ExcludeSatelliteAssemblies>
+
+		<!-- Administrator elevation manifest -->
+		<ApplicationManifest>app.manifest</ApplicationManifest>
+	</PropertyGroup>
+
+	<ItemGroup>
+		<Resource Include="app.ico" />
+	</ItemGroup>
+
+	<ItemGroup>
+		<!-- Native disk and diagnostic tools bundled in lib/ -->
+		<None Include="lib\**\*">
+			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+			<TargetPath>lib\%(RecursiveDir)%(Filename)%(Extension)</TargetPath>
+		</None>
+	</ItemGroup>
+
+	<ItemGroup>
+		<ProjectReference Include="..\Velox.Shared\Velox.Shared.csproj" />
+	</ItemGroup>
+
+	<ItemGroup>
+		<PackageReference Include="AForge.Video" Version="2.2.5" />
+		<PackageReference Include="AForge.Video.DirectShow" Version="2.2.5" />
+		<PackageReference Include="NAudio" Version="2.3.0" />
+		<PackageReference Include="Microsoft.Data.Sqlite" Version="10.0.0" />
+		<PackageReference Include="QRCoder" Version="1.8.0" />
+		<PackageReference Include="System.Management" Version="10.0.10" />
+	</ItemGroup>
+
+</Project>
