@@ -37,7 +37,19 @@ $assigned = Invoke-RestMethod -Uri "$ApiUrl/api/v1/assets/$($asset.id)/assign" -
 Write-Host "[4/5] Asset Assigned to $($login.name)" -ForegroundColor Green
 
 # 5. Technician checks personal queue on VeloxLink and marks testing complete
-$jobs = Invoke-RestMethod -Uri "$ApiUrl/api/v1/jobs/mine" -Method GET -Headers @{ "Authorization" = "Bearer $($login.token)" }
+$bearer = "Bearer " + $login.token
+$headers = @{ "Authorization" = $bearer }
+try {
+    $jobs = Invoke-RestMethod -Uri "$ApiUrl/api/v1/jobs/mine" -Method GET -Headers $headers
+} catch {
+    Write-Host "Jobs/mine failed: $($_.Exception.Message)" -ForegroundColor Red
+    if ($_.Exception.Response) {
+        $stream = $_.Exception.Response.GetResponseStream()
+        $reader = New-Object System.IO.StreamReader($stream)
+        Write-Host "Response Body: $($reader.ReadToEnd())" -ForegroundColor Red
+    }
+    throw
+}
 $myJob = $jobs.jobs | Where-Object { $_.serialNumber -eq $serial }
 if ($myJob) {
     Write-Host "[5/5] Technician successfully retrieved assigned job in VeloxLink feed!" -ForegroundColor Green
