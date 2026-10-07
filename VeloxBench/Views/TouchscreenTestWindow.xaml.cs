@@ -1,12 +1,13 @@
 using System;
+using System.Collections.Generic;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Shapes;
-using VeloxBench.Services;
+using SuperAutoMater.Wpf.Services;
 
-namespace VeloxBench.Views
+namespace SuperAutoMater.Wpf.Views
 {
     public partial class TouchscreenTestWindow : Window
     {
@@ -40,7 +41,7 @@ namespace VeloxBench.Views
             else
             {
                 TxtHwStatus.Text = "STANDARD PANEL (MOUSE/PEN INPUT)";
-                TxtHwStatus.Foreground = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#8B949E"));
+                TxtHwStatus.Foreground = (Brush)FindResource("BrushTextVioletLight");
                 BorderHwStatus.Background = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#21262D"));
                 BorderHwStatus.BorderBrush = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#30363D"));
                 TxtMaxTouches.Text = "DIGITIZER TEST MODE";
@@ -61,7 +62,7 @@ namespace VeloxBench.Views
                         FontFamily = new FontFamily("Consolas"),
                         FontWeight = FontWeights.Bold,
                         FontSize = 13,
-                        Foreground = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#3FB950")),
+                        Foreground = (Brush)FindResource("BrushTextEmerald"),
                         HorizontalAlignment = HorizontalAlignment.Center,
                         VerticalAlignment = VerticalAlignment.Center
                     };
@@ -108,6 +109,7 @@ namespace VeloxBench.Views
 
                     UpdateCoverageText();
 
+                    // Auto-qualify test if >= 90% covered
                     if (_touchedCount >= (int)(TOTAL_BLOCKS * 0.90))
                     {
                         TestPassed = true;
@@ -184,17 +186,17 @@ namespace VeloxBench.Views
             _isMouseDown = false;
         }
 
-        private void Grid_TouchDown(object? sender, TouchEventArgs e)
+        private void Grid_TouchDown(object sender, TouchEventArgs e)
         {
             ProcessPoint(e.GetTouchPoint(DigitizerGrid).Position);
         }
 
-        private void Grid_TouchMove(object? sender, TouchEventArgs e)
+        private void Grid_TouchMove(object sender, TouchEventArgs e)
         {
             ProcessPoint(e.GetTouchPoint(DigitizerGrid).Position);
         }
 
-        private void Grid_TouchUp(object? sender, TouchEventArgs e)
+        private void Grid_TouchUp(object sender, TouchEventArgs e)
         {
         }
 

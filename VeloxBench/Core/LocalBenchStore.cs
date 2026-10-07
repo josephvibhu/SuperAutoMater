@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.IO;
 using Microsoft.Data.Sqlite;
 using Velox.Shared.Dtos;
+using SuperAutoMater.Wpf.Core;
 
 namespace VeloxBench.Core;
 

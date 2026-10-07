@@ -2,7 +2,7 @@ using System;
 using System.Diagnostics;
 using System.Runtime.InteropServices;
 
-namespace VeloxBench.Services
+namespace SuperAutoMater.Wpf.Services
 {
     public sealed class KeyboardHookService : IDisposable
     {
@@ -21,8 +21,8 @@ namespace VeloxBench.Services
         private readonly LowLevelKeyboardProc _proc;
         private IntPtr _hookId = IntPtr.Zero;
 
-        public event Action<int>? KeyDown;
-        public event Action<int>? KeyUp;
+        public event Action<int> KeyDown;
+        public event Action<int> KeyUp;
 
         private KeyboardHookService()
         {
@@ -33,7 +33,7 @@ namespace VeloxBench.Services
         {
             if (_hookId != IntPtr.Zero) return;
             using (Process curProcess = Process.GetCurrentProcess())
-            using (ProcessModule? curModule = curProcess.MainModule)
+            using (ProcessModule curModule = curProcess.MainModule)
             {
                 _hookId = SetWindowsHookEx(WH_KEYBOARD_LL, _proc, GetModuleHandle(curModule?.ModuleName), 0);
             }
@@ -83,6 +83,6 @@ namespace VeloxBench.Services
         private static extern IntPtr CallNextHookEx(IntPtr hhk, int nCode, IntPtr wParam, IntPtr lParam);
 
         [DllImport("kernel32.dll", CharSet = CharSet.Auto, SetLastError = true)]
-        private static extern IntPtr GetModuleHandle(string? lpModuleName);
+        private static extern IntPtr GetModuleHandle(string lpModuleName);
     }
 }

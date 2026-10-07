@@ -5,9 +5,9 @@ using System.Linq;
 using System.Runtime.InteropServices;
 using System.Threading;
 using System.Threading.Tasks;
-using VeloxBench.Core;
+using SuperAutoMater.Wpf.Core;
 
-namespace VeloxBench.Services
+namespace SuperAutoMater.Wpf.Services
 {
     public enum RamDegradationState
     {

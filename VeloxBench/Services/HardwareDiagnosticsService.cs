@@ -9,9 +9,8 @@ using System.Runtime.InteropServices;
 using System.Text;
 using System.Text.RegularExpressions;
 using System.Threading.Tasks;
-using VeloxBench.Core;
 
-namespace VeloxBench.Services
+namespace SuperAutoMater.Wpf.Services
 {
     public class SystemIdentityModel
     {
@@ -287,44 +286,28 @@ namespace VeloxBench.Services
 
         private HardwareDiagnosticsService() { }
 
-        private static Task RunWithTimeout(Action action, int timeoutMs = 3500)
-        {
-            return Task.Run(() =>
-            {
-                try
-                {
-                    var task = Task.Run(action);
-                    if (!task.Wait(timeoutMs))
-                    {
-                        // Safely timed out to prevent corrupt WMI hangs on legacy laptops
-                    }
-                }
-                catch { }
-            });
-        }
-
         public async Task InitializeAsync()
         {
             // Tier-1 (Core Identity & Topology): Ultra-fast, completes in <80ms for instant UI display
             var tier1Tasks = new Task[]
             {
-                RunWithTimeout(ProbeSystemIdentity, 3000),
-                RunWithTimeout(ProbeCpu, 3000),
-                RunWithTimeout(ProbeMemory, 3000),
-                RunWithTimeout(ProbeTouchscreen, 1500)
+                Task.Run(ProbeSystemIdentity),
+                Task.Run(ProbeCpu),
+                Task.Run(ProbeMemory),
+                Task.Run(ProbeTouchscreen)
             };
 
             // Tier-2 (Extended Peripherals & Network): Secondary WMI & external process probes
             var tier2Tasks = new Task[]
             {
-                RunWithTimeout(ProbeGpu, 3500),
-                RunWithTimeout(ProbeStorage, 3500),
-                RunWithTimeout(ProbeBattery, 3500),
-                RunWithTimeout(ProbeNetwork, 2500)
+                Task.Run(ProbeGpu),
+                Task.Run(ProbeStorage),
+                Task.Run(ProbeBattery),
+                Task.Run(ProbeNetwork)
             };
 
-            // Fast UI hydration: wait up to 100ms for Tier-1 to populate initial window
-            await Task.WhenAny(Task.WhenAll(tier1Tasks), Task.Delay(100));
+            // Fast UI hydration: wait up to 120ms for Tier-1 to populate initial window
+            await Task.WhenAny(Task.WhenAll(tier1Tasks), Task.Delay(120));
             TelemetryUpdated?.Invoke();
 
             // Background continuation ensures secondary hardware details hydrate cleanly without blocking
@@ -398,7 +381,7 @@ namespace VeloxBench.Services
                 }
 
                 // Check if serial is missing or generic
-                bool isGeneric = IsGenericSerial(SystemIdentity.Serial);
+                bool isGeneric = Core.QcRunStore.IsGenericSerial(SystemIdentity.Serial);
                 if (isGeneric || string.IsNullOrWhiteSpace(SystemIdentity.Serial))
                 {
                     SystemIdentity.IsSerialMissing = true;
@@ -412,13 +395,6 @@ namespace VeloxBench.Services
                 _systemIdentityProbed = true;
             }
             catch { }
-        }
-
-        private static bool IsGenericSerial(string s)
-        {
-            if (string.IsNullOrWhiteSpace(s)) return true;
-            var lower = s.Trim().ToLowerInvariant();
-            return lower is "to be filled by o.e.m." or "default string" or "none" or "system serial number" or "0" or "n/a" or "chassis serial number";
         }
 
         public void ProbeCpu()
@@ -1268,6 +1244,12 @@ namespace VeloxBench.Services
                 HasTouchscreen = false;
                 MaxTouchContacts = 0;
             }
+        }
+
+        private static bool RunWithTimeout(Action action, int timeoutMs = 3000)
+        {
+            var task = Task.Run(action);
+            return task.Wait(timeoutMs);
         }
     }
 }

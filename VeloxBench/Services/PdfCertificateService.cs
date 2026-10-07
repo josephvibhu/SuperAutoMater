@@ -7,9 +7,9 @@ using System.IO;
 using System.Linq;
 using System.Text;
 using QRCoder;
-using VeloxBench.Core;
+using SuperAutoMater.Wpf.Core;
 
-namespace VeloxBench.Services
+namespace SuperAutoMater.Wpf.Services
 {
     public class CertificateData
     {
@@ -45,11 +45,12 @@ namespace VeloxBench.Services
         public string ApprovalTechnician { get; set; } = "Depot Lead";
         public string QcProfileUsed { get; set; } = "Full Diagnostic";
         public string MissingComponents { get; set; } = "";
-        public string CloudAuditUrl { get; set; } = "https://velox-api-production.up.railway.app";
+        public string CloudAuditUrl { get; set; } = GoogleSheetsDispatcher.DefaultSheetsUrl;
         public List<string> PassedTests { get; set; } = new List<string>();
     }
 
     public class PdfCertificateService
+
     {
         private static readonly Lazy<PdfCertificateService> _instance =
             new Lazy<PdfCertificateService>(() => new PdfCertificateService());
@@ -57,42 +58,91 @@ namespace VeloxBench.Services
 
         private PdfCertificateService() { }
 
-        public string GenerateCertificate(CertificateData data, string? targetPath = null)
+        public string GenerateCertificate(CertificateData data)
         {
             if (data == null) throw new ArgumentNullException(nameof(data));
 
-            var summary = data.RunSummary ?? new QcRunSummary
+            // Resolve and validate completed QC run summary
+            var summary = data.RunSummary;
+            if (summary == null && !string.IsNullOrEmpty(data.RunId))
             {
-                RunId = data.RunId,
-                SerialNumber = data.SerialNumber,
-                Model = data.Model,
-                Technician = data.TechnicianName,
-                Grade = data.PhysicalGrade,
-                StartedAtUtc = DateTimeOffset.UtcNow,
-                CompletedAtUtc = DateTimeOffset.UtcNow,
-                Status = QcRunStatus.Completed
-            };
-
-            string cleanSerial = string.IsNullOrWhiteSpace(data.SerialNumber) || data.SerialNumber.Contains("Detecting")
-                ? "UNKNOWN"
-                : data.SerialNumber.Trim();
-
-            string pdfPath = targetPath;
-            if (string.IsNullOrWhiteSpace(pdfPath))
+                var store = new QcRunStore();
+                summary = store.GetRunSummary(data.RunId);
+            }
+            if (summary == null && QcRunOrchestrator.Instance.IsRunActive)
             {
-                string desktopDir = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.DesktopDirectory), "Velox_Certificates");
-                Directory.CreateDirectory(desktopDir);
-                pdfPath = Path.Combine(desktopDir, $"Velox_Certificate_{cleanSerial}_{summary.RunId}.pdf");
+                summary = QcRunOrchestrator.Instance.GetCurrentSummary();
             }
 
+            if (summary == null)
+            {
+                throw new InvalidOperationException("Cannot generate certificate: No QC Run found for this unit.");
+            }
+
+            if (summary.Status != QcRunStatus.Completed)
+            {
+                throw new InvalidOperationException($"Cannot generate certificate: QC Run '{summary.RunId}' is in state '{summary.Status}'. All mandatory tests must be passed or approved overrides.");
+            }
+
+            if (!QcRunOrchestrator.VerifyRunTamper(summary))
+            {
+                throw new InvalidOperationException("Cannot generate certificate: Verification hash mismatch! The recorded run data has been modified.");
+            }
+
+            // Sync verified metadata from summary
+            data.RunSummary = summary;
+            data.RunId = summary.RunId;
+            data.PhysicalGrade = summary.Grade;
+            if (!string.IsNullOrEmpty(summary.SerialNumber))
+            {
+                data.SerialNumber = summary.SerialNumber;
+            }
+            if (!string.IsNullOrEmpty(summary.Model))
+            {
+                data.Model = summary.Model;
+            }
+            if (!string.IsNullOrEmpty(summary.Technician))
+            {
+                data.TechnicianName = summary.Technician;
+            }
+
+            if (string.IsNullOrWhiteSpace(data.AssetTag) && !string.IsNullOrWhiteSpace(summary.AssetTag))
+            {
+                data.AssetTag = summary.AssetTag;
+            }
+
+            try
+            {
+                var store = new QcRunStore();
+                var asset = store.FindAssetBySerialOrTag(!string.IsNullOrWhiteSpace(data.AssetTag) ? data.AssetTag : data.SerialNumber);
+                if (asset != null)
+                {
+                    if (string.IsNullOrWhiteSpace(data.AssetTag)) data.AssetTag = asset.AssetTag;
+                    if (!string.IsNullOrWhiteSpace(asset.IntakeTechnician)) data.IntakeTechnician = asset.IntakeTechnician;
+                    if (!string.IsNullOrWhiteSpace(asset.ServiceTechnician)) data.ServiceTechnician = asset.ServiceTechnician;
+                    if (!string.IsNullOrWhiteSpace(asset.QcTechnician)) data.QcTechnician = asset.QcTechnician;
+                    if (!string.IsNullOrWhiteSpace(asset.ApprovalTechnician)) data.ApprovalTechnician = asset.ApprovalTechnician;
+                    if (!string.IsNullOrWhiteSpace(asset.MissingComponents)) data.MissingComponents = asset.MissingComponents;
+                }
+            }
+            catch { }
+
+            string cleanSerial = string.IsNullOrWhiteSpace(data.SerialNumber) || data.SerialNumber.Contains("Detecting")
+                ? (string.IsNullOrWhiteSpace(summary.AssetTag) ? "UNKNOWN" : summary.AssetTag)
+                : data.SerialNumber.Trim();
+
+
+            string desktopDir = Environment.GetFolderPath(Environment.SpecialFolder.DesktopDirectory);
+            string pdfPath = Path.Combine(desktopDir, $"SuperAutoMater_Certificate_{cleanSerial}_{summary.RunId.Substring(0, 8)}.pdf");
+
             // Generate QR Code image bytes
-            byte[] qrImageBytes = GenerateQrCodeBytes(data.CloudAuditUrl ?? "https://velox-api-production.up.railway.app");
+            byte[] qrImageBytes = GenerateQrCodeBytes(data.CloudAuditUrl);
 
             // Construct PDF 1.4 stream
             byte[] pdfBytes = BuildPdfStream(data, summary, qrImageBytes);
             File.WriteAllBytes(pdfPath, pdfBytes);
 
-            AppLogger.Info($"Generated verified Velox QC certificate at {pdfPath} for run {summary.RunId}");
+            AppLogger.Info($"Generated verified QC certificate at {pdfPath} for run {summary.RunId}");
             return pdfPath;
         }
 
@@ -109,7 +159,7 @@ namespace VeloxBench.Services
             }
             catch (Exception ex)
             {
-                AppLogger.Error($"Failed to open certificate PDF at {pdfPath}", ex);
+                AppLogger.Warn($"Failed to open certificate PDF at {pdfPath}", ex);
             }
         }
 
@@ -118,7 +168,7 @@ namespace VeloxBench.Services
             try
             {
                 using (var qrGen = new QRCodeGenerator())
-                using (var qrData = qrGen.CreateQrCode(url, QRCodeGenerator.ECCLevel.M))
+                using (var qrData = qrGen.CreateQrCode(url ?? GoogleSheetsDispatcher.DefaultSheetsUrl, QRCodeGenerator.ECCLevel.M))
                 using (var qrCode = new PngByteQRCode(qrData))
                 {
                     return qrCode.GetGraphic(4);
@@ -126,7 +176,7 @@ namespace VeloxBench.Services
             }
             catch (Exception ex)
             {
-                AppLogger.Error("Failed to generate QR code bytes for certificate", ex);
+                AppLogger.Warn("Failed to generate QR code bytes for certificate", ex);
                 return null;
             }
         }

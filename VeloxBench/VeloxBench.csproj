@@ -3,15 +3,15 @@
 	<PropertyGroup>
 		<OutputType>WinExe</OutputType>
 		<TargetFramework>net10.0-windows</TargetFramework>
-		<Nullable>enable</Nullable>
+		<Nullable>disable</Nullable>
 		<UseWPF>true</UseWPF>
 		<UseWindowsForms>true</UseWindowsForms>
 		<AssemblyName>VeloxBench</AssemblyName>
-		<Product>VeloxBench — Precision Diagnostic &amp; Refurbishment Engine</Product>
+		<Product>VeloxBench — Hardware Diagnostic &amp; QC Cockpit</Product>
 		<Company>Velox Depot Systems</Company>
-		<Version>1.0.0</Version>
-		<AssemblyVersion>1.0.0.0</AssemblyVersion>
-		<FileVersion>1.0.0.0</FileVersion>
+		<Version>1.6.10</Version>
+		<AssemblyVersion>1.6.10.0</AssemblyVersion>
+		<FileVersion>1.6.10.0</FileVersion>
 		<ApplicationIcon>app.ico</ApplicationIcon>
 		<NoWarn>NU1701;WFO1000;NU1903</NoWarn>
 
@@ -43,6 +43,14 @@
 			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
 			<TargetPath>lib\%(RecursiveDir)%(Filename)%(Extension)</TargetPath>
 		</None>
+		<None Include="test_audio.mp3" Condition="Exists('test_audio.mp3')">
+			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+			<TargetPath>lib\test_audio.mp3</TargetPath>
+		</None>
+		<None Include="test_audio.wav" Condition="Exists('test_audio.wav')">
+			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+			<TargetPath>lib\test_audio.wav</TargetPath>
+		</None>
 	</ItemGroup>
 
 	<ItemGroup>
@@ -56,6 +64,8 @@
 		<PackageReference Include="Microsoft.Data.Sqlite" Version="10.0.0" />
 		<PackageReference Include="QRCoder" Version="1.8.0" />
 		<PackageReference Include="System.Management" Version="10.0.10" />
+		<PackageReference Include="ZXing.Net" Version="0.16.11" />
+		<PackageReference Include="ZXing.Net.Bindings.Windows.Compatibility" Version="0.16.16" />
 	</ItemGroup>
 
 </Project>

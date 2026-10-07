@@ -1,4 +1,4 @@
-<Window x:Class="VeloxBench.Views.DisplayTestWindow"
+<Window x:Class="SuperAutoMater.Wpf.Views.DisplayTestWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         Title="Advanced Display &amp; Panel Diagnostic Lab"
@@ -35,11 +35,12 @@
                 Background="#E6161B22"
                 BorderBrush="#388BFD"
                 BorderThickness="1.5"
-                CornerRadius="10"
+                CornerRadius="12"
                 Padding="16,10"
                 HorizontalAlignment="Center"
                 VerticalAlignment="Bottom"
-                Margin="0,0,0,24">
+                Margin="0,0,0,24"
+                Effect="{StaticResource EffectCardShadow}">
             <StackPanel>
                 <DockPanel LastChildFill="False" Margin="0,0,0,6">
                     <StackPanel Orientation="Horizontal" DockPanel.Dock="Left" VerticalAlignment="Center">
@@ -48,8 +49,8 @@
                     </StackPanel>
 
                     <StackPanel Orientation="Horizontal" DockPanel.Dock="Right" VerticalAlignment="Center">
-                        <Button x:Name="BtnLaunchTouch" Content="👆 TOUCH DIGITIZER" Background="#21262D" Foreground="#F0F6FC" BorderBrush="#30363D" BorderThickness="1" Click="BtnLaunchTouch_Click" Padding="8,3" FontSize="10" Margin="0,0,8,0" Cursor="Hand"/>
-                        <Button Content="✓ PASS DISPLAY [ENTER]" Background="#238636" Foreground="#FFFFFF" BorderBrush="#2EA043" BorderThickness="1" Click="BtnPass_Click" Padding="12,4" FontSize="10" FontWeight="Bold" Cursor="Hand"/>
+                        <Button x:Name="BtnLaunchTouch" Content="👆 TOUCH DIGITIZER" Style="{StaticResource StyleDarkActionBtn}" Click="BtnLaunchTouch_Click" Padding="8,3" FontSize="10" Margin="0,0,8,0"/>
+                        <Button Content="✓ PASS DISPLAY [ENTER]" Style="{StaticResource StyleCloudPassButton}" Click="BtnPass_Click" Padding="12,4" FontSize="10"/>
                     </StackPanel>
                 </DockPanel>
 

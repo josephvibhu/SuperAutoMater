@@ -6,9 +6,9 @@ using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Shapes;
 using System.Windows.Threading;
-using VeloxBench.Services;
+using SuperAutoMater.Wpf.Services;
 
-namespace VeloxBench.Views
+namespace SuperAutoMater.Wpf.Views
 {
     public partial class DisplayTestWindow : Window
     {
@@ -33,10 +33,10 @@ namespace VeloxBench.Views
         private DisplayStage _currentStage = DisplayStage.SolidWhite;
         private const int TOTAL_STAGES = 14;
 
-        private DispatcherTimer? _hudTimer;
-        private DispatcherTimer? _motionTimer;
+        private DispatcherTimer _hudTimer;
+        private DispatcherTimer _motionTimer;
         private double _motionBarX = 0;
-        private Rectangle? _motionRect;
+        private Rectangle _motionRect;
         public bool TestPassed { get; private set; } = false;
 
         public DisplayTestWindow()
@@ -62,7 +62,14 @@ namespace VeloxBench.Views
 
         private void DisplayTestWindow_Loaded(object sender, RoutedEventArgs e)
         {
-            BtnLaunchTouch.Visibility = Visibility.Visible;
+            if (HardwareDiagnosticsService.Instance.HasTouchscreen)
+            {
+                BtnLaunchTouch.Visibility = Visibility.Visible;
+            }
+            else
+            {
+                BtnLaunchTouch.Visibility = Visibility.Visible; // Technician can still launch touch test
+            }
 
             DisplayTimingService.Instance.StartMeasurement();
             DisplayTimingService.Instance.TimingUpdated += OnDisplayTimingUpdated;
@@ -71,7 +78,7 @@ namespace VeloxBench.Views
             ShowHud();
         }
 
-        private void DisplayTestWindow_Closed(object? sender, EventArgs e)
+        private void DisplayTestWindow_Closed(object sender, EventArgs e)
         {
             DisplayTimingService.Instance.TimingUpdated -= OnDisplayTimingUpdated;
             DisplayTimingService.Instance.StopMeasurement();
@@ -84,11 +91,7 @@ namespace VeloxBench.Views
             Dispatcher.InvokeAsync(() =>
             {
                 TxtRefreshRate.Text = $"{stats.MeasuredHz:F1} Hz PANEL";
-                try
-                {
-                    TxtRefreshRate.Foreground = new SolidColorBrush((Color)ColorConverter.ConvertFromString(stats.AccentHex));
-                }
-                catch { }
+                TxtRefreshRate.Foreground = new SolidColorBrush((Color)ColorConverter.ConvertFromString(stats.AccentHex));
                 TxtTimingDetails.Text = $"{stats.ResolutionWidth}x{stats.ResolutionHeight} · {stats.JitterMs:F2}ms Jitter · {stats.DroppedFrames} Drops";
             }, DispatcherPriority.Render);
         }
@@ -107,7 +110,7 @@ namespace VeloxBench.Views
             TxtStageIndex.Text = $"STAGE {idx}/{TOTAL_STAGES}";
 
             DisplayCanvas.Children.Clear();
-            _motionTimer?.Stop();
+            _motionTimer.Stop();
 
             double w = ActualWidth > 100 ? ActualWidth : 1920;
             double h = ActualHeight > 100 ? ActualHeight : 1080;
@@ -196,8 +199,8 @@ namespace VeloxBench.Views
         {
             var faintBorder = new Rectangle
             {
-                Width = Math.Max(10, w - 40),
-                Height = Math.Max(10, h - 40),
+                Width = w - 40,
+                Height = h - 40,
                 Stroke = new SolidColorBrush(Color.FromArgb(40, 255, 255, 255)),
                 StrokeThickness = 1
             };
@@ -226,9 +229,10 @@ namespace VeloxBench.Views
         private void DrawGrayscaleGamma(double w, double h)
         {
             double pad = 50;
-            double sectionH = Math.Max(20, (h - pad * 3.5) / 2.0);
-            double sectionW = Math.Max(20, w - pad * 2);
+            double sectionH = (h - pad * 3.5) / 2.0;
+            double sectionW = w - pad * 2;
 
+            // 1. Continuous Smooth Ramp
             var gradBrush = new LinearGradientBrush(Colors.Black, Colors.White, 0);
             var smoothRect = new Rectangle
             {
@@ -242,6 +246,7 @@ namespace VeloxBench.Views
             Canvas.SetTop(smoothRect, pad);
             DisplayCanvas.Children.Add(smoothRect);
 
+            // 2. Discrete 16-Step Blocks
             int steps = 16;
             double blockW = sectionW / steps;
             double stepY = pad * 2 + sectionH;
@@ -280,13 +285,17 @@ namespace VeloxBench.Views
         {
             double pad = 40;
             int barCount = 4;
-            double barH = Math.Max(20, (h - pad * (barCount + 1.5)) / barCount);
-            double barW = Math.Max(20, w - pad * 2);
+            double barH = (h - pad * (barCount + 1.5)) / barCount;
+            double barW = w - pad * 2;
 
+            // Red
             AddColorBar(pad, pad + 0 * (barH + pad), barW, barH, Colors.Black, Colors.Red, "RED DYNAMIC RANGE (0-255)");
+            // Green
             AddColorBar(pad, pad + 1 * (barH + pad), barW, barH, Colors.Black, Colors.Lime, "GREEN DYNAMIC RANGE (0-255)");
+            // Blue
             AddColorBar(pad, pad + 2 * (barH + pad), barW, barH, Colors.Black, Colors.Blue, "BLUE DYNAMIC RANGE (0-255)");
 
+            // Rainbow Spectrum
             var rainbowBrush = new LinearGradientBrush();
             rainbowBrush.StartPoint = new Point(0, 0);
             rainbowBrush.EndPoint = new Point(1, 0);
@@ -360,10 +369,11 @@ namespace VeloxBench.Views
                 DisplayCanvas.Children.Add(l);
             }
 
+            // Outer Perimeter Overscan Box (Red)
             var outer = new Rectangle
             {
-                Width = Math.Max(10, w - 4),
-                Height = Math.Max(10, h - 4),
+                Width = w - 4,
+                Height = h - 4,
                 Stroke = Brushes.Red,
                 StrokeThickness = 2
             };
@@ -371,6 +381,7 @@ namespace VeloxBench.Views
             Canvas.SetTop(outer, 2);
             DisplayCanvas.Children.Add(outer);
 
+            // Concentric Aspect Ratio Circles
             double cx = w / 2;
             double cy = h / 2;
             double[] radii = { 120, 240, 360, 480 };
@@ -391,6 +402,7 @@ namespace VeloxBench.Views
                 }
             }
 
+            // Center Crosshair
             var ch1 = new Line { X1 = cx - 40, Y1 = cy, X2 = cx + 40, Y2 = cy, Stroke = Brushes.Yellow, StrokeThickness = 2 };
             var ch2 = new Line { X1 = cx, Y1 = cy - 40, X2 = cx, Y2 = cy + 40, Stroke = Brushes.Yellow, StrokeThickness = 2 };
             DisplayCanvas.Children.Add(ch1);
@@ -408,7 +420,7 @@ namespace VeloxBench.Views
                 "12pt :: The quick brown fox jumps over the lazy dog. 0123456789 ABCDEFGHIJKLMNOPQRSTUVWXYZ",
                 "14pt :: The quick brown fox jumps over the lazy dog. 0123456789 ABCDEFGHIJKLMNOPQRSTUVWXYZ",
                 "18pt :: Subpixel ClearType Optical Crispness & Aliasing Verification (RGB Pattern)",
-                "24pt :: VELOXBENCH PRECISION QC DISPLAY LABORATORY"
+                "24pt :: SUPERAUTOMATER QC DISPLAY LABORATORY"
             };
             double[] sizes = { 8, 11, 13, 16, 18, 24, 32 };
 
@@ -437,7 +449,7 @@ namespace VeloxBench.Views
             _motionRect = new Rectangle
             {
                 Width = 140,
-                Height = Math.Max(20, h * 0.6),
+                Height = h * 0.6,
                 Fill = Brushes.White,
                 Stroke = Brushes.Cyan,
                 StrokeThickness = 2
@@ -446,10 +458,10 @@ namespace VeloxBench.Views
             Canvas.SetTop(_motionRect, h * 0.2);
             DisplayCanvas.Children.Add(_motionRect);
 
-            _motionTimer?.Start();
+            _motionTimer.Start();
         }
 
-        private void MotionTimer_Tick(object? sender, EventArgs e)
+        private void MotionTimer_Tick(object sender, EventArgs e)
         {
             if (_currentStage != DisplayStage.MotionGhosting || _motionRect == null) return;
 
@@ -458,6 +470,8 @@ namespace VeloxBench.Views
             if (_motionBarX > w + 150) _motionBarX = -150;
 
             Canvas.SetLeft(_motionRect, _motionBarX);
+
+            // Measured frame rate is maintained with microsecond precision via DisplayTimingService
         }
 
         private void NextStage()

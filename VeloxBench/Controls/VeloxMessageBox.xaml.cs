@@ -3,7 +3,7 @@ using System.Windows;
 using System.Windows.Input;
 using System.Windows.Media;
 
-namespace VeloxBench.Controls;
+namespace SuperAutoMater.Wpf.Controls;
 
 public partial class VeloxMessageBox : Window
 {

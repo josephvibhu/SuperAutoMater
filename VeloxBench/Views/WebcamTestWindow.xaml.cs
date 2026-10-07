@@ -1,25 +1,18 @@
 using System;
 using System.Drawing;
 using System.Media;
-using System.Runtime.InteropServices;
+using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
-using System.Windows.Interop;
-using System.Windows.Media.Imaging;
-using System.Windows.Threading;
 using AForge.Video;
 using AForge.Video.DirectShow;
 
-namespace VeloxBench.Views
+namespace SuperAutoMater.Wpf.Views
 {
     public partial class WebcamTestWindow : Window
     {
-        [DllImport("gdi32.dll")]
-        [return: MarshalAs(UnmanagedType.Bool)]
-        private static extern bool DeleteObject(IntPtr hObject);
-
-        private FilterInfoCollection? _videoDevices;
-        private VideoCaptureDevice? _videoSource;
+        private FilterInfoCollection _videoDevices;
+        private VideoCaptureDevice _videoSource;
         public bool TestPassed { get; private set; } = false;
 
         public WebcamTestWindow()
@@ -52,7 +45,7 @@ namespace VeloxBench.Views
                     StackNoCamera.Visibility = Visibility.Visible;
                     TxtNoCameraMsg.Text = "No webcam or video capture sensors detected.";
                     TxtStatus.Text = "○ NO CAMERA DETECTED";
-                    TxtStatus.Foreground = new System.Windows.Media.SolidColorBrush((System.Windows.Media.Color)System.Windows.Media.ColorConverter.ConvertFromString("#D29922"));
+                    TxtStatus.Foreground = (System.Windows.Media.Brush)FindResource("BrushTextAmber");
                     return;
                 }
 
@@ -90,7 +83,7 @@ namespace VeloxBench.Views
 
                 StackNoCamera.Visibility = Visibility.Collapsed;
                 TxtStatus.Text = "● SENSOR STREAM ACTIVE";
-                TxtStatus.Foreground = new System.Windows.Media.SolidColorBrush((System.Windows.Media.Color)System.Windows.Media.ColorConverter.ConvertFromString("#3FB950"));
+                TxtStatus.Foreground = (System.Windows.Media.Brush)FindResource("BrushTextEmerald");
 
                 if (_videoSource.VideoCapabilities != null && _videoSource.VideoCapabilities.Length > 0)
                 {
@@ -109,26 +102,9 @@ namespace VeloxBench.Views
         {
             try
             {
-                using var bitmap = (Bitmap)eventArgs.Frame.Clone();
-                IntPtr hBitmap = bitmap.GetHbitmap();
-                try
-                {
-                    var bitmapSource = Imaging.CreateBitmapSourceFromHBitmap(
-                        hBitmap,
-                        IntPtr.Zero,
-                        Int32Rect.Empty,
-                        BitmapSizeOptions.FromEmptyOptions());
-                    bitmapSource.Freeze();
-
-                    Dispatcher.InvokeAsync(() =>
-                    {
-                        ImgCameraFeed.Source = bitmapSource;
-                    }, DispatcherPriority.Render);
-                }
-                finally
-                {
-                    DeleteObject(hBitmap);
-                }
+                var old = PicCameraFeed.Image;
+                PicCameraFeed.Image = (Bitmap)eventArgs.Frame.Clone();
+                old?.Dispose();
             }
             catch { }
         }
@@ -145,15 +121,12 @@ namespace VeloxBench.Views
                 }
                 catch { }
             }
-            Dispatcher.InvokeAsync(() =>
-            {
-                ImgCameraFeed.Source = null;
-            });
         }
 
-        private void WebcamTestWindow_Closed(object? sender, EventArgs e)
+        private void WebcamTestWindow_Closed(object sender, EventArgs e)
         {
             StopCamera();
+            PicCameraFeed.Image?.Dispose();
         }
 
         private void BtnPass_Click(object sender, RoutedEventArgs e)

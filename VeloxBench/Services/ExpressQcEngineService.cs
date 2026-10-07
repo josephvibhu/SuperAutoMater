@@ -18,10 +18,9 @@ using AForge.Video;
 using AForge.Video.DirectShow;
 using NAudio.Wave;
 using NAudio.CoreAudioApi;
-using VeloxBench.Core;
-using VeloxBench.ViewModels;
+using SuperAutoMater.Wpf.ViewModels;
 
-namespace VeloxBench.Services
+namespace SuperAutoMater.Wpf.Services
 {
     public enum ExpressTestStatus
     {
@@ -32,63 +31,25 @@ namespace VeloxBench.Services
         Failed
     }
 
-    public class ExpressSubsystemResult : System.ComponentModel.INotifyPropertyChanged
+    public class ExpressSubsystemResult
     {
-        private string _key = "";
-        public string Key { get => _key; set { _key = value; OnPropertyChanged(); } }
-
-        private string _name = "";
-        public string Name { get => _name; set { _name = value; OnPropertyChanged(); } }
-
-        private string _icon = "";
-        public string Icon { get => _icon; set { _icon = value; OnPropertyChanged(); } }
-
-        private string _hotkeyText = "";
-        public string HotkeyText { get => _hotkeyText; set { _hotkeyText = value; OnPropertyChanged(); } }
-
-        private ExpressTestStatus _status = ExpressTestStatus.Pending;
-        public ExpressTestStatus Status
-        {
-            get => _status;
-            set
-            {
-                _status = value;
-                OnPropertyChanged();
-                OnPropertyChanged(nameof(StatusBadge));
-                OnPropertyChanged(nameof(AccentHex));
-                OnPropertyChanged(nameof(IsPassed));
-                OnPropertyChanged(nameof(IsRunning));
-            }
-        }
-
-        private string _headline = "Queued...";
-        public string Headline { get => _headline; set { _headline = value; OnPropertyChanged(); } }
-
-        private string _detail = "";
-        public string Detail { get => _detail; set { _detail = value; OnPropertyChanged(); } }
-
-        private string _metricValue = "--";
-        public string MetricValue { get => _metricValue; set { _metricValue = value; OnPropertyChanged(); } }
-
-        private BitmapSource? _snapshotImage;
-        public BitmapSource? SnapshotImage { get => _snapshotImage; set { _snapshotImage = value; OnPropertyChanged(); } }
-
-        private float _signalLevel = 0f;
-        public float SignalLevel { get => _signalLevel; set { _signalLevel = value; OnPropertyChanged(); } }
-
-        private bool _isSelected;
-        public bool IsSelected { get => _isSelected; set { _isSelected = value; OnPropertyChanged(); } }
-
-        public bool IsPassed => Status == ExpressTestStatus.Passed;
-        public bool IsRunning => Status == ExpressTestStatus.Running;
+        public string Key { get; set; }
+        public string Name { get; set; }
+        public string Icon { get; set; }
+        public ExpressTestStatus Status { get; set; } = ExpressTestStatus.Pending;
+        public string Headline { get; set; } = "Queued...";
+        public string Detail { get; set; } = "";
+        public string MetricValue { get; set; } = "--";
+        public BitmapSource SnapshotImage { get; set; }
+        public float SignalLevel { get; set; } = 0f;
 
         public string StatusBadge => Status switch
         {
-            ExpressTestStatus.Passed => "[PASS]",
-            ExpressTestStatus.Warning => "[WARN]",
-            ExpressTestStatus.Failed => "[FAIL]",
-            ExpressTestStatus.Running => "[RUN]",
-            _ => "[--]"
+            ExpressTestStatus.Passed => "✓ NOMINAL",
+            ExpressTestStatus.Warning => "⚠ WARNING",
+            ExpressTestStatus.Failed => "✕ FAILED",
+            ExpressTestStatus.Running => "⚡ TESTING...",
+            _ => "● QUEUED"
         };
 
         public string AccentHex => Status switch
@@ -99,10 +60,6 @@ namespace VeloxBench.Services
             ExpressTestStatus.Running => "#58A6FF",
             _ => "#8B949E"
         };
-
-        public event System.ComponentModel.PropertyChangedEventHandler? PropertyChanged;
-        protected void OnPropertyChanged([System.Runtime.CompilerServices.CallerMemberName] string? name = null) =>
-            PropertyChanged?.Invoke(this, new System.ComponentModel.PropertyChangedEventArgs(name));
     }
 
     public enum QcProfile
@@ -169,15 +126,14 @@ namespace VeloxBench.Services
             var report = new ExpressQcFullReport
             {
                 ProfileUsed = profile,
-                TechnicianName = string.IsNullOrWhiteSpace(techName) ? (vm?.AssignedTechnician ?? "Technician") : techName
+                TechnicianName = string.IsNullOrWhiteSpace(techName) ? TechnicianProfileService.Instance.CurrentProfile.Name : techName
             };
             var results = new Dictionary<string, ExpressSubsystemResult>();
 
-            // Initialize all 10 subsystem cards in pending state
-            string[] keys = { "Camera", "Mic", "Speaker", "Storage", "CpuRam", "Battery", "Display", "Network", "Keyboard", "Fingerprint" };
-            string[] names = { "Webcam Optics", "Mic Array", "Stereo Speakers", "Storage NVMe", "CPU & RAM", "Battery Power", "Display VSync", "Wi-Fi & Bluetooth", "Keyboard & Trackpad", "Fingerprint Sensor" };
-            string[] icons = { "📷", "🎤", "🔊", "💾", "⚡", "🔋", "🖥", "📶", "⌨", "👆" };
-            string[] hotkeys = { "[F1]", "[F2]", "[F3]", "[F4]", "[F6]", "[F7]", "[F8]", "[F9]", "[F10]", "[F11]" };
+            // Initialize all 8 subsystem cards in pending state
+            string[] keys = { "Camera", "Mic", "Speaker", "Storage", "CpuRam", "Battery", "Display", "Network" };
+            string[] names = { "Webcam Optics", "Mic Array", "Stereo Speakers", "Storage NVMe", "CPU & RAM", "Battery Power", "Display VSync", "Wi-Fi & Bluetooth" };
+            string[] icons = { "📷", "🎤", "🔊", "💾", "⚡", "🔋", "🖥", "📶" };
 
             for (int i = 0; i < keys.Length; i++)
             {
@@ -186,7 +142,6 @@ namespace VeloxBench.Services
                     Key = keys[i],
                     Name = names[i],
                     Icon = icons[i],
-                    HotkeyText = hotkeys[i],
                     Status = ExpressTestStatus.Pending,
                     Headline = "Queued for automated audit..."
                 };
@@ -423,28 +378,6 @@ namespace VeloxBench.Services
                 SubsystemUpdated?.Invoke(netResult);
 
                 // ==============================================================
-                // STAGE 9: KEYBOARD MATRIX & TRACKPAD HARDWARE SCAN
-                // ==============================================================
-                ReportProgress(97, "Probing keyboard controller & trackpad interface...");
-                var kbResult = results["Keyboard"];
-                kbResult.Status = ExpressTestStatus.Running;
-                SubsystemUpdated?.Invoke(kbResult);
-
-                await TestKeyboardAsync(kbResult, token);
-                SubsystemUpdated?.Invoke(kbResult);
-
-                // ==============================================================
-                // STAGE 10: BIOMETRIC FINGERPRINT SENSOR
-                // ==============================================================
-                ReportProgress(99, "Probing Windows Biometric Framework sensor...");
-                var fpResult = results["Fingerprint"];
-                fpResult.Status = ExpressTestStatus.Running;
-                SubsystemUpdated?.Invoke(fpResult);
-
-                await TestFingerprintAsync(fpResult, token);
-                SubsystemUpdated?.Invoke(fpResult);
-
-                // ==============================================================
                 // FINAL: SMART QC GRADING CALCULATION
                 // ==============================================================
                 CalculateSmartGrade(report);
@@ -471,82 +404,6 @@ namespace VeloxBench.Services
             }
         }
 
-        public async Task RunSingleSubsystemAsync(string key, MainViewModel vm, CancellationToken token = default)
-        {
-            if (vm == null || string.IsNullOrWhiteSpace(key)) return;
-            var sub = vm.Subsystems.FirstOrDefault(s => string.Equals(s.Key, key, StringComparison.OrdinalIgnoreCase));
-            if (sub == null) return;
-
-            sub.Status = ExpressTestStatus.Running;
-            sub.Headline = "Executing on-demand subsystem diagnostic...";
-            SubsystemUpdated?.Invoke(sub);
-
-            try
-            {
-                switch (key.ToLowerInvariant())
-                {
-                    case "camera":
-                        ReportProgress(20, "Auditing webcam sensor, optical lens & frame capture...");
-                        await TestCameraAsync(sub, token);
-                        break;
-                    case "mic":
-                        ReportProgress(30, "Sampling microphone array transduction & noise floor...");
-                        await TestMicrophoneAsync(sub, token);
-                        break;
-                    case "speaker":
-                        ReportProgress(40, "Playing calibrated acoustic chirp sweep & loopback...");
-                        await TestSpeakerLoopbackAsync(sub, token);
-                        break;
-                    case "storage":
-                        ReportProgress(50, "Benchmarking storage S.M.A.R.T. & I/O throughput...");
-                        await TestStorageAsync(sub, vm, token);
-                        break;
-                    case "cpuram":
-                        ReportProgress(60, "Executing CPU multi-core & RAM cell audit...");
-                        await TestCpuRamAsync(sub, token);
-                        break;
-                    case "battery":
-                        ReportProgress(70, "Auditing battery degradation, mWh capacity & AC flow...");
-                        await TestBatteryAsync(sub, vm, token);
-                        break;
-                    case "display":
-                        ReportProgress(80, "Profiling display VSync refresh rate & jitter...");
-                        await TestDisplayAsync(sub, token);
-                        break;
-                    case "network":
-                        ReportProgress(90, "Verifying Wi-Fi adapter, gateway routing & BT...");
-                        await TestNetworkAsync(sub, vm, token);
-                        break;
-                    case "keyboard":
-                        ReportProgress(94, "Probing keyboard and pointing hardware...");
-                        await TestKeyboardAsync(sub, token);
-                        break;
-                    case "fingerprint":
-                        ReportProgress(97, "Probing biometric fingerprint sensor...");
-                        await TestFingerprintAsync(sub, token);
-                        break;
-                    default:
-                        sub.Status = ExpressTestStatus.Warning;
-                        sub.Headline = $"Unknown subsystem: {key}";
-                        break;
-                }
-            }
-            catch (OperationCanceledException)
-            {
-                sub.Status = ExpressTestStatus.Warning;
-                sub.Headline = "Subsystem test aborted";
-            }
-            catch (Exception ex)
-            {
-                sub.Status = ExpressTestStatus.Failed;
-                sub.Headline = "Subsystem test exception";
-                sub.Detail = ex.Message;
-            }
-            finally
-            {
-                SubsystemUpdated?.Invoke(sub);
-            }
-        }
 
         public void Cancel()
         {
@@ -1259,76 +1116,6 @@ namespace VeloxBench.Services
                     res.MetricValue = "Online";
                 }
             }, token);
-        }
-
-        // ====================================================================
-        // 9. KEYBOARD & TRACKPAD INTERFACE SCAN
-        // ====================================================================
-        private async Task TestKeyboardAsync(ExpressSubsystemResult res, CancellationToken token)
-        {
-            await Task.Run(() =>
-            {
-                try
-                {
-                    int kbCount = 0;
-                    using (var searcher = new ManagementObjectSearcher("SELECT Name FROM Win32_Keyboard"))
-                    using (var col = searcher.Get())
-                    {
-                        kbCount = col.Count;
-                    }
-
-                    int mouseCount = 0;
-                    using (var searcher = new ManagementObjectSearcher("SELECT Name FROM Win32_PointingDevice"))
-                    using (var col = searcher.Get())
-                    {
-                        mouseCount = col.Count;
-                    }
-
-                    res.Status = ExpressTestStatus.Passed;
-                    res.Headline = "✓ KEYBOARD & TRACKPAD CONTROLLERS DETECTED";
-                    res.Detail = $"{kbCount} Keyboard / {mouseCount} Pointing interface(s) online. Press [F10] to launch interactive heatmap & puck tester.";
-                    res.MetricValue = $"{kbCount} Kb / {mouseCount} Ptr";
-                }
-                catch (Exception ex)
-                {
-                    res.Status = ExpressTestStatus.Passed;
-                    res.Headline = "✓ KEYBOARD & TRACKPAD READY";
-                    res.Detail = "Controller active. Interactive testing available via [F10].";
-                    res.MetricValue = "Ready";
-                }
-            }, token);
-        }
-
-        // ====================================================================
-        // 10. BIOMETRIC FINGERPRINT SENSOR PROBE
-        // ====================================================================
-        private async Task TestFingerprintAsync(ExpressSubsystemResult res, CancellationToken token)
-        {
-            try
-            {
-                var info = await FingerprintService.Instance.ProbeSensorAsync();
-                if (info.HasSensor)
-                {
-                    res.Status = ExpressTestStatus.Passed;
-                    res.Headline = $"✓ BIOMETRIC SENSOR DETECTED ({info.Name})";
-                    res.Detail = $"{info.Manufacturer} ({info.Source}) · Unit #{info.UnitId}. Press [F11] to verify physical touch.";
-                    res.MetricValue = "Online";
-                }
-                else
-                {
-                    res.Status = ExpressTestStatus.Passed;
-                    res.Headline = "○ NO BIOMETRIC SENSOR DETECTED";
-                    res.Detail = "No WBF/PnP fingerprint hardware detected on this chassis (Not equipped).";
-                    res.MetricValue = "N/A";
-                }
-            }
-            catch (Exception ex)
-            {
-                res.Status = ExpressTestStatus.Passed;
-                res.Headline = "○ FINGERPRINT PROBE COMPLETE";
-                res.Detail = ex.Message;
-                res.MetricValue = "N/A";
-            }
         }
 
         // ====================================================================

@@ -4,7 +4,7 @@ using System.Diagnostics;
 using System.Runtime.InteropServices;
 using System.Windows.Media;
 
-namespace VeloxBench.Services
+namespace SuperAutoMater.Wpf.Services
 {
     public class DisplayTimingStats
     {

@@ -3,7 +3,7 @@ using System.IO;
 using System.Threading.Tasks;
 using NAudio.Wave;
 
-namespace VeloxBench.Services
+namespace SuperAutoMater.Wpf.Services
 {
     public class AcousticTestResult
     {

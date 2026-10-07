@@ -6,6 +6,7 @@ using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
 using Velox.Shared.Dtos;
+using SuperAutoMater.Wpf.Core;
 using VeloxBench.Core;
 
 namespace VeloxBench.Services;

@@ -4,18 +4,18 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
 using System.Windows.Media.Effects;
-using VeloxBench.Services;
+using SuperAutoMater.Wpf.Services;
 
-namespace VeloxBench.Controls
+namespace SuperAutoMater.Wpf.Controls
 {
     public partial class KeyboardMatrixControl : UserControl
     {
         private class KeyVisual
         {
             public int VkCode;
-            public string Label = "";
-            public Border BorderElem = null!;
-            public TextBlock TextElem = null!;
+            public string Label;
+            public Border BorderElem;
+            public TextBlock TextElem;
             public double Width;
             public bool IsTested;
             public bool IsPressed;
@@ -27,15 +27,7 @@ namespace VeloxBench.Controls
         private int _totalTargetKeys = 0;
         private bool _isNumpadVisible = false;
 
-        private readonly SolidColorBrush _brushPressedBg = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#1F6FEB"));
-        private readonly SolidColorBrush _brushTestedBg = new SolidColorBrush(Color.FromArgb(0x35, 0x2E, 0xA0, 0x43));
-        private readonly SolidColorBrush _brushTestedBorder = new SolidColorBrush(Color.FromArgb(0x80, 0x3F, 0xB9, 0x50));
-        private readonly SolidColorBrush _brushTestedText = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#3FB950"));
-        private readonly SolidColorBrush _brushDefaultBg = new SolidColorBrush(Color.FromRgb(0x16, 0x1B, 0x22));
-        private readonly SolidColorBrush _brushDefaultBorder = new SolidColorBrush(Color.FromRgb(0x26, 0x2C, 0x36));
-        private readonly SolidColorBrush _brushDefaultText = new SolidColorBrush(Color.FromRgb(0xC9, 0xD1, 0xD9));
-
-        public event Action<int, int>? ProgressChanged; // logged, total
+        public event Action<int, int> ProgressChanged; // logged, total
 
         public KeyboardMatrixControl()
         {
@@ -80,7 +72,7 @@ namespace VeloxBench.Controls
                 (0xBD, "-", 28), (0xBB, "=", 28), (0x08, "BKSP", 56)
             });
 
-            // Row 3: QWERTY
+            // Row 3: QWERTY (Fixed 'R' VK code to 0x52)
             AddRow(StackKeyRows, _keyMap, new (int, string, double)[]
             {
                 (0x09, "TAB", 44),
@@ -115,32 +107,40 @@ namespace VeloxBench.Controls
                 (0xA5, "ALT", 36), (0x5D, "MENU", 34), (0xA3, "CTRL", 40)
             });
 
-            // Dynamic Numpad & Navigation Block (Rows 1-6)
+            // ==============================================================
+            // DYNAMIC NUMPAD & NAVIGATION BLOCK (Rows 1-6)
+            // ==============================================================
+            // Numpad Row 1: NumLock, Divide, Multiply, Subtract
             AddRow(StackNumpadRows, _numpadKeyMap, new (int, string, double)[]
             {
                 (0x90, "NUM", 28), (0x6F, "/", 28), (0x6A, "*", 28), (0x6D, "-", 28)
             });
 
+            // Numpad Row 2: 7, 8, 9, Add
             AddRow(StackNumpadRows, _numpadKeyMap, new (int, string, double)[]
             {
                 (0x67, "7", 28), (0x68, "8", 28), (0x69, "9", 28), (0x6B, "+", 28)
             });
 
+            // Numpad Row 3: 4, 5, 6, [Add continuation / Clear]
             AddRow(StackNumpadRows, _numpadKeyMap, new (int, string, double)[]
             {
                 (0x64, "4", 28), (0x65, "5", 28), (0x66, "6", 28), (0x0C, "CLR", 28)
             });
 
+            // Numpad Row 4: 1, 2, 3, Enter
             AddRow(StackNumpadRows, _numpadKeyMap, new (int, string, double)[]
             {
                 (0x61, "1", 28), (0x62, "2", 28), (0x63, "3", 28), (0x0D, "ENT", 28)
             });
 
+            // Numpad Row 5: 0, Decimal, Up Arrow
             AddRow(StackNumpadRows, _numpadKeyMap, new (int, string, double)[]
             {
                 (0x60, "0", 58), (0x6E, ".", 28), (0x26, "▲", 28)
             });
 
+            // Numpad Row 6: Left, Down, Right, PageDown
             AddRow(StackNumpadRows, _numpadKeyMap, new (int, string, double)[]
             {
                 (0x25, "◀", 28), (0x28, "▼", 28), (0x27, "▶", 28), (0x22, "PDN", 28)
@@ -178,10 +178,10 @@ namespace VeloxBench.Controls
                 var txt = new TextBlock
                 {
                     Text = text,
-                    FontFamily = new FontFamily("Consolas"),
+                    FontFamily = (FontFamily)FindResource("FontMono"),
                     FontSize = 9,
                     FontWeight = FontWeights.Bold,
-                    Foreground = _brushDefaultText,
+                    Foreground = new SolidColorBrush(Color.FromRgb(0xC9, 0xD1, 0xD9)),
                     HorizontalAlignment = HorizontalAlignment.Center,
                     VerticalAlignment = VerticalAlignment.Center
                 };
@@ -191,8 +191,8 @@ namespace VeloxBench.Controls
                     Width = width,
                     Height = 26,
                     CornerRadius = new CornerRadius(4),
-                    Background = _brushDefaultBg,
-                    BorderBrush = _brushDefaultBorder,
+                    Background = new SolidColorBrush(Color.FromRgb(0x16, 0x1B, 0x22)),
+                    BorderBrush = new SolidColorBrush(Color.FromRgb(0x26, 0x2C, 0x36)),
                     BorderThickness = new Thickness(1),
                     Margin = new Thickness(1.5, 0, 1.5, 0),
                     Child = txt
@@ -231,10 +231,12 @@ namespace VeloxBench.Controls
                     TxtLastKey.Text = $"LAST KEY: {GetKeyLabel(vkCode)}";
                 }
 
+                // Remap general modifiers to Left versions
                 if (vkCode == 0x10) vkCode = 0xA0; // VK_LSHIFT
                 if (vkCode == 0x11) vkCode = 0xA2; // VK_LCONTROL
                 if (vkCode == 0x12) vkCode = 0xA4; // VK_LMENU
 
+                // Dynamically expand NumPad if ANY numpad or navigation key is pressed!
                 bool isNumpadActuation = (vkCode >= 0x60 && vkCode <= 0x6F) || vkCode == 0x90 ||
                                          vkCode == 0x25 || vkCode == 0x26 || vkCode == 0x27 || vkCode == 0x28;
                 if (isNumpadActuation && !_isNumpadVisible)
@@ -242,9 +244,11 @@ namespace VeloxBench.Controls
                     SetNumpadVisibility(true);
                 }
 
-                KeyVisual? key = null;
+                // Check in main keymap or numpad keymap
+                KeyVisual key = null;
                 if (!_keyMap.TryGetValue(vkCode, out key) && !_numpadKeyMap.TryGetValue(vkCode, out key))
                 {
+                    // Fallback alias for laptops where top row sends media codes instead of F1-F12
                     int mediaAlias = vkCode switch
                     {
                         0xAD => 0x70, // Mute -> F1
@@ -282,7 +286,7 @@ namespace VeloxBench.Controls
                 if (vkCode == 0x11) vkCode = 0xA2;
                 if (vkCode == 0x12) vkCode = 0xA4;
 
-                KeyVisual? key = null;
+                KeyVisual key = null;
                 if (!_keyMap.TryGetValue(vkCode, out key) && !_numpadKeyMap.TryGetValue(vkCode, out key))
                 {
                     int mediaAlias = vkCode switch
@@ -349,21 +353,27 @@ namespace VeloxBench.Controls
         {
             if (key.IsPressed)
             {
-                key.BorderElem.Background = _brushPressedBg;
-                key.BorderElem.BorderBrush = Brushes.White;
-                key.TextElem.Foreground = Brushes.White;
+                // Active pressed key: bright blue/white highlight
+                key.BorderElem.Background = (Brush)FindResource("BrushAccentBlue");
+                key.BorderElem.BorderBrush = new SolidColorBrush(Colors.White);
+                key.TextElem.Foreground = new SolidColorBrush(Colors.White);
+                key.BorderElem.Effect = (Effect)FindResource("EffectGlowEmerald");
             }
             else if (key.IsTested)
             {
-                key.BorderElem.Background = _brushTestedBg;
-                key.BorderElem.BorderBrush = _brushTestedBorder;
-                key.TextElem.Foreground = _brushTestedText;
+                // Tested emerald state
+                key.BorderElem.Background = new SolidColorBrush(Color.FromArgb(0x35, 0x2E, 0xA0, 0x43));
+                key.BorderElem.BorderBrush = new SolidColorBrush(Color.FromArgb(0x80, 0x3F, 0xB9, 0x50));
+                key.TextElem.Foreground = (Brush)FindResource("BrushTextEmerald");
+                key.BorderElem.Effect = null;
             }
             else
             {
-                key.BorderElem.Background = _brushDefaultBg;
-                key.BorderElem.BorderBrush = _brushDefaultBorder;
-                key.TextElem.Foreground = _brushDefaultText;
+                // Default dark slate
+                key.BorderElem.Background = new SolidColorBrush(Color.FromRgb(0x16, 0x1B, 0x22));
+                key.BorderElem.BorderBrush = new SolidColorBrush(Color.FromRgb(0x26, 0x2C, 0x36));
+                key.TextElem.Foreground = new SolidColorBrush(Color.FromRgb(0xC9, 0xD1, 0xD9));
+                key.BorderElem.Effect = null;
             }
         }
 

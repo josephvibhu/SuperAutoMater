@@ -6,7 +6,8 @@ using System.Windows.Controls;
 using System.Windows.Media;
 using System.Windows.Threading;
 using VeloxBench.Services;
-using VeloxBench.ViewModels;
+using SuperAutoMater.Wpf.ViewModels;
+using SuperAutoMater.Wpf.Controls;
 
 namespace VeloxBench.Controls;
 

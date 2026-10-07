@@ -1,7 +1,7 @@
 using System;
 using System.Collections.Generic;
 
-namespace VeloxBench.Core
+namespace SuperAutoMater.Wpf.Core
 {
     /// <summary>
     /// Lifecycle state of a QC run.

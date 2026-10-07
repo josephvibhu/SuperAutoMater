@@ -1,0 +1,50 @@
+<UserControl x:Class="SuperAutoMater.Wpf.Controls.BentoCard"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             x:Name="RootCard">
+    <Border x:Name="CardBorder"
+            CornerRadius="16"
+            Background="{DynamicResource BrushCardVioletGlass}"
+            BorderBrush="{DynamicResource BrushHairlineViolet}"
+            BorderThickness="1"
+            Padding="14"
+            Effect="{DynamicResource EffectCardShadow}">
+        <Grid>
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="*"/>
+            </Grid.RowDefinitions>
+
+            <!-- Card Header Bar -->
+            <DockPanel Grid.Row="0" LastChildFill="False" Margin="0,0,0,10">
+                <StackPanel Orientation="Horizontal" DockPanel.Dock="Left" VerticalAlignment="Center">
+                    <Ellipse x:Name="DotIndicator"
+                             Width="7" Height="7"
+                             Fill="{Binding StatusDotBrush, ElementName=RootCard}"
+                             Margin="0,0,8,0"
+                             Effect="{DynamicResource EffectGlowPurpleSm}"/>
+                    <TextBlock Text="{Binding Title, ElementName=RootCard}"
+                               Style="{DynamicResource TextCardHeader}"/>
+                </StackPanel>
+
+                <!-- Right Header Badge / Action -->
+                <Border DockPanel.Dock="Right"
+                        CornerRadius="6"
+                        Background="#2B1446"
+                        BorderBrush="#4D3B1A59"
+                        BorderThickness="1"
+                        Padding="6,2"
+                        VerticalAlignment="Center"
+                        Visibility="{Binding BadgeVisibility, ElementName=RootCard}">
+                    <TextBlock Text="{Binding SubtitleBadge, ElementName=RootCard}"
+                               Style="{DynamicResource TextBadgeMono}"
+                               Foreground="{DynamicResource BrushTextVioletLight}"/>
+                </Border>
+            </DockPanel>
+
+            <!-- Card Content Body -->
+            <ContentPresenter Grid.Row="1"
+                              Content="{Binding Content, ElementName=RootCard}"/>
+        </Grid>
+    </Border>
+</UserControl>

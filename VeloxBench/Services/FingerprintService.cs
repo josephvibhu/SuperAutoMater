@@ -1,10 +1,10 @@
-using System;
+﻿using System;
 using System.Management;
 using System.Runtime.InteropServices;
 using System.Threading;
 using System.Threading.Tasks;
 
-namespace VeloxBench.Services
+namespace SuperAutoMater.Wpf.Services
 {
     public class FingerprintSensorInfo
     {

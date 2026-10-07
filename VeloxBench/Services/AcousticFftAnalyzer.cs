@@ -1,6 +1,6 @@
 using System;
 
-namespace VeloxBench.Services
+namespace SuperAutoMater.Wpf.Services
 {
     public class FftAnalysisResult
     {

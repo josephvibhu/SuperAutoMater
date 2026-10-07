@@ -4,7 +4,7 @@ using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Media;
 
-namespace VeloxBench.Controls
+namespace SuperAutoMater.Wpf.Controls
 {
     public partial class TrackpadTestControl : UserControl
     {
@@ -30,7 +30,7 @@ namespace VeloxBench.Controls
         private readonly SolidColorBrush _brushReadyBorder = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#30363D"));
         private readonly SolidColorBrush _brushReadyText = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#8B949E"));
 
-        public event Action<bool>? CertificationChanged;
+        public event Action<bool> CertificationChanged;
 
         public bool IsCertified => _isLeftTested && _isRightTested && _isMotionTested;
 
@@ -45,13 +45,15 @@ namespace VeloxBench.Controls
         {
             Point p = e.GetPosition(TrackpadCanvas);
 
+            // Update crosshair puck
             TrackingPuck.Visibility = Visibility.Visible;
             StackGuideHint.Visibility = Visibility.Collapsed;
-            Canvas.SetLeft(TrackingPuck, p.X - (TrackingPuck.ActualWidth > 0 ? TrackingPuck.ActualWidth / 2 : 16));
-            Canvas.SetTop(TrackingPuck, p.Y - (TrackingPuck.ActualHeight > 0 ? TrackingPuck.ActualHeight / 2 : 16));
+            Canvas.SetLeft(TrackingPuck, p.X - (TrackingPuck.ActualWidth > 0 ? TrackingPuck.ActualWidth / 2 : 18));
+            Canvas.SetTop(TrackingPuck, p.Y - (TrackingPuck.ActualHeight > 0 ? TrackingPuck.ActualHeight / 2 : 18));
 
             TxtCoordReadout.Text = $"X: {(int)p.X:000} · Y: {(int)p.Y:000}";
 
+            // Track movement distance
             if (_lastPos.HasValue)
             {
                 double dx = p.X - _lastPos.Value.X;
