@@ -157,5 +157,61 @@ public static class AssetEndpoints
                 ? Results.Ok(new { found = false })
                 : Results.Ok(new { found = true, asset });
         });
+
+        // ── Fitted Components (BOM) Endpoints ────────────────────────────────
+
+        // GET /api/v1/assets/{id}/components
+        grp.MapGet("/{id}/components", (string id, HttpContext ctx, VeloxDb db) =>
+        {
+            var tenantId = ctx.TenantId();
+            if (tenantId == null) return Results.Unauthorized();
+
+            var asset = db.GetAssetById(tenantId, id);
+            if (asset is null) return Results.NotFound(new { error = "Asset not found." });
+
+            var components = db.ListFittedComponents(tenantId, id);
+            return Results.Ok(new { assetId = id, count = components.Count, items = components });
+        });
+
+        // POST /api/v1/assets/{id}/components
+        grp.MapPost("/{id}/components", async (string id, AttachComponentRequest req, HttpContext ctx, VeloxDb db, SseHub sse) =>
+        {
+            var tenantId = ctx.TenantId();
+            if (tenantId == null) return Results.Unauthorized();
+
+            var asset = db.GetAssetById(tenantId, id);
+            if (asset is null) return Results.NotFound(new { error = "Parent asset not found." });
+
+            if (string.IsNullOrWhiteSpace(req.Description) && string.IsNullOrWhiteSpace(req.ComponentAssetId))
+                return Results.BadRequest(new { error = "Either description or component_asset_id is required." });
+
+            var cmp = db.AttachComponent(tenantId, id, req);
+            var updatedAsset = db.GetAssetById(tenantId, id)!;
+            await sse.BroadcastAsync(SseEventType.AssetUpdated, updatedAsset);
+            return Results.Ok(cmp);
+        });
+
+        // DELETE /api/v1/assets/{id}/components/{componentId}
+        grp.MapDelete("/{id}/components/{componentId}", async (string id, string componentId, bool returnToStock, string? condition, HttpContext ctx, VeloxDb db, SseHub sse) =>
+        {
+            var tenantId = ctx.TenantId();
+            if (tenantId == null) return Results.Unauthorized();
+
+            var asset = db.GetAssetById(tenantId, id);
+            if (asset is null) return Results.NotFound(new { error = "Parent asset not found." });
+
+            var req = new DetachComponentRequest
+            {
+                ReturnToStock = returnToStock,
+                Condition = condition ?? "Used / Tested"
+            };
+
+            var ok = db.DetachComponent(tenantId, componentId, req);
+            if (!ok) return Results.NotFound(new { error = "Fitted component not found." });
+
+            var updatedAsset = db.GetAssetById(tenantId, id)!;
+            await sse.BroadcastAsync(SseEventType.AssetUpdated, updatedAsset);
+            return Results.Ok(new { success = true });
+        });
     }
 }

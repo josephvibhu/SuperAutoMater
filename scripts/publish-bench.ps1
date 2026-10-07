@@ -7,8 +7,8 @@ param (
 
 Write-Host "Publishing VeloxBench ($Runtime) to $OutputDir..." -ForegroundColor Cyan
 
-if (Test-Path $OutputDir) {
-    Remove-Item -Path $OutputDir -Recurse -Force -ErrorAction SilentlyContinue
+if (Test-Path "$OutputDir/VeloxBench.exe") {
+    Rename-Item -Path "$OutputDir/VeloxBench.exe" -NewName "VeloxBench.old.exe" -Force -ErrorAction SilentlyContinue
 }
 
 dotnet publish "$PSScriptRoot/../VeloxBench/VeloxBench.csproj" `
@@ -17,6 +17,9 @@ dotnet publish "$PSScriptRoot/../VeloxBench/VeloxBench.csproj" `
     --self-contained true `
     -p:PublishSingleFile=true `
     -p:IncludeNativeLibrariesForSelfExtract=true `
+    -p:EnableCompressionInSingleFile=true `
+    -p:DebugType=none `
+    -p:DebugSymbols=false `
     -o $OutputDir
 
 if ($LASTEXITCODE -eq 0) {

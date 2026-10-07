@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Net.Http;
 using System.Text;
 using System.Text.Json;
@@ -245,6 +246,31 @@ public sealed class CloudSyncService
         {
             LocalBenchStore.Instance.EnqueueOutbox($"/api/v1/assets/{assetId}/events", "POST", json);
         }
+    }
+
+    public async Task<List<FittedComponentDto>> GetFittedComponentsAsync(string assetId)
+    {
+        if (string.IsNullOrWhiteSpace(assetId)) return new List<FittedComponentDto>();
+        var cfg = BenchConfigService.Current;
+        try
+        {
+            using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(3));
+            var req = new HttpRequestMessage(HttpMethod.Get, $"{cfg.ApiUrl}/api/v1/assets/{assetId}/components");
+            req.Headers.Add("X-API-Key", cfg.ApiKey);
+            var resp = await _http.SendAsync(req, cts.Token);
+            if (resp.IsSuccessStatusCode)
+            {
+                var json = await resp.Content.ReadAsStringAsync();
+                using var doc = JsonDocument.Parse(json);
+                if (doc.RootElement.TryGetProperty("items", out var itemsElem))
+                {
+                    var items = JsonSerializer.Deserialize<List<FittedComponentDto>>(itemsElem.GetRawText(), new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+                    return items ?? new List<FittedComponentDto>();
+                }
+            }
+        }
+        catch { }
+        return new List<FittedComponentDto>();
     }
 
     // ── Outbox Background Flush ───────────────────────────────────────────────

@@ -43,6 +43,8 @@ public class ManagerViewModel : INotifyPropertyChanged
     public ObservableCollection<AssetItemViewModel> AvailableBaseUnits { get; } = new();
     public ObservableCollection<AssetItemViewModel> ComponentStock { get; } = new();
     public ObservableCollection<InvoiceItem> CurrentInvoiceItems { get; } = new();
+    public ObservableCollection<FittedComponentItemViewModel> SelectedAssetFittedComponents { get; } = new();
+    public bool HasFittedComponents => SelectedAssetFittedComponents.Count > 0;
 
     // ── Active Selection ───────────────────────────────────────────────────────
     private AssetItemViewModel? _selectedAsset;
@@ -55,6 +57,7 @@ public class ManagerViewModel : INotifyPropertyChanged
             OnPropertyChanged();
             OnPropertyChanged(nameof(HasSelectedAsset));
             AutoFillInvoiceDetailsFromSelectedAsset();
+            _ = LoadFittedComponentsForSelectedAssetAsync();
         }
     }
     public bool HasSelectedAsset => SelectedAsset != null;
@@ -165,6 +168,72 @@ public class ManagerViewModel : INotifyPropertyChanged
     {
         get => _quickIntakeNotes;
         set { _quickIntakeNotes = value; OnPropertyChanged(); }
+    }
+
+    // ── Fitted Components (BOM) Form Fields ─────────────────────────────────────
+    private bool _attachFromStock = false;
+    public bool AttachFromStock
+    {
+        get => _attachFromStock;
+        set { _attachFromStock = value; OnPropertyChanged(); }
+    }
+
+    public ObservableCollection<string> BomCategoryOptions { get; } = new()
+    {
+        "RAM", "Storage", "Battery", "Display", "Charger", "Peripheral", "RepairSpare", "Other"
+    };
+
+    private string _newBomCategory = "RAM";
+    public string NewBomCategory
+    {
+        get => _newBomCategory;
+        set { _newBomCategory = value; OnPropertyChanged(); }
+    }
+
+    private string _newBomDescription = "";
+    public string NewBomDescription
+    {
+        get => _newBomDescription;
+        set { _newBomDescription = value; OnPropertyChanged(); }
+    }
+
+    private string _newBomSerial = "";
+    public string NewBomSerial
+    {
+        get => _newBomSerial;
+        set { _newBomSerial = value; OnPropertyChanged(); }
+    }
+
+    private string _newBomCostDelta = "0";
+    public string NewBomCostDelta
+    {
+        get => _newBomCostDelta;
+        set { _newBomCostDelta = value; OnPropertyChanged(); }
+    }
+
+    private string _newBomPriceDelta = "0";
+    public string NewBomPriceDelta
+    {
+        get => _newBomPriceDelta;
+        set { _newBomPriceDelta = value; OnPropertyChanged(); }
+    }
+
+    private AssetItemViewModel? _selectedBomStockItem;
+    public AssetItemViewModel? SelectedBomStockItem
+    {
+        get => _selectedBomStockItem;
+        set
+        {
+            _selectedBomStockItem = value;
+            OnPropertyChanged();
+            if (value != null)
+            {
+                NewBomDescription = value.ModelName;
+                NewBomSerial = value.SerialNumber;
+                NewBomCategory = value.Category.ToString();
+                NewBomPriceDelta = value.SalePrice?.ToString("N0") ?? "0";
+            }
+        }
     }
 
     // ── Metrics & Badges ───────────────────────────────────────────────────────
@@ -459,6 +528,9 @@ public class ManagerViewModel : INotifyPropertyChanged
     public ICommand GenerateInvoiceCommand { get; }
     public ICommand PreviewInvoiceCommand { get; }
     public ICommand ToggleLanServerCommand { get; }
+    public ICommand AttachBomComponentCommand { get; }
+    public ICommand DetachBomComponentCommand { get; }
+    public ICommand ImportFittedToInvoiceCommand { get; }
 
     public ManagerViewModel()
     {
@@ -480,6 +552,9 @@ public class ManagerViewModel : INotifyPropertyChanged
         GenerateInvoiceCommand = new RelayCommand(async _ => await GenerateInvoiceForSelectedAssetsAsync());
         PreviewInvoiceCommand = new RelayCommand(p => PreviewInvoice(p as Invoice));
         ToggleLanServerCommand = new RelayCommand(_ => ToggleLanServer());
+        AttachBomComponentCommand = new RelayCommand(async _ => await AttachBomComponentAsync());
+        DetachBomComponentCommand = new RelayCommand(async p => await DetachBomComponentAsync(p as FittedComponentItemViewModel));
+        ImportFittedToInvoiceCommand = new RelayCommand(_ => ImportFittedToInvoice());
 
         // Wire up Real-Time Events
         _api.CloudConnectionChanged += connected =>
@@ -678,6 +753,147 @@ public class ManagerViewModel : INotifyPropertyChanged
         {
             VeloxMessageBox.Show("Failed to intake item to cloud inventory. Please check cloud connection.", "Intake Error", MessageBoxButton.OK, MessageBoxImage.Error);
         }
+    }
+
+    // ── Fitted Components (BOM) Actions ──────────────────────────────────────────
+    public async Task LoadFittedComponentsForSelectedAssetAsync()
+    {
+        if (SelectedAsset == null)
+        {
+            Application.Current?.Dispatcher.Invoke(() =>
+            {
+                SelectedAssetFittedComponents.Clear();
+                OnPropertyChanged(nameof(HasFittedComponents));
+            });
+            return;
+        }
+
+        var list = await _api.GetFittedComponentsAsync(SelectedAsset.Id);
+        Application.Current?.Dispatcher.Invoke(() =>
+        {
+            SelectedAssetFittedComponents.Clear();
+            foreach (var item in list)
+            {
+                SelectedAssetFittedComponents.Add(new FittedComponentItemViewModel(item));
+            }
+            OnPropertyChanged(nameof(SelectedAssetFittedComponents));
+            OnPropertyChanged(nameof(HasFittedComponents));
+        });
+    }
+
+    public async Task AttachBomComponentAsync()
+    {
+        if (SelectedAsset == null)
+        {
+            VeloxMessageBox.Show("Please select an asset from inventory first.", "No Asset Selected", MessageBoxButton.OK, MessageBoxImage.Warning);
+            return;
+        }
+
+        if (AttachFromStock && SelectedBomStockItem == null)
+        {
+            VeloxMessageBox.Show("Please select a component from stock, or switch to 'Free-Form Quick Spec'.", "Stock Item Required", MessageBoxButton.OK, MessageBoxImage.Warning);
+            return;
+        }
+
+        if (!AttachFromStock && string.IsNullOrWhiteSpace(NewBomDescription))
+        {
+            VeloxMessageBox.Show("Please enter a component description (e.g. '16GB DDR4 3200MHz').", "Description Required", MessageBoxButton.OK, MessageBoxImage.Warning);
+            return;
+        }
+
+        double.TryParse(NewBomCostDelta, out var cost);
+        double.TryParse(NewBomPriceDelta, out var price);
+        Enum.TryParse<AssetCategory>(NewBomCategory, true, out var cat);
+
+        var req = new AttachComponentRequest
+        {
+            ComponentAssetId = AttachFromStock ? SelectedBomStockItem?.Id : null,
+            Category = cat,
+            Description = AttachFromStock ? SelectedBomStockItem!.ModelName : NewBomDescription.Trim(),
+            SerialNumber = AttachFromStock ? SelectedBomStockItem?.SerialNumber : (string.IsNullOrWhiteSpace(NewBomSerial) ? null : NewBomSerial.Trim()),
+            CostDelta = cost,
+            PriceDelta = price,
+            InstalledBy = ManagerConfigService.Current.ManagerName
+        };
+
+        var attached = await _api.AttachComponentAsync(SelectedAsset.Id, req);
+        if (attached != null)
+        {
+            // Reset form
+            NewBomDescription = "";
+            NewBomSerial = "";
+            NewBomCostDelta = "0";
+            NewBomPriceDelta = "0";
+            SelectedBomStockItem = null;
+
+            await LoadFittedComponentsForSelectedAssetAsync();
+            await LoadAssetsAndEmployeesAsync();
+            VeloxMessageBox.Show($"Component attached to {SelectedAsset.ModelName} successfully.", "Component Fitted", MessageBoxButton.OK, MessageBoxImage.Information);
+        }
+        else
+        {
+            VeloxMessageBox.Show("Failed to attach component to cloud.", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
+        }
+    }
+
+    public async Task DetachBomComponentAsync(FittedComponentItemViewModel? item)
+    {
+        if (SelectedAsset == null || item == null) return;
+
+        var result = VeloxMessageBox.Show(
+            $"Do you want to return '{item.Description}' to inventory as a reusable/tested spare?\n\nClick [OK] to return to stock, or [Cancel] to detach without restocking.",
+            "Return Part to Inventory?",
+            MessageBoxButton.OKCancel,
+            MessageBoxImage.Question);
+
+        bool returnToStock = (result == MessageBoxResult.OK);
+
+        var ok = await _api.DetachComponentAsync(SelectedAsset.Id, item.Id, returnToStock: returnToStock, condition: "Used / Tested");
+        if (ok)
+        {
+            await LoadFittedComponentsForSelectedAssetAsync();
+            await LoadAssetsAndEmployeesAsync();
+            VeloxMessageBox.Show("Component detached successfully.", "Component Removed", MessageBoxButton.OK, MessageBoxImage.Information);
+        }
+    }
+
+    public void ImportFittedToInvoice()
+    {
+        if (SelectedAssetFittedComponents.Count == 0)
+        {
+            VeloxMessageBox.Show("No fitted components recorded on this asset.", "No Components", MessageBoxButton.OK, MessageBoxImage.Information);
+            return;
+        }
+
+        int count = 0;
+        foreach (var c in SelectedAssetFittedComponents)
+        {
+            var cat = c.Category switch
+            {
+                AssetCategory.RAM => InvoiceItemCategory.RamUpgrade,
+                AssetCategory.Storage => InvoiceItemCategory.StorageUpgrade,
+                AssetCategory.Charger => InvoiceItemCategory.Charger,
+                AssetCategory.Peripheral => InvoiceItemCategory.Peripheral,
+                AssetCategory.RepairSpare => InvoiceItemCategory.SparePart,
+                _ => InvoiceItemCategory.SparePart
+            };
+
+            var invoiceItem = new InvoiceItem
+            {
+                LineNumber = CurrentInvoiceItems.Count + 1,
+                ItemCategory = cat,
+                Model = c.Description,
+                Description = $"{c.CategoryIcon} {c.Description}",
+                SerialNumber = c.SerialNumber != "Untracked" ? c.SerialNumber : "",
+                Quantity = 1,
+                UnitPrice = (decimal)c.PriceDelta,
+                AssetId = c.Model.ComponentAssetId ?? ""
+            };
+            CurrentInvoiceItems.Add(invoiceItem);
+            count++;
+        }
+        RecalculateDraftTotals();
+        VeloxMessageBox.Show($"Imported {count} fitted upgrade(s) into current invoice draft.", "Upgrades Imported", MessageBoxButton.OK, MessageBoxImage.Information);
     }
 
     // ── Vyapar Refurbishment Billing Actions ─────────────────────────────────────

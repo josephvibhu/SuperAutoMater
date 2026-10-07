@@ -133,4 +133,65 @@ public sealed class AssetTests : IClassFixture<VeloxApiFactory>
         var body   = await resp.Content.ReadFromJsonAsync<JsonElement>();
         Assert.True(body.GetProperty("count").GetInt32() >= 1);
     }
+
+    [Fact]
+    public async Task FittedComponents_AttachUntrackedAndTracked_Succeeds()
+    {
+        // 1. Create parent laptop
+        var laptopResp = await _client.PostAsJsonAsync("/api/v1/assets/intake",
+            new IntakeRequest { SerialNumber = "LAP-BOM-001", Model = "ThinkPad T14", Category = AssetCategory.Laptop });
+        var laptop = await laptopResp.Content.ReadFromJsonAsync<AssetDto>();
+        Assert.NotNull(laptop);
+
+        // 2. Attach untracked free-form RAM spec (no stock needed)
+        var ramAttach = await _client.PostAsJsonAsync($"/api/v1/assets/{laptop!.Id}/components", new AttachComponentRequest
+        {
+            Category = AssetCategory.RAM,
+            Description = "Crucial 16GB DDR4 3200MHz",
+            SerialNumber = "RAM-SN-001",
+            PriceDelta = 2500
+        });
+        Assert.Equal(HttpStatusCode.OK, ramAttach.StatusCode);
+        var fittedRam = await ramAttach.Content.ReadFromJsonAsync<FittedComponentDto>();
+        Assert.NotNull(fittedRam);
+        Assert.Equal("Crucial 16GB DDR4 3200MHz", fittedRam!.Description);
+        Assert.Equal(2500, fittedRam.PriceDelta);
+
+        // 3. Create tracked SSD in stock with quantity = 2
+        var ssdResp = await _client.PostAsJsonAsync("/api/v1/assets/intake",
+            new IntakeRequest { SerialNumber = "SSD-STOCK-001", Model = "Samsung 980 500GB NVMe", Category = AssetCategory.Storage, Quantity = 2 });
+        var ssd = await ssdResp.Content.ReadFromJsonAsync<AssetDto>();
+        Assert.NotNull(ssd);
+        Assert.Equal(2, ssd!.Quantity);
+
+        // 4. Attach tracked SSD to laptop -> should decrement stock to 1
+        var ssdAttach = await _client.PostAsJsonAsync($"/api/v1/assets/{laptop.Id}/components", new AttachComponentRequest
+        {
+            ComponentAssetId = ssd.Id,
+            Category = AssetCategory.Storage,
+            PriceDelta = 3500
+        });
+        Assert.Equal(HttpStatusCode.OK, ssdAttach.StatusCode);
+        var fittedSsd = await ssdAttach.Content.ReadFromJsonAsync<FittedComponentDto>();
+        Assert.NotNull(fittedSsd);
+        Assert.Equal(ssd.Id, fittedSsd!.ComponentAssetId);
+
+        // Verify stock decremented
+        var getSsd = await _client.GetAsync($"/api/v1/assets/{ssd.Id}");
+        var updatedSsd = await getSsd.Content.ReadFromJsonAsync<AssetDto>();
+        Assert.Equal(1, updatedSsd!.Quantity);
+
+        // 5. List components for laptop
+        var listResp = await _client.GetAsync($"/api/v1/assets/{laptop.Id}/components");
+        var listBody = await listResp.Content.ReadFromJsonAsync<JsonElement>();
+        Assert.Equal(2, listBody.GetProperty("count").GetInt32());
+
+        // 6. Detach SSD with returnToStock=true -> stock should restore to 2
+        var detachResp = await _client.DeleteAsync($"/api/v1/assets/{laptop.Id}/components/{fittedSsd.Id}?returnToStock=true");
+        Assert.Equal(HttpStatusCode.OK, detachResp.StatusCode);
+
+        var getRestoredSsd = await _client.GetAsync($"/api/v1/assets/{ssd.Id}");
+        var restoredSsd = await getRestoredSsd.Content.ReadFromJsonAsync<AssetDto>();
+        Assert.Equal(2, restoredSsd!.Quantity);
+    }
 }

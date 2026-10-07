@@ -174,3 +174,42 @@ public sealed class LoginResponse
     public string StationId { get; init; } = "BENCH-01";
     public DateTimeOffset ExpiresAtUtc { get; init; }
 }
+
+// ─── Refurbishment Fitted Components (Optional BOM) ──────────────────────────
+
+public sealed class FittedComponentDto
+{
+    public string Id { get; init; } = "";
+    public string TenantId { get; init; } = "";
+    public string ParentAssetId { get; init; } = "";
+    public string? ComponentAssetId { get; set; }
+    public AssetCategory Category { get; set; } = AssetCategory.RAM;
+    public string Description { get; set; } = "";
+    public string? SerialNumber { get; set; }
+    public double CostDelta { get; set; } = 0.0;
+    public double PriceDelta { get; set; } = 0.0;
+    public string? InstalledBy { get; set; }
+    public string? Notes { get; set; }
+    public DateTimeOffset InstalledAtUtc { get; init; }
+}
+
+public sealed class AttachComponentRequest
+{
+    public string? ComponentAssetId { get; set; } // Optional: ID of tracked inventory asset
+    public AssetCategory Category { get; set; } = AssetCategory.RAM;
+    public string Description { get; set; } = "";
+    public string? SerialNumber { get; set; }
+    public double CostDelta { get; set; } = 0.0;
+    public double PriceDelta { get; set; } = 0.0;
+    public string? InstalledBy { get; set; }
+    public string? Notes { get; set; }
+}
+
+public sealed class DetachComponentRequest
+{
+    public bool ReturnToStock { get; set; } = false;
+    public string? Condition { get; set; } = "Used / Tested";
+    public double? RestockPurchaseCost { get; set; }
+    public double? RestockSalePrice { get; set; }
+}
+

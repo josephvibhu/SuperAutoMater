@@ -24,6 +24,13 @@ public class EmployeeResponseWrapper
     public List<EmployeeDto> Employees { get; set; } = new();
 }
 
+public class FittedComponentsResponseWrapper
+{
+    public string AssetId { get; set; } = "";
+    public int Count { get; set; }
+    public List<FittedComponentDto> Items { get; set; } = new();
+}
+
 public class ManagerApiClient
 {
     private static ManagerApiClient? _instance;
@@ -268,6 +275,55 @@ public class ManagerApiClient
     {
         var updated = await PatchEmployeeAsync(id, new PatchEmployeeRequest { StationId = stationId });
         return updated != null;
+    }
+
+    // ── Fitted Components (BOM) ──────────────────────────────────────────────
+    public async Task<List<FittedComponentDto>> GetFittedComponentsAsync(string assetId)
+    {
+        try
+        {
+            var res = await _http.GetAsync($"api/v1/assets/{assetId}/components");
+            if (res.IsSuccessStatusCode)
+            {
+                var json = await res.Content.ReadAsStringAsync();
+                var wrap = JsonSerializer.Deserialize<FittedComponentsResponseWrapper>(json, JsonOpts);
+                return wrap?.Items ?? new List<FittedComponentDto>();
+            }
+        }
+        catch { }
+        return new List<FittedComponentDto>();
+    }
+
+    public async Task<FittedComponentDto?> AttachComponentAsync(string assetId, AttachComponentRequest req)
+    {
+        try
+        {
+            var jsonBody = JsonSerializer.Serialize(req, JsonOpts);
+            var content = new StringContent(jsonBody, Encoding.UTF8, "application/json");
+            var res = await _http.PostAsync($"api/v1/assets/{assetId}/components", content);
+            if (res.IsSuccessStatusCode)
+            {
+                var json = await res.Content.ReadAsStringAsync();
+                return JsonSerializer.Deserialize<FittedComponentDto>(json, JsonOpts);
+            }
+        }
+        catch { }
+        return null;
+    }
+
+    public async Task<bool> DetachComponentAsync(string assetId, string componentId, bool returnToStock, string? condition = null)
+    {
+        try
+        {
+            var url = $"api/v1/assets/{assetId}/components/{componentId}?returnToStock={returnToStock.ToString().ToLowerInvariant()}";
+            if (!string.IsNullOrWhiteSpace(condition))
+                url += $"&condition={Uri.EscapeDataString(condition)}";
+
+            var res = await _http.DeleteAsync(url);
+            return res.IsSuccessStatusCode;
+        }
+        catch { }
+        return false;
     }
 
     // ── Real-Time Zero-Click SSE Event Stream ──────────────────────────────

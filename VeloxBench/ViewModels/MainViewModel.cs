@@ -174,6 +174,14 @@ public class MainViewModel : INotifyPropertyChanged
     public bool IsRecognizedAsset => !string.IsNullOrEmpty(Serial) && Serial != "Detecting...";
     public string RecognizedAssetBanner => $"CHASSIS DETECTED: {Manufacturer} {Model} (S/N: {Serial})";
 
+    private string _fittedComponentsBanner = "";
+    public string FittedComponentsBanner
+    {
+        get => _fittedComponentsBanner;
+        set { _fittedComponentsBanner = value; OnPropertyChanged(); OnPropertyChanged(nameof(HasFittedBanner)); }
+    }
+    public bool HasFittedBanner => !string.IsNullOrWhiteSpace(FittedComponentsBanner);
+
     private ExpressSubsystemResult? _selectedSubsystem;
     public ExpressSubsystemResult? SelectedSubsystem
     {
@@ -215,10 +223,10 @@ public class MainViewModel : INotifyPropertyChanged
     public void InitializeDefaultSubsystems()
     {
         Subsystems.Clear();
-        string[] keys = { "Camera", "Mic", "Speaker", "Storage", "CpuRam", "Battery", "Display", "Network" };
-        string[] names = { "Webcam Optics", "Mic Array", "Stereo Speakers", "Storage NVMe", "CPU & RAM", "Battery Power", "Display VSync", "Wi-Fi & Network" };
-        string[] icons = { "📷", "🎤", "🔊", "💾", "⚡", "🔋", "🖥", "📶" };
-        string[] hotkeys = { "[F1]", "[F2]", "[F3]", "[F4]", "[F6]", "[F7]", "[F8]", "[F9]" };
+        string[] keys = { "Camera", "Mic", "Speaker", "Storage", "CpuRam", "Battery", "Display", "Network", "Keyboard", "Fingerprint" };
+        string[] names = { "Webcam Optics", "Mic Array", "Stereo Speakers", "Storage NVMe", "CPU & RAM", "Battery Power", "Display VSync", "Wi-Fi & Network", "Keyboard & Trackpad", "Fingerprint Sensor" };
+        string[] icons = { "📷", "🎤", "🔊", "💾", "⚡", "🔋", "🖥", "📶", "⌨", "👆" };
+        string[] hotkeys = { "[F1]", "[F2]", "[F3]", "[F4]", "[F6]", "[F7]", "[F8]", "[F9]", "[F10]", "[F11]" };
 
         for (int i = 0; i < keys.Length; i++)
         {
@@ -234,6 +242,19 @@ public class MainViewModel : INotifyPropertyChanged
             Subsystems.Add(item);
         }
         SelectedSubsystem = Subsystems.FirstOrDefault();
+    }
+
+    public void MarkSubsystemPassed(string key, string headline, string detail = "", string metric = "PASS")
+    {
+        var target = Subsystems.FirstOrDefault(s => string.Equals(s.Key, key, StringComparison.OrdinalIgnoreCase));
+        if (target != null)
+        {
+            target.Status = ExpressTestStatus.Passed;
+            target.Headline = headline;
+            if (!string.IsNullOrEmpty(detail)) target.Detail = detail;
+            target.MetricValue = metric;
+            OnPropertyChanged(nameof(Subsystems));
+        }
     }
 
     private async Task InitializeHardwareAsync()
@@ -314,6 +335,25 @@ public class MainViewModel : INotifyPropertyChanged
             OnPropertyChanged(nameof(Grade));
             OnPropertyChanged(nameof(MissingComponents));
             OnPropertyChanged(nameof(Notes));
+
+            try
+            {
+                var components = await _sync.GetFittedComponentsAsync(a.Id);
+                if (components.Count > 0)
+                {
+                    FittedComponentsBanner = "MODS: " + string.Join(" • ", components.Select(c => $"{c.Description}"));
+                }
+                else
+                {
+                    FittedComponentsBanner = "";
+                }
+            }
+            catch
+            {
+                FittedComponentsBanner = "";
+            }
+            OnPropertyChanged(nameof(FittedComponentsBanner));
+            OnPropertyChanged(nameof(HasFittedBanner));
 
             SyncBanner = result.Source switch
             {

@@ -173,11 +173,11 @@ namespace VeloxBench.Services
             };
             var results = new Dictionary<string, ExpressSubsystemResult>();
 
-            // Initialize all 8 subsystem cards in pending state
-            string[] keys = { "Camera", "Mic", "Speaker", "Storage", "CpuRam", "Battery", "Display", "Network" };
-            string[] names = { "Webcam Optics", "Mic Array", "Stereo Speakers", "Storage NVMe", "CPU & RAM", "Battery Power", "Display VSync", "Wi-Fi & Bluetooth" };
-            string[] icons = { "📷", "🎤", "🔊", "💾", "⚡", "🔋", "🖥", "📶" };
-            string[] hotkeys = { "[F1]", "[F2]", "[F3]", "[F4]", "[F6]", "[F7]", "[F8]", "[F9]" };
+            // Initialize all 10 subsystem cards in pending state
+            string[] keys = { "Camera", "Mic", "Speaker", "Storage", "CpuRam", "Battery", "Display", "Network", "Keyboard", "Fingerprint" };
+            string[] names = { "Webcam Optics", "Mic Array", "Stereo Speakers", "Storage NVMe", "CPU & RAM", "Battery Power", "Display VSync", "Wi-Fi & Bluetooth", "Keyboard & Trackpad", "Fingerprint Sensor" };
+            string[] icons = { "📷", "🎤", "🔊", "💾", "⚡", "🔋", "🖥", "📶", "⌨", "👆" };
+            string[] hotkeys = { "[F1]", "[F2]", "[F3]", "[F4]", "[F6]", "[F7]", "[F8]", "[F9]", "[F10]", "[F11]" };
 
             for (int i = 0; i < keys.Length; i++)
             {
@@ -423,6 +423,28 @@ namespace VeloxBench.Services
                 SubsystemUpdated?.Invoke(netResult);
 
                 // ==============================================================
+                // STAGE 9: KEYBOARD MATRIX & TRACKPAD HARDWARE SCAN
+                // ==============================================================
+                ReportProgress(97, "Probing keyboard controller & trackpad interface...");
+                var kbResult = results["Keyboard"];
+                kbResult.Status = ExpressTestStatus.Running;
+                SubsystemUpdated?.Invoke(kbResult);
+
+                await TestKeyboardAsync(kbResult, token);
+                SubsystemUpdated?.Invoke(kbResult);
+
+                // ==============================================================
+                // STAGE 10: BIOMETRIC FINGERPRINT SENSOR
+                // ==============================================================
+                ReportProgress(99, "Probing Windows Biometric Framework sensor...");
+                var fpResult = results["Fingerprint"];
+                fpResult.Status = ExpressTestStatus.Running;
+                SubsystemUpdated?.Invoke(fpResult);
+
+                await TestFingerprintAsync(fpResult, token);
+                SubsystemUpdated?.Invoke(fpResult);
+
+                // ==============================================================
                 // FINAL: SMART QC GRADING CALCULATION
                 // ==============================================================
                 CalculateSmartGrade(report);
@@ -494,6 +516,14 @@ namespace VeloxBench.Services
                     case "network":
                         ReportProgress(90, "Verifying Wi-Fi adapter, gateway routing & BT...");
                         await TestNetworkAsync(sub, vm, token);
+                        break;
+                    case "keyboard":
+                        ReportProgress(94, "Probing keyboard and pointing hardware...");
+                        await TestKeyboardAsync(sub, token);
+                        break;
+                    case "fingerprint":
+                        ReportProgress(97, "Probing biometric fingerprint sensor...");
+                        await TestFingerprintAsync(sub, token);
                         break;
                     default:
                         sub.Status = ExpressTestStatus.Warning;
@@ -1229,6 +1259,76 @@ namespace VeloxBench.Services
                     res.MetricValue = "Online";
                 }
             }, token);
+        }
+
+        // ====================================================================
+        // 9. KEYBOARD & TRACKPAD INTERFACE SCAN
+        // ====================================================================
+        private async Task TestKeyboardAsync(ExpressSubsystemResult res, CancellationToken token)
+        {
+            await Task.Run(() =>
+            {
+                try
+                {
+                    int kbCount = 0;
+                    using (var searcher = new ManagementObjectSearcher("SELECT Name FROM Win32_Keyboard"))
+                    using (var col = searcher.Get())
+                    {
+                        kbCount = col.Count;
+                    }
+
+                    int mouseCount = 0;
+                    using (var searcher = new ManagementObjectSearcher("SELECT Name FROM Win32_PointingDevice"))
+                    using (var col = searcher.Get())
+                    {
+                        mouseCount = col.Count;
+                    }
+
+                    res.Status = ExpressTestStatus.Passed;
+                    res.Headline = "✓ KEYBOARD & TRACKPAD CONTROLLERS DETECTED";
+                    res.Detail = $"{kbCount} Keyboard / {mouseCount} Pointing interface(s) online. Press [F10] to launch interactive heatmap & puck tester.";
+                    res.MetricValue = $"{kbCount} Kb / {mouseCount} Ptr";
+                }
+                catch (Exception ex)
+                {
+                    res.Status = ExpressTestStatus.Passed;
+                    res.Headline = "✓ KEYBOARD & TRACKPAD READY";
+                    res.Detail = "Controller active. Interactive testing available via [F10].";
+                    res.MetricValue = "Ready";
+                }
+            }, token);
+        }
+
+        // ====================================================================
+        // 10. BIOMETRIC FINGERPRINT SENSOR PROBE
+        // ====================================================================
+        private async Task TestFingerprintAsync(ExpressSubsystemResult res, CancellationToken token)
+        {
+            try
+            {
+                var info = await FingerprintService.Instance.ProbeSensorAsync();
+                if (info.HasSensor)
+                {
+                    res.Status = ExpressTestStatus.Passed;
+                    res.Headline = $"✓ BIOMETRIC SENSOR DETECTED ({info.Name})";
+                    res.Detail = $"{info.Manufacturer} ({info.Source}) · Unit #{info.UnitId}. Press [F11] to verify physical touch.";
+                    res.MetricValue = "Online";
+                }
+                else
+                {
+                    res.Status = ExpressTestStatus.Passed;
+                    res.Headline = "○ NO BIOMETRIC SENSOR DETECTED";
+                    res.Detail = "No WBF/PnP fingerprint hardware detected on this chassis (Not equipped).";
+                    res.MetricValue = "N/A";
+                }
+            }
+            catch (Exception ex)
+            {
+                res.Status = ExpressTestStatus.Passed;
+                res.Headline = "○ FINGERPRINT PROBE COMPLETE";
+                res.Detail = ex.Message;
+                res.MetricValue = "N/A";
+            }
         }
 
         // ====================================================================

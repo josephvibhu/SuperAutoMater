@@ -610,6 +610,126 @@
                                     </StackPanel>
                                 </ScrollViewer>
                             </TabItem>
+
+                            <!-- TAB 0C: FITTED COMPONENTS (OPTIONAL BOM) -->
+                            <TabItem Header="🛠️ FITTED BOM" FontSize="11" Padding="10,5">
+                                <Grid Margin="0,10,0,0">
+                                    <!-- Empty state if no asset selected -->
+                                    <TextBlock Text="Select a laptop or unit from inventory to view or attach fitted components/upgrades."
+                                               Foreground="#8B949E" FontSize="12" TextWrapping="Wrap" HorizontalAlignment="Center" VerticalAlignment="Center" TextAlignment="Center"
+                                               Visibility="{Binding HasSelectedAsset, Converter={StaticResource NullVis}, ConverterParameter=invert}" />
+
+                                    <ScrollViewer VerticalScrollBarVisibility="Auto" Visibility="{Binding HasSelectedAsset, Converter={StaticResource NullVis}}">
+                                        <StackPanel>
+                                            <Border Background="#0D1117" BorderBrush="#30363D" BorderThickness="1" CornerRadius="6" Padding="10" Margin="0,0,0,10">
+                                                <StackPanel>
+                                                    <TextBlock Text="{Binding SelectedAsset.ModelName}" FontWeight="Bold" FontSize="12" Foreground="#58A6FF" />
+                                                    <TextBlock Text="{Binding SelectedAsset.SerialNumber, StringFormat='S/N: {0}'}" FontSize="11" Foreground="#8B949E" Margin="0,2,0,0" />
+                                                </StackPanel>
+                                            </Border>
+
+                                            <!-- Fitted Items List -->
+                                            <DockPanel Margin="0,0,0,6">
+                                                <TextBlock Text="FITTED COMPONENTS &amp; UPGRADES" FontSize="11" FontWeight="Bold" Foreground="#8B949E" />
+                                                <TextBlock Text="{Binding SelectedAssetFittedComponents.Count, StringFormat='({0} items)'}" FontSize="11" Foreground="#58A6FF" HorizontalAlignment="Right" />
+                                            </DockPanel>
+
+                                            <!-- Notice if no fitted components -->
+                                            <Border Background="#161B22" BorderBrush="#30363D" BorderThickness="1" CornerRadius="6" Padding="10" Margin="0,0,0,10"
+                                                    Visibility="{Binding HasFittedComponents, Converter={StaticResource NullVis}, ConverterParameter=invert}">
+                                                <TextBlock Text="Standard Factory Chassis. No custom upgrades recorded." Foreground="#8B949E" FontSize="11" FontStyle="Italic" TextAlignment="Center" />
+                                            </Border>
+
+                                            <!-- Items DataGrid/List -->
+                                            <ItemsControl ItemsSource="{Binding SelectedAssetFittedComponents}" Margin="0,0,0,12"
+                                                          Visibility="{Binding HasFittedComponents, Converter={StaticResource NullVis}}">
+                                                <ItemsControl.ItemTemplate>
+                                                    <DataTemplate>
+                                                        <Border Background="#0D1117" BorderBrush="#30363D" BorderThickness="1" CornerRadius="6" Padding="8" Margin="0,0,0,6">
+                                                            <Grid>
+                                                                <Grid.ColumnDefinitions>
+                                                                    <ColumnDefinition Width="*" />
+                                                                    <ColumnDefinition Width="Auto" />
+                                                                </Grid.ColumnDefinitions>
+                                                                <StackPanel Grid.Column="0">
+                                                                    <StackPanel Orientation="Horizontal" Margin="0,0,0,2">
+                                                                        <TextBlock Text="{Binding CategoryIcon}" Margin="0,0,4,0" />
+                                                                        <TextBlock Text="{Binding Description}" FontWeight="Bold" FontSize="11" Foreground="#F0F6FC" TextWrapping="Wrap" />
+                                                                    </StackPanel>
+                                                                    <StackPanel Orientation="Horizontal">
+                                                                        <TextBlock Text="{Binding SerialNumber, StringFormat='S/N: {0}'}" FontSize="10" Foreground="#8B949E" Margin="0,0,8,0" />
+                                                                        <TextBlock Text="{Binding PriceDeltaDisplay}" FontSize="10" Foreground="#3FB950" FontWeight="Bold" />
+                                                                    </StackPanel>
+                                                                </StackPanel>
+
+                                                                <Button Grid.Column="1" Content="✕ Detach"
+                                                                        Command="{Binding DataContext.DetachBomComponentCommand, RelativeSource={RelativeSource AncestorType=Window}}"
+                                                                        CommandParameter="{Binding}"
+                                                                        Background="#21262D" Foreground="#F85149" BorderBrush="#30363D" Padding="6,3" FontSize="10" FontWeight="SemiBold" VerticalAlignment="Center"
+                                                                        ToolTip="Detach component (optionally return part to stock)" />
+                                                            </Grid>
+                                                        </Border>
+                                                    </DataTemplate>
+                                                </ItemsControl.ItemTemplate>
+                                            </ItemsControl>
+
+                                            <!-- Quick Attach Panel -->
+                                            <Border Background="#0D1117" BorderBrush="#30363D" BorderThickness="1" CornerRadius="6" Padding="10">
+                                                <StackPanel>
+                                                    <TextBlock Text="➕ ATTACH UPGRADE / REPLACEMENT" FontSize="11" FontWeight="Bold" Foreground="#3FB950" Margin="0,0,0,8" />
+
+                                                    <!-- Mode Toggle: Stock vs Free-Form -->
+                                                    <CheckBox Content="Link from Tracked Depot Stock" IsChecked="{Binding AttachFromStock}" Foreground="#58A6FF" FontSize="11" FontWeight="SemiBold" Margin="0,0,0,8"
+                                                              ToolTip="Check to pick from entered inventory stock and decrement quantity. Uncheck to type a free-form spec without stock balance." />
+
+                                                    <!-- Tracked Stock Picker (Visible if AttachFromStock is true) -->
+                                                    <StackPanel Visibility="{Binding AttachFromStock, Converter={StaticResource NullVis}}">
+                                                        <TextBlock Text="PICK FROM DEPOT STOCK" FontSize="10" FontWeight="SemiBold" Foreground="#8B949E" Margin="0,0,0,4" />
+                                                        <ComboBox ItemsSource="{Binding ComponentStock}" SelectedItem="{Binding SelectedBomStockItem}" Margin="0,0,0,8">
+                                                            <ComboBox.ItemTemplate>
+                                                                <DataTemplate>
+                                                                    <StackPanel Orientation="Horizontal">
+                                                                        <TextBlock Text="{Binding CategoryIcon}" Margin="0,0,4,0" />
+                                                                        <TextBlock Text="{Binding ModelName}" FontWeight="SemiBold" Foreground="#F0F6FC" Margin="0,0,8,0" />
+                                                                        <TextBlock Text="{Binding QuantityDisplay}" Foreground="#D29922" Margin="0,0,8,0" FontSize="10" />
+                                                                        <TextBlock Text="{Binding SalePrice, StringFormat='₹{0:N0}'}" Foreground="#3FB950" FontWeight="Bold" />
+                                                                    </StackPanel>
+                                                                </DataTemplate>
+                                                            </ComboBox.ItemTemplate>
+                                                        </ComboBox>
+                                                    </StackPanel>
+
+                                                    <!-- Free-Form Spec Fields -->
+                                                    <TextBlock Text="CATEGORY" FontSize="10" FontWeight="SemiBold" Foreground="#8B949E" Margin="0,0,0,4" />
+                                                    <ComboBox ItemsSource="{Binding BomCategoryOptions}" SelectedItem="{Binding NewBomCategory}" Margin="0,0,0,8" />
+
+                                                    <TextBlock Text="COMPONENT SPEC / DESCRIPTION" FontSize="10" FontWeight="SemiBold" Foreground="#8B949E" Margin="0,0,0,4" />
+                                                    <TextBox Text="{Binding NewBomDescription, UpdateSourceTrigger=PropertyChanged}" ToolTip="e.g. 16GB DDR4 3200MHz SODIMM or 512GB NVMe M.2" Margin="0,0,0,8" />
+
+                                                    <Grid Margin="0,0,0,8">
+                                                        <Grid.ColumnDefinitions>
+                                                            <ColumnDefinition Width="*" />
+                                                            <ColumnDefinition Width="8" />
+                                                            <ColumnDefinition Width="100" />
+                                                        </Grid.ColumnDefinitions>
+                                                        <StackPanel Grid.Column="0">
+                                                            <TextBlock Text="SERIAL # (OPTIONAL)" FontSize="10" FontWeight="SemiBold" Foreground="#8B949E" Margin="0,0,0,4" />
+                                                            <TextBox Text="{Binding NewBomSerial, UpdateSourceTrigger=PropertyChanged}" ToolTip="Leave blank if untracked" />
+                                                        </StackPanel>
+                                                        <StackPanel Grid.Column="2">
+                                                            <TextBlock Text="PRICE DELTA (₹)" FontSize="10" FontWeight="SemiBold" Foreground="#8B949E" Margin="0,0,0,4" />
+                                                            <TextBox Text="{Binding NewBomPriceDelta, UpdateSourceTrigger=PropertyChanged}" ToolTip="Added price for invoice" />
+                                                        </StackPanel>
+                                                    </Grid>
+
+                                                    <Button Content="➕ Attach Component to Machine" Command="{Binding AttachBomComponentCommand}"
+                                                            Background="#238636" Foreground="#FFF" BorderBrush="#2EA043" FontWeight="Bold" Padding="10,6" FontSize="11" />
+                                                </StackPanel>
+                                            </Border>
+                                        </StackPanel>
+                                    </ScrollViewer>
+                                </Grid>
+                            </TabItem>
                         </TabControl>
                     </Border>
                 </Grid>
@@ -979,6 +1099,10 @@
 
                                         <Button Content="➕ Attach Base Unit to Invoice" Command="{Binding AddBaseToDraftCommand}"
                                                 Background="#1F6FEB" Foreground="#FFF" BorderBrush="#388BFD" FontWeight="Bold" Padding="10,6" FontSize="11" />
+
+                                        <Button Content="📥 Import Fitted Upgrades to Draft" Command="{Binding ImportFittedToInvoiceCommand}"
+                                                Background="#21262D" Foreground="#58A6FF" BorderBrush="#30363D" FontWeight="SemiBold" Padding="8,5" FontSize="10" Margin="0,6,0,0"
+                                                ToolTip="Automatically import any recorded fitted upgrades (RAM/SSD) into this invoice draft" />
                                     </StackPanel>
                                 </Border>
 

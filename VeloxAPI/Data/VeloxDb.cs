@@ -176,6 +176,30 @@ INSERT OR IGNORE INTO schema_migrations(version, applied_at_utc) VALUES(1, CURRE
             }
             catch { }
 
+            // Migration: ensure asset_components table exists
+            try
+            {
+                Exec(conn, @"
+CREATE TABLE IF NOT EXISTS asset_components (
+    id                  TEXT PRIMARY KEY,
+    tenant_id           TEXT NOT NULL,
+    parent_asset_id     TEXT NOT NULL,
+    component_asset_id  TEXT NULL,
+    category            TEXT NOT NULL,
+    description         TEXT NOT NULL,
+    serial_number       TEXT NULL,
+    cost_delta          REAL DEFAULT 0,
+    price_delta         REAL DEFAULT 0,
+    installed_at_utc    TEXT NOT NULL,
+    installed_by        TEXT NULL,
+    notes               TEXT NULL,
+    FOREIGN KEY(parent_asset_id) REFERENCES assets(id)
+);
+CREATE INDEX IF NOT EXISTS ix_asset_components_parent ON asset_components(parent_asset_id);
+");
+            }
+            catch { }
+
             // Auto-seed default depot tenant, primary API key, and technician if empty
             using var checkCmd = conn.CreateCommand();
             checkCmd.CommandText = "SELECT COUNT(*) FROM tenants";
@@ -755,6 +779,204 @@ INSERT OR IGNORE INTO schema_migrations(version, applied_at_utc) VALUES(1, CURRE
         SourceBenchId = r.IsDBNull(7) ? "" : r.GetString(7),
         RecordedAtUtc = DateTimeOffset.Parse(r.GetString(8))
     };
+
+    private static FittedComponentDto MapFittedComponent(SqliteDataReader r) => new()
+    {
+        Id               = r.GetString(0),
+        TenantId         = r.GetString(1),
+        ParentAssetId    = r.GetString(2),
+        ComponentAssetId = r.IsDBNull(3) ? null : r.GetString(3),
+        Category         = Enum.TryParse<AssetCategory>(r.GetString(4), true, out var c) ? c : AssetCategory.RAM,
+        Description      = r.GetString(5),
+        SerialNumber     = r.IsDBNull(6) ? null : r.GetString(6),
+        CostDelta        = r.IsDBNull(7) ? 0.0 : r.GetDouble(7),
+        PriceDelta       = r.IsDBNull(8) ? 0.0 : r.GetDouble(8),
+        InstalledAtUtc   = DateTimeOffset.Parse(r.GetString(9)),
+        InstalledBy      = r.IsDBNull(10) ? null : r.GetString(10),
+        Notes            = r.IsDBNull(11) ? null : r.GetString(11)
+    };
+
+    // ── Fitted Components (BOM) ──────────────────────────────────────────────
+
+    public List<FittedComponentDto> ListFittedComponents(string tenantId, string parentAssetId)
+    {
+        lock (_gate)
+        {
+            using var conn = Open();
+            using var cmd = conn.CreateCommand();
+            cmd.CommandText = "SELECT id,tenant_id,parent_asset_id,component_asset_id,category,description,serial_number,cost_delta,price_delta,installed_at_utc,installed_by,notes FROM asset_components WHERE tenant_id=@tid AND parent_asset_id=@pid ORDER BY installed_at_utc ASC";
+            cmd.Parameters.AddWithValue("@tid", tenantId);
+            cmd.Parameters.AddWithValue("@pid", parentAssetId);
+            var list = new List<FittedComponentDto>();
+            using var r = cmd.ExecuteReader();
+            while (r.Read())
+            {
+                list.Add(MapFittedComponent(r));
+            }
+            return list;
+        }
+    }
+
+    public FittedComponentDto AttachComponent(string tenantId, string parentAssetId, AttachComponentRequest req)
+    {
+        var id = "cmp-" + NewId();
+        var now = DateTimeOffset.UtcNow;
+        var nowIso = Iso(now);
+        var desc = req.Description;
+        var sn = req.SerialNumber;
+        var cat = req.Category;
+
+        lock (_gate)
+        {
+            using var conn = Open();
+
+            // If linked to tracked stock asset, decrement stock or fetch details
+            if (!string.IsNullOrWhiteSpace(req.ComponentAssetId))
+            {
+                using var cmdAsset = conn.CreateCommand();
+                cmdAsset.CommandText = "SELECT model, serial_number, category, quantity FROM assets WHERE tenant_id=@tid AND id=@cid";
+                cmdAsset.Parameters.AddWithValue("@tid", tenantId);
+                cmdAsset.Parameters.AddWithValue("@cid", req.ComponentAssetId);
+                using var r = cmdAsset.ExecuteReader();
+                if (r.Read())
+                {
+                    if (string.IsNullOrWhiteSpace(desc)) desc = r.GetString(0);
+                    if (string.IsNullOrWhiteSpace(sn) && !r.IsDBNull(1)) sn = r.GetString(1);
+                    if (Enum.TryParse<AssetCategory>(r.GetString(2), true, out var parsedCat)) cat = parsedCat;
+                    int qty = r.GetInt32(3);
+                    r.Close();
+
+                    // Decrement stock quantity
+                    int newQty = Math.Max(0, qty - 1);
+                    using var updateQty = conn.CreateCommand();
+                    updateQty.CommandText = "UPDATE assets SET quantity=@q, updated_at_utc=@ts WHERE tenant_id=@tid AND id=@cid";
+                    updateQty.Parameters.AddWithValue("@q", newQty);
+                    updateQty.Parameters.AddWithValue("@ts", nowIso);
+                    updateQty.Parameters.AddWithValue("@tid", tenantId);
+                    updateQty.Parameters.AddWithValue("@cid", req.ComponentAssetId);
+                    updateQty.ExecuteNonQuery();
+                }
+            }
+
+            Exec(conn, @"
+INSERT INTO asset_components(id, tenant_id, parent_asset_id, component_asset_id, category, description, serial_number, cost_delta, price_delta, installed_at_utc, installed_by, notes)
+VALUES(@id, @tid, @pid, @cid, @cat, @desc, @sn, @cd, @pd, @ts, @by, @notes)",
+                P("@id", id), P("@tid", tenantId), P("@pid", parentAssetId),
+                P("@cid", (object?)req.ComponentAssetId ?? DBNull.Value),
+                P("@cat", cat.ToString()),
+                P("@desc", desc),
+                P("@sn", (object?)sn ?? DBNull.Value),
+                P("@cd", req.CostDelta),
+                P("@pd", req.PriceDelta),
+                P("@ts", nowIso),
+                P("@by", (object?)req.InstalledBy ?? DBNull.Value),
+                P("@notes", (object?)req.Notes ?? DBNull.Value));
+
+            // Log event to parent asset
+            AppendEvent(tenantId, parentAssetId, new AppendEventRequest
+            {
+                EventType = "ComponentFitted",
+                Actor = req.InstalledBy ?? "Depot Tech",
+                NotesJson = $"{{\"componentId\":\"{id}\",\"category\":\"{cat}\",\"desc\":\"{desc}\"}}"
+            });
+
+            return new FittedComponentDto
+            {
+                Id = id,
+                TenantId = tenantId,
+                ParentAssetId = parentAssetId,
+                ComponentAssetId = req.ComponentAssetId,
+                Category = cat,
+                Description = desc,
+                SerialNumber = sn,
+                CostDelta = req.CostDelta,
+                PriceDelta = req.PriceDelta,
+                InstalledBy = req.InstalledBy,
+                Notes = req.Notes,
+                InstalledAtUtc = now
+            };
+        }
+    }
+
+    public bool DetachComponent(string tenantId, string componentId, DetachComponentRequest req)
+    {
+        lock (_gate)
+        {
+            using var conn = Open();
+
+            // Find component first
+            using var findCmd = conn.CreateCommand();
+            findCmd.CommandText = "SELECT id, parent_asset_id, component_asset_id, category, description, serial_number FROM asset_components WHERE tenant_id=@tid AND id=@id";
+            findCmd.Parameters.AddWithValue("@tid", tenantId);
+            findCmd.Parameters.AddWithValue("@id", componentId);
+
+            string parentId = "";
+            string? compAssetId = null;
+            string categoryStr = "Other";
+            string desc = "";
+            string? sn = null;
+
+            using (var r = findCmd.ExecuteReader())
+            {
+                if (!r.Read()) return false;
+                parentId = r.GetString(1);
+                compAssetId = r.IsDBNull(2) ? null : r.GetString(2);
+                categoryStr = r.GetString(3);
+                desc = r.GetString(4);
+                sn = r.IsDBNull(5) ? null : r.GetString(5);
+            }
+
+            var nowIso = Iso(DateTimeOffset.UtcNow);
+
+            // Handle optional restock
+            if (req.ReturnToStock)
+            {
+                if (!string.IsNullOrWhiteSpace(compAssetId))
+                {
+                    // Existing tracked asset: increment quantity
+                    using var incCmd = conn.CreateCommand();
+                    incCmd.CommandText = "UPDATE assets SET quantity = quantity + 1, updated_at_utc=@ts WHERE tenant_id=@tid AND id=@cid";
+                    incCmd.Parameters.AddWithValue("@ts", nowIso);
+                    incCmd.Parameters.AddWithValue("@tid", tenantId);
+                    incCmd.Parameters.AddWithValue("@cid", compAssetId);
+                    incCmd.ExecuteNonQuery();
+                }
+                else
+                {
+                    // Untracked pulled part: intake as new stock asset
+                    var newAssetId = "ast-" + NewId();
+                    Exec(conn, @"
+INSERT INTO assets(id, tenant_id, serial_number, asset_tag, model, category, quantity, grade, current_location, lifecycle_queue, notes, created_at_utc, updated_at_utc)
+VALUES(@id, @tid, @sn, @tag, @model, @cat, 1, @grade, 'Depot Staging', 'ReadyForSale', @notes, @ts, @ts)",
+                        P("@id", newAssetId), P("@tid", tenantId),
+                        P("@sn", (object?)sn ?? ("PULLED-" + NewId()[..8].ToUpperInvariant())),
+                        P("@tag", "TAG-" + NewId()[..6].ToUpperInvariant()),
+                        P("@model", !string.IsNullOrWhiteSpace(desc) ? desc : "Pulled Spare"),
+                        P("@cat", categoryStr),
+                        P("@grade", req.Condition ?? "Used / Tested"),
+                        P("@notes", $"Pulled from asset {parentId} on {nowIso}"),
+                        P("@ts", nowIso));
+                }
+            }
+
+            // Delete from asset_components
+            using var delCmd = conn.CreateCommand();
+            delCmd.CommandText = "DELETE FROM asset_components WHERE tenant_id=@tid AND id=@id";
+            delCmd.Parameters.AddWithValue("@tid", tenantId);
+            delCmd.Parameters.AddWithValue("@id", componentId);
+            delCmd.ExecuteNonQuery();
+
+            // Log event to parent asset
+            AppendEvent(tenantId, parentId, new AppendEventRequest
+            {
+                EventType = "ComponentDetached",
+                Actor = "Depot Tech",
+                NotesJson = $"{{\"componentId\":\"{componentId}\",\"category\":\"{categoryStr}\",\"returnedToStock\":{req.ReturnToStock.ToString().ToLowerInvariant()}}}"
+            });
+
+            return true;
+        }
+    }
 
     public void Dispose()
     {

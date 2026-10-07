@@ -52,6 +52,9 @@ public enum AssetCategory
     Storage,
     Charger,
     Peripheral,
-    RepairSpare
+    RepairSpare,
+    Battery,
+    Display
 }
+
 
