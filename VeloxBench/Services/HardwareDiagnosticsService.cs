@@ -1003,8 +1003,8 @@ namespace SuperAutoMater.Wpf.Services
                 }
 
                 BatteryTelemetry.FlowWatts = BatteryTelemetry.PowerOnline
-                    ? (BatteryTelemetry.IsCharging ? $"+{(Math.Abs(BatteryTelemetry.ChargeDischargeRateMw) / 1000.0):0.0}W (Charging)" : "0.0W (AC Standby Float)")
-                    : $"-{(Math.Abs(BatteryTelemetry.ChargeDischargeRateMw) / 1000.0):0.0}W (Discharging)";
+                    ? (BatteryTelemetry.IsCharging ? $"+{(Math.Abs(BatteryTelemetry.ChargeDischargeRateMw) / 1000.0):0.1}W (Charging)" : "0.0W (AC Float)")
+                    : $"-{(Math.Abs(BatteryTelemetry.ChargeDischargeRateMw) / 1000.0):0.1}W (Discharging)";
 
                 BatteryTelemetry.TimeRemaining = BatteryTelemetry.PowerOnline
                     ? (BatteryTelemetry.IsCharging ? "Charging to 100%" : "Full (AC Float)")

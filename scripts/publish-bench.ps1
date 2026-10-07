@@ -7,8 +7,12 @@ param (
 
 Write-Host "Publishing VeloxBench ($Runtime) to $OutputDir..." -ForegroundColor Cyan
 
+if (Test-Path "$OutputDir/VeloxBench.old.exe") {
+    Remove-Item "$OutputDir/VeloxBench.old.exe" -Force -ErrorAction SilentlyContinue
+}
 if (Test-Path "$OutputDir/VeloxBench.exe") {
-    Rename-Item -Path "$OutputDir/VeloxBench.exe" -NewName "VeloxBench.old.exe" -Force -ErrorAction SilentlyContinue
+    $ts = [DateTimeOffset]::UtcNow.ToUnixTimeSeconds()
+    Rename-Item -Path "$OutputDir/VeloxBench.exe" -NewName "VeloxBench.old-$ts.exe" -Force -ErrorAction SilentlyContinue
 }
 
 dotnet publish "$PSScriptRoot/../VeloxBench/VeloxBench.csproj" `

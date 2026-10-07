@@ -93,10 +93,10 @@
                     </StackPanel>
 
                     <!-- Technician Operator Badge Pill [Alt+T] -->
-                    <Border x:Name="BtnTechnicianPill" Background="#161B22" BorderBrush="#30363D" BorderThickness="1" CornerRadius="6" Padding="8,3" Cursor="Hand" MouseLeftButtonUp="BtnTechnicianPill_Click" ToolTip="Click to change Technician or scan QR/Barcode badge [Alt+T]" Margin="10,0,0,0" VerticalAlignment="Center">
+                    <Border x:Name="BtnTechnicianPill" Background="#161B22" BorderBrush="#30363D" BorderThickness="1" CornerRadius="6" Padding="8,3" Cursor="Hand" MouseLeftButtonUp="BtnTechnicianPill_Click" ToolTip="{Binding TechnicianDisplayBadge}" Margin="10,0,0,0" VerticalAlignment="Center">
                         <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
                             <TextBlock Text="👤 " FontSize="11" VerticalAlignment="Center"/>
-                            <TextBlock Text="{Binding TechnicianDisplayBadge}" Style="{StaticResource TextBadgeMono}" FontWeight="Bold" Foreground="#58A6FF"/>
+                            <TextBlock Text="{Binding TechnicianShortBadge}" Style="{StaticResource TextBadgeMono}" FontWeight="Bold" Foreground="#58A6FF"/>
                             <TextBlock Text=" 📷" FontSize="9" Foreground="#8B949E" Margin="4,0,0,0"/>
                         </StackPanel>
                     </Border>
@@ -144,7 +144,7 @@
                     <Border DockPanel.Dock="Right" Style="{StaticResource StyleTelemetryChip}" Margin="6,0,0,0">
                         <StackPanel Orientation="Horizontal">
                             <TextBlock Text="WI-FI " Style="{StaticResource TextAvionicsChip}" Foreground="{StaticResource BrushTextVioletMuted}"/>
-                            <TextBlock Text="{Binding WifiSummary}" Style="{StaticResource TextAvionicsChip}" FontWeight="Bold" Foreground="{StaticResource BrushTextVioletLight}"/>
+                            <TextBlock Text="{Binding WifiSummary}" Style="{StaticResource TextAvionicsChip}" FontWeight="Bold" Foreground="{StaticResource BrushTextVioletLight}" TextTrimming="CharacterEllipsis" MaxWidth="130"/>
                         </StackPanel>
                     </Border>
 
@@ -152,7 +152,7 @@
                     <Border DockPanel.Dock="Right" Style="{StaticResource StyleTelemetryChip}" Margin="6,0,0,0">
                         <StackPanel Orientation="Horizontal">
                             <TextBlock Text="CPU FREQ " Style="{StaticResource TextAvionicsChip}" Foreground="{StaticResource BrushTextVioletMuted}"/>
-                            <TextBlock Text="{Binding ClockSummary}" Style="{StaticResource TextAvionicsChip}" FontWeight="Bold" Foreground="{StaticResource BrushTextVioletLight}"/>
+                            <TextBlock Text="{Binding ClockSummary}" Style="{StaticResource TextAvionicsChip}" FontWeight="Bold" Foreground="{StaticResource BrushTextVioletLight}" TextTrimming="CharacterEllipsis" MaxWidth="110"/>
                             <TextBlock Text=" TURBO" Style="{StaticResource TextBadgeMono}" Foreground="{StaticResource BrushTextEmerald}" Margin="4,0,0,0"/>
                         </StackPanel>
                     </Border>
@@ -162,7 +162,7 @@
                         <StackPanel Orientation="Horizontal">
                             <TextBlock Text="BATTERY " Style="{StaticResource TextAvionicsChip}" Foreground="{StaticResource BrushTextVioletMuted}"/>
                             <TextBlock Text="{Binding BatteryCharge, StringFormat='{}{0}%'}" Style="{StaticResource TextAvionicsChip}" FontWeight="Bold" Foreground="{StaticResource BrushTextEmerald}"/>
-                            <TextBlock Text="{Binding BatteryFlowWatts, StringFormat=' ({0})'}" Style="{StaticResource TextAvionicsChip}" Foreground="{StaticResource BrushTextVioletSubdued}"/>
+                            <TextBlock Text="{Binding BatteryFlowWatts, StringFormat=' · {0}'}" Style="{StaticResource TextAvionicsChip}" Foreground="{StaticResource BrushTextVioletSubdued}" TextTrimming="CharacterEllipsis" MaxWidth="120"/>
                         </StackPanel>
                     </Border>
                 </DockPanel>
@@ -431,17 +431,17 @@
                     <!-- CARD 4: BATTERY TELEMETRY -->
                     <controls:BentoCard Grid.Column="3" Title="BATTERY POWER" SubtitleBadge="{Binding BatteryIntegrityBadge}" Margin="6,0,0,0">
                         <StackPanel Margin="0,4,0,0">
-                            <TextBlock Text="{Binding BatteryFlowWatts}" Style="{StaticResource TextCardValueLarge}"/>
+                            <TextBlock Text="{Binding BatteryFlowWatts}" Style="{StaticResource TextCardValueLarge}" TextTrimming="CharacterEllipsis"/>
                             <DockPanel LastChildFill="False" Margin="0,6,0,0">
-                                <TextBlock DockPanel.Dock="Left" Text="{Binding BatteryWearSummary}" Style="{StaticResource TextCardSubtle}" Foreground="{StaticResource BrushTextAmber}"/>
+                                <TextBlock DockPanel.Dock="Left" Text="{Binding BatteryWearSummary}" Style="{StaticResource TextCardSubtle}" Foreground="{StaticResource BrushTextAmber}" TextTrimming="CharacterEllipsis" MaxWidth="150"/>
                                 <TextBlock DockPanel.Dock="Right" Text="{Binding BatteryTimeRemaining}" Style="{StaticResource TextBadgeMono}" Foreground="{StaticResource BrushTextVioletLight}"/>
                             </DockPanel>
                         </StackPanel>
                     </controls:BentoCard>
                 </Grid>
 
-                <!-- Main Interactive Arena (Row 1) -->
-                <Grid Grid.Row="1">
+                <!-- Main Interactive Arena (Row 2: fills all available remaining height, no bottom buffer gap) -->
+                <Grid Grid.Row="2">
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="8.2*"/> <!-- Dynamic Diagnostic Workbench -->
                         <ColumnDefinition Width="3.8*"/> <!-- Avionics QC Audit & Inventory Console -->

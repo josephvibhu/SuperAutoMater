@@ -421,7 +421,7 @@ namespace SuperAutoMater.Wpf.ViewModels
                 OnPropertyChanged(nameof(AutoAdvanceBadgeColor));
             }
         }
-        public string AutoAdvanceStatusText => _isAutoAdvanceEnabled ? "AUTO-ADVANCE ON" : "AUTO-ADVANCE OFF";
+        public string AutoAdvanceStatusText => _isAutoAdvanceEnabled ? "AUTO ON" : "AUTO OFF";
         public string AutoAdvanceBadgeColor => _isAutoAdvanceEnabled ? "#3FB950" : "#8B949E";
 
         // Battery Load Sag Test Properties
@@ -1249,6 +1249,7 @@ namespace SuperAutoMater.Wpf.ViewModels
         public string TechnicianId => TechnicianProfileService.Instance.CurrentProfile.Id;
         public string TechnicianStation => TechnicianProfileService.Instance.CurrentProfile.StationBay;
         public string TechnicianDisplayBadge => TechnicianProfileService.Instance.CurrentProfile.DisplayBadge;
+        public string TechnicianShortBadge => !string.IsNullOrWhiteSpace(TechnicianId) ? TechnicianId : (!string.IsNullOrWhiteSpace(TechnicianName) ? TechnicianName : "TECH-01");
 
         // PnP Device Manager Driver Audit
         private DriverAuditResult _driverAudit = new DriverAuditResult();
