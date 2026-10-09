@@ -21,16 +21,16 @@ namespace VeloxManager.Controls
 
         public int UpdatedCount { get; private set; }
 
-        public MassAssetUpdateModalWindow(IEnumerable<AssetItemViewModel> allAssets, string? initialInputs = null)
+        public MassAssetUpdateModalWindow(IEnumerable<AssetItemViewModel>? allAssets, string? initialInputs = null)
         {
             InitializeComponent();
-            _allAssets = allAssets.ToList();
+            _allAssets = allAssets?.ToList() ?? new List<AssetItemViewModel>();
 
-            ChkUpdateStatus.IsChecked = true;
+            if (ChkUpdateStatus != null) ChkUpdateStatus.IsChecked = true;
             if (CmbTargetStatus != null) CmbTargetStatus.IsEnabled = true;
             if (TxtTargetOutDate != null) TxtTargetOutDate.Text = DateTime.Now.ToString("yyyy-MM-dd");
 
-            if (!string.IsNullOrWhiteSpace(initialInputs))
+            if (!string.IsNullOrWhiteSpace(initialInputs) && TxtAssetInputs != null)
             {
                 TxtAssetInputs.Text = initialInputs;
                 PerformMatch();

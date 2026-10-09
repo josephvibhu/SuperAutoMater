@@ -3,7 +3,7 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         Title="VeloxManager — Mass Asset Batch Update Tool"
         Height="780" Width="1080"
-        WindowStartupLocation="CenterOwner"
+        WindowStartupLocation="CenterScreen"
         Background="#0D1117" Foreground="#F0F6FC"
         FontFamily="Segoe UI" FontSize="13">
 
