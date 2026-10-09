@@ -545,6 +545,7 @@ public class ManagerViewModel : INotifyPropertyChanged
     public ICommand CopyEmployeeIdCommand { get; }
     public ICommand CopyEmployeeStationCommand { get; }
     public ICommand SelectEmployeeForPinResetCommand { get; }
+    public ICommand OpenShowroomWebCommand { get; }
 
     public ManagerViewModel()
     {
@@ -582,6 +583,7 @@ public class ManagerViewModel : INotifyPropertyChanged
         CopyAssetTagCommand = new RelayCommand(p => CopyAssetTag(p as AssetItemViewModel));
         CopySerialNumberCommand = new RelayCommand(p => CopySerialNumber(p as AssetItemViewModel));
         DeleteAssetCommand = new RelayCommand(async p => await DeleteAssetAsync(p as AssetItemViewModel));
+        OpenShowroomWebCommand = new RelayCommand(_ => OpenShowroomWeb());
 
         // Wire up Real-Time Events
         _api.CloudConnectionChanged += connected =>
@@ -1434,6 +1436,23 @@ public class ManagerViewModel : INotifyPropertyChanged
         catch (Exception ex)
         {
             MessageBox.Show($"Export error: {ex.Message}", "Export Failed", MessageBoxButton.OK, MessageBoxImage.Error);
+        }
+    }
+
+    private void OpenShowroomWeb()
+    {
+        try
+        {
+            var url = $"{ManagerConfigService.Current.ApiUrl.TrimEnd('/')}/showroom";
+            System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo
+            {
+                FileName = url,
+                UseShellExecute = true
+            });
+        }
+        catch (Exception ex)
+        {
+            MessageBox.Show($"Unable to launch web browser:\n{ex.Message}", "VeloxShowroom", MessageBoxButton.OK, MessageBoxImage.Warning);
         }
     }
 

@@ -31,6 +31,10 @@ public sealed class ApiKeyMiddleware(RequestDelegate next)
             {
                 ctx.Items["TenantId"] = headerTenant;
             }
+            else
+            {
+                ctx.Items["TenantId"] = "tenant-default";
+            }
         }
 
         // Static files and UI routes bypass API key requirement
@@ -43,7 +47,8 @@ public sealed class ApiKeyMiddleware(RequestDelegate next)
         // Unauthenticated routes (admin routes enforce X-Admin-Secret internally)
         if (path == "/health" ||
             path.StartsWith("/api/v1/auth", StringComparison.OrdinalIgnoreCase) ||
-            path.StartsWith("/api/v1/admin", StringComparison.OrdinalIgnoreCase))
+            path.StartsWith("/api/v1/admin", StringComparison.OrdinalIgnoreCase) ||
+            path.StartsWith("/api/v1/showroom", StringComparison.OrdinalIgnoreCase))
         {
             await next(ctx);
             return;

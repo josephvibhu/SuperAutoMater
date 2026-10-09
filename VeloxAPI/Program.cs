@@ -70,6 +70,7 @@ app.MapEmployeeEndpoints();
 app.MapSseEndpoints();
 app.MapJobEndpoints();
 app.MapAdminEndpoints();
+app.MapShowroomEndpoints();
 
 app.Run();
 
