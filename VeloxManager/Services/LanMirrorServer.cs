@@ -85,7 +85,7 @@ public class LanMirrorServer
         }
         catch { }
 
-        // Attempt 3: Bind localhost, 127.0.0.1, and local LAN IP (works without elevated permissions)
+        // Attempt 3: Bind localhost, 127.0.0.1, and local LAN IP
         try
         {
             _listener = new HttpListener();
@@ -94,8 +94,23 @@ public class LanMirrorServer
             var localIp = GetLocalIpAddress();
             if (localIp != "127.0.0.1")
             {
-                try { _listener.Prefixes.Add($"http://{localIp}:{port}/"); } catch { }
+                _listener.Prefixes.Add($"http://{localIp}:{port}/");
             }
+            _listener.Start();
+            IsRunning = true;
+            ServerAddress = $"http://{localIp}:{port}/";
+            _cts = new CancellationTokenSource();
+            _ = ListenLoopAsync(_cts.Token);
+            return;
+        }
+        catch { }
+
+        // Attempt 4: Bind localhost and 127.0.0.1 ONLY (100% guaranteed to succeed without admin permissions)
+        try
+        {
+            _listener = new HttpListener();
+            _listener.Prefixes.Add($"http://localhost:{port}/");
+            _listener.Prefixes.Add($"http://127.0.0.1:{port}/");
             _listener.Start();
             IsRunning = true;
             ServerAddress = $"http://localhost:{port}/";
