@@ -93,6 +93,19 @@ public static class AssetEndpoints
             return Results.Ok(asset);
         });
 
+        // DELETE /api/v1/assets/{id}
+        grp.MapDelete("/{id}", async (string id, HttpContext ctx, VeloxDb db, SseHub sse) =>
+        {
+            var tenantId = ctx.TenantId();
+            if (tenantId == null) return Results.Unauthorized();
+
+            var ok = db.DeleteAsset(tenantId, id);
+            if (!ok) return Results.NotFound(new { error = "Asset not found." });
+
+            await sse.BroadcastAsync(SseEventType.AssetUpdated, new { id, deleted = true });
+            return Results.Ok(new { success = true, id });
+        });
+
         // POST /api/v1/assets/{id}/events
         grp.MapPost("/{id}/events", async (string id, AppendEventRequest req, HttpContext ctx, VeloxDb db, SseHub sse) =>
         {

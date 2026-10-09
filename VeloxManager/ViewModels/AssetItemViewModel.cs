@@ -15,10 +15,44 @@ public class AssetItemViewModel : INotifyPropertyChanged
     public string AssetTag => Model.AssetTag;
     public string ModelName => Model.Model;
     public string Supplier => Model.Supplier;
-    public string Customer => Model.Customer;
+    public string Customer
+    {
+        get => Model.Customer;
+        set
+        {
+            if (Model.Customer != value)
+            {
+                Model.Customer = value;
+                OnPropertyChanged();
+            }
+        }
+    }
+    public string OutDate
+    {
+        get => Model.OutDate;
+        set
+        {
+            if (Model.OutDate != value)
+            {
+                Model.OutDate = value;
+                OnPropertyChanged();
+            }
+        }
+    }
     public int StorageHealth => Model.StorageHealth ?? 100;
     public string MissingComponents => Model.MissingComponents;
-    public string Notes => Model.Notes;
+    public string Notes
+    {
+        get => Model.Notes;
+        set
+        {
+            if (Model.Notes != value)
+            {
+                Model.Notes = value;
+                OnPropertyChanged();
+            }
+        }
+    }
     public double? PurchasePrice => Model.PurchasePrice;
     public double? SalePrice => Model.SalePrice;
     public DateTimeOffset UpdatedAt => Model.UpdatedAtUtc;

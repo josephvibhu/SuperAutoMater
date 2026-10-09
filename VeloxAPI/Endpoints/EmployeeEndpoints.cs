@@ -63,5 +63,18 @@ public static class EmployeeEndpoints
             await sse.BroadcastAsync(SseEventType.EmployeeUpdated, emp);
             return Results.Ok(emp);
         });
+
+        // DELETE /api/v1/employees/{id}
+        grp.MapDelete("/{id}", async (string id, HttpContext ctx, VeloxDb db, SseHub sse) =>
+        {
+            var tenantId = ctx.TenantId();
+            if (tenantId == null) return Results.Unauthorized();
+
+            var ok = db.DeleteEmployee(tenantId, id);
+            if (!ok) return Results.NotFound(new { error = "Employee not found." });
+
+            await sse.BroadcastAsync(SseEventType.EmployeeUpdated, new { id, deleted = true });
+            return Results.Ok(new { success = true, id });
+        });
     }
 }

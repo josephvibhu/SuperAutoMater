@@ -298,6 +298,19 @@ public class ManagerApiClient
         }
     }
 
+    public async Task<bool> DeleteAssetAsync(string assetId)
+    {
+        try
+        {
+            var res = await _http.DeleteAsync($"api/v1/assets/{assetId}");
+            return res.IsSuccessStatusCode;
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
     public async Task<bool> AssignAssetAsync(string assetId, string employeeId, string? actor = null)
     {
         try
@@ -382,6 +395,19 @@ public class ManagerApiClient
     {
         var updated = await PatchEmployeeAsync(id, new PatchEmployeeRequest { StationId = stationId });
         return updated != null;
+    }
+
+    public async Task<bool> DeleteEmployeeAsync(string id)
+    {
+        try
+        {
+            var res = await _http.DeleteAsync($"api/v1/employees/{id}");
+            return res.IsSuccessStatusCode;
+        }
+        catch
+        {
+            return false;
+        }
     }
 
     // ── Fitted Components (BOM) ──────────────────────────────────────────────

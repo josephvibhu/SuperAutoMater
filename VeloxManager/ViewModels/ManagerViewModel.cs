@@ -534,6 +534,17 @@ public class ManagerViewModel : INotifyPropertyChanged
     public ICommand ImportFittedToInvoiceCommand { get; }
     public ICommand ImportExcelCommand { get; }
     public ICommand ExportCsvCommand { get; }
+    public ICommand OpenMassUpdateCommand { get; }
+    public ICommand QuickMarkSoldCommand { get; }
+    public ICommand QuickMarkRtsCommand { get; }
+    public ICommand QuickMarkWipCommand { get; }
+    public ICommand CopyAssetTagCommand { get; }
+    public ICommand CopySerialNumberCommand { get; }
+    public ICommand DeleteAssetCommand { get; }
+    public ICommand DeleteEmployeeCommand { get; }
+    public ICommand CopyEmployeeIdCommand { get; }
+    public ICommand CopyEmployeeStationCommand { get; }
+    public ICommand SelectEmployeeForPinResetCommand { get; }
 
     public ManagerViewModel()
     {
@@ -545,7 +556,11 @@ public class ManagerViewModel : INotifyPropertyChanged
         CreateEmployeeCommand = new RelayCommand(async _ => await CreateNewEmployeeAsync());
         ResetEmployeePinCommand = new RelayCommand(async _ => await ResetSelectedEmployeePinAsync());
         UpdateEmployeeStationCommand = new RelayCommand(async _ => await UpdateSelectedEmployeeStationAsync());
-        ToggleEmployeeActiveCommand = new RelayCommand(async _ => await ToggleSelectedEmployeeActiveAsync());
+        ToggleEmployeeActiveCommand = new RelayCommand(async p => await ToggleSelectedEmployeeActiveAsync(p as EmployeeDto));
+        DeleteEmployeeCommand = new RelayCommand(async p => await DeleteEmployeeAsync(p as EmployeeDto));
+        CopyEmployeeIdCommand = new RelayCommand(p => CopyEmployeeId(p as EmployeeDto));
+        CopyEmployeeStationCommand = new RelayCommand(p => CopyEmployeeStation(p as EmployeeDto));
+        SelectEmployeeForPinResetCommand = new RelayCommand(p => SelectEmployeeForPinReset(p as EmployeeDto));
         QuickIntakeCommand = new RelayCommand(async _ => await QuickIntakeStockAsync());
         AddBaseToDraftCommand = new RelayCommand(_ => AddBaseMachineToInvoice());
         AddComponentToDraftCommand = new RelayCommand(_ => AddComponentToInvoice());
@@ -560,6 +575,13 @@ public class ManagerViewModel : INotifyPropertyChanged
         ImportFittedToInvoiceCommand = new RelayCommand(_ => ImportFittedToInvoice());
         ImportExcelCommand = new RelayCommand(_ => OpenImportExcelDialog());
         ExportCsvCommand = new RelayCommand(_ => ExportAssetsToCsv());
+        OpenMassUpdateCommand = new RelayCommand(p => OpenMassUpdateDialog(p as AssetItemViewModel));
+        QuickMarkSoldCommand = new RelayCommand(async p => await QuickUpdateAssetStatusAsync(p as AssetItemViewModel, LifecycleQueue.Sold));
+        QuickMarkRtsCommand = new RelayCommand(async p => await QuickUpdateAssetStatusAsync(p as AssetItemViewModel, LifecycleQueue.ReadyForSale));
+        QuickMarkWipCommand = new RelayCommand(async p => await QuickUpdateAssetStatusAsync(p as AssetItemViewModel, LifecycleQueue.ActiveTesting));
+        CopyAssetTagCommand = new RelayCommand(p => CopyAssetTag(p as AssetItemViewModel));
+        CopySerialNumberCommand = new RelayCommand(p => CopySerialNumber(p as AssetItemViewModel));
+        DeleteAssetCommand = new RelayCommand(async p => await DeleteAssetAsync(p as AssetItemViewModel));
 
         // Wire up Real-Time Events
         _api.CloudConnectionChanged += connected =>
@@ -1210,15 +1232,65 @@ public class ManagerViewModel : INotifyPropertyChanged
         }
     }
 
-    public async Task ToggleSelectedEmployeeActiveAsync()
+    public async Task ToggleSelectedEmployeeActiveAsync(EmployeeDto? target = null)
     {
-        if (SelectedEmployeeForEdit == null) return;
-        var newStatus = !SelectedEmployeeForEdit.IsActive;
-        var updated = await _api.PatchEmployeeAsync(SelectedEmployeeForEdit.Id, new PatchEmployeeRequest { IsActive = newStatus });
+        var emp = target ?? SelectedEmployeeForEdit;
+        if (emp == null) return;
+        var newStatus = !emp.IsActive;
+        var updated = await _api.PatchEmployeeAsync(emp.Id, new PatchEmployeeRequest { IsActive = newStatus });
         if (updated != null)
         {
-            LiveActivityFeed.Insert(0, $"[{DateTime.Now:HH:mm:ss}] {SelectedEmployeeForEdit.Name} status toggled: {(newStatus ? "ACTIVE" : "INACTIVE")}");
+            LiveActivityFeed.Insert(0, $"[{DateTime.Now:HH:mm:ss}] {emp.Name} status toggled: {(newStatus ? "ACTIVE" : "INACTIVE")}");
             await LoadAssetsAndEmployeesAsync();
+        }
+    }
+
+    public async Task DeleteEmployeeAsync(EmployeeDto? target = null)
+    {
+        var emp = target ?? SelectedEmployeeForEdit;
+        if (emp == null) return;
+
+        var confirm = VeloxMessageBox.Show(
+            $"Are you sure you want to permanently delete technician '{emp.Name}' (Station: {emp.StationId})?\n\nAny currently assigned assets will be unassigned.",
+            "Confirm Delete Technician", MessageBoxButton.YesNo, MessageBoxImage.Warning);
+
+        if (confirm != MessageBoxResult.Yes) return;
+
+        var ok = await _api.DeleteEmployeeAsync(emp.Id);
+        if (ok)
+        {
+            if (SelectedEmployeeForEdit?.Id == emp.Id)
+            {
+                SelectedEmployeeForEdit = null;
+            }
+            Employees.Remove(emp);
+            LiveActivityFeed.Insert(0, $"[{DateTime.Now:HH:mm:ss}] Technician deleted: {emp.Name}");
+            VeloxMessageBox.Show($"Technician '{emp.Name}' deleted successfully.", "Technician Deleted", MessageBoxButton.OK, MessageBoxImage.Information);
+            await LoadAssetsAndEmployeesAsync();
+        }
+        else
+        {
+            VeloxMessageBox.Show($"Failed to delete technician '{emp.Name}'.", "Delete Failed", MessageBoxButton.OK, MessageBoxImage.Error);
+        }
+    }
+
+    private void CopyEmployeeId(EmployeeDto? emp)
+    {
+        var e = emp ?? SelectedEmployeeForEdit;
+        if (e != null && !string.IsNullOrWhiteSpace(e.Id)) Clipboard.SetText(e.Id);
+    }
+
+    private void CopyEmployeeStation(EmployeeDto? emp)
+    {
+        var e = emp ?? SelectedEmployeeForEdit;
+        if (e != null && !string.IsNullOrWhiteSpace(e.StationId)) Clipboard.SetText(e.StationId);
+    }
+
+    private void SelectEmployeeForPinReset(EmployeeDto? emp)
+    {
+        if (emp != null)
+        {
+            SelectedEmployeeForEdit = emp;
         }
     }
 
@@ -1245,6 +1317,93 @@ public class ManagerViewModel : INotifyPropertyChanged
         if (win.ShowDialog() == true)
         {
             _ = LoadAssetsAndEmployeesAsync();
+        }
+    }
+
+    private void OpenMassUpdateDialog(AssetItemViewModel? initialAsset = null)
+    {
+        string? initialInput = initialAsset != null ? (!string.IsNullOrWhiteSpace(initialAsset.AssetTag) ? initialAsset.AssetTag : initialAsset.SerialNumber) : null;
+        var win = new VeloxManager.Controls.MassAssetUpdateModalWindow(Assets, initialInput)
+        {
+            Owner = Application.Current?.MainWindow
+        };
+        if (win.ShowDialog() == true)
+        {
+            ApplyFilter();
+            RefreshMetrics();
+            LiveActivityFeed.Insert(0, $"[{DateTime.Now:HH:mm:ss}] Batch mass update applied to {win.UpdatedCount} assets");
+        }
+    }
+
+    private async Task QuickUpdateAssetStatusAsync(AssetItemViewModel? target, LifecycleQueue newStatus)
+    {
+        var asset = target ?? SelectedAsset;
+        if (asset == null) return;
+
+        var patch = new PatchAssetRequest
+        {
+            LifecycleQueue = newStatus,
+            Actor = ManagerConfigService.Current.ManagerName
+        };
+
+        if (newStatus == LifecycleQueue.Sold)
+        {
+            patch.OutDate = DateTime.Now.ToString("yyyy-MM-dd");
+        }
+
+        var ok = await _api.PatchAssetAsync(asset.Id, patch);
+        if (ok)
+        {
+            asset.Status = newStatus;
+            if (newStatus == LifecycleQueue.Sold && patch.OutDate != null) asset.OutDate = patch.OutDate;
+            ApplyFilter();
+            RefreshMetrics();
+            LiveActivityFeed.Insert(0, $"[{DateTime.Now:HH:mm:ss}] {asset.AssetTag} status updated to {newStatus}");
+        }
+    }
+
+    private void CopyAssetTag(AssetItemViewModel? asset)
+    {
+        var a = asset ?? SelectedAsset;
+        if (a != null && !string.IsNullOrWhiteSpace(a.AssetTag))
+        {
+            Clipboard.SetText(a.AssetTag);
+        }
+    }
+
+    private void CopySerialNumber(AssetItemViewModel? asset)
+    {
+        var a = asset ?? SelectedAsset;
+        if (a != null && !string.IsNullOrWhiteSpace(a.SerialNumber))
+        {
+            Clipboard.SetText(a.SerialNumber);
+        }
+    }
+
+    private async Task DeleteAssetAsync(AssetItemViewModel? target)
+    {
+        var asset = target ?? SelectedAsset;
+        if (asset == null) return;
+
+        var confirm = VeloxMessageBox.Show(
+            $"Are you sure you want to permanently delete asset '{asset.AssetTag}' ({asset.ModelName}) from the database?\n\nThis will remove all associated service history events and BOM fitted components.",
+            "Confirm Delete Asset", MessageBoxButton.YesNo, MessageBoxImage.Warning);
+
+        if (confirm != MessageBoxResult.Yes) return;
+
+        var ok = await _api.DeleteAssetAsync(asset.Id);
+        if (ok)
+        {
+            Assets.Remove(asset);
+            if (SelectedAsset == asset) SelectedAsset = null;
+            ApplyFilter();
+            RefreshMetrics();
+            LiveActivityFeed.Insert(0, $"[{DateTime.Now:HH:mm:ss}] Deleted asset {asset.AssetTag} ({asset.SerialNumber})");
+            VeloxMessageBox.Show($"Asset {asset.AssetTag} successfully deleted.", "Asset Deleted", MessageBoxButton.OK, MessageBoxImage.Information);
+        }
+        else
+        {
+            VeloxMessageBox.Show($"Failed to delete asset {asset.AssetTag}.", "Delete Failed", MessageBoxButton.OK, MessageBoxImage.Error);
         }
     }
 

@@ -70,163 +70,6 @@
             <Setter Property="FontSize" Value="13" />
         </Style>
 
-        <!-- ComboBox Toggle Button Template -->
-        <ControlTemplate x:Key="ComboBoxToggleButtonTemplate" TargetType="ToggleButton">
-            <Grid>
-                <Border x:Name="Border" Background="{TemplateBinding Background}" BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="{TemplateBinding BorderThickness}" CornerRadius="6" />
-                <Path x:Name="Arrow" HorizontalAlignment="Right" VerticalAlignment="Center" Margin="0,0,10,0" Fill="#8B949E" Data="M 0 0 L 4 4 L 8 0 Z" />
-            </Grid>
-            <ControlTemplate.Triggers>
-                <Trigger Property="IsMouseOver" Value="True">
-                    <Setter TargetName="Border" Property="BorderBrush" Value="#58A6FF" />
-                    <Setter TargetName="Arrow" Property="Fill" Value="#58A6FF" />
-                </Trigger>
-            </ControlTemplate.Triggers>
-        </ControlTemplate>
-
-        <!-- Dark ComboBox Style -->
-        <Style TargetType="ComboBox">
-            <Setter Property="Background" Value="#161B22" />
-            <Setter Property="Foreground" Value="#F0F6FC" />
-            <Setter Property="BorderBrush" Value="#30363D" />
-            <Setter Property="BorderThickness" Value="1" />
-            <Setter Property="Padding" Value="8,5" />
-            <Setter Property="SnapsToDevicePixels" Value="True" />
-            <Setter Property="ScrollViewer.HorizontalScrollBarVisibility" Value="Auto" />
-            <Setter Property="ScrollViewer.VerticalScrollBarVisibility" Value="Auto" />
-            <Setter Property="Template">
-                <Setter.Value>
-                    <ControlTemplate TargetType="ComboBox">
-                        <Grid>
-                            <ToggleButton Name="ToggleButton"
-                                          Template="{StaticResource ComboBoxToggleButtonTemplate}"
-                                          Background="{TemplateBinding Background}"
-                                          BorderBrush="{TemplateBinding BorderBrush}"
-                                          BorderThickness="{TemplateBinding BorderThickness}"
-                                          Focusable="False"
-                                          IsChecked="{Binding Path=IsDropDownOpen, Mode=TwoWay, RelativeSource={RelativeSource TemplatedParent}}"
-                                          ClickMode="Press" />
-                            <ContentPresenter Name="ContentSite"
-                                              IsHitTestVisible="False"
-                                              Content="{TemplateBinding SelectionBoxItem}"
-                                              ContentTemplate="{TemplateBinding SelectionBoxItemTemplate}"
-                                              Margin="8,3,28,3"
-                                              VerticalAlignment="Center"
-                                              HorizontalAlignment="Left" />
-                            <Popup Name="Popup"
-                                   Placement="Bottom"
-                                   IsOpen="{TemplateBinding IsDropDownOpen}"
-                                   AllowsTransparency="True"
-                                   Focusable="False"
-                                   PopupAnimation="Slide">
-                                <Grid Name="DropDown"
-                                      SnapsToDevicePixels="True"
-                                      MinWidth="{TemplateBinding ActualWidth}"
-                                      MaxHeight="{TemplateBinding MaxDropDownHeight}">
-                                    <Border Name="DropDownBorder"
-                                            Background="#161B22"
-                                            BorderBrush="#30363D"
-                                            BorderThickness="1"
-                                            CornerRadius="6"
-                                            Margin="0,2,0,2">
-                                        <ScrollViewer Margin="4,4,4,4" SnapsToDevicePixels="True">
-                                            <StackPanel IsItemsHost="True" KeyboardNavigation.DirectionalNavigation="Contained" />
-                                        </ScrollViewer>
-                                    </Border>
-                                </Grid>
-                            </Popup>
-                        </Grid>
-                    </ControlTemplate>
-                </Setter.Value>
-            </Setter>
-        </Style>
-
-        <!-- Dark ComboBoxItem Style -->
-        <Style TargetType="ComboBoxItem">
-            <Setter Property="Background" Value="Transparent" />
-            <Setter Property="Foreground" Value="#F0F6FC" />
-            <Setter Property="Padding" Value="8,5" />
-            <Setter Property="Template">
-                <Setter.Value>
-                    <ControlTemplate TargetType="ComboBoxItem">
-                        <Border x:Name="Border" Background="{TemplateBinding Background}" Padding="{TemplateBinding Padding}" CornerRadius="4" Margin="1">
-                            <ContentPresenter />
-                        </Border>
-                        <ControlTemplate.Triggers>
-                            <Trigger Property="IsHighlighted" Value="True">
-                                <Setter TargetName="Border" Property="Background" Value="#1F6FEB" />
-                                <Setter Property="Foreground" Value="#FFFFFF" />
-                            </Trigger>
-                            <Trigger Property="IsSelected" Value="True">
-                                <Setter TargetName="Border" Property="Background" Value="#238636" />
-                                <Setter Property="Foreground" Value="#FFFFFF" />
-                            </Trigger>
-                        </ControlTemplate.Triggers>
-                    </ControlTemplate>
-                </Setter.Value>
-            </Setter>
-        </Style>
-
-        <!-- Dark DataGrid Column Header Style (Eradicates Windows Aero White Header) -->
-        <Style TargetType="DataGridColumnHeader">
-            <Setter Property="Background" Value="#161B22" />
-            <Setter Property="Foreground" Value="#8B949E" />
-            <Setter Property="FontWeight" Value="SemiBold" />
-            <Setter Property="FontSize" Value="11" />
-            <Setter Property="Padding" Value="10,8" />
-            <Setter Property="BorderBrush" Value="#30363D" />
-            <Setter Property="BorderThickness" Value="0,0,1,1" />
-            <Setter Property="Template">
-                <Setter.Value>
-                    <ControlTemplate TargetType="DataGridColumnHeader">
-                        <Border Background="{TemplateBinding Background}"
-                                BorderBrush="{TemplateBinding BorderBrush}"
-                                BorderThickness="{TemplateBinding BorderThickness}"
-                                Padding="{TemplateBinding Padding}">
-                            <ContentPresenter HorizontalAlignment="Left" VerticalAlignment="Center" />
-                        </Border>
-                    </ControlTemplate>
-                </Setter.Value>
-            </Setter>
-        </Style>
-
-        <!-- Dark DataGrid Row Style -->
-        <Style TargetType="DataGridRow">
-            <Setter Property="Background" Value="#0D1117" />
-            <Setter Property="Foreground" Value="#F0F6FC" />
-            <Setter Property="BorderThickness" Value="0" />
-            <Style.Triggers>
-                <Trigger Property="IsSelected" Value="True">
-                    <Setter Property="Background" Value="#1F6FEB" />
-                    <Setter Property="Foreground" Value="#FFFFFF" />
-                </Trigger>
-                <Trigger Property="IsMouseOver" Value="True">
-                    <Setter Property="Background" Value="#21262D" />
-                </Trigger>
-            </Style.Triggers>
-        </Style>
-
-        <!-- Dark DataGrid Cell Style -->
-        <Style TargetType="DataGridCell">
-            <Setter Property="Padding" Value="8,6" />
-            <Setter Property="Foreground" Value="{Binding RelativeSource={RelativeSource AncestorType=DataGridRow}, Path=Foreground}" />
-            <Setter Property="Template">
-                <Setter.Value>
-                    <ControlTemplate TargetType="DataGridCell">
-                        <Border Background="{TemplateBinding Background}" BorderThickness="0" Padding="{TemplateBinding Padding}">
-                            <ContentPresenter VerticalAlignment="Center" />
-                        </Border>
-                    </ControlTemplate>
-                </Setter.Value>
-            </Setter>
-            <Style.Triggers>
-                <Trigger Property="IsSelected" Value="True">
-                    <Setter Property="Background" Value="#1F6FEB" />
-                    <Setter Property="Foreground" Value="#FFFFFF" />
-                </Trigger>
-            </Style.Triggers>
-        </Style>
-
         <!-- Dark TabControl Style -->
         <Style TargetType="TabItem">
             <Setter Property="Background" Value="#161B22" />
@@ -426,6 +269,16 @@
                                         <TextBlock Text="Import Excel / CSV" />
                                     </StackPanel>
                                 </Button>
+
+                                <Button Command="{Binding OpenMassUpdateCommand}"
+                                        Background="#1F6FEB" Foreground="#FFFFFF" BorderBrush="#388BFD" BorderThickness="1"
+                                        Padding="10,5" FontWeight="Bold" FontSize="11" Margin="8,0,0,0"
+                                        ToolTip="Mass update status (SOLD, RTS, WIP), locations, grades, or customers using a list of asset tags / numbers">
+                                    <StackPanel Orientation="Horizontal">
+                                        <TextBlock Text="⚡" Margin="0,0,4,0" />
+                                        <TextBlock Text="Mass Update Assets" />
+                                    </StackPanel>
+                                </Button>
                             </StackPanel>
                         </Grid>
                     </Border>
@@ -446,6 +299,45 @@
                                   BorderThickness="0"
                                   HeadersVisibility="Column"
                                   SelectionMode="Single">
+
+                            <DataGrid.RowStyle>
+                                <Style TargetType="DataGridRow" BasedOn="{StaticResource {x:Type DataGridRow}}">
+                                    <Setter Property="ContextMenu">
+                                        <Setter.Value>
+                                            <ContextMenu>
+                                                <MenuItem Header="⚡ Quick Mark as SOLD"
+                                                          Command="{Binding DataContext.QuickMarkSoldCommand, RelativeSource={RelativeSource AncestorType=DataGrid}}"
+                                                          CommandParameter="{Binding}"
+                                                          FontWeight="Bold" Foreground="#8B949E" />
+                                                <MenuItem Header="✅ Quick Mark as READY FOR SALE (RTS)"
+                                                          Command="{Binding DataContext.QuickMarkRtsCommand, RelativeSource={RelativeSource AncestorType=DataGrid}}"
+                                                          CommandParameter="{Binding}"
+                                                          Foreground="#3FB950" />
+                                                <MenuItem Header="🔧 Quick Mark as ACTIVE TESTING (WIP)"
+                                                          Command="{Binding DataContext.QuickMarkWipCommand, RelativeSource={RelativeSource AncestorType=DataGrid}}"
+                                                          CommandParameter="{Binding}"
+                                                          Foreground="#58A6FF" />
+                                                <Separator />
+                                                <MenuItem Header="⚡ Mass Batch Update Tool..."
+                                                          Command="{Binding DataContext.OpenMassUpdateCommand, RelativeSource={RelativeSource AncestorType=DataGrid}}"
+                                                          CommandParameter="{Binding}" />
+                                                <Separator />
+                                                <MenuItem Header="📋 Copy Asset Tag"
+                                                          Command="{Binding DataContext.CopyAssetTagCommand, RelativeSource={RelativeSource AncestorType=DataGrid}}"
+                                                          CommandParameter="{Binding}" />
+                                                <MenuItem Header="📋 Copy Serial Number"
+                                                          Command="{Binding DataContext.CopySerialNumberCommand, RelativeSource={RelativeSource AncestorType=DataGrid}}"
+                                                          CommandParameter="{Binding}" />
+                                                <Separator />
+                                                <MenuItem Header="🗑 Delete Asset from DB"
+                                                          Command="{Binding DataContext.DeleteAssetCommand, RelativeSource={RelativeSource AncestorType=DataGrid}}"
+                                                          CommandParameter="{Binding}"
+                                                          Foreground="#F85149" />
+                                            </ContextMenu>
+                                        </Setter.Value>
+                                    </Setter>
+                                </Style>
+                            </DataGrid.RowStyle>
 
                             <DataGrid.Columns>
                                 <!-- Category Pill -->
@@ -820,6 +712,34 @@
                             <DataGrid Grid.Row="1" ItemsSource="{Binding Employees}" SelectedItem="{Binding SelectedEmployeeForEdit}"
                                       AutoGenerateColumns="False" IsReadOnly="True"
                                       Background="#0D1117" RowBackground="#0D1117" AlternatingRowBackground="#161B22" Foreground="#F0F6FC" BorderThickness="0">
+                                <DataGrid.RowStyle>
+                                    <Style TargetType="DataGridRow" BasedOn="{StaticResource {x:Type DataGridRow}}">
+                                        <Setter Property="ContextMenu">
+                                            <Setter.Value>
+                                                <ContextMenu>
+                                                    <MenuItem Header="🗑 Delete Technician Permanently"
+                                                              Command="{Binding DataContext.DeleteEmployeeCommand, RelativeSource={RelativeSource AncestorType=DataGrid}}"
+                                                              CommandParameter="{Binding}"
+                                                              Foreground="#F85149" FontWeight="Bold" />
+                                                    <Separator />
+                                                    <MenuItem Header="⏻ Toggle Active / Inactive"
+                                                              Command="{Binding DataContext.ToggleEmployeeActiveCommand, RelativeSource={RelativeSource AncestorType=DataGrid}}"
+                                                              CommandParameter="{Binding}" />
+                                                    <MenuItem Header="🔑 Reset Station PIN..."
+                                                              Command="{Binding DataContext.SelectEmployeeForPinResetCommand, RelativeSource={RelativeSource AncestorType=DataGrid}}"
+                                                              CommandParameter="{Binding}" />
+                                                    <Separator />
+                                                    <MenuItem Header="📋 Copy Technician ID"
+                                                              Command="{Binding DataContext.CopyEmployeeIdCommand, RelativeSource={RelativeSource AncestorType=DataGrid}}"
+                                                              CommandParameter="{Binding}" />
+                                                    <MenuItem Header="📋 Copy Station ID"
+                                                              Command="{Binding DataContext.CopyEmployeeStationCommand, RelativeSource={RelativeSource AncestorType=DataGrid}}"
+                                                              CommandParameter="{Binding}" />
+                                                </ContextMenu>
+                                            </Setter.Value>
+                                        </Setter>
+                                    </Style>
+                                </DataGrid.RowStyle>
                                 <DataGrid.Columns>
                                     <DataGridTextColumn Header="ID" Binding="{Binding Id}" Width="120" />
                                     <DataGridTextColumn Header="NAME" Binding="{Binding Name}" FontWeight="Bold" Width="160" />
@@ -877,11 +797,10 @@
                                     </Grid>
 
                                     <TextBlock Text="SECURITY ROLE" FontSize="10" FontWeight="SemiBold" Foreground="#8B949E" Margin="0,0,0,4" />
-                                    <ComboBox Text="{Binding NewEmployeeRole, UpdateSourceTrigger=PropertyChanged}" Margin="0,0,0,14" IsEditable="True">
+                                    <ComboBox SelectedValuePath="Content" SelectedValue="{Binding NewEmployeeRole, UpdateSourceTrigger=PropertyChanged}" Margin="0,0,0,14">
                                         <ComboBoxItem Content="Technician" IsSelected="True" />
-                                        <ComboBoxItem Content="Supervisor" />
-                                        <ComboBoxItem Content="WarehouseManager" />
-                                        <ComboBoxItem Content="Administrator" />
+                                        <ComboBoxItem Content="Manager" />
+                                        <ComboBoxItem Content="Owner" />
                                     </ComboBox>
 
                                     <Button Content="+ Register Technician" Command="{Binding CreateEmployeeCommand}"
@@ -925,10 +844,19 @@
                                         <Button Grid.Column="2" Content="🏷 Update Station" Command="{Binding UpdateEmployeeStationCommand}"
                                                 Background="#21262D" Foreground="#F0F6FC" BorderBrush="#30363D" FontWeight="Bold" Padding="10,6" />
                                     </Grid>
-
-                                    <!-- Toggle Active -->
-                                    <Button Content="⏻ Toggle Active / Inactive Status" Command="{Binding ToggleEmployeeActiveCommand}"
-                                            Background="#21262D" Foreground="#D29922" BorderBrush="#30363D" FontWeight="SemiBold" Padding="10,7" />
+                                    <!-- Toggle Active & Delete -->
+                                    <Grid Margin="0,4,0,0">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="8" />
+                                            <ColumnDefinition Width="*" />
+                                        </Grid.ColumnDefinitions>
+                                        <Button Grid.Column="0" Content="⏻ Toggle Active" Command="{Binding ToggleEmployeeActiveCommand}"
+                                                Background="#21262D" Foreground="#D29922" BorderBrush="#30363D" FontWeight="SemiBold" Padding="10,7" />
+                                        <Button Grid.Column="2" Content="🗑 Delete Tech" Command="{Binding DeleteEmployeeCommand}"
+                                                Background="#21262D" Foreground="#F85149" BorderBrush="#F85149" FontWeight="Bold" Padding="10,7"
+                                                ToolTip="Permanently delete this technician from the database" />
+                                    </Grid>
                                 </StackPanel>
                             </Border>
                         </StackPanel>

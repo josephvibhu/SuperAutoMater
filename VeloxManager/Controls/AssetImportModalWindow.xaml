@@ -124,7 +124,7 @@
                     <!-- Category Default -->
                     <StackPanel Grid.Column="0" Margin="0,0,8,0">
                         <TextBlock Text="Default Category (if not in sheet):" FontSize="11" Foreground="#8B949E" Margin="0,0,0,4" />
-                        <ComboBox x:Name="CmbDefaultCategory" Background="#0D1117" Foreground="#F0F6FC" BorderBrush="#30363D" Padding="8,5">
+                        <ComboBox x:Name="CmbDefaultCategory" Padding="8,5">
                             <ComboBoxItem Content="Laptop" IsSelected="True" />
                             <ComboBoxItem Content="Desktop" />
                             <ComboBoxItem Content="Workstation" />
@@ -142,7 +142,7 @@
                     <!-- Location Default -->
                     <StackPanel Grid.Column="1" Margin="4,0,4,0">
                         <TextBlock Text="Default Location / Shelf:" FontSize="11" Foreground="#8B949E" Margin="0,0,0,4" />
-                        <ComboBox x:Name="CmbDefaultLocation" Background="#0D1117" Foreground="#F0F6FC" BorderBrush="#30363D" Padding="8,5" IsEditable="True">
+                        <ComboBox x:Name="CmbDefaultLocation" Padding="8,5" IsEditable="True">
                             <ComboBoxItem Content="IntakeStaging" IsSelected="True" />
                             <ComboBoxItem Content="Warehouse-Shelf-A" />
                             <ComboBoxItem Content="Warehouse-Shelf-B" />
@@ -154,7 +154,7 @@
                     <!-- Status / Queue Default -->
                     <StackPanel Grid.Column="2" Margin="8,0,0,0">
                         <TextBlock Text="Default Lifecycle Queue:" FontSize="11" Foreground="#8B949E" Margin="0,0,0,4" />
-                        <ComboBox x:Name="CmbDefaultQueue" Background="#0D1117" Foreground="#F0F6FC" BorderBrush="#30363D" Padding="8,5">
+                        <ComboBox x:Name="CmbDefaultQueue" Padding="8,5">
                             <ComboBoxItem Content="IntakeStaging" IsSelected="True" />
                             <ComboBoxItem Content="ReadyForSale" />
                             <ComboBoxItem Content="ActiveTesting" />

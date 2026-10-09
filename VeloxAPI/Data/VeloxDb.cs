@@ -380,6 +380,25 @@ CREATE INDEX IF NOT EXISTS ix_asset_components_parent ON asset_components(parent
         }
     }
 
+    public bool DeleteEmployee(string tenantId, string id)
+    {
+        lock (_gate)
+        {
+            using var conn = Open();
+            using var unassign = conn.CreateCommand();
+            unassign.CommandText = "UPDATE assets SET assigned_employee_id=NULL WHERE tenant_id=@tid AND assigned_employee_id=@id";
+            unassign.Parameters.AddWithValue("@tid", tenantId);
+            unassign.Parameters.AddWithValue("@id", id);
+            unassign.ExecuteNonQuery();
+
+            using var del = conn.CreateCommand();
+            del.CommandText = "DELETE FROM employees WHERE tenant_id=@tid AND id=@id";
+            del.Parameters.AddWithValue("@tid", tenantId);
+            del.Parameters.AddWithValue("@id", id);
+            return del.ExecuteNonQuery() > 0;
+        }
+    }
+
     // ── Assets ───────────────────────────────────────────────────────────────
 
     public AssetDto UpsertAsset(string tenantId, IntakeRequest req)
@@ -559,6 +578,31 @@ CREATE INDEX IF NOT EXISTS ix_asset_components_parent ON asset_components(parent
             parms.Add(P("@id", id));
             Exec(conn, $"UPDATE assets SET {string.Join(",", sets)} WHERE tenant_id=@tid AND id=@id", [.. parms]);
             return true;
+        }
+    }
+
+    public bool DeleteAsset(string tenantId, string id)
+    {
+        lock (_gate)
+        {
+            using var conn = Open();
+            using var delEvents = conn.CreateCommand();
+            delEvents.CommandText = "DELETE FROM asset_events WHERE tenant_id=@tid AND asset_id=@id";
+            delEvents.Parameters.AddWithValue("@tid", tenantId);
+            delEvents.Parameters.AddWithValue("@id", id);
+            delEvents.ExecuteNonQuery();
+
+            using var delCmps = conn.CreateCommand();
+            delCmps.CommandText = "DELETE FROM fitted_components WHERE tenant_id=@tid AND parent_asset_id=@id";
+            delCmps.Parameters.AddWithValue("@tid", tenantId);
+            delCmps.Parameters.AddWithValue("@id", id);
+            delCmps.ExecuteNonQuery();
+
+            using var delCmd = conn.CreateCommand();
+            delCmd.CommandText = "DELETE FROM assets WHERE tenant_id=@tid AND id=@id";
+            delCmd.Parameters.AddWithValue("@tid", tenantId);
+            delCmd.Parameters.AddWithValue("@id", id);
+            return delCmd.ExecuteNonQuery() > 0;
         }
     }
 
