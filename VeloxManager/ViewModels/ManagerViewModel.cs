@@ -480,7 +480,7 @@ public class ManagerViewModel : INotifyPropertyChanged
         set { _newEmployeeStationId = value; OnPropertyChanged(); }
     }
 
-    // ── Selected Employee Management ────────────────────────────────────────────
+    // ── Selected Employee Management & Cockpit Tracking ────────────────────────
     private EmployeeDto? _selectedEmployeeForEdit;
     public EmployeeDto? SelectedEmployeeForEdit
     {
@@ -493,6 +493,12 @@ public class ManagerViewModel : INotifyPropertyChanged
             if (value != null)
             {
                 EditEmployeeStationId = value.StationId;
+                _ = LoadSelectedTechDataAsync(value.Id);
+            }
+            else
+            {
+                SelectedTechAssignedAssets.Clear();
+                SelectedTechActivityLog.Clear();
             }
         }
     }
@@ -510,6 +516,66 @@ public class ManagerViewModel : INotifyPropertyChanged
     {
         get => _editEmployeeStationId;
         set { _editEmployeeStationId = value; OnPropertyChanged(); }
+    }
+
+    // ── Selected Tech Detailed Cockpit Observables ──────────────────────────────
+    public ObservableCollection<AssetItemViewModel> SelectedTechAssignedAssets { get; } = new();
+    public ObservableCollection<TechnicianActivityDto> SelectedTechActivityLog { get; } = new();
+
+    private int _selectedTechActiveAssignedCount;
+    public int SelectedTechActiveAssignedCount
+    {
+        get => _selectedTechActiveAssignedCount;
+        set { _selectedTechActiveAssignedCount = value; OnPropertyChanged(); }
+    }
+
+    private int _selectedTechCompletedTodayCount;
+    public int SelectedTechCompletedTodayCount
+    {
+        get => _selectedTechCompletedTodayCount;
+        set { _selectedTechCompletedTodayCount = value; OnPropertyChanged(); }
+    }
+
+    private int _selectedTechCompletedAllTimeCount;
+    public int SelectedTechCompletedAllTimeCount
+    {
+        get => _selectedTechCompletedAllTimeCount;
+        set { _selectedTechCompletedAllTimeCount = value; OnPropertyChanged(); }
+    }
+
+    private int _selectedTechTotalFixesCount;
+    public int SelectedTechTotalFixesCount
+    {
+        get => _selectedTechTotalFixesCount;
+        set { _selectedTechTotalFixesCount = value; OnPropertyChanged(); }
+    }
+
+    private int _selectedTechComponentsFittedCount;
+    public int SelectedTechComponentsFittedCount
+    {
+        get => _selectedTechComponentsFittedCount;
+        set { _selectedTechComponentsFittedCount = value; OnPropertyChanged(); }
+    }
+
+    private string _selectedTechCurrentStatus = "Standby";
+    public string SelectedTechCurrentStatus
+    {
+        get => _selectedTechCurrentStatus;
+        set { _selectedTechCurrentStatus = value; OnPropertyChanged(); }
+    }
+
+    private string _selectedTechLastAction = "None";
+    public string SelectedTechLastAction
+    {
+        get => _selectedTechLastAction;
+        set { _selectedTechLastAction = value; OnPropertyChanged(); }
+    }
+
+    private bool _isSelectedTechLoading;
+    public bool IsSelectedTechLoading
+    {
+        get => _isSelectedTechLoading;
+        set { _isSelectedTechLoading = value; OnPropertyChanged(); }
     }
 
     // ── Commands ───────────────────────────────────────────────────────────────
@@ -546,6 +612,11 @@ public class ManagerViewModel : INotifyPropertyChanged
     public ICommand CopyEmployeeStationCommand { get; }
     public ICommand SelectEmployeeForPinResetCommand { get; }
     public ICommand OpenShowroomWebCommand { get; }
+    public ICommand ReassignAssignedAssetCommand { get; }
+    public ICommand UnassignAssignedAssetCommand { get; }
+    public ICommand AssignAssetToSelectedTechCommand { get; }
+    public ICommand QuickMarkAssignedRtsCommand { get; }
+    public ICommand RefreshSelectedTechDataCommand { get; }
 
     public ManagerViewModel()
     {
@@ -584,6 +655,11 @@ public class ManagerViewModel : INotifyPropertyChanged
         CopySerialNumberCommand = new RelayCommand(p => CopySerialNumber(p as AssetItemViewModel));
         DeleteAssetCommand = new RelayCommand(async p => await DeleteAssetAsync(p as AssetItemViewModel));
         OpenShowroomWebCommand = new RelayCommand(_ => OpenShowroomWeb());
+        ReassignAssignedAssetCommand = new RelayCommand(p => ReassignAssignedAsset(p as AssetItemViewModel));
+        UnassignAssignedAssetCommand = new RelayCommand(async p => await UnassignAssignedAssetAsync(p as AssetItemViewModel));
+        AssignAssetToSelectedTechCommand = new RelayCommand(_ => AssignAssetToSelectedTech());
+        QuickMarkAssignedRtsCommand = new RelayCommand(async p => await QuickMarkAssignedRtsAsync(p as AssetItemViewModel));
+        RefreshSelectedTechDataCommand = new RelayCommand(async _ => await LoadSelectedTechDataAsync());
 
         // Wire up Real-Time Events
         _api.CloudConnectionChanged += connected =>
@@ -1454,6 +1530,123 @@ public class ManagerViewModel : INotifyPropertyChanged
         {
             MessageBox.Show($"Unable to launch web browser:\n{ex.Message}", "VeloxShowroom", MessageBoxButton.OK, MessageBoxImage.Warning);
         }
+    }
+
+    public async Task LoadSelectedTechDataAsync(string? employeeId = null)
+    {
+        var emp = SelectedEmployeeForEdit;
+        if (emp == null) return;
+        var id = employeeId ?? emp.Id;
+
+        IsSelectedTechLoading = true;
+        try
+        {
+            // 1. Populate assigned assets from local inventory
+            var assigned = Assets.Where(a => a.AssignedEmployeeId == id).ToList();
+            SelectedTechAssignedAssets.Clear();
+            foreach (var a in assigned)
+            {
+                SelectedTechAssignedAssets.Add(a);
+            }
+
+            // 2. Query Cloud API for performance stats and rich activity audit trail
+            var perf = await _api.GetTechnicianPerformanceAsync(id);
+            if (perf != null)
+            {
+                SelectedTechActiveAssignedCount = perf.ActiveAssignedCount;
+                SelectedTechCompletedTodayCount = perf.CompletedTodayCount;
+                SelectedTechCompletedAllTimeCount = perf.CompletedAllTimeCount;
+                SelectedTechTotalFixesCount = perf.TotalFixesCount;
+                SelectedTechComponentsFittedCount = perf.ComponentsFittedCount;
+                SelectedTechCurrentStatus = perf.CurrentStatusText;
+                SelectedTechLastAction = perf.LastActionText;
+
+                SelectedTechActivityLog.Clear();
+                foreach (var act in perf.RecentActivity)
+                {
+                    SelectedTechActivityLog.Add(act);
+                }
+            }
+            else
+            {
+                // Fallback using local state
+                SelectedTechActiveAssignedCount = assigned.Count(a => a.Status != LifecycleQueue.ReadyForSale && a.Status != LifecycleQueue.Sold);
+                SelectedTechCompletedAllTimeCount = emp.FinishedCount;
+                SelectedTechCurrentStatus = emp.CurrentActivity;
+                SelectedTechLastAction = emp.CurrentActivity;
+            }
+        }
+        catch { }
+        finally
+        {
+            IsSelectedTechLoading = false;
+        }
+    }
+
+    private void ReassignAssignedAsset(AssetItemViewModel? target)
+    {
+        var asset = target ?? SelectedAsset;
+        if (asset == null) return;
+
+        var win = new ReassignAssetModalWindow(asset, Employees, _api, SelectedEmployeeForEdit?.Id)
+        {
+            Owner = Application.Current.MainWindow
+        };
+        if (win.ShowDialog() == true)
+        {
+            _ = LoadSelectedTechDataAsync();
+            ApplyFilter();
+            RefreshMetrics();
+            LiveActivityFeed.Insert(0, $"[{DateTime.Now:HH:mm:ss}] Reassigned asset {asset.AssetTag} -> {asset.AssignedEmployeeName}");
+        }
+    }
+
+    private async Task UnassignAssignedAssetAsync(AssetItemViewModel? target)
+    {
+        var asset = target ?? SelectedAsset;
+        if (asset == null) return;
+
+        var confirm = VeloxMessageBox.Show($"Are you sure you want to unassign '{asset.AssetTag}' ({asset.ModelName}) and return it to the general depot queue?", "Confirm Unassign", MessageBoxButton.YesNo, MessageBoxImage.Question);
+        if (confirm != MessageBoxResult.Yes) return;
+
+        var ok = await _api.UnassignAssetAsync(asset.Id);
+        if (ok)
+        {
+            asset.AssignedEmployeeId = "";
+            asset.AssignedEmployeeName = "";
+            SelectedTechAssignedAssets.Remove(asset);
+            SelectedTechActiveAssignedCount = Math.Max(0, SelectedTechActiveAssignedCount - 1);
+            ApplyFilter();
+            RefreshMetrics();
+            LiveActivityFeed.Insert(0, $"[{DateTime.Now:HH:mm:ss}] Unassigned asset {asset.AssetTag} to depot pool");
+        }
+    }
+
+    private void AssignAssetToSelectedTech()
+    {
+        if (SelectedEmployeeForEdit == null) return;
+
+        var win = new AssignAssetPickerModalWindow(SelectedEmployeeForEdit, Assets, _api)
+        {
+            Owner = Application.Current.MainWindow
+        };
+        if (win.ShowDialog() == true && win.AssignedAsset != null)
+        {
+            var asset = win.AssignedAsset;
+            if (!SelectedTechAssignedAssets.Contains(asset))
+                SelectedTechAssignedAssets.Insert(0, asset);
+            SelectedTechActiveAssignedCount++;
+            ApplyFilter();
+            RefreshMetrics();
+            LiveActivityFeed.Insert(0, $"[{DateTime.Now:HH:mm:ss}] Dispatched asset {asset.AssetTag} to {SelectedEmployeeForEdit.Name}");
+        }
+    }
+
+    private async Task QuickMarkAssignedRtsAsync(AssetItemViewModel? target)
+    {
+        if (target == null) return;
+        await QuickUpdateAssetStatusAsync(target, LifecycleQueue.ReadyForSale);
+        _ = LoadSelectedTechDataAsync();
     }
 
     private static string EscapeCsv(string? val)

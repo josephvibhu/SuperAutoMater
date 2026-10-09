@@ -158,6 +158,21 @@ public class AssetItemViewModel : INotifyPropertyChanged
         }
     }
 
+    public string AssignedEmployeeId
+    {
+        get => Model.AssignedEmployeeId;
+        set
+        {
+            if (Model.AssignedEmployeeId != value)
+            {
+                Model.AssignedEmployeeId = value;
+                OnPropertyChanged();
+            }
+        }
+    }
+
+    public DateTimeOffset UpdatedAtUtc => Model.UpdatedAtUtc;
+
     public string AssignedEmployeeName
     {
         get => Model.AssignedEmployeeName;

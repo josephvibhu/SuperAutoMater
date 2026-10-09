@@ -126,18 +126,21 @@ public static class AssetEndpoints
             var tenantId = ctx.TenantId();
             if (tenantId == null) return Results.Unauthorized();
 
-            var ok = db.AssignAsset(tenantId, id, req.EmployeeId);
+            var isUnassign = string.IsNullOrWhiteSpace(req.EmployeeId) || req.EmployeeId.Equals("unassign", StringComparison.OrdinalIgnoreCase);
+            var targetEmpId = isUnassign ? null : req.EmployeeId.Trim();
+
+            var ok = db.AssignAsset(tenantId, id, targetEmpId);
             if (!ok) return Results.NotFound(new { error = "Asset not found." });
 
             db.AppendEvent(tenantId, id, new AppendEventRequest
             {
-                EventType = "Assigned",
+                EventType = isUnassign ? "Unassigned" : "Assigned",
                 Actor     = req.Actor ?? "Manager",
-                NotesJson = $"{{\"employeeId\":\"{req.EmployeeId}\"}}"
+                NotesJson = isUnassign ? "{}" : $"{{\"employeeId\":\"{targetEmpId}\"}}"
             });
 
             var asset = db.GetAssetById(tenantId, id)!;
-            await sse.BroadcastAsync(SseEventType.AssetAssigned, new { assetId = id, employeeId = req.EmployeeId, asset });
+            await sse.BroadcastAsync(SseEventType.AssetAssigned, new { assetId = id, employeeId = targetEmpId, asset });
             return Results.Ok(asset);
         });
 

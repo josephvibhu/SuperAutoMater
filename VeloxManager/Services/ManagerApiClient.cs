@@ -311,13 +311,13 @@ public class ManagerApiClient
         }
     }
 
-    public async Task<bool> AssignAssetAsync(string assetId, string employeeId, string? actor = null)
+    public async Task<bool> AssignAssetAsync(string assetId, string? employeeId, string? actor = null)
     {
         try
         {
             var assign = new AssignRequest
             {
-                EmployeeId = employeeId,
+                EmployeeId = employeeId ?? "",
                 Actor = actor ?? ManagerConfigService.Current.ManagerName
             };
             var content = new StringContent(JsonSerializer.Serialize(assign), Encoding.UTF8, "application/json");
@@ -402,6 +402,57 @@ public class ManagerApiClient
         try
         {
             var res = await _http.DeleteAsync($"api/v1/employees/{id}");
+            return res.IsSuccessStatusCode;
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
+    public async Task<bool> UnassignAssetAsync(string assetId, string? actor = null) =>
+        await AssignAssetAsync(assetId, "", actor);
+
+    public async Task<TechnicianPerformanceDto?> GetTechnicianPerformanceAsync(string employeeId)
+    {
+        try
+        {
+            var res = await _http.GetAsync($"api/v1/employees/{employeeId}/performance");
+            if (res.IsSuccessStatusCode)
+            {
+                var json = await res.Content.ReadAsStringAsync();
+                return JsonSerializer.Deserialize<TechnicianPerformanceDto>(json, JsonOpts);
+            }
+        }
+        catch { }
+        return null;
+    }
+
+    public async Task<List<TechnicianActivityDto>> GetTechnicianActivityAsync(string employeeId, int limit = 50)
+    {
+        try
+        {
+            var res = await _http.GetAsync($"api/v1/employees/{employeeId}/activity?limit={limit}");
+            if (res.IsSuccessStatusCode)
+            {
+                var json = await res.Content.ReadAsStringAsync();
+                using var doc = JsonDocument.Parse(json);
+                if (doc.RootElement.TryGetProperty("activity", out var arr))
+                {
+                    return JsonSerializer.Deserialize<List<TechnicianActivityDto>>(arr.GetRawText(), JsonOpts) ?? new();
+                }
+            }
+        }
+        catch { }
+        return new();
+    }
+
+    public async Task<bool> AppendAssetEventAsync(string assetId, AppendEventRequest evt)
+    {
+        try
+        {
+            var content = new StringContent(JsonSerializer.Serialize(evt), Encoding.UTF8, "application/json");
+            var res = await _http.PostAsync($"api/v1/assets/{assetId}/events", content);
             return res.IsSuccessStatusCode;
         }
         catch

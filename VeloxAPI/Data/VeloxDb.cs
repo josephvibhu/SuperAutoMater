@@ -325,7 +325,10 @@ CREATE INDEX IF NOT EXISTS ix_asset_components_parent ON asset_components(parent
             using var r = cmd.ExecuteReader();
             if (!r.Read()) return null;
             var emp = MapEmployee(r);
+            r.Close();
             emp.WorkloadCount = CountAssigned(conn, tenantId, emp.Id);
+            emp.FinishedCount = CountFinished(conn, tenantId, emp.Id, emp.Name);
+            emp.CurrentActivity = GetLatestActivitySummary(conn, tenantId, emp.Id, emp.Name);
             return emp;
         }
     }
@@ -339,13 +342,21 @@ CREATE INDEX IF NOT EXISTS ix_asset_components_parent ON asset_components(parent
             cmd.CommandText = "SELECT id,tenant_id,name,role,is_active,station_id,created_at_utc FROM employees WHERE tenant_id=@tid ORDER BY name";
             cmd.Parameters.AddWithValue("@tid", tenantId);
             var list = new List<EmployeeDto>();
-            using var r = cmd.ExecuteReader();
-            while (r.Read())
+            using (var r = cmd.ExecuteReader())
             {
-                var emp = MapEmployee(r);
-                emp.WorkloadCount = CountAssigned(conn, tenantId, emp.Id);
-                list.Add(emp);
+                while (r.Read())
+                {
+                    list.Add(MapEmployee(r));
+                }
             }
+
+            foreach (var emp in list)
+            {
+                emp.WorkloadCount = CountAssigned(conn, tenantId, emp.Id);
+                emp.FinishedCount = CountFinished(conn, tenantId, emp.Id, emp.Name);
+                emp.CurrentActivity = GetLatestActivitySummary(conn, tenantId, emp.Id, emp.Name);
+            }
+
             return list;
         }
     }
@@ -606,7 +617,7 @@ CREATE INDEX IF NOT EXISTS ix_asset_components_parent ON asset_components(parent
         }
     }
 
-    public bool AssignAsset(string tenantId, string assetId, string employeeId)
+    public bool AssignAsset(string tenantId, string assetId, string? employeeId)
     {
         lock (_gate)
         {
@@ -614,7 +625,7 @@ CREATE INDEX IF NOT EXISTS ix_asset_components_parent ON asset_components(parent
             var now = Iso(DateTimeOffset.UtcNow);
             using var cmd = conn.CreateCommand();
             cmd.CommandText = "UPDATE assets SET assigned_employee_id=@eid, updated_at_utc=@ts WHERE tenant_id=@tid AND id=@id";
-            cmd.Parameters.AddWithValue("@eid", employeeId);
+            cmd.Parameters.AddWithValue("@eid", string.IsNullOrWhiteSpace(employeeId) ? DBNull.Value : employeeId.Trim());
             cmd.Parameters.AddWithValue("@ts", now);
             cmd.Parameters.AddWithValue("@tid", tenantId);
             cmd.Parameters.AddWithValue("@id", assetId);
@@ -736,10 +747,190 @@ CREATE INDEX IF NOT EXISTS ix_asset_components_parent ON asset_components(parent
     private int CountAssigned(SqliteConnection conn, string tenantId, string empId)
     {
         using var cmd = conn.CreateCommand();
-        cmd.CommandText = "SELECT COUNT(1) FROM assets WHERE tenant_id=@tid AND assigned_employee_id=@eid";
+        cmd.CommandText = "SELECT COUNT(1) FROM assets WHERE tenant_id=@tid AND assigned_employee_id=@eid AND lifecycle_queue NOT IN ('ReadyForSale', 'Sold')";
         cmd.Parameters.AddWithValue("@tid", tenantId);
         cmd.Parameters.AddWithValue("@eid", empId);
         return (int)(long)(cmd.ExecuteScalar() ?? 0L);
+    }
+
+    private int CountFinished(SqliteConnection conn, string tenantId, string empId, string empName)
+    {
+        using var cmd = conn.CreateCommand();
+        cmd.CommandText = @"SELECT COUNT(DISTINCT a.id) FROM assets a
+                            WHERE a.tenant_id=@tid
+                              AND (a.assigned_employee_id=@eid OR a.id IN (SELECT asset_id FROM asset_events WHERE tenant_id=@tid AND (actor=@ename OR actor=@eid)))
+                              AND a.lifecycle_queue IN ('ReadyForSale', 'Sold')";
+        cmd.Parameters.AddWithValue("@tid", tenantId);
+        cmd.Parameters.AddWithValue("@eid", empId);
+        cmd.Parameters.AddWithValue("@ename", empName);
+        return (int)(long)(cmd.ExecuteScalar() ?? 0L);
+    }
+
+    private string GetLatestActivitySummary(SqliteConnection conn, string tenantId, string empId, string empName)
+    {
+        using var cmd = conn.CreateCommand();
+        cmd.CommandText = @"SELECT e.event_type, coalesce(a.asset_tag, coalesce(a.model, '')), e.recorded_at_utc
+                            FROM asset_events e
+                            LEFT JOIN assets a ON e.asset_id = a.id AND e.tenant_id = a.tenant_id
+                            WHERE e.tenant_id = @tid
+                              AND (e.actor = @ename OR e.actor = @eid OR e.notes_json LIKE '%' || @eid || '%')
+                            ORDER BY e.recorded_at_utc DESC
+                            LIMIT 1";
+        cmd.Parameters.AddWithValue("@tid", tenantId);
+        cmd.Parameters.AddWithValue("@eid", empId);
+        cmd.Parameters.AddWithValue("@ename", empName);
+        using var r = cmd.ExecuteReader();
+        if (r.Read())
+        {
+            var evt = r.GetString(0);
+            var tag = r.IsDBNull(1) ? "" : r.GetString(1);
+            var ts = DateTimeOffset.Parse(r.GetString(2));
+            var diff = DateTimeOffset.UtcNow - ts;
+            if (diff.TotalMinutes < 30)
+                return $"Testing {tag} ({evt})";
+            else if (diff.TotalHours < 24)
+                return $"{evt}: {tag} ({(int)diff.TotalMinutes}m ago)";
+            else
+                return $"{evt}: {tag}";
+        }
+        return "Standby (Idle)";
+    }
+
+    public TechnicianPerformanceDto? GetTechnicianPerformance(string tenantId, string employeeId)
+    {
+        lock (_gate)
+        {
+            using var conn = Open();
+            var emp = GetEmployee(tenantId, employeeId);
+            if (emp == null) return null;
+
+            var dto = new TechnicianPerformanceDto
+            {
+                EmployeeId = emp.Id,
+                Name = emp.Name,
+                Role = emp.Role,
+                StationId = emp.StationId,
+                IsActive = emp.IsActive,
+                ActiveAssignedCount = emp.WorkloadCount,
+                CompletedAllTimeCount = emp.FinishedCount
+            };
+
+            // Completed today count
+            using (var cmd = conn.CreateCommand())
+            {
+                cmd.CommandText = @"SELECT COUNT(DISTINCT a.id) FROM assets a
+                                    WHERE a.tenant_id=@tid
+                                      AND (a.assigned_employee_id=@eid OR a.id IN (SELECT asset_id FROM asset_events WHERE tenant_id=@tid AND (actor=@ename OR actor=@eid)))
+                                      AND a.lifecycle_queue IN ('ReadyForSale', 'Sold')
+                                      AND date(a.updated_at_utc) = date('now')";
+                cmd.Parameters.AddWithValue("@tid", tenantId);
+                cmd.Parameters.AddWithValue("@eid", employeeId);
+                cmd.Parameters.AddWithValue("@ename", emp.Name);
+                dto.CompletedTodayCount = (int)(long)(cmd.ExecuteScalar() ?? 0L);
+            }
+
+            // Total Fixes & Bench Actions logged
+            using (var cmd = conn.CreateCommand())
+            {
+                cmd.CommandText = "SELECT COUNT(1) FROM asset_events WHERE tenant_id=@tid AND (actor=@ename OR actor=@eid)";
+                cmd.Parameters.AddWithValue("@tid", tenantId);
+                cmd.Parameters.AddWithValue("@eid", employeeId);
+                cmd.Parameters.AddWithValue("@ename", emp.Name);
+                dto.TotalFixesCount = (int)(long)(cmd.ExecuteScalar() ?? 0L);
+            }
+
+            // Components Fitted / BOM upgrades
+            using (var cmd = conn.CreateCommand())
+            {
+                cmd.CommandText = "SELECT COUNT(1) FROM fitted_components WHERE tenant_id=@tid AND (installed_by=@ename OR installed_by=@eid)";
+                cmd.Parameters.AddWithValue("@tid", tenantId);
+                cmd.Parameters.AddWithValue("@eid", employeeId);
+                cmd.Parameters.AddWithValue("@ename", emp.Name);
+                dto.ComponentsFittedCount = (int)(long)(cmd.ExecuteScalar() ?? 0L);
+            }
+
+            // Recent activity (latest 50)
+            dto.RecentActivity = GetTechnicianActivityInternal(conn, tenantId, employeeId, emp.Name, 50);
+
+            // Assigned Assets
+            dto.AssignedAssets = QueryAssets(conn, "WHERE a.tenant_id=@tid AND a.assigned_employee_id=@eid ORDER BY a.updated_at_utc DESC",
+                P("@tid", tenantId), P("@eid", employeeId));
+
+            // Status & Last Action
+            if (dto.RecentActivity.Count > 0)
+            {
+                var latest = dto.RecentActivity[0];
+                dto.LastActiveUtc = latest.RecordedAtUtc;
+                var target = !string.IsNullOrWhiteSpace(latest.AssetTag) ? latest.AssetTag : latest.Model;
+                dto.LastActionText = $"{latest.EventType}: {target}";
+
+                var timeDiff = DateTimeOffset.UtcNow - latest.RecordedAtUtc;
+                if (timeDiff.TotalMinutes < 30)
+                {
+                    dto.CurrentStatusText = $"Active on {dto.StationId} ({target})";
+                }
+                else
+                {
+                    dto.CurrentStatusText = dto.ActiveAssignedCount > 0 ? $"Bench Assigned ({dto.ActiveAssignedCount} WIP)" : "Standby (Idle)";
+                }
+            }
+            else
+            {
+                dto.CurrentStatusText = dto.ActiveAssignedCount > 0 ? $"Bench Assigned ({dto.ActiveAssignedCount} WIP)" : "Standby (Idle)";
+                dto.LastActionText = "No recorded actions";
+            }
+
+            return dto;
+        }
+    }
+
+    public List<TechnicianActivityDto> GetTechnicianActivity(string tenantId, string employeeId, int limit = 50)
+    {
+        lock (_gate)
+        {
+            using var conn = Open();
+            var emp = GetEmployee(tenantId, employeeId);
+            var empName = emp?.Name ?? "";
+            return GetTechnicianActivityInternal(conn, tenantId, employeeId, empName, limit);
+        }
+    }
+
+    private List<TechnicianActivityDto> GetTechnicianActivityInternal(SqliteConnection conn, string tenantId, string employeeId, string empName, int limit)
+    {
+        using var cmd = conn.CreateCommand();
+        cmd.CommandText = @"SELECT e.id, e.asset_id, coalesce(a.asset_tag, '') as asset_tag,
+                                   coalesce(a.serial_number, '') as serial_number, coalesce(a.model, '') as model,
+                                   e.event_type, coalesce(e.location, '') as location, e.actor, e.notes_json, e.recorded_at_utc
+                            FROM asset_events e
+                            LEFT JOIN assets a ON e.asset_id = a.id AND e.tenant_id = a.tenant_id
+                            WHERE e.tenant_id = @tid
+                              AND (e.actor = @ename OR e.actor = @eid OR e.notes_json LIKE '%' || @eid || '%')
+                            ORDER BY e.recorded_at_utc DESC
+                            LIMIT @limit";
+        cmd.Parameters.AddWithValue("@tid", tenantId);
+        cmd.Parameters.AddWithValue("@eid", employeeId);
+        cmd.Parameters.AddWithValue("@ename", empName);
+        cmd.Parameters.AddWithValue("@limit", limit);
+
+        var list = new List<TechnicianActivityDto>();
+        using var r = cmd.ExecuteReader();
+        while (r.Read())
+        {
+            list.Add(new TechnicianActivityDto
+            {
+                Id = r.GetString(0),
+                AssetId = r.GetString(1),
+                AssetTag = r.GetString(2),
+                SerialNumber = r.GetString(3),
+                Model = r.GetString(4),
+                EventType = r.GetString(5),
+                Location = r.GetString(6),
+                Actor = r.GetString(7),
+                NotesJson = r.GetString(8),
+                RecordedAtUtc = DateTimeOffset.Parse(r.GetString(9))
+            });
+        }
+        return list;
     }
 
     private AssetDto? QuerySingleAsset(SqliteConnection conn, string where, params SqliteParameter[] parms)

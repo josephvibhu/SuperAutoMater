@@ -328,6 +328,15 @@
                                                           CommandParameter="{Binding}"
                                                           Foreground="#58A6FF" />
                                                 <Separator />
+                                                <MenuItem Header="🔄 Reassign to Technician..."
+                                                          Command="{Binding DataContext.ReassignAssignedAssetCommand, RelativeSource={RelativeSource AncestorType=DataGrid}}"
+                                                          CommandParameter="{Binding}"
+                                                          FontWeight="Bold" Foreground="#58A6FF" />
+                                                <MenuItem Header="📦 Unassign (Return to Depot Pool)"
+                                                          Command="{Binding DataContext.UnassignAssignedAssetCommand, RelativeSource={RelativeSource AncestorType=DataGrid}}"
+                                                          CommandParameter="{Binding}"
+                                                          Foreground="#D29922" />
+                                                <Separator />
                                                 <MenuItem Header="⚡ Mass Batch Update Tool..."
                                                           Command="{Binding DataContext.OpenMassUpdateCommand, RelativeSource={RelativeSource AncestorType=DataGrid}}"
                                                           CommandParameter="{Binding}" />
@@ -697,26 +706,37 @@
             </TabItem>
 
             <!-- ═══════════════════════════════════════════════════════════════════ -->
-            <!-- TAB 2: TECHNICIANS & JOB QUEUE                                      -->
+            <!-- ═══════════════════════════════════════════════════════════════════ -->
+            <!-- TAB 2: TECHNICIANS & JOB QUEUE (OPERATIONS COCKPIT)                   -->
             <!-- ═══════════════════════════════════════════════════════════════════ -->
             <TabItem Header="👥 TECHNICIANS &amp; JOBS">
-                <Grid Margin="16">
-                    <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="*" />
-                        <ColumnDefinition Width="380" />
-                    </Grid.ColumnDefinitions>
+                <Grid Margin="14">
+                    <Grid.RowDefinitions>
+                        <!-- 0: Depot Technician Roster (Top Pane) -->
+                        <RowDefinition Height="220" MinHeight="160" />
+                        <!-- 1: Splitter -->
+                        <RowDefinition Height="8" />
+                        <!-- 2: Selected Technician Detailed Cockpit & History (Bottom Pane) -->
+                        <RowDefinition Height="*" MinHeight="280" />
+                    </Grid.RowDefinitions>
 
-                    <!-- Employee List -->
-                    <Border Grid.Column="0" Background="#161B22" BorderBrush="#30363D" BorderThickness="1" CornerRadius="8" Padding="14" Margin="0,0,12,0">
+                    <!-- ── TOP PANE: DEPOT TECHNICIAN ROSTER ─────────────────────── -->
+                    <Border Grid.Row="0" Background="#161B22" BorderBrush="#30363D" BorderThickness="1" CornerRadius="8" Padding="12">
                         <Grid>
                             <Grid.RowDefinitions>
                                 <RowDefinition Height="Auto" />
                                 <RowDefinition Height="*" />
                             </Grid.RowDefinitions>
 
-                            <DockPanel Grid.Row="0" Margin="0,0,0,10">
-                                <TextBlock Text="DEPOT TECHNICIANS &amp; BENCH OPERATORS" FontSize="13" FontWeight="Bold" Foreground="#F0F6FC" VerticalAlignment="Center" />
-                                <TextBlock Text="Select a technician to reset PIN or modify assigned bench" FontSize="11" Foreground="#8B949E" HorizontalAlignment="Right" VerticalAlignment="Center" />
+                            <DockPanel Grid.Row="0" Margin="0,0,0,8">
+                                <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                    <TextBlock Text="DEPOT TECHNICIANS &amp; BENCH OPERATORS" FontSize="13" FontWeight="Bold" Foreground="#F0F6FC" />
+                                    <Border Background="#21262D" CornerRadius="10" Padding="8,2" Margin="10,0,0,0">
+                                        <TextBlock Text="{Binding Employees.Count, StringFormat='{}{0} Registered'}" FontSize="11" FontWeight="SemiBold" Foreground="#58A6FF" />
+                                    </Border>
+                                </StackPanel>
+                                <TextBlock Text="Click any technician to view live bench queue, productivity stats, and audit history below"
+                                           FontSize="11" Foreground="#8B949E" HorizontalAlignment="Right" VerticalAlignment="Center" />
                             </DockPanel>
 
                             <DataGrid Grid.Row="1" ItemsSource="{Binding Employees}" SelectedItem="{Binding SelectedEmployeeForEdit}"
@@ -727,6 +747,10 @@
                                         <Setter Property="ContextMenu">
                                             <Setter.Value>
                                                 <ContextMenu>
+                                                    <MenuItem Header="➕ Dispatch Asset to this Tech..."
+                                                              Command="{Binding DataContext.AssignAssetToSelectedTechCommand, RelativeSource={RelativeSource AncestorType=DataGrid}}"
+                                                              FontWeight="Bold" Foreground="#3FB950" />
+                                                    <Separator />
                                                     <MenuItem Header="🗑 Delete Technician Permanently"
                                                               Command="{Binding DataContext.DeleteEmployeeCommand, RelativeSource={RelativeSource AncestorType=DataGrid}}"
                                                               CommandParameter="{Binding}"
@@ -751,8 +775,7 @@
                                     </Style>
                                 </DataGrid.RowStyle>
                                 <DataGrid.Columns>
-                                    <DataGridTextColumn Header="ID" Binding="{Binding Id}" Width="120" />
-                                    <DataGridTextColumn Header="NAME" Binding="{Binding Name}" FontWeight="Bold" Width="160" />
+                                    <DataGridTextColumn Header="NAME" Binding="{Binding Name}" FontWeight="Bold" Width="170" />
                                     <DataGridTextColumn Header="ROLE" Binding="{Binding Role}" Width="110" />
                                     <DataGridTemplateColumn Header="STATION" Width="110">
                                         <DataGridTemplateColumn.CellTemplate>
@@ -772,105 +795,346 @@
                                             </DataTemplate>
                                         </DataGridTemplateColumn.CellTemplate>
                                     </DataGridTemplateColumn>
-                                    <DataGridTextColumn Header="ASSIGNED WORK" Binding="{Binding WorkloadCount, StringFormat='{}{0} assets'}" Width="110" />
-                                    <DataGridTextColumn Header="CREATED" Binding="{Binding CreatedAtUtc, StringFormat='{}{0:yyyy-MM-dd HH:mm}'}" Width="*" />
+                                    <DataGridTextColumn Header="ACTIVE WIP" Binding="{Binding WorkloadCount, StringFormat='{}{0} WIP'}" FontWeight="Bold" Width="100" />
+                                    <DataGridTextColumn Header="FINISHED (RTS)" Binding="{Binding FinishedCount, StringFormat='{}{0} done'}" Width="110" />
+                                    <DataGridTextColumn Header="LIVE BENCH ACTIVITY / LAST ACTION" Binding="{Binding CurrentActivity}" Foreground="#58A6FF" Width="*" />
+                                    <DataGridTextColumn Header="CREATED" Binding="{Binding CreatedAtUtc, StringFormat='{}{0:yyyy-MM-dd}'}" Width="100" />
                                 </DataGrid.Columns>
                             </DataGrid>
                         </Grid>
                     </Border>
 
-                    <!-- Right Column: Registration & Active Technician Management -->
-                    <ScrollViewer Grid.Column="1" VerticalScrollBarVisibility="Auto">
-                        <StackPanel>
-                            <!-- Register Technician Card -->
-                            <Border Background="#161B22" BorderBrush="#30363D" BorderThickness="1" CornerRadius="8" Padding="14" Margin="0,0,0,12">
-                                <StackPanel>
-                                    <TextBlock Text="REGISTER NEW TECHNICIAN" FontSize="12" FontWeight="Bold" Foreground="#58A6FF" Margin="0,0,0,12" />
+                    <!-- ── SPLITTER ──────────────────────────────────────────────── -->
+                    <GridSplitter Grid.Row="1" Height="6" Background="#30363D" HorizontalAlignment="Stretch" VerticalAlignment="Center" Cursor="SizeNS" Margin="0,1" />
 
-                                    <TextBlock Text="FULL NAME" FontSize="10" FontWeight="SemiBold" Foreground="#8B949E" Margin="0,0,0,4" />
-                                    <TextBox Text="{Binding NewEmployeeName, UpdateSourceTrigger=PropertyChanged}" Margin="0,0,0,10" />
+                    <!-- ── BOTTOM PANE: SELECTED OPERATOR DEEP COCKPIT ───────────── -->
+                    <Border Grid.Row="2" Background="#161B22" BorderBrush="#30363D" BorderThickness="1" CornerRadius="8" Padding="14">
+                        <Grid>
+                            <!-- Empty State when no tech selected -->
+                            <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center"
+                                        Visibility="{Binding HasSelectedEmployeeForEdit, Converter={StaticResource NullVis}, ConverterParameter=Invert}">
+                                <TextBlock Text="👥" FontSize="36" HorizontalAlignment="Center" Margin="0,0,0,10" Foreground="#8B949E" />
+                                <TextBlock Text="SELECT AN OPERATOR FROM THE ROSTER ABOVE" FontWeight="Bold" FontSize="14" Foreground="#F0F6FC" HorizontalAlignment="Center" />
+                                <TextBlock Text="Inspect active bench queue, finished productivity, and full audit trail of everything this technician does."
+                                           FontSize="12" Foreground="#8B949E" HorizontalAlignment="Center" Margin="0,4,0,0" />
+                            </StackPanel>
 
-                                    <Grid Margin="0,0,0,10">
-                                        <Grid.ColumnDefinitions>
-                                            <ColumnDefinition Width="*" />
-                                            <ColumnDefinition Width="8" />
-                                            <ColumnDefinition Width="*" />
-                                        </Grid.ColumnDefinitions>
-                                        <StackPanel Grid.Column="0">
-                                            <TextBlock Text="STATION PIN" FontSize="10" FontWeight="SemiBold" Foreground="#8B949E" Margin="0,0,0,4" />
-                                            <TextBox Text="{Binding NewEmployeePin, UpdateSourceTrigger=PropertyChanged}" ToolTip="4+ digit PIN for bench and mobile PWA login" />
+                            <!-- Detailed Tech Inspector -->
+                            <Grid Visibility="{Binding HasSelectedEmployeeForEdit, Converter={StaticResource NullVis}}">
+                                <Grid.RowDefinitions>
+                                    <!-- 0: Profile Header & Action Bar -->
+                                    <RowDefinition Height="Auto" />
+                                    <!-- 1: Performance Metric Strip -->
+                                    <RowDefinition Height="Auto" />
+                                    <!-- 2: Detailed Sub-Tabs: Assigned Units, Work Log, Settings -->
+                                    <RowDefinition Height="*" />
+                                </Grid.RowDefinitions>
+
+                                <!-- Header Profile & Toolbar -->
+                                <Border Grid.Row="0" Margin="0,0,0,12" Padding="0,0,0,10" BorderBrush="#30363D" BorderThickness="0,0,0,1">
+                                    <DockPanel>
+                                        <!-- Operator Info & Live Status -->
+                                        <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                            <TextBlock Text="👤" FontSize="24" Margin="0,0,10,0" VerticalAlignment="Center" Foreground="#58A6FF" />
+                                            <StackPanel>
+                                                <StackPanel Orientation="Horizontal">
+                                                    <TextBlock Text="{Binding SelectedEmployeeForEdit.Name}" FontWeight="Bold" FontSize="16" Foreground="#FFFFFF" />
+                                                    <Border Background="#21262D" BorderBrush="#30363D" BorderThickness="1" CornerRadius="4" Padding="6,1" Margin="10,0,0,0" VerticalAlignment="Center">
+                                                        <TextBlock Text="{Binding SelectedEmployeeForEdit.StationId}" FontWeight="Bold" FontSize="11" Foreground="#58A6FF" />
+                                                    </Border>
+                                                    <Border Background="#21262D" CornerRadius="4" Padding="6,1" Margin="6,0,0,0" VerticalAlignment="Center">
+                                                        <TextBlock Text="{Binding SelectedEmployeeForEdit.Role}" FontSize="11" Foreground="#8B949E" />
+                                                    </Border>
+                                                </StackPanel>
+                                                <StackPanel Orientation="Horizontal" Margin="0,3,0,0">
+                                                    <TextBlock Text="Live Status: " FontSize="11" Foreground="#8B949E" />
+                                                    <TextBlock Text="{Binding SelectedTechCurrentStatus}" FontWeight="Bold" FontSize="11" Foreground="#3FB950" Margin="0,0,12,0" />
+                                                    <TextBlock Text="•  Last Action: " FontSize="11" Foreground="#8B949E" />
+                                                    <TextBlock Text="{Binding SelectedTechLastAction}" FontSize="11" Foreground="#F0F6FC" />
+                                                </StackPanel>
+                                            </StackPanel>
                                         </StackPanel>
-                                        <StackPanel Grid.Column="2">
-                                            <TextBlock Text="STATION / BENCH ID" FontSize="10" FontWeight="SemiBold" Foreground="#8B949E" Margin="0,0,0,4" />
-                                            <TextBox Text="{Binding NewEmployeeStationId, UpdateSourceTrigger=PropertyChanged}" ToolTip="Assigned hardware bench (e.g. BENCH-01)" />
+
+                                        <!-- Actions Toolbar -->
+                                        <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center">
+                                            <Button Content="➕ Dispatch Asset to Tech" Command="{Binding AssignAssetToSelectedTechCommand}"
+                                                    Background="#238636" Foreground="#FFF" BorderBrush="#2EA043" FontWeight="Bold" Padding="12,6" FontSize="12" Margin="0,0,8,0"
+                                                    ToolTip="Pick any unassigned depot unit and dispatch it directly to this technician's bench" />
+
+                                            <Button Content="🔄 Refresh Tech" Command="{Binding RefreshSelectedTechDataCommand}"
+                                                    Background="#21262D" Foreground="#F0F6FC" BorderBrush="#30363D" FontWeight="SemiBold" Padding="10,6" FontSize="12" Margin="0,0,8,0"
+                                                    ToolTip="Reload this technician's live bench queue and recent audit activity" />
+
+                                            <Button Content="⏻ Toggle Active" Command="{Binding ToggleEmployeeActiveCommand}"
+                                                    Background="#21262D" Foreground="#D29922" BorderBrush="#30363D" FontWeight="SemiBold" Padding="10,6" FontSize="12" Margin="0,0,8,0" />
+
+                                            <Button Content="🗑 Delete Tech" Command="{Binding DeleteEmployeeCommand}"
+                                                    Background="#21262D" Foreground="#F85149" BorderBrush="#F85149" FontWeight="Bold" Padding="10,6" FontSize="12"
+                                                    ToolTip="Permanently delete this technician" />
                                         </StackPanel>
-                                    </Grid>
+                                    </DockPanel>
+                                </Border>
 
-                                    <TextBlock Text="SECURITY ROLE" FontSize="10" FontWeight="SemiBold" Foreground="#8B949E" Margin="0,0,0,4" />
-                                    <ComboBox SelectedValuePath="Content" SelectedValue="{Binding NewEmployeeRole, UpdateSourceTrigger=PropertyChanged}" Margin="0,0,0,14">
-                                        <ComboBoxItem Content="Technician" IsSelected="True" />
-                                        <ComboBoxItem Content="Manager" />
-                                        <ComboBoxItem Content="Owner" />
-                                    </ComboBox>
+                                <!-- Performance Metric Strip (5 Cards) -->
+                                <Grid Grid.Row="1" Margin="0,0,0,12">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="*" />
+                                    </Grid.ColumnDefinitions>
 
-                                    <Button Content="+ Register Technician" Command="{Binding CreateEmployeeCommand}"
-                                            Background="#238636" Foreground="#FFF" BorderBrush="#2EA043" FontWeight="Bold" Padding="12,8" />
-                                </StackPanel>
-                            </Border>
+                                    <!-- WIP Units -->
+                                    <Border Grid.Column="0" Background="#0D1117" BorderBrush="#30363D" BorderThickness="1" CornerRadius="6" Padding="10,8" Margin="0,0,6,0">
+                                        <StackPanel>
+                                            <TextBlock Text="ACTIVE IN-PROGRESS" FontSize="10" FontWeight="Bold" Foreground="#8B949E" />
+                                            <TextBlock Text="{Binding SelectedTechActiveAssignedCount, StringFormat='{}{0} units'}" FontSize="16" FontWeight="Bold" Foreground="#58A6FF" Margin="0,2,0,0" />
+                                        </StackPanel>
+                                    </Border>
 
-                            <!-- Selected Technician Management Card -->
-                            <Border Background="#161B22" BorderBrush="#388BFD" BorderThickness="1" CornerRadius="8" Padding="14"
-                                    Visibility="{Binding HasSelectedEmployeeForEdit, Converter={StaticResource NullVis}}">
-                                <StackPanel>
-                                    <TextBlock Text="MANAGE SELECTED OPERATOR" FontSize="12" FontWeight="Bold" Foreground="#58A6FF" Margin="0,0,0,4" />
-                                    <StackPanel Orientation="Horizontal" Margin="0,0,0,12">
-                                        <TextBlock Text="{Binding SelectedEmployeeForEdit.Name}" FontWeight="Bold" FontSize="13" Foreground="#FFFFFF" />
-                                        <TextBlock Text=" — " Foreground="#8B949E" />
-                                        <TextBlock Text="{Binding SelectedEmployeeForEdit.Role}" Foreground="#8B949E" />
-                                    </StackPanel>
+                                    <!-- Finished Today -->
+                                    <Border Grid.Column="1" Background="#0D1117" BorderBrush="#30363D" BorderThickness="1" CornerRadius="6" Padding="10,8" Margin="0,0,6,0">
+                                        <StackPanel>
+                                            <TextBlock Text="FINISHED TODAY" FontSize="10" FontWeight="Bold" Foreground="#8B949E" />
+                                            <TextBlock Text="{Binding SelectedTechCompletedTodayCount, StringFormat='{}{0} units'}" FontSize="16" FontWeight="Bold" Foreground="#3FB950" Margin="0,2,0,0" />
+                                        </StackPanel>
+                                    </Border>
 
-                                    <!-- Reset PIN -->
-                                    <TextBlock Text="NEW STATION PIN" FontSize="10" FontWeight="SemiBold" Foreground="#8B949E" Margin="0,0,0,4" />
-                                    <Grid Margin="0,0,0,10">
-                                        <Grid.ColumnDefinitions>
-                                            <ColumnDefinition Width="*" />
-                                            <ColumnDefinition Width="8" />
-                                            <ColumnDefinition Width="Auto" />
-                                        </Grid.ColumnDefinitions>
-                                        <TextBox Grid.Column="0" Text="{Binding EditEmployeePin, UpdateSourceTrigger=PropertyChanged}" />
-                                        <Button Grid.Column="2" Content="🔑 Reset PIN" Command="{Binding ResetEmployeePinCommand}"
-                                                Background="#21262D" Foreground="#58A6FF" BorderBrush="#30363D" FontWeight="Bold" Padding="10,6" />
-                                    </Grid>
+                                    <!-- Finished Total (RTS/Sold) -->
+                                    <Border Grid.Column="2" Background="#0D1117" BorderBrush="#30363D" BorderThickness="1" CornerRadius="6" Padding="10,8" Margin="0,0,6,0">
+                                        <StackPanel>
+                                            <TextBlock Text="FINISHED TOTAL (RTS)" FontSize="10" FontWeight="Bold" Foreground="#8B949E" />
+                                            <TextBlock Text="{Binding SelectedTechCompletedAllTimeCount, StringFormat='{}{0} units'}" FontSize="16" FontWeight="Bold" Foreground="#F0F6FC" Margin="0,2,0,0" />
+                                        </StackPanel>
+                                    </Border>
 
-                                    <!-- Modify Station ID -->
-                                    <TextBlock Text="ASSIGN BENCH / STATION ID" FontSize="10" FontWeight="SemiBold" Foreground="#8B949E" Margin="0,0,0,4" />
-                                    <Grid Margin="0,0,0,12">
-                                        <Grid.ColumnDefinitions>
-                                            <ColumnDefinition Width="*" />
-                                            <ColumnDefinition Width="8" />
-                                            <ColumnDefinition Width="Auto" />
-                                        </Grid.ColumnDefinitions>
-                                        <TextBox Grid.Column="0" Text="{Binding EditEmployeeStationId, UpdateSourceTrigger=PropertyChanged}" />
-                                        <Button Grid.Column="2" Content="🏷 Update Station" Command="{Binding UpdateEmployeeStationCommand}"
-                                                Background="#21262D" Foreground="#F0F6FC" BorderBrush="#30363D" FontWeight="Bold" Padding="10,6" />
-                                    </Grid>
-                                    <!-- Toggle Active & Delete -->
-                                    <Grid Margin="0,4,0,0">
-                                        <Grid.ColumnDefinitions>
-                                            <ColumnDefinition Width="*" />
-                                            <ColumnDefinition Width="8" />
-                                            <ColumnDefinition Width="*" />
-                                        </Grid.ColumnDefinitions>
-                                        <Button Grid.Column="0" Content="⏻ Toggle Active" Command="{Binding ToggleEmployeeActiveCommand}"
-                                                Background="#21262D" Foreground="#D29922" BorderBrush="#30363D" FontWeight="SemiBold" Padding="10,7" />
-                                        <Button Grid.Column="2" Content="🗑 Delete Tech" Command="{Binding DeleteEmployeeCommand}"
-                                                Background="#21262D" Foreground="#F85149" BorderBrush="#F85149" FontWeight="Bold" Padding="10,7"
-                                                ToolTip="Permanently delete this technician from the database" />
-                                    </Grid>
-                                </StackPanel>
-                            </Border>
-                        </StackPanel>
-                    </ScrollViewer>
+                                    <!-- Total Bench Actions -->
+                                    <Border Grid.Column="3" Background="#0D1117" BorderBrush="#30363D" BorderThickness="1" CornerRadius="6" Padding="10,8" Margin="0,0,6,0">
+                                        <StackPanel>
+                                            <TextBlock Text="BENCH ACTIONS / FIXES" FontSize="10" FontWeight="Bold" Foreground="#8B949E" />
+                                            <TextBlock Text="{Binding SelectedTechTotalFixesCount, StringFormat='{}{0} logged'}" FontSize="16" FontWeight="Bold" Foreground="#D29922" Margin="0,2,0,0" />
+                                        </StackPanel>
+                                    </Border>
+
+                                    <!-- BOM Components Fitted -->
+                                    <Border Grid.Column="4" Background="#0D1117" BorderBrush="#30363D" BorderThickness="1" CornerRadius="6" Padding="10,8">
+                                        <StackPanel>
+                                            <TextBlock Text="PARTS &amp; UPGRADES FITTED" FontSize="10" FontWeight="Bold" Foreground="#8B949E" />
+                                            <TextBlock Text="{Binding SelectedTechComponentsFittedCount, StringFormat='{}{0} parts'}" FontSize="16" FontWeight="Bold" Foreground="#A371F7" Margin="0,2,0,0" />
+                                        </StackPanel>
+                                    </Border>
+                                </Grid>
+
+                                <!-- Sub-Tabs: Assigned Units, Work History, Settings -->
+                                <TabControl Grid.Row="2" Background="Transparent" BorderThickness="0">
+                                    <!-- TAB A: Currently Assigned Assets Queue -->
+                                    <TabItem Header="📋 ASSIGNED BENCH QUEUE">
+                                        <Grid Margin="0,10,0,0">
+                                            <Grid.RowDefinitions>
+                                                <RowDefinition Height="Auto" />
+                                                <RowDefinition Height="*" />
+                                            </Grid.RowDefinitions>
+
+                                            <DockPanel Grid.Row="0" Margin="0,0,0,8">
+                                                <TextBlock Text="UNITS CURRENTLY ASSIGNED TO THIS OPERATOR'S BENCH:" FontSize="11" FontWeight="Bold" Foreground="#8B949E" VerticalAlignment="Center" />
+                                                <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+                                                    <TextBlock Text="Use the action buttons in any row to reassign, unassign back to depot pool, or mark as RTS." FontSize="11" Foreground="#8B949E" VerticalAlignment="Center" />
+                                                </StackPanel>
+                                            </DockPanel>
+
+                                            <DataGrid Grid.Row="1" ItemsSource="{Binding SelectedTechAssignedAssets}"
+                                                      AutoGenerateColumns="False" IsReadOnly="True"
+                                                      Background="#0D1117" RowBackground="#0D1117" AlternatingRowBackground="#161B22" Foreground="#F0F6FC" BorderThickness="0">
+                                                <DataGrid.RowStyle>
+                                                    <Style TargetType="DataGridRow" BasedOn="{StaticResource {x:Type DataGridRow}}">
+                                                        <Setter Property="ContextMenu">
+                                                            <Setter.Value>
+                                                                <ContextMenu>
+                                                                    <MenuItem Header="🔄 Reassign to Another Tech..."
+                                                                              Command="{Binding DataContext.ReassignAssignedAssetCommand, RelativeSource={RelativeSource AncestorType=DataGrid}}"
+                                                                              CommandParameter="{Binding}" FontWeight="Bold" />
+                                                                    <MenuItem Header="📦 Unassign (Return to Depot Pool)"
+                                                                              Command="{Binding DataContext.UnassignAssignedAssetCommand, RelativeSource={RelativeSource AncestorType=DataGrid}}"
+                                                                              CommandParameter="{Binding}" />
+                                                                    <Separator />
+                                                                    <MenuItem Header="✅ Quick Mark as Ready For Sale (RTS)"
+                                                                              Command="{Binding DataContext.QuickMarkAssignedRtsCommand, RelativeSource={RelativeSource AncestorType=DataGrid}}"
+                                                                              CommandParameter="{Binding}" Foreground="#3FB950" />
+                                                                    <Separator />
+                                                                    <MenuItem Header="📋 Copy Asset Tag"
+                                                                              Command="{Binding DataContext.CopyAssetTagCommand, RelativeSource={RelativeSource AncestorType=DataGrid}}"
+                                                                              CommandParameter="{Binding}" />
+                                                                    <MenuItem Header="📋 Copy Serial Number"
+                                                                              Command="{Binding DataContext.CopySerialNumberCommand, RelativeSource={RelativeSource AncestorType=DataGrid}}"
+                                                                              CommandParameter="{Binding}" />
+                                                                </ContextMenu>
+                                                            </Setter.Value>
+                                                        </Setter>
+                                                    </Style>
+                                                </DataGrid.RowStyle>
+                                                <DataGrid.Columns>
+                                                    <DataGridTextColumn Header="TAG" Binding="{Binding AssetTag}" FontWeight="Bold" Width="110" />
+                                                    <DataGridTextColumn Header="SERIAL NUMBER" Binding="{Binding SerialNumber}" Width="130" />
+                                                    <DataGridTextColumn Header="MODEL" Binding="{Binding ModelName}" FontWeight="SemiBold" Width="*" />
+                                                    <DataGridTextColumn Header="LOCATION" Binding="{Binding CurrentLocation}" Width="100" />
+                                                    <DataGridTextColumn Header="STATUS" Binding="{Binding Status}" Width="110" />
+                                                    <DataGridTextColumn Header="GRADE" Binding="{Binding GradeBadge}" Width="80" />
+                                                    <DataGridTextColumn Header="BATTERY" Binding="{Binding BatteryHealth, StringFormat='{}{0}%'}" Width="80" />
+                                                    <DataGridTextColumn Header="SSD" Binding="{Binding StorageHealth, StringFormat='{}{0}%'}" Width="70" />
+                                                    <DataGridTextColumn Header="NOTES" Binding="{Binding Notes}" Width="140" />
+
+                                                    <!-- In-Row Quick Actions -->
+                                                    <DataGridTemplateColumn Header="DISPATCH ACTIONS" Width="220">
+                                                        <DataGridTemplateColumn.CellTemplate>
+                                                            <DataTemplate>
+                                                                <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                                                    <Button Content="🔄 Reassign"
+                                                                            Command="{Binding DataContext.ReassignAssignedAssetCommand, RelativeSource={RelativeSource AncestorType=DataGrid}}"
+                                                                            CommandParameter="{Binding}"
+                                                                            Background="#21262D" Foreground="#58A6FF" BorderBrush="#30363D" FontWeight="SemiBold" FontSize="11" Padding="6,3" Margin="0,0,4,0"
+                                                                            ToolTip="Reassign this product to another operator or station" />
+
+                                                                    <Button Content="📦 Unassign"
+                                                                            Command="{Binding DataContext.UnassignAssignedAssetCommand, RelativeSource={RelativeSource AncestorType=DataGrid}}"
+                                                                            CommandParameter="{Binding}"
+                                                                            Background="#21262D" Foreground="#D29922" BorderBrush="#30363D" FontWeight="SemiBold" FontSize="11" Padding="6,3" Margin="0,0,4,0"
+                                                                            ToolTip="Unassign this asset and return to general depot intake/bench pool" />
+
+                                                                    <Button Content="⚡ RTS"
+                                                                            Command="{Binding DataContext.QuickMarkAssignedRtsCommand, RelativeSource={RelativeSource AncestorType=DataGrid}}"
+                                                                            CommandParameter="{Binding}"
+                                                                            Background="#21262D" Foreground="#3FB950" BorderBrush="#30363D" FontWeight="Bold" FontSize="11" Padding="6,3"
+                                                                            ToolTip="Promote asset to Ready For Sale" />
+                                                                </StackPanel>
+                                                            </DataTemplate>
+                                                        </DataGridTemplateColumn.CellTemplate>
+                                                    </DataGridTemplateColumn>
+                                                </DataGrid.Columns>
+                                            </DataGrid>
+                                        </Grid>
+                                    </TabItem>
+
+                                    <!-- TAB B: Work Log & Audit Trail -->
+                                    <TabItem Header="🕒 WORK LOG &amp; AUDIT TRAIL">
+                                        <Grid Margin="0,10,0,0">
+                                            <Grid.RowDefinitions>
+                                                <RowDefinition Height="Auto" />
+                                                <RowDefinition Height="*" />
+                                            </Grid.RowDefinitions>
+
+                                            <DockPanel Grid.Row="0" Margin="0,0,0,8">
+                                                <TextBlock Text="HISTORICAL ACTIONS, BENCH FIXES, AND REPAIR LOGGED BY THIS OPERATOR:" FontSize="11" FontWeight="Bold" Foreground="#8B949E" VerticalAlignment="Center" />
+                                                <TextBlock Text="{Binding SelectedTechActivityLog.Count, StringFormat='{}{0} Activity Events'}" FontSize="11" Foreground="#58A6FF" FontWeight="SemiBold" HorizontalAlignment="Right" VerticalAlignment="Center" />
+                                            </DockPanel>
+
+                                            <DataGrid Grid.Row="1" ItemsSource="{Binding SelectedTechActivityLog}"
+                                                      AutoGenerateColumns="False" IsReadOnly="True"
+                                                      Background="#0D1117" RowBackground="#0D1117" AlternatingRowBackground="#161B22" Foreground="#F0F6FC" BorderThickness="0">
+                                                <DataGrid.Columns>
+                                                    <DataGridTextColumn Header="TIME" Binding="{Binding RecordedAtUtc, StringFormat='{}{0:yyyy-MM-dd HH:mm:ss}'}" Width="150" />
+                                                    <DataGridTextColumn Header="ASSET TAG" Binding="{Binding AssetTag}" FontWeight="Bold" Foreground="#58A6FF" Width="120" />
+                                                    <DataGridTextColumn Header="SERIAL NUMBER" Binding="{Binding SerialNumber}" Width="130" />
+                                                    <DataGridTextColumn Header="MODEL" Binding="{Binding Model}" FontWeight="SemiBold" Width="170" />
+                                                    <DataGridTemplateColumn Header="BENCH ACTION" Width="140">
+                                                        <DataGridTemplateColumn.CellTemplate>
+                                                            <DataTemplate>
+                                                                <Border Background="#21262D" BorderBrush="#30363D" BorderThickness="1" CornerRadius="4" Padding="6,2" HorizontalAlignment="Left">
+                                                                    <TextBlock Text="{Binding EventType}" FontWeight="Bold" FontSize="11" Foreground="#3FB950" />
+                                                                </Border>
+                                                            </DataTemplate>
+                                                        </DataGridTemplateColumn.CellTemplate>
+                                                    </DataGridTemplateColumn>
+                                                    <DataGridTextColumn Header="BENCH / STATION" Binding="{Binding Location}" Width="120" />
+                                                    <DataGridTextColumn Header="ACTION DETAILS / NOTES" Binding="{Binding NotesJson}" Width="*" />
+                                                </DataGrid.Columns>
+                                            </DataGrid>
+                                        </Grid>
+                                    </TabItem>
+
+                                    <!-- TAB C: Station Settings & Registration -->
+                                    <TabItem Header="⚙ STATION CONFIG &amp; REGISTRATION">
+                                        <Grid Margin="0,12,0,0">
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="*" />
+                                                <ColumnDefinition Width="20" />
+                                                <ColumnDefinition Width="*" />
+                                            </Grid.ColumnDefinitions>
+
+                                            <!-- Left: Manage Current Operator -->
+                                            <Border Grid.Column="0" Background="#0D1117" BorderBrush="#30363D" BorderThickness="1" CornerRadius="8" Padding="14">
+                                                <StackPanel>
+                                                    <TextBlock Text="OPERATOR CREDENTIALS &amp; BENCH STATION" FontSize="12" FontWeight="Bold" Foreground="#58A6FF" Margin="0,0,0,12" />
+
+                                                    <!-- Reset PIN -->
+                                                    <TextBlock Text="NEW STATION PIN" FontSize="10" FontWeight="SemiBold" Foreground="#8B949E" Margin="0,0,0,4" />
+                                                    <Grid Margin="0,0,0,12">
+                                                        <Grid.ColumnDefinitions>
+                                                            <ColumnDefinition Width="*" />
+                                                            <ColumnDefinition Width="8" />
+                                                            <ColumnDefinition Width="Auto" />
+                                                        </Grid.ColumnDefinitions>
+                                                        <TextBox Grid.Column="0" Text="{Binding EditEmployeePin, UpdateSourceTrigger=PropertyChanged}" />
+                                                        <Button Grid.Column="2" Content="🔑 Reset PIN" Command="{Binding ResetEmployeePinCommand}"
+                                                                Background="#21262D" Foreground="#58A6FF" BorderBrush="#30363D" FontWeight="Bold" Padding="10,6" />
+                                                    </Grid>
+
+                                                    <!-- Modify Station ID -->
+                                                    <TextBlock Text="ASSIGN HARDWARE BENCH / STATION ID" FontSize="10" FontWeight="SemiBold" Foreground="#8B949E" Margin="0,0,0,4" />
+                                                    <Grid Margin="0,0,0,12">
+                                                        <Grid.ColumnDefinitions>
+                                                            <ColumnDefinition Width="*" />
+                                                            <ColumnDefinition Width="8" />
+                                                            <ColumnDefinition Width="Auto" />
+                                                        </Grid.ColumnDefinitions>
+                                                        <TextBox Grid.Column="0" Text="{Binding EditEmployeeStationId, UpdateSourceTrigger=PropertyChanged}" />
+                                                        <Button Grid.Column="2" Content="🏷 Update Station" Command="{Binding UpdateEmployeeStationCommand}"
+                                                                Background="#21262D" Foreground="#F0F6FC" BorderBrush="#30363D" FontWeight="Bold" Padding="10,6" />
+                                                    </Grid>
+                                                </StackPanel>
+                                            </Border>
+
+                                            <!-- Right: Register New Technician Form -->
+                                            <Border Grid.Column="2" Background="#0D1117" BorderBrush="#30363D" BorderThickness="1" CornerRadius="8" Padding="14">
+                                                <StackPanel>
+                                                    <TextBlock Text="REGISTER NEW TECHNICIAN / OPERATOR" FontSize="12" FontWeight="Bold" Foreground="#58A6FF" Margin="0,0,0,12" />
+
+                                                    <TextBlock Text="FULL NAME" FontSize="10" FontWeight="SemiBold" Foreground="#8B949E" Margin="0,0,0,4" />
+                                                    <TextBox Text="{Binding NewEmployeeName, UpdateSourceTrigger=PropertyChanged}" Margin="0,0,0,10" />
+
+                                                    <Grid Margin="0,0,0,10">
+                                                        <Grid.ColumnDefinitions>
+                                                            <ColumnDefinition Width="*" />
+                                                            <ColumnDefinition Width="8" />
+                                                            <ColumnDefinition Width="*" />
+                                                        </Grid.ColumnDefinitions>
+                                                        <StackPanel Grid.Column="0">
+                                                            <TextBlock Text="STATION PIN" FontSize="10" FontWeight="SemiBold" Foreground="#8B949E" Margin="0,0,0,4" />
+                                                            <TextBox Text="{Binding NewEmployeePin, UpdateSourceTrigger=PropertyChanged}" ToolTip="4+ digit PIN for bench login" />
+                                                        </StackPanel>
+                                                        <StackPanel Grid.Column="2">
+                                                            <TextBlock Text="STATION / BENCH ID" FontSize="10" FontWeight="SemiBold" Foreground="#8B949E" Margin="0,0,0,4" />
+                                                            <TextBox Text="{Binding NewEmployeeStationId, UpdateSourceTrigger=PropertyChanged}" ToolTip="Assigned hardware bench (e.g. BENCH-01)" />
+                                                        </StackPanel>
+                                                    </Grid>
+
+                                                    <TextBlock Text="SECURITY ROLE" FontSize="10" FontWeight="SemiBold" Foreground="#8B949E" Margin="0,0,0,4" />
+                                                    <ComboBox SelectedValuePath="Content" SelectedValue="{Binding NewEmployeeRole, UpdateSourceTrigger=PropertyChanged}" Margin="0,0,0,14">
+                                                        <ComboBoxItem Content="Technician" IsSelected="True" />
+                                                        <ComboBoxItem Content="Manager" />
+                                                        <ComboBoxItem Content="Owner" />
+                                                    </ComboBox>
+
+                                                    <Button Content="+ Register Technician" Command="{Binding CreateEmployeeCommand}"
+                                                            Background="#238636" Foreground="#FFF" BorderBrush="#2EA043" FontWeight="Bold" Padding="12,8" />
+                                                </StackPanel>
+                                            </Border>
+                                        </Grid>
+                                    </TabItem>
+                                </TabControl>
+                            </Grid>
+                        </Grid>
+                    </Border>
                 </Grid>
             </TabItem>
 

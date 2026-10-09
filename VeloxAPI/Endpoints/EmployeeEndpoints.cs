@@ -76,5 +76,27 @@ public static class EmployeeEndpoints
             await sse.BroadcastAsync(SseEventType.EmployeeUpdated, new { id, deleted = true });
             return Results.Ok(new { success = true, id });
         });
+
+        // GET /api/v1/employees/{id}/performance
+        grp.MapGet("/{id}/performance", (string id, HttpContext ctx, VeloxDb db) =>
+        {
+            var tenantId = ctx.TenantId();
+            if (tenantId == null) return Results.Unauthorized();
+
+            var perf = db.GetTechnicianPerformance(tenantId, id);
+            return perf is null
+                ? Results.NotFound(new { error = "Employee not found." })
+                : Results.Ok(perf);
+        });
+
+        // GET /api/v1/employees/{id}/activity
+        grp.MapGet("/{id}/activity", (string id, HttpContext ctx, VeloxDb db, int limit = 50) =>
+        {
+            var tenantId = ctx.TenantId();
+            if (tenantId == null) return Results.Unauthorized();
+
+            var list = db.GetTechnicianActivity(tenantId, id, limit);
+            return Results.Ok(new { employeeId = id, count = list.Count, activity = list });
+        });
     }
 }

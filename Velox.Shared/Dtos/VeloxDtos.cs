@@ -46,6 +46,8 @@ public sealed class EmployeeDto
     public bool IsActive { get; init; } = true;
     public string StationId { get; set; } = "BENCH-01";
     public int WorkloadCount { get; set; }
+    public int FinishedCount { get; set; }
+    public string CurrentActivity { get; set; } = "Standby";
     public DateTimeOffset CreatedAtUtc { get; init; }
 }
 
@@ -212,4 +214,40 @@ public sealed class DetachComponentRequest
     public double? RestockPurchaseCost { get; set; }
     public double? RestockSalePrice { get; set; }
 }
+
+// ─── Technician Performance & Tracking ────────────────────────────────────────
+
+public sealed class TechnicianActivityDto
+{
+    public string Id { get; init; } = "";
+    public string AssetId { get; init; } = "";
+    public string AssetTag { get; init; } = "";
+    public string SerialNumber { get; init; } = "";
+    public string Model { get; init; } = "";
+    public string EventType { get; init; } = "";
+    public string Location { get; init; } = "";
+    public string Actor { get; init; } = "";
+    public string NotesJson { get; init; } = "{}";
+    public DateTimeOffset RecordedAtUtc { get; init; }
+}
+
+public sealed class TechnicianPerformanceDto
+{
+    public string EmployeeId { get; init; } = "";
+    public string Name { get; init; } = "";
+    public EmployeeRole Role { get; init; } = EmployeeRole.Technician;
+    public string StationId { get; init; } = "BENCH-01";
+    public bool IsActive { get; init; } = true;
+    public int ActiveAssignedCount { get; set; }
+    public int CompletedTodayCount { get; set; }
+    public int CompletedAllTimeCount { get; set; }
+    public int TotalFixesCount { get; set; }
+    public int ComponentsFittedCount { get; set; }
+    public string CurrentStatusText { get; set; } = "Standby";
+    public string LastActionText { get; set; } = "None";
+    public DateTimeOffset? LastActiveUtc { get; set; }
+    public List<TechnicianActivityDto> RecentActivity { get; set; } = new();
+    public List<AssetDto> AssignedAssets { get; set; } = new();
+}
+
 
