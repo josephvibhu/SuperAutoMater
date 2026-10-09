@@ -565,7 +565,7 @@ namespace VeloxManager.Services
             }
             else if (upperStatus == "SOLD")
             {
-                queue = "ReadyForSale";
+                queue = "Sold";
             }
             else if (upperStatus == "WIP" || upperStatus.Contains("PROGRESS") || upperStatus == "RFR")
             {

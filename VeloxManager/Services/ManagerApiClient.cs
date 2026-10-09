@@ -215,6 +215,11 @@ public class ManagerApiClient
                         patch.Customer = r.Customer;
                         needsPatch = true;
                     }
+                    if (!string.IsNullOrWhiteSpace(r.OutDate))
+                    {
+                        patch.OutDate = r.OutDate;
+                        needsPatch = true;
+                    }
                     if (r.BatteryHealth.HasValue)
                     {
                         patch.BatteryHealth = r.BatteryHealth.Value;
