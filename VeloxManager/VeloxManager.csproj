@@ -35,6 +35,7 @@
 
 	<ItemGroup>
 		<Resource Include="app.ico" />
+		<EmbeddedResource Include="..\VeloxAPI\wwwroot\showroom\index.html" Link="Resources\showroom_index.html" />
 	</ItemGroup>
 
 	<ItemGroup>

@@ -576,4 +576,26 @@ public class ManagerApiClient
     {
         _sseCts?.Cancel();
     }
+
+    public async Task<bool> HoldAssetAsync(string assetId, HoldAssetRequest req)
+    {
+        try
+        {
+            var json = JsonSerializer.Serialize(req);
+            var content = new StringContent(json, Encoding.UTF8, "application/json");
+            var res = await _http.PostAsync($"api/v1/showroom/assets/{assetId}/hold", content);
+            return res.IsSuccessStatusCode;
+        }
+        catch { return false; }
+    }
+
+    public async Task<bool> ReleaseHoldAsync(string assetId)
+    {
+        try
+        {
+            var res = await _http.PostAsync($"api/v1/showroom/assets/{assetId}/release-hold", new StringContent("{}", Encoding.UTF8, "application/json"));
+            return res.IsSuccessStatusCode;
+        }
+        catch { return false; }
+    }
 }

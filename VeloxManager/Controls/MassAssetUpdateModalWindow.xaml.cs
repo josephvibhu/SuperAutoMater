@@ -26,7 +26,9 @@ namespace VeloxManager.Controls
             InitializeComponent();
             _allAssets = allAssets.ToList();
 
-            TxtTargetOutDate.Text = DateTime.Now.ToString("yyyy-MM-dd");
+            ChkUpdateStatus.IsChecked = true;
+            if (CmbTargetStatus != null) CmbTargetStatus.IsEnabled = true;
+            if (TxtTargetOutDate != null) TxtTargetOutDate.Text = DateTime.Now.ToString("yyyy-MM-dd");
 
             if (!string.IsNullOrWhiteSpace(initialInputs))
             {
@@ -57,6 +59,9 @@ namespace VeloxManager.Controls
 
         private void PerformMatch()
         {
+            if (TxtAssetInputs == null || GridMatchedAssets == null || TxtMatchedCount == null || TxtUnmatchedCount == null || TxtApplyBtn == null)
+                return;
+
             var raw = TxtAssetInputs.Text;
             if (string.IsNullOrWhiteSpace(raw))
             {
@@ -152,12 +157,36 @@ namespace VeloxManager.Controls
         }
 
         // ── Checkbox state helpers ────────────────────────────────────────────
-        private void ChkUpdateStatus_Changed(object sender, RoutedEventArgs e) => CmbTargetStatus.IsEnabled = ChkUpdateStatus.IsChecked == true;
-        private void ChkUpdateLocation_Changed(object sender, RoutedEventArgs e) => CmbTargetLocation.IsEnabled = ChkUpdateLocation.IsChecked == true;
-        private void ChkUpdateGrade_Changed(object sender, RoutedEventArgs e) => CmbTargetGrade.IsEnabled = ChkUpdateGrade.IsChecked == true;
-        private void ChkUpdateCustomer_Changed(object sender, RoutedEventArgs e) => TxtTargetCustomer.IsEnabled = ChkUpdateCustomer.IsChecked == true;
-        private void ChkUpdateOutDate_Changed(object sender, RoutedEventArgs e) => TxtTargetOutDate.IsEnabled = ChkUpdateOutDate.IsChecked == true;
-        private void ChkUpdateNotes_Changed(object sender, RoutedEventArgs e) => TxtTargetNotes.IsEnabled = ChkUpdateNotes.IsChecked == true;
+        private void ChkUpdateStatus_Changed(object sender, RoutedEventArgs e)
+        {
+            if (CmbTargetStatus != null && ChkUpdateStatus != null)
+                CmbTargetStatus.IsEnabled = ChkUpdateStatus.IsChecked == true;
+        }
+        private void ChkUpdateLocation_Changed(object sender, RoutedEventArgs e)
+        {
+            if (CmbTargetLocation != null && ChkUpdateLocation != null)
+                CmbTargetLocation.IsEnabled = ChkUpdateLocation.IsChecked == true;
+        }
+        private void ChkUpdateGrade_Changed(object sender, RoutedEventArgs e)
+        {
+            if (CmbTargetGrade != null && ChkUpdateGrade != null)
+                CmbTargetGrade.IsEnabled = ChkUpdateGrade.IsChecked == true;
+        }
+        private void ChkUpdateCustomer_Changed(object sender, RoutedEventArgs e)
+        {
+            if (TxtTargetCustomer != null && ChkUpdateCustomer != null)
+                TxtTargetCustomer.IsEnabled = ChkUpdateCustomer.IsChecked == true;
+        }
+        private void ChkUpdateOutDate_Changed(object sender, RoutedEventArgs e)
+        {
+            if (TxtTargetOutDate != null && ChkUpdateOutDate != null)
+                TxtTargetOutDate.IsEnabled = ChkUpdateOutDate.IsChecked == true;
+        }
+        private void ChkUpdateNotes_Changed(object sender, RoutedEventArgs e)
+        {
+            if (TxtTargetNotes != null && ChkUpdateNotes != null)
+                TxtTargetNotes.IsEnabled = ChkUpdateNotes.IsChecked == true;
+        }
 
         // ── Execute Update ───────────────────────────────────────────────────
         private async void BtnApply_Click(object sender, RoutedEventArgs e)

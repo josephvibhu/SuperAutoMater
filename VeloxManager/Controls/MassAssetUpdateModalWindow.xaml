@@ -129,7 +129,7 @@
                         <Border Background="#0D1117" BorderBrush="#30363D" BorderThickness="1" CornerRadius="6" Padding="12" Margin="0,0,0,10">
                             <StackPanel>
                                 <CheckBox x:Name="ChkUpdateStatus" Content="Update Lifecycle Status" FontWeight="SemiBold" Foreground="#F0F6FC"
-                                          IsChecked="True" Checked="ChkUpdateStatus_Changed" Unchecked="ChkUpdateStatus_Changed" />
+                                          Checked="ChkUpdateStatus_Changed" Unchecked="ChkUpdateStatus_Changed" />
                                 <TextBlock Text="Change asset pipeline state (e.g. mark batch as Sold or RTS)" FontSize="10" Foreground="#8B949E" Margin="22,2,0,6" />
                                 <ComboBox x:Name="CmbTargetStatus" Margin="22,0,0,0" Padding="8,5">
                                     <ComboBoxItem Content="Sold" IsSelected="True" />

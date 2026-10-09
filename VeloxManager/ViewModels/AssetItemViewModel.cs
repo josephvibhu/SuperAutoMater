@@ -119,6 +119,32 @@ public class AssetItemViewModel : INotifyPropertyChanged
     public bool IsOnHold => Model.IsOnHold;
     public string HoldStatusDisplay => IsOnHold ? $"⏳ Reserved: {HoldCustomer} ({HoldSalesRep})" : "Available";
 
+    public void SetHold(string customer, string salesRep, string expiresAtUtc)
+    {
+        Model.HoldCustomer = customer;
+        Model.HoldSalesRep = salesRep;
+        Model.HoldExpiresAtUtc = expiresAtUtc;
+        OnPropertyChanged(nameof(HoldCustomer));
+        OnPropertyChanged(nameof(HoldSalesRep));
+        OnPropertyChanged(nameof(HoldExpiresAtUtc));
+        OnPropertyChanged(nameof(IsOnHold));
+        OnPropertyChanged(nameof(HoldStatusDisplay));
+    }
+
+    public void ClearHold()
+    {
+        Model.HoldCustomer = "";
+        Model.HoldSalesRep = "";
+        Model.HoldExpiresAtUtc = null;
+        OnPropertyChanged(nameof(HoldCustomer));
+        OnPropertyChanged(nameof(HoldSalesRep));
+        OnPropertyChanged(nameof(HoldExpiresAtUtc));
+        OnPropertyChanged(nameof(IsOnHold));
+        OnPropertyChanged(nameof(HoldStatusDisplay));
+    }
+
+    public AssetDto ToDto() => Model;
+
     public DateTimeOffset UpdatedAt => Model.UpdatedAtUtc;
 
     public AssetCategory Category

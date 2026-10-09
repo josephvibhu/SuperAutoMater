@@ -698,6 +698,48 @@ public class ManagerViewModel : INotifyPropertyChanged
             });
         };
 
+        _lan.AssetProvider = () => Assets;
+        _lan.HoldAssetHandler = async (id, req) =>
+        {
+            var asset = Assets.FirstOrDefault(a => string.Equals(a.Id, id, StringComparison.OrdinalIgnoreCase) ||
+                                                   string.Equals(a.AssetTag, id, StringComparison.OrdinalIgnoreCase) ||
+                                                   string.Equals(a.SerialNumber, id, StringComparison.OrdinalIgnoreCase));
+            if (asset == null) return false;
+
+            var duration = req.DurationMinutes > 0 ? req.DurationMinutes : 120;
+            var expires = DateTimeOffset.UtcNow.AddMinutes(duration).ToString("o");
+            var salesRep = string.IsNullOrWhiteSpace(req.SalesRep) ? "Sales Team" : req.SalesRep.Trim();
+            var customer = req.CustomerName.Trim();
+
+            Application.Current?.Dispatcher.Invoke(() =>
+            {
+                asset.SetHold(customer, salesRep, expires);
+                RefreshMetrics();
+                LiveActivityFeed.Insert(0, $"[{DateTime.Now:HH:mm:ss}] ⏳ Showroom Hold: {asset.AssetTag} ({asset.ModelName}) reserved for {customer} by {salesRep}");
+            });
+
+            _ = _api.HoldAssetAsync(asset.Id, req);
+            return true;
+        };
+
+        _lan.ReleaseHoldHandler = async (id) =>
+        {
+            var asset = Assets.FirstOrDefault(a => string.Equals(a.Id, id, StringComparison.OrdinalIgnoreCase) ||
+                                                   string.Equals(a.AssetTag, id, StringComparison.OrdinalIgnoreCase) ||
+                                                   string.Equals(a.SerialNumber, id, StringComparison.OrdinalIgnoreCase));
+            if (asset == null) return false;
+
+            Application.Current?.Dispatcher.Invoke(() =>
+            {
+                asset.ClearHold();
+                RefreshMetrics();
+                LiveActivityFeed.Insert(0, $"[{DateTime.Now:HH:mm:ss}] Showroom reservation released on {asset.AssetTag} ({asset.ModelName})");
+            });
+
+            _ = _api.ReleaseHoldAsync(asset.Id);
+            return true;
+        };
+
         if (ManagerConfigService.Current.EnableLanServer)
         {
             _lan.Start(ManagerConfigService.Current.LanPort);
@@ -1417,16 +1459,24 @@ public class ManagerViewModel : INotifyPropertyChanged
 
     private void OpenMassUpdateDialog(AssetItemViewModel? initialAsset = null)
     {
-        string? initialInput = initialAsset != null ? (!string.IsNullOrWhiteSpace(initialAsset.AssetTag) ? initialAsset.AssetTag : initialAsset.SerialNumber) : null;
-        var win = new VeloxManager.Controls.MassAssetUpdateModalWindow(Assets, initialInput)
+        try
         {
-            Owner = Application.Current?.MainWindow
-        };
-        if (win.ShowDialog() == true)
+            string? initialInput = initialAsset != null ? (!string.IsNullOrWhiteSpace(initialAsset.AssetTag) ? initialAsset.AssetTag : initialAsset.SerialNumber) : null;
+            var win = new VeloxManager.Controls.MassAssetUpdateModalWindow(Assets, initialInput);
+            if (Application.Current?.MainWindow != null && Application.Current.MainWindow.IsLoaded)
+            {
+                win.Owner = Application.Current.MainWindow;
+            }
+            if (win.ShowDialog() == true)
+            {
+                ApplyFilter();
+                RefreshMetrics();
+                LiveActivityFeed.Insert(0, $"[{DateTime.Now:HH:mm:ss}] Batch mass update applied to {win.UpdatedCount} assets");
+            }
+        }
+        catch (Exception ex)
         {
-            ApplyFilter();
-            RefreshMetrics();
-            LiveActivityFeed.Insert(0, $"[{DateTime.Now:HH:mm:ss}] Batch mass update applied to {win.UpdatedCount} assets");
+            VeloxMessageBox.Show($"Could not open Mass Asset Update dialog:\n\n{ex.Message}", "Mass Update Error", MessageBoxButton.OK, MessageBoxImage.Error);
         }
     }
 
@@ -1569,16 +1619,42 @@ public class ManagerViewModel : INotifyPropertyChanged
     {
         try
         {
-            var url = $"{ManagerConfigService.Current.ApiUrl.TrimEnd('/')}/showroom";
+            // Ensure local LAN mirror server is active so showroom is 100% accessible locally and on LAN
+            if (!_lan.IsRunning)
+            {
+                _lan.Start(ManagerConfigService.Current.LanPort);
+            }
+
+            var port = _lan.Port;
+            var localUrl = $"http://localhost:{port}/showroom";
+            var lanIp = LanMirrorServer.GetLocalIpAddress();
+            var lanUrl = $"http://{lanIp}:{port}/showroom";
+
+            // Copy LAN URL to clipboard for easy sharing with Sales / Media team
+            try
+            {
+                Clipboard.SetText(lanUrl);
+            }
+            catch { }
+
             System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo
             {
-                FileName = url,
+                FileName = localUrl,
                 UseShellExecute = true
             });
+
+            LiveActivityFeed.Insert(0, $"[{DateTime.Now:HH:mm:ss}] ⚡ VeloxShowroom Active: {lanUrl} (Link copied to clipboard for Sales & Media)");
+
+            VeloxMessageBox.Show(
+                $"VeloxShowroom is active and running!\n\n" +
+                $"• Local URL: {localUrl}\n" +
+                $"• LAN URL for Sales & Media: {lanUrl}\n\n" +
+                $"The LAN URL has been automatically copied to your clipboard. Anyone on your local network (Sales, Media, or Floor Staff) can open this URL from any computer, tablet, or phone to view live RTS inventory and place reservations.",
+                "VeloxShowroom Active", MessageBoxButton.OK, MessageBoxImage.Information);
         }
         catch (Exception ex)
         {
-            MessageBox.Show($"Unable to launch web browser:\n{ex.Message}", "VeloxShowroom", MessageBoxButton.OK, MessageBoxImage.Warning);
+            VeloxMessageBox.Show($"Unable to launch VeloxShowroom:\n{ex.Message}", "VeloxShowroom Error", MessageBoxButton.OK, MessageBoxImage.Warning);
         }
     }
 
