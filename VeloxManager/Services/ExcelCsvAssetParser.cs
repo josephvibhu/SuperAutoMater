@@ -21,7 +21,7 @@ namespace VeloxManager.Services
         public string Category { get; set; } = "Laptop";
         public string CurrentLocation { get; set; } = "IntakeStaging";
         public string LifecycleQueue { get; set; } = "IntakeStaging";
-        public string Grade { get; set; } = "Unknown";
+        public string Grade { get; set; } = "A+";
         public string Supplier { get; set; } = "";
         public string Customer { get; set; } = "";
         public int? BatteryHealth { get; set; }
@@ -32,8 +32,11 @@ namespace VeloxManager.Services
         public string MissingComponents { get; set; } = "";
         public string Notes { get; set; } = "";
         public string InDate { get; set; } = "";
+        public string OutDate { get; set; } = "";
 
-        public bool IsValid => !string.IsNullOrWhiteSpace(SerialNumber) || !string.IsNullOrWhiteSpace(AssetTag);
+        public bool IsValid => (!string.IsNullOrWhiteSpace(SerialNumber) || !string.IsNullOrWhiteSpace(AssetTag))
+                               && !string.Equals(SerialNumber, "SERIAL", StringComparison.OrdinalIgnoreCase)
+                               && !string.Equals(AssetTag, "TAG", StringComparison.OrdinalIgnoreCase);
     }
 
     public sealed class ParsedAssetBatch
@@ -48,9 +51,11 @@ namespace VeloxManager.Services
     }
 
     /// <summary>
-    /// High-performance native parser for Excel (.xlsx) and CSV (.csv) files.
-    /// Supports SuperAutoMater 15-column ITAM format as well as generic warehouse manifests.
-    /// Zero third-party NuGet dependencies; utilizes standard BCL ZipArchive & XML Linq.
+    /// Multi-Section Adaptive Parser for Excel (.xlsx) and CSV (.csv) warehouse manifests.
+    /// Handles embedded section headers (HP, Lenovo, Dell, Microsoft Tablet, Surface, Invoices),
+    /// mixed column layouts (VYP, PLACE, IN, OUT, TAG, SERIAL, Model, Processor, MEM, B+, Status, WIP, PHY, Remarks, etc.),
+    /// and auto-infers categories, locations, specifications, and defect attributions.
+    /// Zero external NuGet dependencies.
     /// </summary>
     public static class ExcelCsvAssetParser
     {
@@ -85,23 +90,16 @@ namespace VeloxManager.Services
             var lines = File.ReadAllLines(filePath, Encoding.UTF8);
             if (lines.Length == 0) return batch;
 
-            // Detect delimiter (, or ; or \t)
-            char delimiter = DetectDelimiter(lines[0]);
-            var headers = ParseCsvLine(lines[0], delimiter);
-            batch.HeadersFound = headers;
+            char delimiter = DetectDelimiter(lines);
 
-            var colMap = BuildColumnMapping(headers);
-
-            for (int i = 1; i < lines.Length; i++)
+            var rawRows = new List<List<string>>();
+            foreach (var line in lines)
             {
-                string line = lines[i];
                 if (string.IsNullOrWhiteSpace(line)) continue;
-
-                var cells = ParseCsvLine(line, delimiter);
-                var row = MapRow(cells, colMap, i + 1);
-                batch.Rows.Add(row);
+                rawRows.Add(ParseCsvLine(line, delimiter));
             }
 
+            batch.Rows = ProcessMultiSectionRows(rawRows, batch.HeadersFound);
             return batch;
         }
 
@@ -115,7 +113,7 @@ namespace VeloxManager.Services
 
             using var archive = ZipFile.OpenRead(filePath);
 
-            // 1. Load Shared Strings (if available)
+            // 1. Shared Strings
             var sharedStrings = new List<string>();
             var sharedStringsEntry = archive.GetEntry("xl/sharedStrings.xml");
             if (sharedStringsEntry != null)
@@ -125,59 +123,141 @@ namespace VeloxManager.Services
                 XNamespace ns = "http://schemas.openxmlformats.org/spreadsheetml/2006/main";
                 foreach (var si in ssDoc.Descendants(ns + "si"))
                 {
-                    // Handle single <t> or multiple run elements <r><t>
                     var texts = si.Descendants(ns + "t").Select(t => t.Value);
                     sharedStrings.Add(string.Concat(texts));
                 }
             }
 
-            // 2. Open first worksheet
-            var sheetEntry = archive.GetEntry("xl/worksheets/sheet1.xml") 
-                          ?? archive.Entries.FirstOrDefault(e => e.FullName.StartsWith("xl/worksheets/sheet", StringComparison.OrdinalIgnoreCase));
+            // 2. Worksheets (process sheet1 or all sheets)
+            var sheetEntries = archive.Entries
+                .Where(e => e.FullName.StartsWith("xl/worksheets/sheet", StringComparison.OrdinalIgnoreCase) && e.FullName.EndsWith(".xml"))
+                .ToList();
 
-            if (sheetEntry == null)
-                throw new InvalidOperationException("Could not find worksheet in .xlsx workbook.");
+            if (sheetEntries.Count == 0)
+                throw new InvalidOperationException("No worksheet found in .xlsx workbook.");
 
-            using var sheetStream = sheetEntry.Open();
-            var doc = XDocument.Load(sheetStream);
-            XNamespace sheetNs = "http://schemas.openxmlformats.org/spreadsheetml/2006/main";
+            var allRawRows = new List<List<string>>();
 
-            var rowsXml = doc.Descendants(sheetNs + "row").ToList();
-            if (rowsXml.Count == 0) return batch;
-
-            // 3. Extract header row (first row)
-            var firstRowXml = rowsXml[0];
-            var headerCells = ExtractRowCells(firstRowXml, sheetNs, sharedStrings);
-            var headers = headerCells.Select(c => c.Value?.Trim() ?? "").ToList();
-            batch.HeadersFound = headers;
-
-            var colMap = BuildColumnMapping(headers);
-
-            // 4. Extract data rows
-            for (int r = 1; r < rowsXml.Count; r++)
+            foreach (var sheetEntry in sheetEntries)
             {
-                var rowXml = rowsXml[r];
-                var cells = ExtractRowCells(rowXml, sheetNs, sharedStrings);
-                
-                // Map cells by column index
-                int maxCol = cells.Count > 0 ? cells.Max(c => c.ColumnIndex) + 1 : 0;
-                var cellList = new List<string>(new string[Math.Max(maxCol, headers.Count)]);
-                for (int c = 0; c < cellList.Count; c++) cellList[c] = "";
-                foreach (var cell in cells)
+                using var sheetStream = sheetEntry.Open();
+                var doc = XDocument.Load(sheetStream);
+                XNamespace sheetNs = "http://schemas.openxmlformats.org/spreadsheetml/2006/main";
+
+                var rowsXml = doc.Descendants(sheetNs + "row").ToList();
+                foreach (var rowXml in rowsXml)
                 {
-                    if (cell.ColumnIndex >= 0 && cell.ColumnIndex < cellList.Count)
+                    var cells = ExtractRowCells(rowXml, sheetNs, sharedStrings);
+                    if (cells.Count == 0) continue;
+
+                    int maxCol = cells.Max(c => c.ColumnIndex) + 1;
+                    var cellList = new List<string>(new string[maxCol]);
+                    for (int c = 0; c < cellList.Count; c++) cellList[c] = "";
+
+                    foreach (var cell in cells)
                     {
-                        cellList[cell.ColumnIndex] = cell.Value ?? "";
+                        if (cell.ColumnIndex >= 0 && cell.ColumnIndex < cellList.Count)
+                            cellList[cell.ColumnIndex] = cell.Value ?? "";
+                    }
+
+                    if (!cellList.All(string.IsNullOrWhiteSpace))
+                    {
+                        allRawRows.Add(cellList);
                     }
                 }
-
-                if (cellList.All(string.IsNullOrWhiteSpace)) continue;
-
-                var row = MapRow(cellList, colMap, r + 1);
-                batch.Rows.Add(row);
             }
 
+            batch.Rows = ProcessMultiSectionRows(allRawRows, batch.HeadersFound);
             return batch;
+        }
+
+        private static List<ParsedAssetRow> ProcessMultiSectionRows(List<List<string>> rawRows, List<string> allHeadersOut)
+        {
+            var result = new List<ParsedAssetRow>();
+            Dictionary<string, int>? currentMap = null;
+            int rowNumber = 0;
+
+            foreach (var cells in rawRows)
+            {
+                rowNumber++;
+                if (cells.Count == 0 || cells.All(string.IsNullOrWhiteSpace))
+                    continue;
+
+                // Check if this row is an asset table header (e.g. VYP, PLACE, TAG, SERIAL, Model, Processor...)
+                if (IsAssetTableHeader(cells))
+                {
+                    currentMap = BuildColumnMapping(cells);
+                    foreach (var c in cells)
+                    {
+                        string trimmed = c?.Trim() ?? "";
+                        if (!string.IsNullOrWhiteSpace(trimmed) && !allHeadersOut.Contains(trimmed, StringComparer.OrdinalIgnoreCase))
+                        {
+                            allHeadersOut.Add(trimmed);
+                        }
+                    }
+                    continue;
+                }
+
+                // Check if this row is an invoice or non-asset table header (e.g. "Invoice Number,In Date,Out Date...")
+                if (IsStopSectionHeader(cells))
+                {
+                    currentMap = null;
+                    continue;
+                }
+
+                // If currently inside an active asset section:
+                if (currentMap != null)
+                {
+                    var item = MapRow(cells, currentMap, rowNumber);
+                    if (item.IsValid)
+                    {
+                        result.Add(item);
+                    }
+                }
+            }
+
+            // Fallback: If no embedded section header was matched, check if row 0 could be a standard single header
+            if (result.Count == 0 && rawRows.Count > 1)
+            {
+                var row0 = rawRows[0];
+                var singleMap = BuildColumnMapping(row0);
+                allHeadersOut.AddRange(row0.Where(h => !string.IsNullOrWhiteSpace(h)));
+
+                for (int i = 1; i < rawRows.Count; i++)
+                {
+                    var item = MapRow(rawRows[i], singleMap, i + 1);
+                    if (item.IsValid)
+                    {
+                        result.Add(item);
+                    }
+                }
+            }
+
+            return result;
+        }
+
+        private static bool IsAssetTableHeader(List<string> cells)
+        {
+            int score = 0;
+            foreach (var c in cells)
+            {
+                string h = NormalizeHeader(c);
+                if (string.IsNullOrWhiteSpace(h)) continue;
+
+                if (Matches(h, "tag", "asset tag", "asset_tag")) score += 3;
+                else if (Matches(h, "serial", "serial number", "serial_number", "sn")) score += 3;
+                else if (Matches(h, "model", "model name", "laptop model")) score += 2;
+                else if (Matches(h, "processor", "cpu", "mem", "memory")) score += 2;
+                else if (Matches(h, "status", "phy", "b+", "place", "work in progress")) score += 2;
+            }
+
+            // Must have high confidence of being an asset inventory table header
+            return score >= 6;
+        }
+
+        private static bool IsStopSectionHeader(List<string> cells)
+        {
+            return cells.Any(c => Matches(NormalizeHeader(c), "invoice number", "invoice", "payment status"));
         }
 
         private struct CellData
@@ -196,7 +276,7 @@ namespace VeloxManager.Services
                 string t = (string?)c.Attribute("t") ?? "";
                 string val = "";
 
-                if (t == "s") // shared string index
+                if (t == "s")
                 {
                     string v = c.Element(ns + "v")?.Value ?? "";
                     if (int.TryParse(v, out int sIdx) && sIdx >= 0 && sIdx < sharedStrings.Count)
@@ -221,7 +301,6 @@ namespace VeloxManager.Services
         private static int ColumnNameToIndex(string cellRef)
         {
             if (string.IsNullOrWhiteSpace(cellRef)) return 0;
-            // Extract letters only, e.g. "AA12" -> "AA"
             int sum = 0;
             foreach (char ch in cellRef)
             {
@@ -234,14 +313,21 @@ namespace VeloxManager.Services
             return Math.Max(0, sum - 1);
         }
 
-        private static char DetectDelimiter(string headerLine)
+        private static char DetectDelimiter(string[] lines)
         {
-            int commas = headerLine.Count(c => c == ',');
-            int semicolons = headerLine.Count(c => c == ';');
-            int tabs = headerLine.Count(c => c == '\t');
-
-            if (tabs > commas && tabs > semicolons) return '\t';
-            if (semicolons > commas) return ';';
+            // Sample lines that might contain table content
+            foreach (var line in lines)
+            {
+                if (line.Contains("TAG", StringComparison.OrdinalIgnoreCase) || line.Contains("SERIAL", StringComparison.OrdinalIgnoreCase))
+                {
+                    int commas = line.Count(c => c == ',');
+                    int semicolons = line.Count(c => c == ';');
+                    int tabs = line.Count(c => c == '\t');
+                    if (tabs > commas && tabs > semicolons) return '\t';
+                    if (semicolons > commas) return ';';
+                    return ',';
+                }
+            }
             return ',';
         }
 
@@ -309,33 +395,37 @@ namespace VeloxManager.Services
                 else if (Matches(h, "processor", "cpu", "processor model"))
                     AssignIfNotSet(map, "Processor", i);
 
-                // Memory / RAM
-                else if (Matches(h, "memory", "ram", "memory [ram/storage]"))
+                // Memory / RAM / Storage
+                else if (Matches(h, "mem", "memory", "ram", "memory [ram/storage]"))
                     AssignIfNotSet(map, "Memory", i);
 
-                // Battery Health
-                else if (Matches(h, "battery health", "battery", "batt health", "battery %", "batt"))
+                // Battery Health (B+)
+                else if (Matches(h, "b+", "b +", "battery health", "battery", "batt health", "battery %", "batt"))
                     AssignIfNotSet(map, "BatteryHealth", i);
 
                 // Storage Health
-                else if (Matches(h, "storage health", "disk health", "ssd health", "hdd health", "hds"))
+                else if (Matches(h, "storage health", "disk health", "ssd health", "hdd health", "hds", "storage %"))
                     AssignIfNotSet(map, "StorageHealth", i);
 
-                // Status / Queue
+                // Status / Lifecycle Queue
                 else if (Matches(h, "status", "queue", "lifecycle", "lifecycle queue", "state"))
                     AssignIfNotSet(map, "Status", i);
 
-                // Work In Progress / Defects
-                else if (Matches(h, "work in progress", "wip", "work_in_progress", "defects", "issue"))
+                // Work In Progress / Defects / Issue
+                else if (Matches(h, "work in progress", "wip", "work_in_progress", "defects", "issue", "issues"))
                     AssignIfNotSet(map, "WorkInProgress", i);
 
-                // Physical Grade
-                else if (Matches(h, "physical grade", "grade", "cosmetic grade", "physical_grade", "cosmetic"))
+                // Physical / Cosmetic Grade (PHY)
+                else if (Matches(h, "phy", "physical grade", "grade", "cosmetic grade", "physical_grade", "cosmetic"))
                     AssignIfNotSet(map, "Grade", i);
 
-                // Remarks / Notes
+                // Remarks / Technician Notes
                 else if (Matches(h, "remarks", "notes", "comment", "comments", "technician notes"))
                     AssignIfNotSet(map, "Remarks", i);
+
+                // Location / Shelf (PLACE)
+                else if (Matches(h, "place", "location", "shelf", "shelf bay", "shelf_location", "bay", "bin", "rack"))
+                    AssignIfNotSet(map, "Location", i);
 
                 // Technician Name or ID
                 else if (Matches(h, "technician", "technician name or id", "tech", "qc tech", "assigned to", "operator"))
@@ -357,15 +447,11 @@ namespace VeloxManager.Services
                 else if (Matches(h, "customer", "client", "buyer", "account"))
                     AssignIfNotSet(map, "Customer", i);
 
-                // Location / Shelf Bay
-                else if (Matches(h, "location", "shelf", "shelf bay", "shelf_location", "bay", "bin", "rack"))
-                    AssignIfNotSet(map, "Location", i);
-
-                // Purchase Price / Cost
+                // Purchase Price
                 else if (Matches(h, "purchase price", "cost", "buy price", "purchase_price"))
                     AssignIfNotSet(map, "PurchasePrice", i);
 
-                // Sale Price / Price
+                // Sale Price
                 else if (Matches(h, "sale price", "price", "selling price", "sale_price", "msrp"))
                     AssignIfNotSet(map, "SalePrice", i);
 
@@ -410,78 +496,168 @@ namespace VeloxManager.Services
                 return "";
             }
 
-            var row = new ParsedAssetRow
+            string rawSerial = Get("SerialNumber");
+            string rawTag = Get("AssetTag");
+            string rawModel = Get("Model");
+            string rawPlace = Get("Location");
+            string rawStatus = Get("Status");
+            string rawWip = Get("WorkInProgress");
+            string rawGrade = Get("Grade");
+            string rawRemarks = Get("Remarks");
+            string rawProc = Get("Processor");
+            string rawMem = Get("Memory");
+            string rawBatt = Get("BatteryHealth");
+            string rawSupplier = Get("Supplier");
+            string rawCustomer = Get("Customer");
+            string rawInDate = Get("InDate");
+            string rawOutDate = Get("OutDate");
+
+            // Filter out counter / subtotal lines like ",,122,24,98,,,,,,,,,,,,,," where serial & tag are blank or purely counters
+            if (string.IsNullOrWhiteSpace(rawSerial) && string.IsNullOrWhiteSpace(rawTag) && string.IsNullOrWhiteSpace(rawModel))
+            {
+                return new ParsedAssetRow { RowNumber = rowNum };
+            }
+
+            // Normalization of Serial & Tag
+            string sn = rawSerial.Trim();
+            string tag = rawTag.Trim();
+
+            // If Serial is empty but Tag is present, fall back to Tag (e.g. "HP100", "DL28", "MST-9")
+            if (string.IsNullOrWhiteSpace(sn) && !string.IsNullOrWhiteSpace(tag))
+                sn = tag;
+            if (string.IsNullOrWhiteSpace(tag) && !string.IsNullOrWhiteSpace(sn))
+                tag = sn;
+
+            // Model
+            string model = !string.IsNullOrWhiteSpace(rawModel) ? rawModel : "Refurb Laptop";
+
+            // Category Auto-Inference
+            string category = "Laptop";
+            string upperTag = tag.ToUpperInvariant();
+            string upperModel = model.ToUpperInvariant();
+
+            if (upperTag.StartsWith("MST-") || upperModel.Contains("TABLET") || upperModel.Contains("TAB") || upperModel.Contains("SURFACE PRO"))
+            {
+                category = "Tablet";
+            }
+            else if (upperTag.StartsWith("MSL-") || upperModel.Contains("SURFACE LAPTOP"))
+            {
+                category = "Laptop";
+            }
+            else if (upperModel.Contains("PRECISION") || upperModel.Contains("WORKSTATION"))
+            {
+                category = "Workstation";
+            }
+            else if (upperModel.Contains("DESKTOP") || upperModel.Contains("OPTIPLEX") || upperModel.Contains("ELITEDESK"))
+            {
+                category = "Desktop";
+            }
+
+            // Location from "PLACE"
+            string location = !string.IsNullOrWhiteSpace(rawPlace) ? rawPlace : "IntakeStaging";
+
+            // Lifecycle Queue from "Status"
+            string queue = "IntakeStaging";
+            string upperStatus = rawStatus.ToUpperInvariant();
+            if (upperStatus == "RTS" || upperStatus == "READY")
+            {
+                queue = "ReadyForSale";
+            }
+            else if (upperStatus == "SOLD")
+            {
+                queue = "ReadyForSale";
+            }
+            else if (upperStatus == "WIP" || upperStatus.Contains("PROGRESS") || upperStatus == "RFR")
+            {
+                queue = "ActiveTesting";
+            }
+            else if (upperStatus == "RENT" || upperStatus == "DEMO")
+            {
+                queue = "OnHold";
+            }
+            else if (upperStatus == "NTC" || upperStatus.Contains("PARTS"))
+            {
+                queue = "AwaitingParts";
+            }
+
+            // Grade Normalization (e.g. "A+ GRADE" -> "A+", "B GRADE" -> "B", "A" -> "A")
+            string grade = "A";
+            string upperGrade = rawGrade.ToUpperInvariant();
+            if (upperGrade.Contains("A+")) grade = "A+";
+            else if (upperGrade.Contains("B")) grade = "B";
+            else if (upperGrade.Contains("C")) grade = "C";
+            else if (upperGrade.Contains("D") || upperGrade.Contains("FAULTY")) grade = "Faulty";
+            else if (upperGrade.Contains("A")) grade = "A";
+
+            // Battery Health (parse first integer 0-100)
+            int? battery = null;
+            var matchB = Regex.Match(rawBatt, @"\b([0-9]{1,3})\b");
+            if (matchB.Success && int.TryParse(matchB.Groups[1].Value, out int bVal))
+            {
+                battery = Math.Clamp(bVal, 0, 100);
+            }
+
+            // Consolidated Notes: preserve Processor, Memory, Defect Issue, Remarks, Sale flags
+            var notesList = new List<string>();
+            if (!string.IsNullOrWhiteSpace(rawProc)) notesList.Add($"CPU: {rawProc}");
+            if (!string.IsNullOrWhiteSpace(rawMem)) notesList.Add($"RAM/SSD: {rawMem}");
+            if (upperStatus == "SOLD") notesList.Add("[SOLD]");
+            if (upperStatus == "RENT") notesList.Add("[RENTED]");
+            if (upperStatus == "DEMO") notesList.Add("[DEMO UNIT]");
+            if (!string.IsNullOrWhiteSpace(rawWip) && rawWip != "All Okay" && rawWip != "Undefined")
+            {
+                notesList.Add($"Issue: {rawWip}");
+            }
+            if (!string.IsNullOrWhiteSpace(rawRemarks) && rawRemarks != "PROBLEM")
+            {
+                notesList.Add(rawRemarks);
+            }
+
+            string combinedNotes = string.Join(" | ", notesList);
+
+            // Date parsing
+            string inDate = ParseNormalizedDate(rawInDate);
+            string outDate = ParseNormalizedDate(rawOutDate);
+
+            return new ParsedAssetRow
             {
                 RowNumber = rowNum,
-                SerialNumber = Get("SerialNumber"),
-                AssetTag = Get("AssetTag"),
-                Model = Get("Model"),
-                Category = Get("Category"),
-                CurrentLocation = Get("Location"),
-                LifecycleQueue = Get("Status"),
-                Grade = Get("Grade"),
-                Supplier = Get("Supplier"),
-                Customer = Get("Customer"),
-                InDate = Get("InDate"),
-                MissingComponents = Get("MissingComponents"),
-                Notes = Get("Remarks")
+                SerialNumber = sn,
+                AssetTag = tag,
+                Model = model,
+                Category = category,
+                CurrentLocation = location,
+                LifecycleQueue = queue,
+                Grade = grade,
+                BatteryHealth = battery,
+                StorageHealth = 100,
+                Supplier = rawSupplier,
+                Customer = rawCustomer,
+                InDate = inDate,
+                OutDate = outDate,
+                Notes = combinedNotes,
+                Quantity = 1
             };
+        }
 
-            // If SerialNumber is empty but Tag is present, or vice-versa
-            if (string.IsNullOrWhiteSpace(row.SerialNumber) && !string.IsNullOrWhiteSpace(row.AssetTag))
-                row.SerialNumber = row.AssetTag;
-            if (string.IsNullOrWhiteSpace(row.AssetTag) && !string.IsNullOrWhiteSpace(row.SerialNumber))
-                row.AssetTag = row.SerialNumber;
+        private static string ParseNormalizedDate(string rawDate)
+        {
+            if (string.IsNullOrWhiteSpace(rawDate)) return "";
+            string trimmed = rawDate.Trim();
 
-            // Combine Processor and Memory into Model if Model is empty
-            if (string.IsNullOrWhiteSpace(row.Model))
+            // Try standard formats: yyyy-MM-dd, dd/MM/yy, dd/MM/yyyy, d/M/yy, d/M/yyyy
+            string[] formats = { "yyyy-MM-dd", "d/M/yy", "dd/MM/yy", "d/M/yyyy", "dd/MM/yyyy", "yyyy/MM/dd", "MM/dd/yyyy" };
+            if (DateTime.TryParseExact(trimmed, formats, CultureInfo.InvariantCulture, DateTimeStyles.None, out var dt))
             {
-                string proc = Get("Processor");
-                string mem = Get("Memory");
-                if (!string.IsNullOrWhiteSpace(proc))
-                    row.Model = proc;
-                else if (!string.IsNullOrWhiteSpace(mem))
-                    row.Model = $"Asset ({mem})";
-                else
-                    row.Model = "Refurb Laptop";
+                return dt.ToString("yyyy-MM-dd");
             }
 
-            // Defaults
-            if (string.IsNullOrWhiteSpace(row.Category)) row.Category = "Laptop";
-            if (string.IsNullOrWhiteSpace(row.CurrentLocation)) row.CurrentLocation = "IntakeStaging";
-            if (string.IsNullOrWhiteSpace(row.Grade)) row.Grade = "A+";
-            if (string.IsNullOrWhiteSpace(row.InDate)) row.InDate = DateTime.Now.ToString("yyyy-MM-dd");
-
-            // Battery Health
-            string bStr = Get("BatteryHealth").Replace("%", "").Trim();
-            if (int.TryParse(bStr, out int bh)) row.BatteryHealth = Math.Clamp(bh, 0, 100);
-
-            // Storage Health
-            string sStr = Get("StorageHealth").Replace("%", "").Trim();
-            if (int.TryParse(sStr, out int sh)) row.StorageHealth = Math.Clamp(sh, 0, 100);
-
-            // Purchase Price
-            string purStr = Get("PurchasePrice").Replace("$", "").Replace("₹", "").Replace("£", "").Replace(",", "").Trim();
-            if (double.TryParse(purStr, NumberStyles.Any, CultureInfo.InvariantCulture, out double pur))
-                row.PurchasePrice = pur;
-
-            // Sale Price
-            string salStr = Get("SalePrice").Replace("$", "").Replace("₹", "").Replace("£", "").Replace(",", "").Trim();
-            if (double.TryParse(salStr, NumberStyles.Any, CultureInfo.InvariantCulture, out double sal))
-                row.SalePrice = sal;
-
-            // Quantity
-            string qtyStr = Get("Quantity").Trim();
-            if (int.TryParse(qtyStr, out int qty) && qty > 0) row.Quantity = qty;
-
-            // Notes append WIP if present
-            string wip = Get("WorkInProgress");
-            if (!string.IsNullOrWhiteSpace(wip) && wip != "All Okay")
+            if (DateTime.TryParse(trimmed, out var dtLoose))
             {
-                row.Notes = string.IsNullOrWhiteSpace(row.Notes) ? $"WIP: {wip}" : $"{row.Notes} | WIP: {wip}";
+                return dtLoose.ToString("yyyy-MM-dd");
             }
 
-            return row;
+            return trimmed;
         }
     }
 }
