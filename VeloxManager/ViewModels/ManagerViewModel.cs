@@ -6,6 +6,7 @@ using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Runtime.CompilerServices;
+using System.Text;
 using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Input;
@@ -531,6 +532,8 @@ public class ManagerViewModel : INotifyPropertyChanged
     public ICommand AttachBomComponentCommand { get; }
     public ICommand DetachBomComponentCommand { get; }
     public ICommand ImportFittedToInvoiceCommand { get; }
+    public ICommand ImportExcelCommand { get; }
+    public ICommand ExportCsvCommand { get; }
 
     public ManagerViewModel()
     {
@@ -555,6 +558,8 @@ public class ManagerViewModel : INotifyPropertyChanged
         AttachBomComponentCommand = new RelayCommand(async _ => await AttachBomComponentAsync());
         DetachBomComponentCommand = new RelayCommand(async p => await DetachBomComponentAsync(p as FittedComponentItemViewModel));
         ImportFittedToInvoiceCommand = new RelayCommand(_ => ImportFittedToInvoice());
+        ImportExcelCommand = new RelayCommand(_ => OpenImportExcelDialog());
+        ExportCsvCommand = new RelayCommand(_ => ExportAssetsToCsv());
 
         // Wire up Real-Time Events
         _api.CloudConnectionChanged += connected =>
@@ -1229,6 +1234,54 @@ public class ManagerViewModel : INotifyPropertyChanged
         }
         OnPropertyChanged(nameof(LanStatusText));
         OnPropertyChanged(nameof(LanStatusColor));
+    }
+
+    private void OpenImportExcelDialog()
+    {
+        var win = new VeloxManager.Controls.AssetImportModalWindow
+        {
+            Owner = Application.Current?.MainWindow
+        };
+        if (win.ShowDialog() == true)
+        {
+            _ = LoadAssetsAndEmployeesAsync();
+        }
+    }
+
+    private void ExportAssetsToCsv()
+    {
+        try
+        {
+            var sfd = new Microsoft.Win32.SaveFileDialog
+            {
+                Title = "Export Asset Inventory to CSV",
+                Filter = "CSV Files (*.csv)|*.csv",
+                FileName = $"Velox_Inventory_Export_{DateTime.Now:yyyyMMdd_HHmmss}.csv"
+            };
+
+            if (sfd.ShowDialog() == true)
+            {
+                var sb = new StringBuilder();
+                sb.AppendLine("Tag,Serial Number,Model,Category,Location,Status,Grade,Battery %,SSD %,Price,Supplier,Customer,In Date,Notes");
+                foreach (var a in Assets)
+                {
+                    var m = a.Model;
+                    sb.AppendLine($"\"{EscapeCsv(m.AssetTag)}\",\"{EscapeCsv(m.SerialNumber)}\",\"{EscapeCsv(m.Model)}\",\"{m.Category}\",\"{EscapeCsv(m.CurrentLocation)}\",\"{m.LifecycleQueue}\",\"{m.Grade}\",{m.BatteryHealth?.ToString() ?? ""},{m.StorageHealth?.ToString() ?? ""},{m.SalePrice?.ToString("F2") ?? ""},\"{EscapeCsv(m.Supplier)}\",\"{EscapeCsv(m.Customer)}\",\"{m.InDate}\",\"{EscapeCsv(m.Notes)}\"");
+                }
+                File.WriteAllText(sfd.FileName, sb.ToString(), Encoding.UTF8);
+                MessageBox.Show($"✓ Successfully exported {Assets.Count} assets to:\n{sfd.FileName}", "CSV Export Complete", MessageBoxButton.OK, MessageBoxImage.Information);
+            }
+        }
+        catch (Exception ex)
+        {
+            MessageBox.Show($"Export error: {ex.Message}", "Export Failed", MessageBoxButton.OK, MessageBoxImage.Error);
+        }
+    }
+
+    private static string EscapeCsv(string? val)
+    {
+        if (string.IsNullOrEmpty(val)) return "";
+        return val.Replace("\"", "\"\"");
     }
 
     public event PropertyChangedEventHandler? PropertyChanged;

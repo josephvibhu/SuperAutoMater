@@ -331,6 +331,26 @@
 
                 <!-- Actions -->
                 <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center">
+                    <Button Command="{Binding ImportExcelCommand}"
+                            Background="#238636" Foreground="#FFFFFF" BorderBrush="#2EA043" BorderThickness="1"
+                            Padding="12,6" FontWeight="Bold" FontSize="12" Margin="0,0,8,0"
+                            ToolTip="Upload an Excel (.xlsx) or CSV (.csv) manifest of assets directly into the database">
+                        <StackPanel Orientation="Horizontal">
+                            <TextBlock Text="📥" Margin="0,0,6,0" />
+                            <TextBlock Text="Import Excel / CSV" />
+                        </StackPanel>
+                    </Button>
+
+                    <Button Command="{Binding ExportCsvCommand}"
+                            Background="#21262D" Foreground="#F0F6FC" BorderBrush="#30363D" BorderThickness="1"
+                            Padding="12,6" FontWeight="SemiBold" FontSize="12" Margin="0,0,8,0"
+                            ToolTip="Export current asset inventory to CSV spreadsheet file">
+                        <StackPanel Orientation="Horizontal">
+                            <TextBlock Text="📊" Margin="0,0,6,0" />
+                            <TextBlock Text="Export CSV" />
+                        </StackPanel>
+                    </Button>
+
                     <Button Command="{Binding RefreshAssetsCommand}"
                             Background="#21262D" Foreground="#F0F6FC" BorderBrush="#30363D" BorderThickness="1"
                             Padding="12,6" FontWeight="SemiBold" FontSize="12">
@@ -388,7 +408,7 @@
                                 </ComboBox>
 
                                 <TextBlock Text="Status:" FontSize="11" FontWeight="SemiBold" Foreground="#8B949E" VerticalAlignment="Center" Margin="0,0,6,0" />
-                                <ComboBox Text="{Binding StatusFilter, UpdateSourceTrigger=PropertyChanged}" Width="140" IsReadOnly="True">
+                                <ComboBox Text="{Binding StatusFilter, UpdateSourceTrigger=PropertyChanged}" Width="140" IsReadOnly="True" Margin="0,0,12,0">
                                     <ComboBoxItem Content="ALL" IsSelected="True" />
                                     <ComboBoxItem Content="READY_FOR_SALE" />
                                     <ComboBoxItem Content="WIP" />
@@ -396,6 +416,16 @@
                                     <ComboBoxItem Content="REPAIR" />
                                     <ComboBoxItem Content="SOLD" />
                                 </ComboBox>
+
+                                <Button Command="{Binding ImportExcelCommand}"
+                                        Background="#238636" Foreground="#FFFFFF" BorderBrush="#2EA043" BorderThickness="1"
+                                        Padding="10,5" FontWeight="Bold" FontSize="11"
+                                        ToolTip="Upload an Excel (.xlsx) or CSV (.csv) list of assets directly to DB">
+                                    <StackPanel Orientation="Horizontal">
+                                        <TextBlock Text="📥" Margin="0,0,4,0" />
+                                        <TextBlock Text="Import Excel / CSV" />
+                                    </StackPanel>
+                                </Button>
                             </StackPanel>
                         </Grid>
                     </Border>
@@ -607,6 +637,10 @@
 
                                         <Button Content="📥 Intake Stock to Inventory" Command="{Binding QuickIntakeCommand}"
                                                 Background="#238636" Foreground="#FFF" BorderBrush="#2EA043" FontWeight="Bold" Padding="12,8" FontSize="11" />
+
+                                        <Button Content="📊 Bulk Import Manifest (Excel / CSV)" Command="{Binding ImportExcelCommand}"
+                                                Background="#1F6FEB" Foreground="#FFF" BorderBrush="#388BFD" FontWeight="Bold" Padding="12,8" FontSize="11" Margin="0,8,0,0"
+                                                ToolTip="Upload an entire Excel (.xlsx) or CSV spreadsheet with multiple assets to the database" />
                                     </StackPanel>
                                 </ScrollViewer>
                             </TabItem>

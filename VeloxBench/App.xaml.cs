@@ -36,6 +36,12 @@ namespace SuperAutoMater.Wpf
 
             try
             {
+                StartupServices.EnsureSheetsSetupFiles();
+            }
+            catch { }
+
+            try
+            {
                 var mainWin = new Views.MainWindow();
                 MainWindow = mainWin;
 

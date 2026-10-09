@@ -21,6 +21,7 @@ using NAudio.Wave;
 using SuperAutoMater.Wpf.Services;
 using SuperAutoMater.Wpf.ViewModels;
 using SuperAutoMater.Wpf.Core;
+using VeloxBench.Services;
 
 namespace SuperAutoMater.Wpf.Views
 {
@@ -765,6 +766,36 @@ namespace SuperAutoMater.Wpf.Views
                             GPU_Model = ViewModel.GpuName,
                             Technician_Notes = "Certified via 1-Click Autopilot QC [F10]"
                         });
+
+                        try
+                        {
+                            var queueRec = new AssetQueueRecord
+                            {
+                                Tag = !string.IsNullOrWhiteSpace(ViewModel.AssetTag) ? ViewModel.AssetTag : ViewModel.Serial,
+                                Serial_Number = ViewModel.Serial,
+                                Model = ViewModel.Model,
+                                Processor = ViewModel.CpuName,
+                                Memory = $"{ViewModel.RamSummary} / {ViewModel.StorageSummary}",
+                                Battery_Health = (int)ViewModel.BatteryHealth,
+                                Storage_Health = ViewModel.HdsHealth > 0 ? ViewModel.HdsHealth : 100,
+                                Physical_Grade = ViewModel.Grade,
+                                Status = "RTS",
+                                Work_In_Progress = "All Okay",
+                                Remarks = "Certified via 1-Click Autopilot QC [F10]",
+                                Technician = "AUTOPILOT",
+                                QC_Tech = "AUTOPILOT",
+                                QC_Profile = "Autopilot",
+                                In_Date = DateTime.Now.ToString("yyyy-MM-dd"),
+                                Supplier = ViewModel.Supplier,
+                                Customer = ViewModel.Customer,
+                                Shelf_Location = ViewModel.TechnicianStation ?? ""
+                            };
+
+                            LocalSheetsBackupService.AppendRecord(queueRec);
+                            OfflineSyncQueue.Instance.Enqueue(queueRec);
+                            _ = Task.Run(async () => await OfflineSyncQueue.Instance.FlushQueueAsync());
+                        }
+                        catch { }
                     }
                 });
             };
@@ -1028,6 +1059,40 @@ namespace SuperAutoMater.Wpf.Views
                     }
                     catch { }
 
+                    // Automatic Sheets Backup (Google Sheets & Local CSV sheets file)
+                    try
+                    {
+                        var queueRec = new AssetQueueRecord
+                        {
+                            Tag = !string.IsNullOrWhiteSpace(ViewModel.AssetTag) ? ViewModel.AssetTag : ViewModel.Serial,
+                            Serial_Number = ViewModel.Serial,
+                            Model = ViewModel.Model,
+                            Processor = ViewModel.CpuName,
+                            Memory = $"{ViewModel.RamSummary} / {ViewModel.StorageSummary}",
+                            Battery_Health = (int)ViewModel.BatteryHealth,
+                            Storage_Health = ViewModel.HdsHealth > 0 ? ViewModel.HdsHealth : 100,
+                            Physical_Grade = rep.CalculatedGrade,
+                            Status = rep.AllPassed ? "RTS" : "WIP",
+                            Work_In_Progress = rep.AllPassed ? "All Okay" : rep.SummaryText,
+                            Remarks = $"Express QC [{rep.ProfileUsed}]: {rep.PassedCount}/{rep.TotalCount} Subsystems Nominal.",
+                            Technician = activeQcTech,
+                            QC_Tech = activeQcTech,
+                            QC_Profile = rep.ProfileUsed.ToString(),
+                            Assigned_To = ViewModel.AssignedTo,
+                            Intake_Tech = ViewModel.IntakeTechnician,
+                            Service_Tech = ViewModel.ServiceTechnician,
+                            Missing_Components = ViewModel.MissingComponents,
+                            In_Date = DateTime.Now.ToString("yyyy-MM-dd"),
+                            Supplier = ViewModel.Supplier,
+                            Customer = ViewModel.Customer,
+                            Shelf_Location = ViewModel.TechnicianStation ?? ""
+                        };
+
+                        LocalSheetsBackupService.AppendRecord(queueRec);
+                        OfflineSyncQueue.Instance.Enqueue(queueRec);
+                        _ = Task.Run(async () => await OfflineSyncQueue.Instance.FlushQueueAsync());
+                    }
+                    catch { }
 
                     if (runner.CloudDispatchRequested)
                     {

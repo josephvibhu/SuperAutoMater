@@ -421,6 +421,13 @@ namespace SuperAutoMater.Wpf.Views
                 // 2. Enqueue to persistent offline queue (Google Sheets)
                 OfflineSyncQueue.Instance.Enqueue(record);
 
+                // 2b. Automatically append to persistent local Excel/CSV sheets file backup
+                try
+                {
+                    LocalSheetsBackupService.AppendRecord(record);
+                }
+                catch { }
+
                 // 3. Flush queue to Google Sheets webhook
                 int flushed = await OfflineSyncQueue.Instance.FlushQueueAsync(OfflineSyncQueue.GetActiveWebhookUrl());
 

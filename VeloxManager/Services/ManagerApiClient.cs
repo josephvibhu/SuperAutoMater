@@ -163,6 +163,108 @@ public class ManagerApiClient
         return null;
     }
 
+    public async Task<(int SuccessCount, int FailCount, List<string> Errors)> ImportParsedAssetsAsync(
+        List<ParsedAssetRow> rows,
+        string defaultCategory = "Laptop",
+        string defaultLocation = "IntakeStaging",
+        string defaultQueue = "IntakeStaging",
+        IProgress<(int Current, int Total, string Status)>? progress = null,
+        CancellationToken cancellationToken = default)
+    {
+        int success = 0;
+        int failed = 0;
+        var errors = new List<string>();
+        int total = rows.Count;
+
+        for (int i = 0; i < total; i++)
+        {
+            if (cancellationToken.IsCancellationRequested) break;
+
+            var r = rows[i];
+            progress?.Report((i + 1, total, $"Uploading {r.SerialNumber ?? r.AssetTag} ({i + 1}/{total})..."));
+
+            try
+            {
+                var intakeReq = new IntakeRequest
+                {
+                    SerialNumber = string.IsNullOrWhiteSpace(r.SerialNumber) ? null : r.SerialNumber.Trim(),
+                    AssetTag = string.IsNullOrWhiteSpace(r.AssetTag) ? null : r.AssetTag.Trim(),
+                    Model = string.IsNullOrWhiteSpace(r.Model) ? "Unknown" : r.Model.Trim(),
+                    Category = Enum.TryParse<AssetCategory>(r.Category, true, out var cat) ? cat : (Enum.TryParse<AssetCategory>(defaultCategory, true, out var defCat) ? defCat : AssetCategory.Laptop),
+                    Location = string.IsNullOrWhiteSpace(r.CurrentLocation) ? defaultLocation : r.CurrentLocation.Trim(),
+                    Supplier = string.IsNullOrWhiteSpace(r.Supplier) ? null : r.Supplier.Trim(),
+                    InDate = string.IsNullOrWhiteSpace(r.InDate) ? DateTime.Now.ToString("yyyy-MM-dd") : r.InDate.Trim(),
+                    PurchasePrice = r.PurchasePrice,
+                    SalePrice = r.SalePrice,
+                    Quantity = r.Quantity > 0 ? r.Quantity : 1,
+                    Actor = ManagerConfigService.Current.ManagerName,
+                    Notes = r.Notes
+                };
+
+                var asset = await IntakeAssetAsync(intakeReq);
+                if (asset != null)
+                {
+                    bool needsPatch = false;
+                    var patch = new PatchAssetRequest
+                    {
+                        Actor = ManagerConfigService.Current.ManagerName
+                    };
+
+                    if (!string.IsNullOrWhiteSpace(r.Customer))
+                    {
+                        patch.Customer = r.Customer;
+                        needsPatch = true;
+                    }
+                    if (r.BatteryHealth.HasValue)
+                    {
+                        patch.BatteryHealth = r.BatteryHealth.Value;
+                        needsPatch = true;
+                    }
+                    if (r.StorageHealth.HasValue)
+                    {
+                        patch.StorageHealth = r.StorageHealth.Value;
+                        needsPatch = true;
+                    }
+                    if (!string.IsNullOrWhiteSpace(r.Grade) && Enum.TryParse<AssetGrade>(r.Grade, true, out var g))
+                    {
+                        patch.Grade = g;
+                        patch.CosmeticGrade = r.Grade;
+                        needsPatch = true;
+                    }
+                    if (!string.IsNullOrWhiteSpace(r.LifecycleQueue) && Enum.TryParse<LifecycleQueue>(r.LifecycleQueue, true, out var lq))
+                    {
+                        patch.LifecycleQueue = lq;
+                        needsPatch = true;
+                    }
+                    else if (!string.IsNullOrWhiteSpace(defaultQueue) && Enum.TryParse<LifecycleQueue>(defaultQueue, true, out var defLq))
+                    {
+                        patch.LifecycleQueue = defLq;
+                        needsPatch = true;
+                    }
+
+                    if (needsPatch)
+                    {
+                        await PatchAssetAsync(asset.Id, patch);
+                    }
+
+                    success++;
+                }
+                else
+                {
+                    failed++;
+                    errors.Add($"Row {r.RowNumber} ({r.SerialNumber ?? r.AssetTag}): Failed to intake asset.");
+                }
+            }
+            catch (Exception ex)
+            {
+                failed++;
+                errors.Add($"Row {r.RowNumber}: {ex.Message}");
+            }
+        }
+
+        return (success, failed, errors);
+    }
+
     public async Task<bool> UpdateAssetStatusAsync(string assetId, LifecycleQueue newStatus, string? notes = null, string? actor = null)
     {
         return await PatchAssetAsync(assetId, new PatchAssetRequest
