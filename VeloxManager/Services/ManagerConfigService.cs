@@ -12,6 +12,8 @@ public class ManagerConfig
     public int LanPort { get; set; } = 9000;
     public bool EnableLanServer { get; set; } = true;
     public string ManagerName { get; set; } = "Depot Operations Manager";
+    public string GoogleSheetsWebhookUrl { get; set; } = "";
+    public int AutoSyncSheetsMinutes { get; set; } = 30;
 }
 
 public static class ManagerConfigService

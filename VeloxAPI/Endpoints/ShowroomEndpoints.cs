@@ -6,6 +6,7 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Routing;
 using VeloxAPI.Auth;
 using VeloxAPI.Data;
+using VeloxAPI.Realtime;
 using Velox.Shared.Dtos;
 using Velox.Shared.Models;
 
@@ -96,15 +97,73 @@ namespace VeloxAPI.Endpoints
                     .Take(10)
                     .ToDictionary(g => g.Key, g => g.Count());
 
+                var onHoldCount = allReady.Count(a => a.IsOnHold);
+
                 return Results.Ok(new
                 {
                     totalReadyForSale = allReady.Count,
                     pristineGradeCount = allReady.Count(a => a.Grade == AssetGrade.A || (a.CosmeticGrade != null && a.CosmeticGrade.Contains("A"))),
+                    onHoldCount,
                     byBrand,
                     byGrade,
                     topLocations = byLocation,
                     updatedAtUtc = DateTimeOffset.UtcNow
                 });
+            });
+
+            // POST /api/v1/showroom/assets/{id}/hold — Sales reservation
+            grp.MapPost("/assets/{id}/hold", async (string id, HoldAssetRequest req, HttpContext ctx, VeloxDb db, SseHub sse) =>
+            {
+                var tenantId = ctx.TenantId() ?? "tenant-default";
+                var asset = db.GetAssetById(tenantId, id);
+                if (asset is null) return Results.NotFound(new { error = "Asset not found." });
+
+                if (asset.IsOnHold)
+                {
+                    return Results.Conflict(new { error = $"Asset is already reserved by {asset.HoldSalesRep} for {asset.HoldCustomer} until {asset.HoldExpiresAtUtc}." });
+                }
+
+                if (string.IsNullOrWhiteSpace(req.CustomerName))
+                    return Results.BadRequest(new { error = "Customer name is required to place a reservation." });
+
+                var duration = req.DurationMinutes > 0 ? req.DurationMinutes : 120;
+                var salesRep = string.IsNullOrWhiteSpace(req.SalesRep) ? "Sales Team" : req.SalesRep.Trim();
+
+                var ok = db.SetAssetHold(tenantId, id, req.CustomerName.Trim(), salesRep, duration);
+                if (!ok) return Results.StatusCode(500);
+
+                var updated = db.GetAssetById(tenantId, id)!;
+                db.AppendEvent(tenantId, id, new AppendEventRequest
+                {
+                    EventType = "Reserved/Hold",
+                    Actor = salesRep,
+                    NotesJson = $"{{\"customer\":\"{req.CustomerName.Trim()}\",\"durationMinutes\":{duration}}}"
+                });
+
+                await sse.BroadcastAsync(SseEventType.AssetUpdated, updated);
+                return Results.Ok(updated);
+            });
+
+            // POST /api/v1/showroom/assets/{id}/release-hold — Release sales reservation
+            grp.MapPost("/assets/{id}/release-hold", async (string id, HttpContext ctx, VeloxDb db, SseHub sse) =>
+            {
+                var tenantId = ctx.TenantId() ?? "tenant-default";
+                var asset = db.GetAssetById(tenantId, id);
+                if (asset is null) return Results.NotFound(new { error = "Asset not found." });
+
+                var ok = db.ReleaseAssetHold(tenantId, id);
+                if (!ok) return Results.StatusCode(500);
+
+                var updated = db.GetAssetById(tenantId, id)!;
+                db.AppendEvent(tenantId, id, new AppendEventRequest
+                {
+                    EventType = "HoldReleased",
+                    Actor = "ShowroomSales",
+                    NotesJson = "{}"
+                });
+
+                await sse.BroadcastAsync(SseEventType.AssetUpdated, updated);
+                return Results.Ok(updated);
             });
         }
 

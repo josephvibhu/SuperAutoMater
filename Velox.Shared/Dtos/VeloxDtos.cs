@@ -31,6 +31,10 @@ public sealed class AssetDto
     public string InDate { get; set; } = "";
     public string OutDate { get; set; } = "";
     public string LatestEventType { get; set; } = "";
+    public string HoldCustomer { get; set; } = "";
+    public string HoldSalesRep { get; set; } = "";
+    public string? HoldExpiresAtUtc { get; set; }
+    public bool IsOnHold => !string.IsNullOrWhiteSpace(HoldExpiresAtUtc) && DateTimeOffset.TryParse(HoldExpiresAtUtc, out var exp) && exp > DateTimeOffset.UtcNow;
     public DateTimeOffset CreatedAtUtc { get; init; }
     public DateTimeOffset UpdatedAtUtc { get; set; }
 }
@@ -126,7 +130,18 @@ public sealed class PatchAssetRequest
     public string? OutDate { get; set; }
     public double? PurchasePrice { get; set; }
     public double? SalePrice { get; set; }
+    public string? HoldCustomer { get; set; }
+    public string? HoldSalesRep { get; set; }
+    public string? HoldExpiresAtUtc { get; set; }
+    public bool? BypassQualityGate { get; set; }
     public string? Actor { get; set; }
+}
+
+public sealed class HoldAssetRequest
+{
+    public string CustomerName { get; init; } = "";
+    public string SalesRep { get; init; } = "";
+    public int DurationMinutes { get; init; } = 120; // Default: 2 hours
 }
 
 public sealed class AppendEventRequest

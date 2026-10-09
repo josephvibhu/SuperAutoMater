@@ -53,8 +53,72 @@ public class AssetItemViewModel : INotifyPropertyChanged
             }
         }
     }
-    public double? PurchasePrice => Model.PurchasePrice;
-    public double? SalePrice => Model.SalePrice;
+    public double? PurchasePrice
+    {
+        get => Model.PurchasePrice;
+        set
+        {
+            if (Model.PurchasePrice != value)
+            {
+                Model.PurchasePrice = value;
+                OnPropertyChanged();
+                NotifyMarginChanged();
+            }
+        }
+    }
+
+    public double? SalePrice
+    {
+        get => Model.SalePrice;
+        set
+        {
+            if (Model.SalePrice != value)
+            {
+                Model.SalePrice = value;
+                OnPropertyChanged();
+                NotifyMarginChanged();
+            }
+        }
+    }
+
+    private double _fittedCostDelta = 0.0;
+    public double FittedCostDelta
+    {
+        get => _fittedCostDelta;
+        set
+        {
+            if (Math.Abs(_fittedCostDelta - value) > 0.001)
+            {
+                _fittedCostDelta = value;
+                OnPropertyChanged();
+                NotifyMarginChanged();
+            }
+        }
+    }
+
+    public double LandedCost => (PurchasePrice ?? 0.0) + FittedCostDelta;
+    public double ProjectedSalePrice => SalePrice ?? 0.0;
+    public double GrossMarginAmount => ProjectedSalePrice > 0 ? (ProjectedSalePrice - LandedCost) : 0.0;
+    public double GrossMarginPercent => LandedCost > 0 && ProjectedSalePrice > 0 ? ((ProjectedSalePrice - LandedCost) / ProjectedSalePrice) * 100.0 : 0.0;
+    public string MarginBadgeText => ProjectedSalePrice > 0 ? $"₹{GrossMarginAmount:N0} ({GrossMarginPercent:F1}%)" : "₹0 (0%)";
+    public string MarginColorHex => GrossMarginAmount >= 0 ? (GrossMarginPercent >= 20 ? "#3FB950" : "#D29922") : "#F85149";
+
+    private void NotifyMarginChanged()
+    {
+        OnPropertyChanged(nameof(LandedCost));
+        OnPropertyChanged(nameof(ProjectedSalePrice));
+        OnPropertyChanged(nameof(GrossMarginAmount));
+        OnPropertyChanged(nameof(GrossMarginPercent));
+        OnPropertyChanged(nameof(MarginBadgeText));
+        OnPropertyChanged(nameof(MarginColorHex));
+    }
+
+    public string HoldCustomer => Model.HoldCustomer;
+    public string HoldSalesRep => Model.HoldSalesRep;
+    public string? HoldExpiresAtUtc => Model.HoldExpiresAtUtc;
+    public bool IsOnHold => Model.IsOnHold;
+    public string HoldStatusDisplay => IsOnHold ? $"⏳ Reserved: {HoldCustomer} ({HoldSalesRep})" : "Available";
+
     public DateTimeOffset UpdatedAt => Model.UpdatedAtUtc;
 
     public AssetCategory Category

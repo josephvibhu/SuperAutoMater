@@ -200,6 +200,11 @@ CREATE INDEX IF NOT EXISTS ix_asset_components_parent ON asset_components(parent
             }
             catch { }
 
+            // Migration: ensure hold fields exist on assets table
+            try { Exec(conn, "ALTER TABLE assets ADD COLUMN hold_customer TEXT DEFAULT ''"); } catch { }
+            try { Exec(conn, "ALTER TABLE assets ADD COLUMN hold_sales_rep TEXT DEFAULT ''"); } catch { }
+            try { Exec(conn, "ALTER TABLE assets ADD COLUMN hold_expires_utc TEXT NULL"); } catch { }
+
             // Auto-seed default depot tenant, primary API key, and technician if empty
             using var checkCmd = conn.CreateCommand();
             checkCmd.CommandText = "SELECT COUNT(*) FROM tenants";
@@ -584,6 +589,9 @@ CREATE INDEX IF NOT EXISTS ix_asset_components_parent ON asset_components(parent
             if (req.SalePrice         != null) { sets.Add("sale_price=@sp");             parms.Add(P("@sp",    req.SalePrice.Value)); }
             if (req.Category          != null) { sets.Add("category=@cat");               parms.Add(P("@cat",   req.Category.Value.ToString())); }
             if (req.Quantity          != null) { sets.Add("quantity=@qty");               parms.Add(P("@qty",   req.Quantity.Value)); }
+            if (req.HoldCustomer      != null) { sets.Add("hold_customer=@hc");           parms.Add(P("@hc",    req.HoldCustomer)); }
+            if (req.HoldSalesRep      != null) { sets.Add("hold_sales_rep=@hs");           parms.Add(P("@hs",    req.HoldSalesRep)); }
+            if (req.HoldExpiresAtUtc  != null) { sets.Add("hold_expires_utc=@hexp");       parms.Add(P("@hexp",  string.IsNullOrWhiteSpace(req.HoldExpiresAtUtc) ? (object)DBNull.Value : req.HoldExpiresAtUtc)); }
 
             parms.Add(P("@tid", tenantId));
             parms.Add(P("@id", id));
@@ -629,6 +637,63 @@ CREATE INDEX IF NOT EXISTS ix_asset_components_parent ON asset_components(parent
             cmd.Parameters.AddWithValue("@ts", now);
             cmd.Parameters.AddWithValue("@tid", tenantId);
             cmd.Parameters.AddWithValue("@id", assetId);
+            return cmd.ExecuteNonQuery() > 0;
+        }
+    }
+
+    public (bool Passed, string Reason) CheckQualityGateForRts(AssetDto asset)
+    {
+        // 1. Grade must not be unknown
+        if (asset.Grade == AssetGrade.Unknown && string.IsNullOrWhiteSpace(asset.CosmeticGrade))
+            return (false, "Cosmetic grade has not been evaluated (Grade is Unknown).");
+
+        // 2. Battery Health check (if recorded, must be >= 70%)
+        if (asset.BatteryHealth.HasValue && asset.BatteryHealth.Value > 0 && asset.BatteryHealth.Value < 70)
+            return (false, $"Battery health is critically degraded ({asset.BatteryHealth.Value}% < 70% minimum threshold). Battery replacement required.");
+
+        // 3. Storage Health check
+        if (asset.StorageHealth.HasValue && asset.StorageHealth.Value < 80)
+            return (false, $"Storage drive health is below acceptable threshold ({asset.StorageHealth.Value}% < 80%). Verify drive integrity.");
+
+        // 4. Missing components
+        if (!string.IsNullOrWhiteSpace(asset.MissingComponents) && asset.MissingComponents.Trim() != "None" && asset.MissingComponents.Trim() != "-")
+            return (false, $"Asset has unresolved missing components flagged: {asset.MissingComponents}.");
+
+        return (true, "All Quality Gate checks passed.");
+    }
+
+    public bool SetAssetHold(string tenantId, string id, string customer, string salesRep, int durationMinutes)
+    {
+        lock (_gate)
+        {
+            using var conn = Open();
+            var exp = Iso(DateTimeOffset.UtcNow.AddMinutes(Math.Max(5, durationMinutes)));
+            using var cmd = conn.CreateCommand();
+            cmd.CommandText = @"UPDATE assets
+                                SET hold_customer=@hc, hold_sales_rep=@hs, hold_expires_utc=@hexp, updated_at_utc=@ts
+                                WHERE tenant_id=@tid AND id=@id";
+            cmd.Parameters.AddWithValue("@hc", customer);
+            cmd.Parameters.AddWithValue("@hs", salesRep);
+            cmd.Parameters.AddWithValue("@hexp", exp);
+            cmd.Parameters.AddWithValue("@ts", Iso(DateTimeOffset.UtcNow));
+            cmd.Parameters.AddWithValue("@tid", tenantId);
+            cmd.Parameters.AddWithValue("@id", id);
+            return cmd.ExecuteNonQuery() > 0;
+        }
+    }
+
+    public bool ReleaseAssetHold(string tenantId, string id)
+    {
+        lock (_gate)
+        {
+            using var conn = Open();
+            using var cmd = conn.CreateCommand();
+            cmd.CommandText = @"UPDATE assets
+                                SET hold_customer='', hold_sales_rep='', hold_expires_utc=NULL, updated_at_utc=@ts
+                                WHERE tenant_id=@tid AND id=@id";
+            cmd.Parameters.AddWithValue("@ts", Iso(DateTimeOffset.UtcNow));
+            cmd.Parameters.AddWithValue("@tid", tenantId);
+            cmd.Parameters.AddWithValue("@id", id);
             return cmd.ExecuteNonQuery() > 0;
         }
     }
@@ -949,7 +1014,8 @@ CREATE INDEX IF NOT EXISTS ix_asset_components_parent ON asset_components(parent
                 a.out_date, a.created_at_utc, a.updated_at_utc,
                 e.name as emp_name,
                 (SELECT event_type FROM asset_events WHERE asset_id=a.id ORDER BY recorded_at_utc DESC LIMIT 1) as latest_event,
-                a.category, a.quantity
+                a.category, a.quantity,
+                a.hold_customer, a.hold_sales_rep, a.hold_expires_utc
             FROM assets a
             LEFT JOIN employees e ON e.id = a.assigned_employee_id
             {where}";
@@ -989,6 +1055,9 @@ CREATE INDEX IF NOT EXISTS ix_asset_components_parent ON asset_components(parent
         LatestEventType    = r.IsDBNull(24) ? "" : r.GetString(24),
         Category           = r.FieldCount > 25 && !r.IsDBNull(25) && Enum.TryParse<AssetCategory>(r.GetString(25), true, out var c) ? c : AssetCategory.Laptop,
         Quantity           = r.FieldCount > 26 && !r.IsDBNull(26) ? r.GetInt32(26) : 1,
+        HoldCustomer       = r.FieldCount > 27 && !r.IsDBNull(27) ? r.GetString(27) : "",
+        HoldSalesRep       = r.FieldCount > 28 && !r.IsDBNull(28) ? r.GetString(28) : "",
+        HoldExpiresAtUtc   = r.FieldCount > 29 && !r.IsDBNull(29) ? r.GetString(29) : null,
     };
 
     private static EmployeeDto MapEmployee(SqliteDataReader r) => new()

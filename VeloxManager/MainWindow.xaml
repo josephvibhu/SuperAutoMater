@@ -289,6 +289,16 @@
                                         <TextBlock Text="Mass Update Assets" />
                                     </StackPanel>
                                 </Button>
+
+                                <Button Command="{Binding SyncGoogleSheetsCommand}"
+                                        Background="#21262D" Foreground="#F0F6FC" BorderBrush="#30363D" BorderThickness="1"
+                                        Padding="10,5" FontWeight="Bold" FontSize="11" Margin="8,0,0,0"
+                                        ToolTip="Export standard 15-column ITAM sheet, sync to Google Sheets webhook, and save local backup">
+                                    <StackPanel Orientation="Horizontal">
+                                        <TextBlock Text="📊" Margin="0,0,4,0" />
+                                        <TextBlock Text="Sync Sheets / Backup" />
+                                    </StackPanel>
+                                </Button>
                             </StackPanel>
                         </Grid>
                     </Border>
@@ -485,12 +495,57 @@
 
                                             <!-- Commercial Details -->
                                             <TextBlock Text="ATTRIBUTION &amp; NOTES" FontSize="11" FontWeight="Bold" Foreground="#8B949E" Margin="0,0,0,6" />
-                                            <Border Background="#0D1117" BorderBrush="#30363D" BorderThickness="1" CornerRadius="6" Padding="10">
+                                            <Border Background="#0D1117" BorderBrush="#30363D" BorderThickness="1" CornerRadius="6" Padding="10" Margin="0,0,0,10">
                                                 <StackPanel>
                                                     <TextBlock Text="{Binding SelectedAsset.Supplier, StringFormat='Supplier: {0}'}" FontSize="11" Foreground="#8B949E" />
                                                     <TextBlock Text="{Binding SelectedAsset.Customer, StringFormat='Customer: {0}'}" FontSize="11" Foreground="#8B949E" Margin="0,2,0,0" />
                                                     <TextBlock Text="{Binding SelectedAsset.MissingComponents, StringFormat='Defects: {0}'}" FontSize="11" Foreground="#D29922" Margin="0,2,0,0" TextWrapping="Wrap" />
                                                     <TextBlock Text="{Binding SelectedAsset.Notes, StringFormat='Notes: {0}'}" FontSize="11" Foreground="#8B949E" Margin="0,4,0,0" TextWrapping="Wrap" />
+                                                </StackPanel>
+                                            </Border>
+
+                                            <!-- Financial Margin & BOM Landed Cost -->
+                                            <TextBlock Text="FINANCIAL MARGIN &amp; BOM LANDED COST" FontSize="11" FontWeight="Bold" Foreground="#8B949E" Margin="0,0,0,6" />
+                                            <Border Background="#0D1117" BorderBrush="#30363D" BorderThickness="1" CornerRadius="6" Padding="10" Margin="0,0,0,10">
+                                                <StackPanel>
+                                                    <Grid Margin="0,0,0,6">
+                                                        <Grid.ColumnDefinitions>
+                                                            <ColumnDefinition Width="*" />
+                                                            <ColumnDefinition Width="*" />
+                                                        </Grid.ColumnDefinitions>
+                                                        <StackPanel Grid.Column="0">
+                                                            <TextBlock Text="PURCHASE PRICE" FontSize="9" FontWeight="Bold" Foreground="#8B949E" />
+                                                            <TextBlock Text="{Binding SelectedAsset.PurchasePrice, StringFormat='₹{0:N0}', TargetNullValue='₹0'}" FontWeight="Bold" FontSize="12" Foreground="#F0F6FC" />
+                                                        </StackPanel>
+                                                        <StackPanel Grid.Column="1">
+                                                            <TextBlock Text="FITTED BOM DELTA" FontSize="9" FontWeight="Bold" Foreground="#8B949E" />
+                                                            <TextBlock Text="{Binding SelectedAsset.FittedCostDelta, StringFormat='+₹{0:N0}'}" FontWeight="Bold" FontSize="12" Foreground="#D2A8FF" />
+                                                        </StackPanel>
+                                                    </Grid>
+                                                    <Grid Margin="0,0,0,8">
+                                                        <Grid.ColumnDefinitions>
+                                                            <ColumnDefinition Width="*" />
+                                                            <ColumnDefinition Width="*" />
+                                                        </Grid.ColumnDefinitions>
+                                                        <StackPanel Grid.Column="0">
+                                                            <TextBlock Text="LANDED COST" FontSize="9" FontWeight="Bold" Foreground="#8B949E" />
+                                                            <TextBlock Text="{Binding SelectedAsset.LandedCost, StringFormat='₹{0:N0}'}" FontWeight="Bold" FontSize="13" Foreground="#FFA657" />
+                                                        </StackPanel>
+                                                        <StackPanel Grid.Column="1">
+                                                            <TextBlock Text="SALE / PROJ. PRICE" FontSize="9" FontWeight="Bold" Foreground="#8B949E" />
+                                                            <TextBlock Text="{Binding SelectedAsset.SalePrice, StringFormat='₹{0:N0}', TargetNullValue='Unpriced'}" FontWeight="Bold" FontSize="13" Foreground="#58A6FF" />
+                                                        </StackPanel>
+                                                    </Grid>
+                                                    <Border Background="#161B22" BorderBrush="#30363D" BorderThickness="1" CornerRadius="4" Padding="8,5">
+                                                        <Grid>
+                                                            <Grid.ColumnDefinitions>
+                                                                <ColumnDefinition Width="*" />
+                                                                <ColumnDefinition Width="Auto" />
+                                                            </Grid.ColumnDefinitions>
+                                                            <TextBlock Text="GROSS MARGIN:" FontSize="10" FontWeight="Bold" Foreground="#8B949E" VerticalAlignment="Center" />
+                                                            <TextBlock Grid.Column="1" Text="{Binding SelectedAsset.MarginBadgeText}" FontWeight="Bold" FontSize="11" Foreground="{Binding SelectedAsset.MarginColorHex, Converter={StaticResource HexBrush}}" VerticalAlignment="Center" />
+                                                        </Grid>
+                                                    </Border>
                                                 </StackPanel>
                                             </Border>
                                         </StackPanel>
@@ -1141,12 +1196,63 @@
             <!-- ═══════════════════════════════════════════════════════════════════ -->
             <!-- TAB 3: BILLING & INVOICING (VYAPAR-STYLE REFURBISHMENT SUITE)        -->
             <!-- ═══════════════════════════════════════════════════════════════════ -->
-            <TabItem Header="🧾 BILLING &amp; INVOICES">
+            <TabItem Header="🧾 BILLING &amp; FINANCIALS">
                 <Grid Margin="16">
-                    <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="*" />
-                        <ColumnDefinition Width="420" />
-                    </Grid.ColumnDefinitions>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="*" />
+                    </Grid.RowDefinitions>
+
+                    <!-- Row 0: Depot Financial Intelligence KPI Banner -->
+                    <Border Grid.Row="0" Background="#161B22" BorderBrush="#30363D" BorderThickness="1" CornerRadius="8" Padding="14,10" Margin="0,0,0,12">
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="*" />
+                            </Grid.ColumnDefinitions>
+                            <!-- KPI 1 -->
+                            <Border Grid.Column="0" BorderBrush="#30363D" BorderThickness="0,0,1,0" Margin="0,0,10,0">
+                                <StackPanel>
+                                    <TextBlock Text="DEPOT INVENTORY COST" FontSize="10" FontWeight="Bold" Foreground="#8B949E" />
+                                    <TextBlock Text="{Binding DepotInventoryCostValue, StringFormat='₹{0:N0}'}" FontSize="18" FontWeight="Bold" Foreground="#F0F6FC" Margin="0,2,0,0" />
+                                    <TextBlock Text="Active non-sold stock cost" FontSize="9" Foreground="#8B949E" />
+                                </StackPanel>
+                            </Border>
+                            <!-- KPI 2 -->
+                            <Border Grid.Column="1" BorderBrush="#30363D" BorderThickness="0,0,1,0" Margin="0,0,10,0">
+                                <StackPanel>
+                                    <TextBlock Text="RTS PROJECTED VALUE" FontSize="10" FontWeight="Bold" Foreground="#8B949E" />
+                                    <TextBlock Text="{Binding DepotProjectedSaleValue, StringFormat='₹{0:N0}'}" FontSize="18" FontWeight="Bold" Foreground="#58A6FF" Margin="0,2,0,0" />
+                                    <TextBlock Text="Ready for sale catalog total" FontSize="9" Foreground="#8B949E" />
+                                </StackPanel>
+                            </Border>
+                            <!-- KPI 3 -->
+                            <Border Grid.Column="2" BorderBrush="#30363D" BorderThickness="0,0,1,0" Margin="0,0,10,0">
+                                <StackPanel>
+                                    <TextBlock Text="PROJECTED MARGIN" FontSize="10" FontWeight="Bold" Foreground="#8B949E" />
+                                    <TextBlock Text="{Binding DepotProjectedMarginValue, StringFormat='₹{0:N0}'}" FontSize="18" FontWeight="Bold" Foreground="#3FB950" Margin="0,2,0,0" />
+                                    <TextBlock Text="RTS sale value - Landed cost" FontSize="9" Foreground="#8B949E" />
+                                </StackPanel>
+                            </Border>
+                            <!-- KPI 4 -->
+                            <Border Grid.Column="3">
+                                <StackPanel>
+                                    <TextBlock Text="AVG GROSS MARGIN %" FontSize="10" FontWeight="Bold" Foreground="#8B949E" />
+                                    <TextBlock Text="{Binding DepotMarginPercent, StringFormat='{}{0:F1}%'}" FontSize="18" FontWeight="Bold" Foreground="#D2A8FF" Margin="0,2,0,0" />
+                                    <TextBlock Text="Depot inventory profitability" FontSize="9" Foreground="#8B949E" />
+                                </StackPanel>
+                            </Border>
+                        </Grid>
+                    </Border>
+
+                    <!-- Row 1: Refurbishment Invoice Builder & Vyapar Suite -->
+                    <Grid Grid.Row="1">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="420" />
+                        </Grid.ColumnDefinitions>
 
                     <!-- Left: Invoice Draft Table + Settlement + History -->
                     <Grid Grid.Column="0" Margin="0,0,12,0">
@@ -1419,7 +1525,8 @@
                         </ScrollViewer>
                     </Border>
                 </Grid>
-            </TabItem>
+            </Grid>
+        </TabItem>
 
             <!-- ═══════════════════════════════════════════════════════════════════ -->
             <!-- TAB 4: SETTINGS & LAN MIRROR SERVER                                 -->

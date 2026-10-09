@@ -243,6 +243,11 @@ public class ManagerViewModel : INotifyPropertyChanged
     public int ReadyForSaleCount => Assets.Count(a => a.Status == LifecycleQueue.ReadyForSale);
     public int SoldCount => Assets.Count(a => a.Status == LifecycleQueue.Sold);
 
+    public double DepotInventoryCostValue => Assets.Where(a => a.Status != LifecycleQueue.Sold && a.Status != LifecycleQueue.Disposed).Sum(a => a.PurchasePrice ?? 0);
+    public double DepotProjectedSaleValue => Assets.Where(a => a.Status == LifecycleQueue.ReadyForSale).Sum(a => a.SalePrice ?? 0);
+    public double DepotProjectedMarginValue => Math.Max(0, DepotProjectedSaleValue - Assets.Where(a => a.Status == LifecycleQueue.ReadyForSale).Sum(a => a.LandedCost));
+    public double DepotMarginPercent => DepotProjectedSaleValue > 0 ? (DepotProjectedMarginValue / DepotProjectedSaleValue) * 100.0 : 0.0;
+
     public string CloudStatusText => _api.IsConnected ? "☁ CLOUD LIVE (Railway)" : "⚠ CONNECTING TO CLOUD...";
     public string CloudStatusColor => _api.IsConnected ? "#3FB950" : "#D29922";
 
@@ -617,6 +622,7 @@ public class ManagerViewModel : INotifyPropertyChanged
     public ICommand AssignAssetToSelectedTechCommand { get; }
     public ICommand QuickMarkAssignedRtsCommand { get; }
     public ICommand RefreshSelectedTechDataCommand { get; }
+    public ICommand SyncGoogleSheetsCommand { get; }
 
     public ManagerViewModel()
     {
@@ -660,6 +666,7 @@ public class ManagerViewModel : INotifyPropertyChanged
         AssignAssetToSelectedTechCommand = new RelayCommand(_ => AssignAssetToSelectedTech());
         QuickMarkAssignedRtsCommand = new RelayCommand(async p => await QuickMarkAssignedRtsAsync(p as AssetItemViewModel));
         RefreshSelectedTechDataCommand = new RelayCommand(async _ => await LoadSelectedTechDataAsync());
+        SyncGoogleSheetsCommand = new RelayCommand(async _ => await SyncAssetsToGoogleSheetsAsync());
 
         // Wire up Real-Time Events
         _api.CloudConnectionChanged += connected =>
@@ -803,6 +810,10 @@ public class ManagerViewModel : INotifyPropertyChanged
         OnPropertyChanged(nameof(WipCount));
         OnPropertyChanged(nameof(ReadyForSaleCount));
         OnPropertyChanged(nameof(SoldCount));
+        OnPropertyChanged(nameof(DepotInventoryCostValue));
+        OnPropertyChanged(nameof(DepotProjectedSaleValue));
+        OnPropertyChanged(nameof(DepotProjectedMarginValue));
+        OnPropertyChanged(nameof(DepotMarginPercent));
         OnPropertyChanged(nameof(CloudStatusText));
         OnPropertyChanged(nameof(CloudStatusColor));
     }
@@ -877,9 +888,15 @@ public class ManagerViewModel : INotifyPropertyChanged
         Application.Current?.Dispatcher.Invoke(() =>
         {
             SelectedAssetFittedComponents.Clear();
+            double totalCostDelta = 0.0;
             foreach (var item in list)
             {
                 SelectedAssetFittedComponents.Add(new FittedComponentItemViewModel(item));
+                totalCostDelta += item.CostDelta;
+            }
+            if (SelectedAsset != null)
+            {
+                SelectedAsset.FittedCostDelta = totalCostDelta;
             }
             OnPropertyChanged(nameof(SelectedAssetFittedComponents));
             OnPropertyChanged(nameof(HasFittedComponents));
@@ -1418,9 +1435,26 @@ public class ManagerViewModel : INotifyPropertyChanged
         var asset = target ?? SelectedAsset;
         if (asset == null) return;
 
+        bool bypassGate = false;
+        if (newStatus == LifecycleQueue.ReadyForSale && asset.Status != LifecycleQueue.ReadyForSale)
+        {
+            var gateWin = new VeloxManager.Controls.QualityGateModalWindow(asset)
+            {
+                Owner = Application.Current?.MainWindow
+            };
+            var result = gateWin.ShowDialog();
+            if (result != true)
+            {
+                LiveActivityFeed.Insert(0, $"[{DateTime.Now:HH:mm:ss}] RTS promotion held by Quality Gate audit for {asset.AssetTag}");
+                return;
+            }
+            bypassGate = gateWin.OverrideApproved;
+        }
+
         var patch = new PatchAssetRequest
         {
             LifecycleQueue = newStatus,
+            BypassQualityGate = bypassGate,
             Actor = ManagerConfigService.Current.ManagerName
         };
 
@@ -1436,7 +1470,7 @@ public class ManagerViewModel : INotifyPropertyChanged
             if (newStatus == LifecycleQueue.Sold && patch.OutDate != null) asset.OutDate = patch.OutDate;
             ApplyFilter();
             RefreshMetrics();
-            LiveActivityFeed.Insert(0, $"[{DateTime.Now:HH:mm:ss}] {asset.AssetTag} status updated to {newStatus}");
+            LiveActivityFeed.Insert(0, $"[{DateTime.Now:HH:mm:ss}] {asset.AssetTag} status updated to {newStatus}{(bypassGate ? " (Quality Gate Overridden)" : "")}");
         }
     }
 
@@ -1512,6 +1546,22 @@ public class ManagerViewModel : INotifyPropertyChanged
         catch (Exception ex)
         {
             MessageBox.Show($"Export error: {ex.Message}", "Export Failed", MessageBoxButton.OK, MessageBoxImage.Error);
+        }
+    }
+
+    public async Task SyncAssetsToGoogleSheetsAsync()
+    {
+        LiveActivityFeed.Insert(0, $"[{DateTime.Now:HH:mm:ss}] Initiating Google Sheets cloud sync & backup...");
+        var result = await GoogleSheetsSyncService.SyncAssetsAsync(Assets.ToList());
+        if (result.Success)
+        {
+            LiveActivityFeed.Insert(0, $"[{DateTime.Now:HH:mm:ss}] {result.Message}");
+            VeloxMessageBox.Show(result.Message, "Sheets Sync Complete", MessageBoxButton.OK, MessageBoxImage.Information);
+        }
+        else
+        {
+            LiveActivityFeed.Insert(0, $"[{DateTime.Now:HH:mm:ss}] Sync warning: {result.Message}");
+            VeloxMessageBox.Show(result.Message, "Sheets Sync Warning", MessageBoxButton.OK, MessageBoxImage.Warning);
         }
     }
 

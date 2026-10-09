@@ -76,6 +76,27 @@ public static class AssetEndpoints
             var tenantId = ctx.TenantId();
             if (tenantId == null) return Results.Unauthorized();
 
+            var existing = db.GetAssetById(tenantId, id);
+            if (existing == null) return Results.NotFound(new { error = "Asset not found." });
+
+            // Mandatory Quality Gate enforcement (unless manager override bypass is supplied)
+            if (req.LifecycleQueue == LifecycleQueue.ReadyForSale && existing.LifecycleQueue != LifecycleQueue.ReadyForSale && req.BypassQualityGate != true)
+            {
+                var simulated = new AssetDto
+                {
+                    Grade = req.Grade ?? existing.Grade,
+                    CosmeticGrade = req.CosmeticGrade ?? existing.CosmeticGrade,
+                    BatteryHealth = req.BatteryHealth ?? existing.BatteryHealth,
+                    StorageHealth = req.StorageHealth ?? existing.StorageHealth,
+                    MissingComponents = req.MissingComponents ?? existing.MissingComponents
+                };
+                var (passed, reason) = db.CheckQualityGateForRts(simulated);
+                if (!passed)
+                {
+                    return Results.BadRequest(new { error = $"Quality Gate Violation: {reason}", qualityGateFailed = true, reason });
+                }
+            }
+
             var ok = db.PatchAsset(tenantId, id, req);
             if (!ok) return Results.NotFound(new { error = "Asset not found." });
 

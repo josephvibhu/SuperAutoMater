@@ -1,0 +1,7 @@
+{
+  "apiUrl": "https://velox-api-production.up.railway.app",
+  "lanApiUrl": "http://192.168.1.100:9000",
+  "apiKey": "vx-2fe1479ad70dffd3017a0aa8c67b1c270fc9dd00bb9d4bdf",
+  "defaultLocation": "INTAKE-STAGING",
+  "actor": "VeloxLink-WinPE"
+}
