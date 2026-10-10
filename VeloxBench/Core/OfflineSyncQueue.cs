@@ -297,6 +297,7 @@ namespace SuperAutoMater
                 {
                     Tag = root.TryGetProperty("Tag", out var pTag) ? pTag.GetString() ?? "" : "",
                     Serial_Number = root.TryGetProperty("Serial_Number", out var pSn) ? pSn.GetString() ?? "" : "",
+                    Model = root.TryGetProperty("Model", out var pMod) ? pMod.GetString() ?? "" : "",
                     Processor = root.TryGetProperty("Processor", out var pCpu) ? pCpu.GetString() ?? "" : "",
                     Memory = root.TryGetProperty("Memory", out var pMem) ? pMem.GetString() ?? "" : "",
                     Battery_Health = bHealth,

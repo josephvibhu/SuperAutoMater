@@ -10,15 +10,15 @@ namespace VeloxBench.Services
     /// <summary>
     /// Dual Sheets Backup Service:
     /// Maintains an automatic, persistent Excel/CSV sheets file backup on the local disk / USB drive
-    /// in the exact 15-column ITAM format matching Google Sheets:
-    /// Tag, Serial Number, Processor, Memory [ram/storage], Battery health, Storage Health, Status,
+    /// in the exact 16-column ITAM format matching Google Sheets:
+    /// Tag, Serial Number, Model, Processor, Memory [ram/storage], Battery health, Storage Health, Status,
     /// Work in Progress, Physical Grade, Remarks, Technician Name or ID, In Date, Supplier, Out Date, Customer.
     /// </summary>
     public static class LocalSheetsBackupService
     {
         private static readonly object _lock = new object();
 
-        private const string CsvHeader = "Tag,Serial Number,Processor,Memory [ram/storage],Battery health,Storage Health,Status,Work in Progress,Physical Grade,Remarks,Technician Name or ID,In Date,Supplier,Out Date,Customer";
+        private const string CsvHeader = "Tag,Serial Number,Model,Processor,Memory [ram/storage],Battery health,Storage Health,Status,Work in Progress,Physical Grade,Remarks,Technician Name or ID,In Date,Supplier,Out Date,Customer";
 
         public static string GetPrimaryCsvPath()
         {
@@ -100,6 +100,7 @@ namespace VeloxBench.Services
         {
             string tag = EscapeCsv(string.IsNullOrWhiteSpace(r.Tag) ? r.Asset_Tag : r.Tag);
             string sn = EscapeCsv(r.Serial_Number);
+            string model = EscapeCsv(r.Model);
             string cpu = EscapeCsv(r.Processor);
             string mem = EscapeCsv(r.Memory);
             string batt = EscapeCsv(r.Battery_Health > 0 ? r.Battery_Health.ToString() : "100");
@@ -114,7 +115,7 @@ namespace VeloxBench.Services
             string outDate = EscapeCsv(r.Out_Date);
             string customer = EscapeCsv(r.Customer);
 
-            return $"{tag},{sn},{cpu},{mem},{batt},{storage},{status},{wip},{grade},{remarks},{tech},{inDate},{supplier},{outDate},{customer}";
+            return $"{tag},{sn},{model},{cpu},{mem},{batt},{storage},{status},{wip},{grade},{remarks},{tech},{inDate},{supplier},{outDate},{customer}";
         }
 
         private static string EscapeCsv(string val)
