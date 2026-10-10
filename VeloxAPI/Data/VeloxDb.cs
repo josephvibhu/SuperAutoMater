@@ -1282,6 +1282,235 @@ VALUES(@id, @tid, @sn, @tag, @model, @cat, 1, @grade, 'Depot Staging', 'ReadyFor
         }
     }
 
+    // ── Backup, Restore & Purge ───────────────────────────────────────────────
+
+    public DatabaseBackupDto ExportBackup(string tenantId)
+    {
+        lock (_gate)
+        {
+            using var conn = Open();
+            var backup = new DatabaseBackupDto
+            {
+                Version = "1.0",
+                ExportedAtUtc = Iso(DateTimeOffset.UtcNow),
+                TenantId = tenantId
+            };
+
+            // 1. Assets
+            backup.Assets = QueryAssets(conn, "WHERE a.tenant_id=@tid ORDER BY a.created_at_utc ASC", P("@tid", tenantId));
+
+            // 2. Fitted Components
+            using (var cmd = conn.CreateCommand())
+            {
+                cmd.CommandText = "SELECT id,tenant_id,parent_asset_id,component_asset_id,category,description,serial_number,cost_delta,price_delta,installed_at_utc,installed_by,notes FROM asset_components WHERE tenant_id=@tid ORDER BY installed_at_utc ASC";
+                cmd.Parameters.AddWithValue("@tid", tenantId);
+                using var r = cmd.ExecuteReader();
+                while (r.Read())
+                {
+                    backup.Components.Add(MapFittedComponent(r));
+                }
+            }
+
+            // 3. Events
+            using (var cmd = conn.CreateCommand())
+            {
+                cmd.CommandText = "SELECT id,asset_id,tenant_id,event_type,location,actor,notes_json,source_bench_id,recorded_at_utc FROM asset_events WHERE tenant_id=@tid ORDER BY recorded_at_utc ASC";
+                cmd.Parameters.AddWithValue("@tid", tenantId);
+                using var r = cmd.ExecuteReader();
+                while (r.Read())
+                {
+                    backup.Events.Add(MapEvent(r));
+                }
+            }
+
+            // 4. Employees
+            using (var cmd = conn.CreateCommand())
+            {
+                cmd.CommandText = "SELECT id,tenant_id,name,role,is_active,station_id,created_at_utc FROM employees WHERE tenant_id=@tid ORDER BY created_at_utc ASC";
+                cmd.Parameters.AddWithValue("@tid", tenantId);
+                using var r = cmd.ExecuteReader();
+                while (r.Read())
+                {
+                    backup.Employees.Add(MapEmployee(r));
+                }
+            }
+
+            return backup;
+        }
+    }
+
+    public int PurgeTenantAssets(string tenantId)
+    {
+        lock (_gate)
+        {
+            using var conn = Open();
+            using var tx = conn.BeginTransaction();
+
+            using (var cmdC = conn.CreateCommand())
+            {
+                cmdC.Transaction = tx;
+                cmdC.CommandText = "DELETE FROM asset_components WHERE tenant_id=@tid";
+                cmdC.Parameters.AddWithValue("@tid", tenantId);
+                cmdC.ExecuteNonQuery();
+            }
+
+            using (var cmdE = conn.CreateCommand())
+            {
+                cmdE.Transaction = tx;
+                cmdE.CommandText = "DELETE FROM asset_events WHERE tenant_id=@tid";
+                cmdE.Parameters.AddWithValue("@tid", tenantId);
+                cmdE.ExecuteNonQuery();
+            }
+
+            int count = 0;
+            using (var cmdA = conn.CreateCommand())
+            {
+                cmdA.Transaction = tx;
+                cmdA.CommandText = "DELETE FROM assets WHERE tenant_id=@tid";
+                cmdA.Parameters.AddWithValue("@tid", tenantId);
+                count = cmdA.ExecuteNonQuery();
+            }
+
+            tx.Commit();
+            return count;
+        }
+    }
+
+    public (int Assets, int Components, int Events) RestoreBackup(string tenantId, DatabaseBackupDto backup)
+    {
+        lock (_gate)
+        {
+            using var conn = Open();
+            using var tx = conn.BeginTransaction();
+
+            // Clear previous assets/components/events
+            using (var cmdDelC = conn.CreateCommand())
+            {
+                cmdDelC.Transaction = tx;
+                cmdDelC.CommandText = "DELETE FROM asset_components WHERE tenant_id=@tid";
+                cmdDelC.Parameters.AddWithValue("@tid", tenantId);
+                cmdDelC.ExecuteNonQuery();
+            }
+            using (var cmdDelE = conn.CreateCommand())
+            {
+                cmdDelE.Transaction = tx;
+                cmdDelE.CommandText = "DELETE FROM asset_events WHERE tenant_id=@tid";
+                cmdDelE.Parameters.AddWithValue("@tid", tenantId);
+                cmdDelE.ExecuteNonQuery();
+            }
+            using (var cmdDelA = conn.CreateCommand())
+            {
+                cmdDelA.Transaction = tx;
+                cmdDelA.CommandText = "DELETE FROM assets WHERE tenant_id=@tid";
+                cmdDelA.Parameters.AddWithValue("@tid", tenantId);
+                cmdDelA.ExecuteNonQuery();
+            }
+
+            int assetCount = 0;
+            if (backup.Assets != null)
+            {
+                foreach (var a in backup.Assets)
+                {
+                    var id = string.IsNullOrWhiteSpace(a.Id) ? ("ast-" + NewId()) : a.Id;
+                    using var cmd = conn.CreateCommand();
+                    cmd.Transaction = tx;
+                    cmd.CommandText = @"INSERT INTO assets(id, tenant_id, serial_number, asset_tag, asset_uuid, model,
+                        current_location, lifecycle_queue, grade, supplier, customer, assigned_employee_id,
+                        purchase_price, sale_price, missing_components, cosmetic_grade, battery_health, storage_health,
+                        notes, in_date, out_date, category, quantity, hold_customer, hold_sales_rep, hold_expires_utc,
+                        created_at_utc, updated_at_utc)
+                        VALUES(@id, @tid, @sn, @tag, @uuid, @model, @loc, @q, @grade, @sup, @cust, @eid,
+                        @pp, @sp, @mc, @cg, @bh, @sh, @notes, @ind, @outd, @cat, @qty, @hc, @hs, @hexp, @created, @updated)";
+                    cmd.Parameters.AddWithValue("@id", id);
+                    cmd.Parameters.AddWithValue("@tid", tenantId);
+                    cmd.Parameters.AddWithValue("@sn", string.IsNullOrWhiteSpace(a.SerialNumber) ? DBNull.Value : a.SerialNumber);
+                    cmd.Parameters.AddWithValue("@tag", string.IsNullOrWhiteSpace(a.AssetTag) ? DBNull.Value : a.AssetTag);
+                    cmd.Parameters.AddWithValue("@uuid", string.IsNullOrWhiteSpace(a.AssetUuid) ? DBNull.Value : a.AssetUuid);
+                    cmd.Parameters.AddWithValue("@model", a.Model ?? "");
+                    cmd.Parameters.AddWithValue("@loc", a.CurrentLocation ?? "");
+                    cmd.Parameters.AddWithValue("@q", a.LifecycleQueue.ToString());
+                    cmd.Parameters.AddWithValue("@grade", a.Grade.ToString());
+                    cmd.Parameters.AddWithValue("@sup", a.Supplier ?? "");
+                    cmd.Parameters.AddWithValue("@cust", a.Customer ?? "");
+                    cmd.Parameters.AddWithValue("@eid", string.IsNullOrWhiteSpace(a.AssignedEmployeeId) ? DBNull.Value : a.AssignedEmployeeId);
+                    cmd.Parameters.AddWithValue("@pp", a.PurchasePrice.HasValue ? a.PurchasePrice.Value : DBNull.Value);
+                    cmd.Parameters.AddWithValue("@sp", a.SalePrice.HasValue ? a.SalePrice.Value : DBNull.Value);
+                    cmd.Parameters.AddWithValue("@mc", a.MissingComponents ?? "");
+                    cmd.Parameters.AddWithValue("@cg", a.CosmeticGrade ?? "");
+                    cmd.Parameters.AddWithValue("@bh", a.BatteryHealth.HasValue ? a.BatteryHealth.Value : DBNull.Value);
+                    cmd.Parameters.AddWithValue("@sh", a.StorageHealth.HasValue ? a.StorageHealth.Value : DBNull.Value);
+                    cmd.Parameters.AddWithValue("@notes", a.Notes ?? "");
+                    cmd.Parameters.AddWithValue("@ind", a.InDate ?? "");
+                    cmd.Parameters.AddWithValue("@outd", a.OutDate ?? "");
+                    cmd.Parameters.AddWithValue("@cat", a.Category.ToString());
+                    cmd.Parameters.AddWithValue("@qty", a.Quantity > 0 ? a.Quantity : 1);
+                    cmd.Parameters.AddWithValue("@hc", a.HoldCustomer ?? "");
+                    cmd.Parameters.AddWithValue("@hs", a.HoldSalesRep ?? "");
+                    cmd.Parameters.AddWithValue("@hexp", string.IsNullOrWhiteSpace(a.HoldExpiresAtUtc) ? DBNull.Value : a.HoldExpiresAtUtc);
+                    cmd.Parameters.AddWithValue("@created", a.CreatedAtUtc != default ? Iso(a.CreatedAtUtc) : Iso(DateTimeOffset.UtcNow));
+                    cmd.Parameters.AddWithValue("@updated", a.UpdatedAtUtc != default ? Iso(a.UpdatedAtUtc) : Iso(DateTimeOffset.UtcNow));
+                    cmd.ExecuteNonQuery();
+                    assetCount++;
+                }
+            }
+
+            int compCount = 0;
+            if (backup.Components != null)
+            {
+                foreach (var c in backup.Components)
+                {
+                    var id = string.IsNullOrWhiteSpace(c.Id) ? ("cmp-" + NewId()) : c.Id;
+                    using var cmd = conn.CreateCommand();
+                    cmd.Transaction = tx;
+                    cmd.CommandText = @"INSERT INTO asset_components(id, tenant_id, parent_asset_id, component_asset_id,
+                        category, description, serial_number, cost_delta, price_delta, installed_at_utc, installed_by, notes)
+                        VALUES(@id, @tid, @pid, @cid, @cat, @desc, @sn, @cd, @pd, @inst_at, @inst_by, @notes)";
+                    cmd.Parameters.AddWithValue("@id", id);
+                    cmd.Parameters.AddWithValue("@tid", tenantId);
+                    cmd.Parameters.AddWithValue("@pid", c.ParentAssetId);
+                    cmd.Parameters.AddWithValue("@cid", string.IsNullOrWhiteSpace(c.ComponentAssetId) ? DBNull.Value : c.ComponentAssetId);
+                    cmd.Parameters.AddWithValue("@cat", c.Category.ToString());
+                    cmd.Parameters.AddWithValue("@desc", c.Description ?? "");
+                    cmd.Parameters.AddWithValue("@sn", string.IsNullOrWhiteSpace(c.SerialNumber) ? DBNull.Value : c.SerialNumber);
+                    cmd.Parameters.AddWithValue("@cd", c.CostDelta);
+                    cmd.Parameters.AddWithValue("@pd", c.PriceDelta);
+                    cmd.Parameters.AddWithValue("@inst_at", c.InstalledAtUtc != default ? Iso(c.InstalledAtUtc) : Iso(DateTimeOffset.UtcNow));
+                    cmd.Parameters.AddWithValue("@inst_by", string.IsNullOrWhiteSpace(c.InstalledBy) ? DBNull.Value : c.InstalledBy);
+                    cmd.Parameters.AddWithValue("@notes", string.IsNullOrWhiteSpace(c.Notes) ? DBNull.Value : c.Notes);
+                    cmd.ExecuteNonQuery();
+                    compCount++;
+                }
+            }
+
+            int eventCount = 0;
+            if (backup.Events != null)
+            {
+                foreach (var ev in backup.Events)
+                {
+                    var id = string.IsNullOrWhiteSpace(ev.Id) ? ("evt-" + NewId()) : ev.Id;
+                    using var cmd = conn.CreateCommand();
+                    cmd.Transaction = tx;
+                    cmd.CommandText = @"INSERT INTO asset_events(id, asset_id, tenant_id, event_type, location, actor, notes_json, source_bench_id, recorded_at_utc)
+                        VALUES(@id, @aid, @tid, @et, @loc, @actor, @notes, @bench, @rec)";
+                    cmd.Parameters.AddWithValue("@id", id);
+                    cmd.Parameters.AddWithValue("@aid", ev.AssetId);
+                    cmd.Parameters.AddWithValue("@tid", tenantId);
+                    cmd.Parameters.AddWithValue("@et", ev.EventType ?? "Log");
+                    cmd.Parameters.AddWithValue("@loc", string.IsNullOrWhiteSpace(ev.Location) ? DBNull.Value : ev.Location);
+                    cmd.Parameters.AddWithValue("@actor", string.IsNullOrWhiteSpace(ev.Actor) ? DBNull.Value : ev.Actor);
+                    cmd.Parameters.AddWithValue("@notes", string.IsNullOrWhiteSpace(ev.NotesJson) ? "{}" : ev.NotesJson);
+                    cmd.Parameters.AddWithValue("@bench", string.IsNullOrWhiteSpace(ev.SourceBenchId) ? DBNull.Value : ev.SourceBenchId);
+                    cmd.Parameters.AddWithValue("@rec", ev.RecordedAtUtc != default ? Iso(ev.RecordedAtUtc) : Iso(DateTimeOffset.UtcNow));
+                    cmd.ExecuteNonQuery();
+                    eventCount++;
+                }
+            }
+
+            tx.Commit();
+            return (assetCount, compCount, eventCount);
+        }
+    }
+
     public void Dispose()
     {
         _keepAliveConn?.Dispose();

@@ -423,8 +423,8 @@ namespace VeloxManager.Services
                 else if (Matches(h, "remarks", "notes", "comment", "comments", "technician notes"))
                     AssignIfNotSet(map, "Remarks", i);
 
-                // Location / Shelf (PLACE)
-                else if (Matches(h, "place", "location", "shelf", "shelf bay", "shelf_location", "bay", "bin", "rack"))
+                // Location / Shelf / Box (PLACE)
+                else if (Matches(h, "place", "location", "shelf", "shelf no", "shelf number", "shelf #", "shelf bay", "shelf_location", "box", "box no", "box number", "box #", "box/shelf", "shelf/box", "bay", "bin", "rack"))
                     AssignIfNotSet(map, "Location", i);
 
                 // Technician Name or ID

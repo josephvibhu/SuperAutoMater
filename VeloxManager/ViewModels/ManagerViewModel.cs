@@ -171,6 +171,13 @@ public class ManagerViewModel : INotifyPropertyChanged
         set { _quickIntakeNotes = value; OnPropertyChanged(); }
     }
 
+    private string _quickIntakeLocation = "Shelf A-1";
+    public string QuickIntakeLocation
+    {
+        get => _quickIntakeLocation;
+        set { _quickIntakeLocation = value; OnPropertyChanged(); }
+    }
+
     // ── Fitted Components (BOM) Form Fields ─────────────────────────────────────
     private bool _attachFromStock = false;
     public bool AttachFromStock
@@ -625,6 +632,11 @@ public class ManagerViewModel : INotifyPropertyChanged
     public ICommand QuickMarkAssignedRtsCommand { get; }
     public ICommand RefreshSelectedTechDataCommand { get; }
     public ICommand SyncGoogleSheetsCommand { get; }
+    public ICommand OpenCloudOperationsCommand { get; }
+    public ICommand BackupCloudDatabaseCommand { get; }
+    public ICommand RestoreCloudDatabaseCommand { get; }
+    public ICommand PurgeCloudDatabaseCommand { get; }
+    public ICommand UpdateSelectedAssetLocationCommand { get; }
 
     public ManagerViewModel()
     {
@@ -669,6 +681,11 @@ public class ManagerViewModel : INotifyPropertyChanged
         QuickMarkAssignedRtsCommand = new RelayCommand(async p => await QuickMarkAssignedRtsAsync(p as AssetItemViewModel));
         RefreshSelectedTechDataCommand = new RelayCommand(async _ => await LoadSelectedTechDataAsync());
         SyncGoogleSheetsCommand = new RelayCommand(async _ => await SyncAssetsToGoogleSheetsAsync());
+        OpenCloudOperationsCommand = new RelayCommand(_ => OpenCloudOperationsDialog());
+        BackupCloudDatabaseCommand = new RelayCommand(async _ => await BackupCloudDatabaseAsync());
+        RestoreCloudDatabaseCommand = new RelayCommand(async _ => await RestoreCloudDatabaseAsync());
+        PurgeCloudDatabaseCommand = new RelayCommand(async _ => await PurgeCloudDatabaseAsync());
+        UpdateSelectedAssetLocationCommand = new RelayCommand(async p => await UpdateSelectedAssetLocationAsync(p as string));
 
         // Wire up Real-Time Events
         _api.CloudConnectionChanged += connected =>
@@ -837,6 +854,7 @@ public class ManagerViewModel : INotifyPropertyChanged
                 var matches = item.SerialNumber.ToLowerInvariant().Contains(q) ||
                               item.AssetTag.ToLowerInvariant().Contains(q) ||
                               item.ModelName.ToLowerInvariant().Contains(q) ||
+                              (item.CurrentLocation ?? "").ToLowerInvariant().Contains(q) ||
                               item.AssignedEmployeeName.ToLowerInvariant().Contains(q) ||
                               item.Supplier.ToLowerInvariant().Contains(q) ||
                               item.Customer.ToLowerInvariant().Contains(q);
@@ -891,7 +909,7 @@ public class ManagerViewModel : INotifyPropertyChanged
             SalePrice = QuickIntakeSalePrice > 0 ? QuickIntakeSalePrice : null,
             Notes = string.IsNullOrWhiteSpace(QuickIntakeNotes) ? $"Batch intake via VeloxManager ({parsedCategory})" : QuickIntakeNotes.Trim(),
             Actor = ManagerConfigService.Current.ManagerName,
-            Location = "MAIN-DEPOT"
+            Location = !string.IsNullOrWhiteSpace(QuickIntakeLocation) ? QuickIntakeLocation.Trim() : "IntakeStaging"
         };
 
         var created = await _api.IntakeAssetAsync(req);
@@ -1761,6 +1779,129 @@ public class ManagerViewModel : INotifyPropertyChanged
         if (target == null) return;
         await QuickUpdateAssetStatusAsync(target, LifecycleQueue.ReadyForSale);
         _ = LoadSelectedTechDataAsync();
+    }
+
+    public void OpenCloudOperationsDialog()
+    {
+        var win = new CloudOperationsModalWindow(async () =>
+        {
+            await LoadAssetsAndEmployeesAsync();
+        })
+        {
+            Owner = Application.Current?.MainWindow
+        };
+        win.ShowDialog();
+    }
+
+    public async Task BackupCloudDatabaseAsync()
+    {
+        try
+        {
+            var sfd = new Microsoft.Win32.SaveFileDialog
+            {
+                Title = "Save Velox Cloud Database Backup",
+                Filter = "JSON Backup File (*.json)|*.json",
+                FileName = $"Velox_Cloud_Backup_{DateTime.Now:yyyyMMdd_HHmm}.json"
+            };
+            if (sfd.ShowDialog() != true) return;
+
+            var json = await _api.DownloadBackupJsonAsync();
+            if (string.IsNullOrWhiteSpace(json))
+            {
+                VeloxMessageBox.Show("Failed to download database backup from Railway Cloud. Check internet connection.", "Backup Failed", MessageBoxButton.OK, MessageBoxImage.Error);
+                return;
+            }
+
+            await System.IO.File.WriteAllTextAsync(sfd.FileName, json);
+            LiveActivityFeed.Insert(0, $"[{DateTime.Now:HH:mm:ss}] Cloud database backup saved to: {System.IO.Path.GetFileName(sfd.FileName)}");
+            VeloxMessageBox.Show($"Cloud database backup successfully saved to:\n\n{sfd.FileName}", "Backup Exported", MessageBoxButton.OK, MessageBoxImage.Information);
+        }
+        catch (Exception ex)
+        {
+            VeloxMessageBox.Show($"Error creating backup: {ex.Message}", "Backup Failed", MessageBoxButton.OK, MessageBoxImage.Error);
+        }
+    }
+
+    public async Task RestoreCloudDatabaseAsync()
+    {
+        try
+        {
+            var ofd = new Microsoft.Win32.OpenFileDialog
+            {
+                Title = "Select Velox Cloud Backup File to Restore",
+                Filter = "JSON Backup File (*.json)|*.json"
+            };
+            if (ofd.ShowDialog() != true) return;
+
+            var confirm = VeloxMessageBox.Show(
+                $"Are you sure you want to restore Railway Cloud from this backup file?\n\n{ofd.FileName}\n\nThis will synchronize cloud assets with the contents of the file.",
+                "Confirm Cloud Restore", MessageBoxButton.YesNo, MessageBoxImage.Question);
+            if (confirm != MessageBoxResult.Yes) return;
+
+            var json = await System.IO.File.ReadAllTextAsync(ofd.FileName);
+            var (success, msg) = await _api.RestoreBackupJsonAsync(json);
+            if (success)
+            {
+                LiveActivityFeed.Insert(0, $"[{DateTime.Now:HH:mm:ss}] Cloud database restored from backup: {System.IO.Path.GetFileName(ofd.FileName)}");
+                VeloxMessageBox.Show(msg, "Restore Complete", MessageBoxButton.OK, MessageBoxImage.Information);
+                await LoadAssetsAndEmployeesAsync();
+            }
+            else
+            {
+                VeloxMessageBox.Show(msg, "Restore Failed", MessageBoxButton.OK, MessageBoxImage.Error);
+            }
+        }
+        catch (Exception ex)
+        {
+            VeloxMessageBox.Show($"Error restoring backup: {ex.Message}", "Restore Failed", MessageBoxButton.OK, MessageBoxImage.Error);
+        }
+    }
+
+    public async Task PurgeCloudDatabaseAsync()
+    {
+        try
+        {
+            var confirm = VeloxMessageBox.Show(
+                "⚠️ DANGER: Are you sure you want to permanently delete all previous test devices and history logs from Railway Cloud?\n\nThis will wipe existing test assets so you can intake real warehouse inventory starting clean at 0.\n\nTechnician user logins, station configs, and API keys are preserved.\n\nDo you want to proceed?",
+                "Confirm Database Purge / Reset", MessageBoxButton.YesNo, MessageBoxImage.Warning);
+            if (confirm != MessageBoxResult.Yes) return;
+
+            var (success, msg, purged) = await _api.PurgeAssetsAsync();
+            if (success)
+            {
+                LiveActivityFeed.Insert(0, $"[{DateTime.Now:HH:mm:ss}] Cloud database purged: {purged} previous devices deleted.");
+                VeloxMessageBox.Show($"Cloud inventory successfully reset to 0!\n\n{purged} previous asset entries and associated test records have been deleted from Railway.\n\nYou can now intake real inventory.", "Cloud Inventory Reset", MessageBoxButton.OK, MessageBoxImage.Information);
+                await LoadAssetsAndEmployeesAsync();
+            }
+            else
+            {
+                VeloxMessageBox.Show(msg, "Purge Failed", MessageBoxButton.OK, MessageBoxImage.Error);
+            }
+        }
+        catch (Exception ex)
+        {
+            VeloxMessageBox.Show($"Error purging database: {ex.Message}", "Purge Failed", MessageBoxButton.OK, MessageBoxImage.Error);
+        }
+    }
+
+    public async Task UpdateSelectedAssetLocationAsync(string? newLocation = null)
+    {
+        if (SelectedAsset == null) return;
+        var loc = (newLocation ?? SelectedAsset.CurrentLocation)?.Trim();
+        if (string.IsNullOrWhiteSpace(loc)) return;
+
+        var ok = await _api.PatchAssetAsync(SelectedAsset.Id, new PatchAssetRequest
+        {
+            CurrentLocation = loc,
+            Actor = ManagerConfigService.Current.ManagerName
+        });
+
+        if (ok)
+        {
+            SelectedAsset.CurrentLocation = loc;
+            ApplyFilter();
+            LiveActivityFeed.Insert(0, $"[{DateTime.Now:HH:mm:ss}] Shelf/Box location updated for {SelectedAsset.AssetTag} -> {loc}");
+        }
     }
 
     private static string EscapeCsv(string? val)

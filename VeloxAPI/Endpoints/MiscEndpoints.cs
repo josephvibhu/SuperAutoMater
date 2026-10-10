@@ -1,6 +1,8 @@
 using VeloxAPI.Auth;
 using VeloxAPI.Data;
+using VeloxAPI.Realtime;
 using Velox.Shared.Dtos;
+using Velox.Shared.Models;
 
 namespace VeloxAPI.Endpoints;
 
@@ -83,6 +85,18 @@ public static class AdminEndpoints
 {
     public static void MapAdminEndpoints(this IEndpointRouteBuilder app)
     {
+        string ResolveAdminTenant(HttpContext ctx, VeloxDb db)
+        {
+            var apiKey = ctx.Request.Headers["X-API-Key"].FirstOrDefault()
+                      ?? ctx.Request.Headers["X-Velox-Api-Key"].FirstOrDefault();
+            if (!string.IsNullOrWhiteSpace(apiKey))
+            {
+                var resolved = db.ResolveTenantFromApiKey(apiKey);
+                if (resolved != null) return resolved;
+            }
+            return ctx.TenantId() ?? ctx.Items["TenantId"] as string ?? "ten-d2428a4cb3da";
+        }
+
         // POST /api/v1/admin/setup — one-time depot setup: creates tenant + API key
         // Protected by VELOX_ADMIN_SECRET header
         app.MapPost("/api/v1/admin/setup", (AdminSetupRequest req, HttpContext ctx, VeloxDb db, IConfiguration config) =>
@@ -103,6 +117,44 @@ public static class AdminEndpoints
                 tenantId,
                 apiKey   = plainKey,
                 note     = "Set X-API-Key: {apiKey} on all machine-to-machine requests."
+            });
+        });
+
+        // GET /api/v1/admin/backup — full database JSON dump
+        app.MapGet("/api/v1/admin/backup", (HttpContext ctx, VeloxDb db) =>
+        {
+            var tenantId = ResolveAdminTenant(ctx, db);
+            var backup = db.ExportBackup(tenantId);
+            return Results.Ok(backup);
+        });
+
+        // POST /api/v1/admin/restore — restore database from JSON backup
+        app.MapPost("/api/v1/admin/restore", async (DatabaseBackupDto backup, HttpContext ctx, VeloxDb db, SseHub sse) =>
+        {
+            var tenantId = ResolveAdminTenant(ctx, db);
+            var (assets, comps, events) = db.RestoreBackup(tenantId, backup);
+            await sse.BroadcastAsync(SseEventType.AssetUpdated, new { restored = assets });
+            return Results.Ok(new RestoreBackupResponse
+            {
+                Success = true,
+                Message = $"Cloud database successfully restored with {assets} assets, {comps} components, and {events} event logs.",
+                RestoredAssets = assets,
+                RestoredComponents = comps,
+                RestoredEvents = events
+            });
+        });
+
+        // POST /api/v1/admin/purge-assets — purge all previous asset entries & history to start clean
+        app.MapPost("/api/v1/admin/purge-assets", async (HttpContext ctx, VeloxDb db, SseHub sse) =>
+        {
+            var tenantId = ResolveAdminTenant(ctx, db);
+            var deleted = db.PurgeTenantAssets(tenantId);
+            await sse.BroadcastAsync(SseEventType.AssetUpdated, new { purged = deleted });
+            return Results.Ok(new PurgeAssetsResponse
+            {
+                Success = true,
+                Message = $"Purged {deleted} previous assets and associated components/history from cloud database.",
+                PurgedAssets = deleted
             });
         });
     }

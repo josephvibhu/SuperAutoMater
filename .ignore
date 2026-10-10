@@ -1,0 +1,14 @@
+Releases/
+**/Releases/
+VeloxBench/
+VeloxManager/
+VeloxLink/
+bin/
+obj/
+**/bin/
+**/obj/
+*.exe
+*.dll
+*.pdb
+*.old*
+lib/

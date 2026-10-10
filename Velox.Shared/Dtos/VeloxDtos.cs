@@ -265,4 +265,34 @@ public sealed class TechnicianPerformanceDto
     public List<AssetDto> AssignedAssets { get; set; } = new();
 }
 
+// ─── Cloud Database Operations & Backup ───────────────────────────────────────
+
+public sealed class DatabaseBackupDto
+{
+    public string Version { get; set; } = "1.0";
+    public string ExportedAtUtc { get; set; } = "";
+    public string TenantId { get; set; } = "";
+    public List<AssetDto> Assets { get; set; } = new();
+    public List<FittedComponentDto> Components { get; set; } = new();
+    public List<AssetEventDto> Events { get; set; } = new();
+    public List<EmployeeDto> Employees { get; set; } = new();
+}
+
+public sealed class RestoreBackupResponse
+{
+    public bool Success { get; set; }
+    public string Message { get; set; } = "";
+    public int RestoredAssets { get; set; }
+    public int RestoredComponents { get; set; }
+    public int RestoredEvents { get; set; }
+    public int RestoredEmployees { get; set; }
+}
+
+public sealed class PurgeAssetsResponse
+{
+    public bool Success { get; set; }
+    public string Message { get; set; } = "";
+    public int PurgedAssets { get; set; }
+}
+
 

@@ -598,4 +598,59 @@ public class ManagerApiClient
         }
         catch { return false; }
     }
+
+    // ── Cloud Database Backup, Restore & Purge ────────────────────────────────
+
+    public async Task<string?> DownloadBackupJsonAsync()
+    {
+        try
+        {
+            var res = await _http.GetAsync("api/v1/admin/backup");
+            if (res.IsSuccessStatusCode)
+            {
+                return await res.Content.ReadAsStringAsync();
+            }
+            return null;
+        }
+        catch { return null; }
+    }
+
+    public async Task<(bool Success, string Message)> RestoreBackupJsonAsync(string backupJson)
+    {
+        try
+        {
+            var content = new StringContent(backupJson, Encoding.UTF8, "application/json");
+            var res = await _http.PostAsync("api/v1/admin/restore", content);
+            var respText = await res.Content.ReadAsStringAsync();
+            if (res.IsSuccessStatusCode)
+            {
+                var dto = JsonSerializer.Deserialize<RestoreBackupResponse>(respText, JsonOpts);
+                return (true, dto?.Message ?? "Database restored successfully.");
+            }
+            return (false, $"Restore failed (HTTP {(int)res.StatusCode}): {respText}");
+        }
+        catch (Exception ex)
+        {
+            return (false, $"Restore failed: {ex.Message}");
+        }
+    }
+
+    public async Task<(bool Success, string Message, int PurgedCount)> PurgeAssetsAsync()
+    {
+        try
+        {
+            var res = await _http.PostAsync("api/v1/admin/purge-assets", new StringContent("{}", Encoding.UTF8, "application/json"));
+            var respText = await res.Content.ReadAsStringAsync();
+            if (res.IsSuccessStatusCode)
+            {
+                var dto = JsonSerializer.Deserialize<PurgeAssetsResponse>(respText, JsonOpts);
+                return (true, dto?.Message ?? "Previous asset inventory wiped clean.", dto?.PurgedAssets ?? 0);
+            }
+            return (false, $"Purge failed (HTTP {(int)res.StatusCode}): {respText}", 0);
+        }
+        catch (Exception ex)
+        {
+            return (false, $"Purge failed: {ex.Message}", 0);
+        }
+    }
 }
