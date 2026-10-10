@@ -142,10 +142,21 @@
                     </Border>
 
                     <!-- LAN Indicator -->
-                    <Border Background="#0D1117" BorderBrush="{Binding LanStatusColor, Converter={StaticResource HexBrush}}" BorderThickness="1" CornerRadius="16" Padding="10,4" Margin="0,0,14,0">
+                    <Border Background="#0D1117" BorderBrush="{Binding LanStatusColor, Converter={StaticResource HexBrush}}" BorderThickness="1" CornerRadius="16" Padding="10,4" Margin="0,0,8,0">
                         <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
                             <Ellipse Width="7" Height="7" Fill="{Binding LanStatusColor, Converter={StaticResource HexBrush}}" Margin="0,0,6,0" />
                             <TextBlock Text="{Binding LanStatusText}" FontWeight="SemiBold" FontSize="11" Foreground="{Binding LanStatusColor, Converter={StaticResource HexBrush}}" />
+                        </StackPanel>
+                    </Border>
+
+                    <!-- Manager Session & License Pill -->
+                    <Border Background="#0D1117" BorderBrush="#30363D" BorderThickness="1" CornerRadius="16" Padding="10,4" Margin="0,0,14,0" ToolTip="Current Operator Session &amp; License Status">
+                        <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                            <TextBlock Text="👤 " FontSize="10" VerticalAlignment="Center" />
+                            <TextBlock Text="{Binding ManagerName}" FontWeight="SemiBold" FontSize="11" Foreground="#F0F6FC" VerticalAlignment="Center" />
+                            <Border Background="#238636" CornerRadius="4" Padding="5,1" Margin="6,0,0,0" VerticalAlignment="Center">
+                                <TextBlock Text="PRO ACTIVE" FontSize="9" FontWeight="Bold" Foreground="#FFFFFF" />
+                            </Border>
                         </StackPanel>
                     </Border>
 
@@ -177,7 +188,7 @@
                     <Button Command="{Binding OpenShowroomWebCommand}"
                             Background="#1F6FEB" Foreground="#FFFFFF" BorderBrush="#388BFD" BorderThickness="1"
                             Padding="12,6" FontWeight="Bold" FontSize="12" Margin="0,0,8,0"
-                            ToolTip="Open the read-only VeloxShowroom portal for Sales &amp; Media teams in default browser">
+                            ToolTip="Open live VeloxShowroom portal on Railway Cloud (link automatically copied to clipboard for Sales &amp; Media team)">
                         <StackPanel Orientation="Horizontal">
                             <TextBlock Text="🌐" Margin="0,0,6,0" />
                             <TextBlock Text="VeloxShowroom" />

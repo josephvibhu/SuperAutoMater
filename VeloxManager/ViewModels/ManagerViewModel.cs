@@ -583,6 +583,8 @@ public class ManagerViewModel : INotifyPropertyChanged
         set { _isSelectedTechLoading = value; OnPropertyChanged(); }
     }
 
+    public string ManagerName => ManagerConfigService.Current.ManagerName;
+
     // ── Commands ───────────────────────────────────────────────────────────────
     public ICommand RefreshAssetsCommand { get; }
     public ICommand UpdateStatusCommand { get; }
@@ -1619,38 +1621,24 @@ public class ManagerViewModel : INotifyPropertyChanged
     {
         try
         {
-            // Ensure local LAN mirror server is active so showroom is 100% accessible locally and on LAN
-            if (!_lan.IsRunning)
-            {
-                _lan.Start(ManagerConfigService.Current.LanPort);
-            }
+            // Point directly to Railway cloud API showroom (matching VeloxLink architecture)
+            var cloudBase = ManagerConfigService.Current.ApiUrl.TrimEnd('/');
+            var showroomUrl = $"{cloudBase}/showroom";
 
-            var port = _lan.Port;
-            var localUrl = $"http://localhost:{port}/showroom";
-            var lanIp = LanMirrorServer.GetLocalIpAddress();
-            var lanUrl = $"http://{lanIp}:{port}/showroom";
-
-            // Copy LAN URL to clipboard for easy sharing with Sales / Media team
+            // Copy cloud URL to clipboard for easy sharing with Sales & Media teams
             try
             {
-                Clipboard.SetText(lanUrl);
+                Clipboard.SetText(showroomUrl);
             }
             catch { }
 
             System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo
             {
-                FileName = localUrl,
+                FileName = showroomUrl,
                 UseShellExecute = true
             });
 
-            LiveActivityFeed.Insert(0, $"[{DateTime.Now:HH:mm:ss}] ⚡ VeloxShowroom Active: {lanUrl} (Link copied to clipboard for Sales & Media)");
-
-            VeloxMessageBox.Show(
-                $"VeloxShowroom is active and running!\n\n" +
-                $"• Local URL: {localUrl}\n" +
-                $"• LAN URL for Sales & Media: {lanUrl}\n\n" +
-                $"The LAN URL has been automatically copied to your clipboard. Anyone on your local network (Sales, Media, or Floor Staff) can open this URL from any computer, tablet, or phone to view live RTS inventory and place reservations.",
-                "VeloxShowroom Active", MessageBoxButton.OK, MessageBoxImage.Information);
+            LiveActivityFeed.Insert(0, $"[{DateTime.Now:HH:mm:ss}] 🌐 VeloxShowroom Cloud Portal: {showroomUrl} (Link copied to clipboard for Sales & Media)");
         }
         catch (Exception ex)
         {
