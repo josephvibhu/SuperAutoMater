@@ -164,17 +164,30 @@ namespace SuperAutoMater.Wpf.Services
                     var devices = new FilterInfoCollection(FilterCategory.VideoInputDevice);
                     if (devices.Count > 0)
                     {
+                        int bestIdx = CameraDeviceService.SelectBestCameraIndex(devices);
+                        string name = devices[bestIdx >= 0 ? bestIdx : 0].Name;
                         camResult.Status = ExpressTestStatus.Passed;
                         camResult.Headline = "✓ OPTICAL SENSOR PRESENT";
-                        camResult.Detail = $"{devices[0].Name} detected.";
+                        camResult.Detail = $"{name} detected.";
                         camResult.MetricValue = $"{devices.Count} Camera(s)";
                     }
                     else
                     {
-                        camResult.Status = ExpressTestStatus.Warning;
-                        camResult.Headline = "⚠ NO CAMERA DETECTED";
-                        camResult.Detail = "0 video capture devices enumerated.";
-                        camResult.MetricValue = "None";
+                        var pnpCams = CameraDeviceService.GetPnpCameraHardware();
+                        if (pnpCams.Count > 0)
+                        {
+                            camResult.Status = ExpressTestStatus.Passed;
+                            camResult.Headline = "✓ OPTICAL HARDWARE DETECTED (PnP)";
+                            camResult.Detail = $"{pnpCams[0].Name} ({pnpCams[0].Manufacturer}) detected.";
+                            camResult.MetricValue = $"{pnpCams.Count} Hardware Sensor(s)";
+                        }
+                        else
+                        {
+                            camResult.Status = ExpressTestStatus.Warning;
+                            camResult.Headline = "⚠ NO CAMERA DETECTED";
+                            camResult.Detail = CameraDeviceService.GetDiagnosticsSummary();
+                            camResult.MetricValue = "None";
+                        }
                     }
                 }
                 else
@@ -430,28 +443,32 @@ namespace SuperAutoMater.Wpf.Services
                     var devices = new FilterInfoCollection(FilterCategory.VideoInputDevice);
                     if (devices.Count == 0)
                     {
+                        var pnpCams = CameraDeviceService.GetPnpCameraHardware();
+                        if (pnpCams.Count > 0)
+                        {
+                            res.Status = ExpressTestStatus.Passed;
+                            res.Headline = "✓ CAMERA DETECTED IN WINDOWS PnP";
+                            res.Detail = $"{pnpCams[0].Name} ({pnpCams[0].Manufacturer}) driver nominal. DirectShow filter unbridged.";
+                            res.MetricValue = "PnP Online";
+                            return;
+                        }
+
                         res.Status = ExpressTestStatus.Failed;
                         res.Headline = "✕ NO WEBCAM HARDWARE DETECTED";
-                        res.Detail = "DirectShow detected 0 video capture devices.";
+                        res.Detail = CameraDeviceService.GetDiagnosticsSummary();
                         res.MetricValue = "0 Cameras";
                         return;
                     }
 
-                    // Pick first non-IR camera
-                    string moniker = devices[0].MonikerString;
-                    string camName = devices[0].Name;
-
-                    for (int i = 0; i < devices.Count; i++)
-                    {
-                        if (!IsIrOrNightVisionCamera(devices[i].Name))
-                        {
-                            moniker = devices[i].MonikerString;
-                            camName = devices[i].Name;
-                            break;
-                        }
-                    }
+                    // Pick best non-IR color camera
+                    int bestIdx = CameraDeviceService.SelectBestCameraIndex(devices);
+                    int chosen = bestIdx >= 0 ? bestIdx : 0;
+                    string moniker = devices[chosen].MonikerString;
+                    string camName = devices[chosen].Name;
 
                     var cam = new VideoCaptureDevice(moniker);
+                    CameraDeviceService.ConfigureOptimalResolution(cam);
+
                     Bitmap capturedFrame = null;
                     var frameEvent = new AutoResetEvent(false);
 
@@ -465,14 +482,25 @@ namespace SuperAutoMater.Wpf.Services
                     };
 
                     cam.Start();
-                    bool gotFrame = frameEvent.WaitOne(2000);
+                    // Give 4000ms timeout for camera power rails & auto-exposure to lock
+                    bool gotFrame = frameEvent.WaitOne(4000);
                     cam.SignalToStop();
 
                     if (!gotFrame || capturedFrame == null)
                     {
+                        var pnpCams = CameraDeviceService.GetPnpCameraHardware();
+                        if (pnpCams.Count > 0)
+                        {
+                            res.Status = ExpressTestStatus.Warning;
+                            res.Headline = "⚠ STREAM TIMEOUT · HARDWARE PRESENT";
+                            res.Detail = $"{camName} present in Windows, but frame stream timed out. Check privacy shutter.";
+                            res.MetricValue = "Present";
+                            return;
+                        }
+
                         res.Status = ExpressTestStatus.Failed;
                         res.Headline = "✕ SENSOR CAPTURE TIMEOUT";
-                        res.Detail = $"{camName} failed to deliver video frames.";
+                        res.Detail = $"{camName} failed to deliver video frames. Check privacy shutter.";
                         res.MetricValue = "0 FPS";
                         return;
                     }

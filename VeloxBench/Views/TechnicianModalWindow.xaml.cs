@@ -90,12 +90,16 @@ namespace SuperAutoMater.Wpf.Views
                 if (videoDevices.Count == 0)
                 {
                     PanelCamPlaceholder.Visibility = Visibility.Visible;
-                    TxtScanStatus.Text = "ℹ No webcam detected. Manual entry available.";
+                    TxtScanStatus.Text = "ℹ " + CameraDeviceService.GetDiagnosticsSummary();
                     return;
                 }
 
-                // Pick first video capture device
-                _videoSource = new VideoCaptureDevice(videoDevices[0].MonikerString);
+                // Pick best non-IR color camera
+                int bestIdx = CameraDeviceService.SelectBestCameraIndex(videoDevices);
+                int chosen = bestIdx >= 0 ? bestIdx : 0;
+                _videoSource = new VideoCaptureDevice(videoDevices[chosen].MonikerString);
+                CameraDeviceService.ConfigureOptimalResolution(_videoSource);
+
                 _videoSource.NewFrame += VideoSource_NewFrame;
                 _videoSource.Start();
                 PanelCamPlaceholder.Visibility = Visibility.Collapsed;

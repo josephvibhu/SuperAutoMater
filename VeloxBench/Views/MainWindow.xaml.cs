@@ -1644,24 +1644,28 @@ namespace SuperAutoMater.Wpf.Views
                 if (_workspaceVideoDevices.Count == 0)
                 {
                     StackCamNoDevice.Visibility = Visibility.Visible;
-                    TxtCamMessage.Text = "No video capture device detected.";
+                    TxtCamMessage.Text = CameraDeviceService.GetDiagnosticsSummary();
                     TxtCamStatus.Text = "OFFLINE";
                     DotCamStatus.Fill = (Brush)FindResource("BrushTextAmber");
                 }
                 else
                 {
                     StackCamNoDevice.Visibility = Visibility.Collapsed;
-                    foreach (FilterInfo dev in _workspaceVideoDevices)
+                    for (int i = 0; i < _workspaceVideoDevices.Count; i++)
                     {
-                        CmbWorkspaceCameras.Items.Add(dev.Name);
+                        var dev = _workspaceVideoDevices[i];
+                        string display = CameraDeviceService.FormatCameraDisplayName(dev.Name);
+                        CmbWorkspaceCameras.Items.Add(display);
                     }
-                    CmbWorkspaceCameras.SelectedIndex = 0;
+
+                    int bestIndex = CameraDeviceService.SelectBestCameraIndex(_workspaceVideoDevices);
+                    CmbWorkspaceCameras.SelectedIndex = bestIndex >= 0 ? bestIndex : 0;
                 }
             }
             catch (Exception ex)
             {
                 StackCamNoDevice.Visibility = Visibility.Visible;
-                TxtCamMessage.Text = "Camera Probe Error: " + ex.Message;
+                TxtCamMessage.Text = "Camera Probe Error: " + ex.Message + "\n" + CameraDeviceService.GetDiagnosticsSummary();
             }
 
             // 2. Start Real-time Microphone Listener
@@ -1682,6 +1686,10 @@ namespace SuperAutoMater.Wpf.Views
             try
             {
                 _workspaceVideoSource = new VideoCaptureDevice(monikerString);
+
+                // Negotiate optimal crisp resolution (<= 1080p) to avoid DirectShow pin stream failure
+                CameraDeviceService.ConfigureOptimalResolution(_workspaceVideoSource);
+
                 _workspaceVideoSource.NewFrame += WorkspaceVideoSource_NewFrame;
                 _workspaceVideoSource.Start();
 

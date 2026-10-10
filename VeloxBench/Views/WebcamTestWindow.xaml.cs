@@ -6,6 +6,7 @@ using System.Windows;
 using System.Windows.Controls;
 using AForge.Video;
 using AForge.Video.DirectShow;
+using SuperAutoMater.Wpf.Services;
 
 namespace SuperAutoMater.Wpf.Views
 {
@@ -43,7 +44,7 @@ namespace SuperAutoMater.Wpf.Views
                 if (_videoDevices.Count == 0)
                 {
                     StackNoCamera.Visibility = Visibility.Visible;
-                    TxtNoCameraMsg.Text = "No webcam or video capture sensors detected.";
+                    TxtNoCameraMsg.Text = CameraDeviceService.GetDiagnosticsSummary();
                     TxtStatus.Text = "○ NO CAMERA DETECTED";
                     TxtStatus.Foreground = (System.Windows.Media.Brush)FindResource("BrushTextAmber");
                     return;
@@ -51,15 +52,16 @@ namespace SuperAutoMater.Wpf.Views
 
                 foreach (FilterInfo device in _videoDevices)
                 {
-                    CmbCameras.Items.Add(device.Name);
+                    CmbCameras.Items.Add(CameraDeviceService.FormatCameraDisplayName(device.Name));
                 }
 
-                CmbCameras.SelectedIndex = 0;
+                int bestIdx = CameraDeviceService.SelectBestCameraIndex(_videoDevices);
+                CmbCameras.SelectedIndex = bestIdx >= 0 ? bestIdx : 0;
             }
             catch (Exception ex)
             {
                 StackNoCamera.Visibility = Visibility.Visible;
-                TxtNoCameraMsg.Text = "Camera Probe Error: " + ex.Message;
+                TxtNoCameraMsg.Text = "Camera Probe Error: " + ex.Message + "\n" + CameraDeviceService.GetDiagnosticsSummary();
             }
         }
 
@@ -78,6 +80,8 @@ namespace SuperAutoMater.Wpf.Views
             try
             {
                 _videoSource = new VideoCaptureDevice(monikerString);
+                var optimalCap = CameraDeviceService.ConfigureOptimalResolution(_videoSource);
+
                 _videoSource.NewFrame += VideoSource_NewFrame;
                 _videoSource.Start();
 
@@ -85,7 +89,11 @@ namespace SuperAutoMater.Wpf.Views
                 TxtStatus.Text = "● SENSOR STREAM ACTIVE";
                 TxtStatus.Foreground = (System.Windows.Media.Brush)FindResource("BrushTextEmerald");
 
-                if (_videoSource.VideoCapabilities != null && _videoSource.VideoCapabilities.Length > 0)
+                if (optimalCap != null)
+                {
+                    TxtResolution.Text = $"{optimalCap.FrameSize.Width}x{optimalCap.FrameSize.Height} @ {optimalCap.AverageFrameRate} FPS";
+                }
+                else if (_videoSource.VideoCapabilities != null && _videoSource.VideoCapabilities.Length > 0)
                 {
                     var cap = _videoSource.VideoCapabilities[0];
                     TxtResolution.Text = $"{cap.FrameSize.Width}x{cap.FrameSize.Height} @ {cap.AverageFrameRate} FPS";
