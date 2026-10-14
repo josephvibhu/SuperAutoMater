@@ -8,6 +8,9 @@ using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
 using SuperAutoMater.Wpf.Services;
+using Velox.Shared.Dtos;
+using VeloxBench.Core;
+using VeloxBench.Services;
 
 namespace SuperAutoMater.Wpf.Core
 {

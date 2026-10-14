@@ -93,6 +93,12 @@ namespace SuperAutoMater.Wpf.Views
         {
             WindowState = WindowState.Maximized;
 
+            // 0. Wire Alpha License & Auto-Update status indicators
+            VeloxBench.Services.LicenseService.Instance.LicenseStatusChanged += UpdateLicenseUi;
+            VeloxBench.Services.AutoUpdateService.Instance.UpdateStatusChanged += (msg) => Dispatcher.Invoke(UpdateUpdateUi);
+            UpdateLicenseUi();
+            UpdateUpdateUi();
+
             // 1. Hook low-level Windows message pump for USB hot-plug
             var helper = new WindowInteropHelper(this);
             _hwndSource = HwndSource.FromHwnd(helper.Handle);
@@ -2393,6 +2399,54 @@ namespace SuperAutoMater.Wpf.Views
         {
             try { _gpuRenderTimer?.Stop(); } catch { }
             _gpuRenderTimer = null;
+        }
+
+        #endregion
+
+        #region Alpha Licensing & Dynamic Auto-Update UI
+
+        private void UpdateLicenseUi()
+        {
+            Dispatcher.Invoke(() =>
+            {
+                var lic = VeloxBench.Services.LicenseService.Instance;
+                if (lic.IsLicensed)
+                {
+                    TxtAlphaLicenseBadge.Text = $"{lic.CompanyName.ToUpperInvariant()} ({lic.DaysRemaining}d)";
+                    PillAlphaLicense.ToolTip = lic.StatusMessage;
+                    TxtAlphaLicenseBadge.Foreground = new SolidColorBrush(Color.FromRgb(56, 189, 248)); // #38BDF8
+                }
+                else
+                {
+                    TxtAlphaLicenseBadge.Text = "UNLICENSED (ALPHA)";
+                    PillAlphaLicense.ToolTip = lic.StatusMessage;
+                    TxtAlphaLicenseBadge.Foreground = new SolidColorBrush(Color.FromRgb(248, 113, 113)); // #F87171
+                }
+            });
+        }
+
+        private void UpdateUpdateUi()
+        {
+            var upd = VeloxBench.Services.AutoUpdateService.Instance.LatestUpdate;
+            if (upd != null && upd.UpdateAvailable)
+            {
+                PillAlphaUpdate.Visibility = Visibility.Visible;
+                PillAlphaUpdate.ToolTip = $"Click to install VeloxBench v{upd.LatestVersion}:\n{upd.ReleaseNotes}";
+            }
+            else
+            {
+                PillAlphaUpdate.Visibility = Visibility.Collapsed;
+            }
+        }
+
+        private async void BtnAlphaUpdate_Click(object sender, MouseButtonEventArgs e)
+        {
+            var upd = VeloxBench.Services.AutoUpdateService.Instance.LatestUpdate;
+            if (upd != null)
+            {
+                TxtAlphaLicenseBadge.Text = "DOWNLOADING UPDATE...";
+                await VeloxBench.Services.AutoUpdateService.Instance.DownloadAndApplyUpdateAsync(upd);
+            }
         }
 
         #endregion

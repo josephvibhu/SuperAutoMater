@@ -89,8 +89,24 @@
                     <StackPanel Orientation="Horizontal" VerticalAlignment="Center" ToolTip="Bay: QC-TERMINAL-01 | Operator: Senior Refurb Tech">
                         <TextBlock Text="● BENCH ONLINE" Style="{StaticResource TextBadgeMono}" Foreground="{StaticResource BrushTextEmerald}" FontWeight="Bold" Margin="0,0,8,0"/>
                         <TextBlock Text="|" Style="{StaticResource TextBadgeMono}" Foreground="#30363D" Margin="0,0,8,0"/>
-                        <TextBlock Text="QC-01" Style="{StaticResource TextBadgeMono}" FontWeight="Bold" Foreground="{StaticResource BrushTextWhite}"/>
+                        <TextBlock Text="QC-01" Style="{StaticResource TextBadgeMono}" FontWeight="Bold" Foreground="{StaticResource BrushTextWhite}" Margin="0,0,10,0"/>
                     </StackPanel>
+
+                    <!-- Alpha License Pill -->
+                    <Border x:Name="PillAlphaLicense" Background="#161B22" BorderBrush="#30363D" BorderThickness="1" CornerRadius="6" Padding="8,3" Margin="0,0,8,0" VerticalAlignment="Center" ToolTip="Alpha Pilot License Status">
+                        <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                            <TextBlock Text="🛡️ " FontSize="10" VerticalAlignment="Center"/>
+                            <TextBlock x:Name="TxtAlphaLicenseBadge" Text="ALPHA PILOT" Style="{StaticResource TextBadgeMono}" FontWeight="Bold" Foreground="#38BDF8"/>
+                        </StackPanel>
+                    </Border>
+
+                    <!-- Dynamic Auto-Update Ready Pill -->
+                    <Border x:Name="PillAlphaUpdate" Visibility="Collapsed" Background="#2E1065" BorderBrush="#A855F7" BorderThickness="1" CornerRadius="6" Padding="8,3" Margin="0,0,8,0" Cursor="Hand" MouseLeftButtonUp="BtnAlphaUpdate_Click" ToolTip="Click to download and restart with latest Alpha update" VerticalAlignment="Center">
+                        <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                            <TextBlock Text="🚀 " FontSize="10" VerticalAlignment="Center"/>
+                            <TextBlock Text="UPDATE READY" Style="{StaticResource TextBadgeMono}" FontWeight="Bold" Foreground="#F3E8FF"/>
+                        </StackPanel>
+                    </Border>
 
                     <!-- Technician Operator Badge Pill [Alt+T] -->
                     <Border x:Name="BtnTechnicianPill" Background="#161B22" BorderBrush="#30363D" BorderThickness="1" CornerRadius="6" Padding="8,3" Cursor="Hand" MouseLeftButtonUp="BtnTechnicianPill_Click" ToolTip="{Binding TechnicianDisplayBadge}" Margin="10,0,0,0" VerticalAlignment="Center">

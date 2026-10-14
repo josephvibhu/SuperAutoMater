@@ -17,7 +17,7 @@ namespace SuperAutoMater.Wpf.Core
         public string HmacSecretKey { get; set; } = "depot_secret_key_8f3a9e2d1c7b4a5f";
         public int EvidenceRetentionDays { get; set; } = 90;
         public string BackupStorageDirectory { get; set; } = "";
-        public string DefaultWebhookUrl { get; set; } = "https://script.google.com/macros/s/AKfycbxh1-pzrBC1DieKrlM55_TsIfjP5sKoTfCdPuJ_PkMDe5E1HXwY1przZkejTBnuWm2_DQ/exec";
+        public string DefaultWebhookUrl { get; set; } = "https://script.google.com/macros/s/AKfycbweLRaXur7tAluRq4IIDjC2RDGDhBU52iss-zAKMau_Sd-yt2NJjlWNZfKEJ2sfYphfOw/exec";
         public bool RequireSupervisorOverride { get; set; } = true;
         public DateTimeOffset LastModifiedUtc { get; set; } = DateTimeOffset.UtcNow;
     }

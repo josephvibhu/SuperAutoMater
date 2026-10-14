@@ -32,7 +32,33 @@ namespace SuperAutoMater.Wpf
             DispatcherUnhandledException += App_DispatcherUnhandledException;
             AppDomain.CurrentDomain.UnhandledException += CurrentDomain_UnhandledException;
 
-            AppLogger.Info("Lifecycle", $"SuperAutoMater v1.6.3 starting on {Environment.MachineName} ({Environment.OSVersion}) [Elevated: {Environment.IsPrivilegedProcess}].");
+            AppLogger.Info("Lifecycle", $"VeloxBench v1.6.10 starting on {Environment.MachineName} ({Environment.OSVersion}) [Elevated: {Environment.IsPrivilegedProcess}].");
+
+            try
+            {
+                // 1. Clean up old binary backups from prior auto-updates
+                VeloxBench.Services.AutoUpdateService.Instance.CleanupOldVersions();
+            }
+            catch { }
+
+            // 2. Initialize Alpha License validation and check for dynamic updates in background
+            _ = System.Threading.Tasks.Task.Run(async () =>
+            {
+                try
+                {
+                    await VeloxBench.Services.LicenseService.Instance.InitializeAndValidateAsync();
+                }
+                catch { }
+
+                try
+                {
+                    if (!e.Args.Contains("--smoke-test"))
+                    {
+                        await VeloxBench.Services.AutoUpdateService.Instance.CheckForUpdatesAsync(autoApplyIfAvailable: false);
+                    }
+                }
+                catch { }
+            });
 
             try
             {
