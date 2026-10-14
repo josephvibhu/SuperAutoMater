@@ -18,7 +18,7 @@ namespace VeloxBench.Services
     {
         private static readonly object _lock = new object();
 
-        private const string CsvHeader = "Tag,Serial Number,Model,Processor,Memory [ram/storage],Battery health,Storage Health,Status,Work in Progress,Physical Grade,Remarks,Technician Name or ID,In Date,Supplier,Out Date,Customer";
+        private const string CsvHeader = "Tag,Serial Number,Model,Processor,Memory [ram/storage],GPU,Battery health,Storage Health,Status,Work in Progress,Physical Grade,Remarks,Technician Name or ID,In Date,Supplier,Out Date,Customer";
 
         public static string GetPrimaryCsvPath()
         {
@@ -103,6 +103,7 @@ namespace VeloxBench.Services
             string model = EscapeCsv(r.Model);
             string cpu = EscapeCsv(r.Processor);
             string mem = EscapeCsv(r.Memory);
+            string gpu = EscapeCsv(r.Gpu);
             string batt = EscapeCsv(r.Battery_Health > 0 ? r.Battery_Health.ToString() : "100");
             string storage = EscapeCsv(r.Storage_Health > 0 ? r.Storage_Health.ToString() : "100");
             string status = EscapeCsv(string.IsNullOrWhiteSpace(r.Status) ? "RTS" : r.Status);
@@ -115,7 +116,7 @@ namespace VeloxBench.Services
             string outDate = EscapeCsv(r.Out_Date);
             string customer = EscapeCsv(r.Customer);
 
-            return $"{tag},{sn},{model},{cpu},{mem},{batt},{storage},{status},{wip},{grade},{remarks},{tech},{inDate},{supplier},{outDate},{customer}";
+            return $"{tag},{sn},{model},{cpu},{mem},{gpu},{batt},{storage},{status},{wip},{grade},{remarks},{tech},{inDate},{supplier},{outDate},{customer}";
         }
 
         private static string EscapeCsv(string val)

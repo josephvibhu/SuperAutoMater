@@ -146,6 +146,14 @@
                                 </StackPanel>
                             </Grid>
 
+                            <!-- Row: GPU / Graphics -->
+                            <Grid Margin="0,0,0,8">
+                                <StackPanel>
+                                    <TextBlock Text="GPU / GRAPHICS (MULTI-GPU DELIMITED '/')" Style="{StaticResource TextBadgeMono}" Foreground="{StaticResource BrushTextVioletSubdued}" Margin="0,0,0,4"/>
+                                    <TextBox x:Name="TxtGpu" Background="#161B22" Foreground="#FFFFFF" BorderBrush="#2D333B" Padding="8,6" FontFamily="{StaticResource FontMono}"/>
+                                </StackPanel>
+                            </Grid>
+
                             <!-- Row: Device Model & Shelf -->
                             <Grid>
                                 <Grid.ColumnDefinitions>

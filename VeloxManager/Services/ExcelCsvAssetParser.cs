@@ -399,6 +399,10 @@ namespace VeloxManager.Services
                 else if (Matches(h, "mem", "memory", "ram", "memory [ram/storage]"))
                     AssignIfNotSet(map, "Memory", i);
 
+                // GPU / Graphics
+                else if (Matches(h, "gpu", "graphics", "video", "display adapter", "vga", "video controller"))
+                    AssignIfNotSet(map, "Gpu", i);
+
                 // Battery Health (B+)
                 else if (Matches(h, "b+", "b +", "battery health", "battery", "batt health", "battery %", "batt"))
                     AssignIfNotSet(map, "BatteryHealth", i);
@@ -506,6 +510,7 @@ namespace VeloxManager.Services
             string rawRemarks = Get("Remarks");
             string rawProc = Get("Processor");
             string rawMem = Get("Memory");
+            string rawGpu = Get("Gpu");
             string rawBatt = Get("BatteryHealth");
             string rawSupplier = Get("Supplier");
             string rawCustomer = Get("Customer");
@@ -601,6 +606,7 @@ namespace VeloxManager.Services
             var notesList = new List<string>();
             if (!string.IsNullOrWhiteSpace(rawProc)) notesList.Add($"CPU: {rawProc}");
             if (!string.IsNullOrWhiteSpace(rawMem)) notesList.Add($"RAM/SSD: {rawMem}");
+            if (!string.IsNullOrWhiteSpace(rawGpu)) notesList.Add($"GPU: {rawGpu}");
             if (upperStatus == "SOLD") notesList.Add("[SOLD]");
             if (upperStatus == "RENT") notesList.Add("[RENTED]");
             if (upperStatus == "DEMO") notesList.Add("[DEMO UNIT]");

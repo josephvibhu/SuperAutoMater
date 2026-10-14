@@ -135,9 +135,6 @@ namespace SuperAutoMater.Wpf.Core
 
         public async Task<int> FlushPendingAsync(string webhookUrl = null)
         {
-            string url = webhookUrl ?? GoogleSheetsDispatcher.DefaultSheetsUrl;
-            if (string.IsNullOrWhiteSpace(url)) return 0;
-
             if (!await _flushLock.WaitAsync(100))
                 return 0; // Already in progress
 
@@ -149,25 +146,92 @@ namespace SuperAutoMater.Wpf.Core
                 var pendingEvents = _store.GetPendingOutboxEvents(50);
                 if (pendingEvents.Count == 0) return 0;
 
-                foreach (var evt in pendingEvents)
+                var cfg = BenchConfigService.Current;
+                var licKey = LicenseService.Instance.LicenseKey;
+                if (string.IsNullOrWhiteSpace(licKey)) licKey = cfg.LicenseKey;
+
+                // Priority 1: Solid Authoritative Velox Cloud Backend (/api/v1/bench/sync)
+                if (!string.IsNullOrWhiteSpace(cfg.ApiUrl) && string.IsNullOrWhiteSpace(webhookUrl))
                 {
                     try
                     {
-                        bool success = await DispatchEventAsync(evt, url);
-                        if (success)
+                        var batchItems = new List<BenchSyncItemDto>();
+                        foreach (var evt in pendingEvents)
                         {
-                            _store.MarkOutboxEventDispatched(evt.Id);
-                            dispatched++;
+                            batchItems.Add(new BenchSyncItemDto
+                            {
+                                EventId = evt.Id,
+                                EventType = evt.EventType,
+                                AggregateId = evt.AggregateId,
+                                IdempotencyKey = evt.IdempotencyKey,
+                                Timestamp = evt.CreatedAtUtc.ToString("yyyy-MM-dd HH:mm:ss"),
+                                PayloadJson = evt.PayloadJson
+                            });
+                        }
+
+                        var batchReq = new BenchSyncBatchRequest
+                        {
+                            LicenseKey = licKey,
+                            MachineName = cfg.BenchName ?? Environment.MachineName,
+                            AppVersion = "1.6.10",
+                            Events = batchItems
+                        };
+
+                        var syncUrl = $"{cfg.ApiUrl.TrimEnd('/')}/api/v1/bench/sync";
+                        var reqMsg = new HttpRequestMessage(HttpMethod.Post, syncUrl);
+                        reqMsg.Headers.Add("X-API-Key", cfg.ApiKey);
+                        if (!string.IsNullOrWhiteSpace(licKey)) reqMsg.Headers.Add("X-License-Key", licKey);
+
+                        var json = JsonSerializer.Serialize(batchReq);
+                        reqMsg.Content = new StringContent(json, Encoding.UTF8, "application/json");
+
+                        var resp = await _httpClient.SendAsync(reqMsg);
+                        if (resp.IsSuccessStatusCode)
+                        {
+                            foreach (var evt in pendingEvents)
+                            {
+                                _store.MarkOutboxEventDispatched(evt.Id);
+                                dispatched++;
+                            }
+                            AppLogger.Info($"[CloudSync] Dispatched batch of {dispatched} QC events to Velox Cloud API.");
+                            return dispatched;
                         }
                         else
                         {
-                            _store.RecordOutboxAttemptFailure(evt.Id, "Server returned non-success response");
+                            var errBody = await resp.Content.ReadAsStringAsync();
+                            AppLogger.Warn($"[CloudSync] Cloud sync rejected (HTTP {resp.StatusCode}): {errBody}");
                         }
                     }
                     catch (Exception ex)
                     {
-                        _store.RecordOutboxAttemptFailure(evt.Id, ex.Message);
-                        AppLogger.Warn($"Failed to dispatch outbox event {evt.Id}", ex);
+                        AppLogger.Warn($"[CloudSync] Cloud sync request failed: {ex.Message}");
+                    }
+                }
+
+                // Priority 2: Fallback to individual dispatch (Legacy Google Sheets or Custom Webhook)
+                string fallbackUrl = webhookUrl ?? GoogleSheetsDispatcher.DefaultSheetsUrl;
+                if (!string.IsNullOrWhiteSpace(fallbackUrl))
+                {
+                    foreach (var evt in pendingEvents)
+                    {
+                        try
+                        {
+                            bool success = await DispatchEventAsync(evt, fallbackUrl);
+                            if (success)
+                            {
+                                _store.MarkOutboxEventDispatched(evt.Id);
+                                dispatched++;
+                            }
+                            else
+                            {
+                                _store.RecordOutboxAttemptFailure(evt.Id, "Server returned non-success response");
+                            }
+                        }
+                        catch (Exception ex)
+                        {
+                            _store.RecordOutboxAttemptFailure(evt.Id, ex.Message);
+                            AppLogger.Warn($"Failed to dispatch outbox event {evt.Id}", ex);
+                        }
                     }
                 }
             }

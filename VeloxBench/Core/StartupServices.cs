@@ -156,6 +156,7 @@ function doPost(e) {
       'Model',
       'Processor',
       'Memory [ram/storage]',
+      'GPU',
       'Battery health',
       'Storage Health',
       'Status',
@@ -175,11 +176,11 @@ function doPost(e) {
       needsHeaderFormat = true;
     } else {
       var firstCell = (sheet.getRange(1, 1).getValue() || '').toString().trim().toUpperCase();
-      var thirdCell = (sheet.getRange(1, 3).getValue() || '').toString().trim().toUpperCase();
+      var sixthCell = (sheet.getRange(1, 6).getValue() || '').toString().trim().toUpperCase();
       var totalCols = sheet.getLastColumn();
 
-      // If sheet has old v6.3 headers ('Asset Tag', 'Processor' in col 3, or fewer than 16 columns)
-      if (firstCell === 'ASSET TAG' || thirdCell === 'PROCESSOR' || totalCols < 16) {
+      // If sheet has old headers ('Asset Tag', not 'GPU' in col 6, or fewer than 17 columns)
+      if (firstCell === 'ASSET TAG' || sixthCell !== 'GPU' || totalCols < 17) {
         sheet.getRange(1, 1, 1, headers.length).setValues([headers]);
         needsHeaderFormat = true;
       }
@@ -206,6 +207,7 @@ function doPost(e) {
     var model         = payload.Model || payload.model || '';
     var processor     = payload.Processor || payload.processor || '';
     var memory        = payload.Memory || payload.memory || payload.ramStorage || '';
+    var gpu           = payload.Gpu || payload.gpu || payload.GPU || '';
     var batteryHealth = payload.Battery_Health || payload.battery_health || payload.batteryHealth || '100';
     var storageHealth = payload.Storage_Health || payload.storage_health || payload.storageHealth || '100';
     var status        = payload.Status || payload.status || 'RTS';
@@ -233,6 +235,7 @@ function doPost(e) {
       model,
       processor,
       memory,
+      gpu,
       numBattery,
       numStorage,
       status,
@@ -289,16 +292,16 @@ function doPost(e) {
     tagCell.setFontWeight('bold');
 
     // 2. Battery & Storage Health numbers (0-100 without percent symbol)
-    var battCell = sheet.getRange(targetRow, 6);
+    var battCell = sheet.getRange(targetRow, 7);
     battCell.setHorizontalAlignment('center');
     battCell.setNumberFormat('0');
 
-    var storageCell = sheet.getRange(targetRow, 7);
+    var storageCell = sheet.getRange(targetRow, 8);
     storageCell.setHorizontalAlignment('center');
     storageCell.setNumberFormat('0');
 
     // 3. Status styling [RTS, WIP, SOLD, RFR, DEMO, RENT]
-    var statusCell = sheet.getRange(targetRow, 8);
+    var statusCell = sheet.getRange(targetRow, 9);
     statusCell.setFontWeight('bold');
     statusCell.setHorizontalAlignment('center');
     if (status === 'RTS') {
@@ -316,8 +319,8 @@ function doPost(e) {
     }
 
     // 4. In Date and Out Date centered
-    sheet.getRange(targetRow, 13).setHorizontalAlignment('center');
-    sheet.getRange(targetRow, 15).setHorizontalAlignment('center');
+    sheet.getRange(targetRow, 14).setHorizontalAlignment('center');
+    sheet.getRange(targetRow, 16).setHorizontalAlignment('center');
 
     return ContentService
       .createTextOutput(JSON.stringify({
@@ -355,7 +358,7 @@ function doGet(e) {
 
       var lastRow = sheet.getLastRow();
       if (lastRow > 1) {
-        var values = sheet.getRange(2, 1, lastRow - 1, 16).getValues();
+        var values = sheet.getRange(2, 1, lastRow - 1, 17).getValues();
         for (var i = values.length - 1; i >= 0; i--) {
           var rowTag = (values[i][0] || '').toString().trim().toUpperCase();
           var rowSerial = (values[i][1] || '').toString().trim().toUpperCase();
@@ -369,17 +372,18 @@ function doGet(e) {
               Model: values[i][2],
               Processor: values[i][3],
               Memory: values[i][4],
-              Battery_Health: values[i][5],
-              Storage_Health: values[i][6],
-              Status: values[i][7],
-              Work_In_Progress: values[i][8],
-              Physical_Grade: values[i][9],
-              Remarks: values[i][10],
-              Technician: values[i][11],
-              In_Date: values[i][12] instanceof Date ? Utilities.formatDate(values[i][12], Session.getScriptTimeZone(), 'yyyy-MM-dd') : values[i][12],
-              Supplier: values[i][13],
-              Out_Date: values[i][14] instanceof Date ? Utilities.formatDate(values[i][14], Session.getScriptTimeZone(), 'yyyy-MM-dd') : values[i][14],
-              Customer: values[i][15]
+              Gpu: values[i][5],
+              Battery_Health: values[i][6],
+              Storage_Health: values[i][7],
+              Status: values[i][8],
+              Work_In_Progress: values[i][9],
+              Physical_Grade: values[i][10],
+              Remarks: values[i][11],
+              Technician: values[i][12],
+              In_Date: values[i][13] instanceof Date ? Utilities.formatDate(values[i][13], Session.getScriptTimeZone(), 'yyyy-MM-dd') : values[i][13],
+              Supplier: values[i][14],
+              Out_Date: values[i][15] instanceof Date ? Utilities.formatDate(values[i][15], Session.getScriptTimeZone(), 'yyyy-MM-dd') : values[i][15],
+              Customer: values[i][16]
             })).setMimeType(ContentService.MimeType.JSON);
           }
         }

@@ -33,6 +33,7 @@ namespace SuperAutoMater.Wpf.Views
                 TxtModel.Text = vm.Model;
                 TxtCpu.Text = vm.CpuName;
                 TxtRamStorage.Text = $"{vm.RamSummary} / {vm.StorageSummary}";
+                TxtGpu.Text = vm.GpuSummary;
                 TxtBatteryHealth.Text = vm.BatteryHealth.ToString();
                 TxtStorageHealth.Text = vm.HdsHealth.ToString();
 
@@ -121,6 +122,9 @@ namespace SuperAutoMater.Wpf.Views
 
             if (!string.IsNullOrWhiteSpace(_priorRecord.Model) && (string.IsNullOrWhiteSpace(TxtModel.Text) || TxtModel.Text.Contains("Detecting")))
                 TxtModel.Text = _priorRecord.Model;
+
+            if (!string.IsNullOrWhiteSpace(_priorRecord.Gpu) && (string.IsNullOrWhiteSpace(TxtGpu.Text) || TxtGpu.Text.Contains("Detecting") || TxtGpu.Text == "Integrated Graphics"))
+                TxtGpu.Text = _priorRecord.Gpu;
 
             if (!string.IsNullOrWhiteSpace(_priorRecord.Assigned_To))
                 CmbAssignedTo.Text = _priorRecord.Assigned_To;
@@ -548,6 +552,7 @@ namespace SuperAutoMater.Wpf.Views
                 Model = TxtModel.Text.Trim(),
                 Processor = TxtCpu.Text.Trim(),
                 Memory = TxtRamStorage.Text.Trim(),
+                Gpu = TxtGpu?.Text?.Trim() ?? "",
                 Battery_Health = Math.Clamp(bHealth, 0, 100),
                 Storage_Health = Math.Clamp(sHealth, 0, 100),
                 Status = status,

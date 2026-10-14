@@ -217,6 +217,32 @@ namespace SuperAutoMater.Wpf.ViewModels
         public ObservableCollection<GpuInfo> AvailableGpus { get; } = new ObservableCollection<GpuInfo>();
         public bool HasMultipleGpus => AvailableGpus.Count > 1;
 
+        public string GpuSummary
+        {
+            get
+            {
+                if (AvailableGpus != null && AvailableGpus.Count > 0)
+                {
+                    var names = AvailableGpus
+                        .Select(g => g.Name?.Trim())
+                        .Where(n => !string.IsNullOrWhiteSpace(n) && !n.Contains("Detecting"))
+                        .Distinct(StringComparer.OrdinalIgnoreCase);
+                    string combined = string.Join(" / ", names);
+                    if (!string.IsNullOrWhiteSpace(combined)) return combined;
+                }
+                if (_hw?.DetectedGpus != null && _hw.DetectedGpus.Count > 0)
+                {
+                    var names = _hw.DetectedGpus
+                        .Select(g => g.Name?.Trim())
+                        .Where(n => !string.IsNullOrWhiteSpace(n))
+                        .Distinct(StringComparer.OrdinalIgnoreCase);
+                    string combined = string.Join(" / ", names);
+                    if (!string.IsNullOrWhiteSpace(combined)) return combined;
+                }
+                return !string.IsNullOrWhiteSpace(GpuName) && !GpuName.Contains("Detecting") ? GpuName : "Integrated Graphics";
+            }
+        }
+
         private GpuInfo _selectedGpu;
         public GpuInfo SelectedGpu
         {
@@ -230,6 +256,7 @@ namespace SuperAutoMater.Wpf.ViewModels
                 OnPropertyChanged(nameof(GpuDriver));
                 OnPropertyChanged(nameof(GpuVram));
                 OnPropertyChanged(nameof(GpuTypeBadge));
+                OnPropertyChanged(nameof(GpuSummary));
             }
         }
 
@@ -861,6 +888,8 @@ namespace SuperAutoMater.Wpf.ViewModels
             {
                 _selectedGpu = AvailableGpus.FirstOrDefault(g => g.IsDedicated) ?? AvailableGpus[0];
             }
+            OnPropertyChanged(nameof(GpuSummary));
+            OnPropertyChanged(nameof(HasMultipleGpus));
 
             AvailableDrives.Clear();
             foreach (var d in _hw.DetectedDrives)

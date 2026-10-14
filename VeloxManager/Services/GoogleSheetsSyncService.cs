@@ -84,9 +84,9 @@ public sealed class GoogleSheetsSyncService
 
         Directory.CreateDirectory(BackupDir);
 
-        // 1. Build 16-Column CSV Representation
+        // 1. Build 17-Column CSV Representation
         var sb = new StringBuilder();
-        sb.AppendLine("tag,serial,model,processor,memory,battHealth,storageHealth,status,wip,grade,remarks,tech,inDate,supplier,outDate,customer");
+        sb.AppendLine("tag,serial,model,processor,memory,gpu,battHealth,storageHealth,status,wip,grade,remarks,tech,inDate,supplier,outDate,customer");
 
         var rowsPayload = new List<Dictionary<string, object>>();
 
@@ -98,6 +98,7 @@ public sealed class GoogleSheetsSyncService
             var model = EscapeCsv(raw.Model);
             var processor = EscapeCsv(ExtractProcessorNotes(raw.Notes));
             var memory = EscapeCsv(ExtractMemoryNotes(raw.Notes));
+            var gpu = EscapeCsv(ExtractGpuNotes(raw.Notes));
             var battHealth = raw.BatteryHealth.HasValue ? $"{raw.BatteryHealth.Value}%" : "";
             var storageHealth = raw.StorageHealth.HasValue ? $"{raw.StorageHealth.Value}%" : "";
             var status = raw.LifecycleQueue switch
@@ -116,7 +117,7 @@ public sealed class GoogleSheetsSyncService
             var outDate = EscapeCsv(raw.OutDate);
             var customer = EscapeCsv(raw.Customer);
 
-            sb.AppendLine($"{tag},{serial},{model},{processor},{memory},{battHealth},{storageHealth},{status},{wip},{grade},{remarks},{tech},{inDate},{supplier},{outDate},{customer}");
+            sb.AppendLine($"{tag},{serial},{model},{processor},{memory},{gpu},{battHealth},{storageHealth},{status},{wip},{grade},{remarks},{tech},{inDate},{supplier},{outDate},{customer}");
 
             rowsPayload.Add(new Dictionary<string, object>
             {
@@ -125,6 +126,7 @@ public sealed class GoogleSheetsSyncService
                 ["Model"] = raw.Model,
                 ["Processor"] = ExtractProcessorNotes(raw.Notes),
                 ["Memory"] = ExtractMemoryNotes(raw.Notes),
+                ["Gpu"] = ExtractGpuNotes(raw.Notes),
                 ["Battery_Health"] = raw.BatteryHealth ?? 100,
                 ["Storage_Health"] = raw.StorageHealth ?? 100,
                 ["Status"] = status,
@@ -222,6 +224,21 @@ public sealed class GoogleSheetsSyncService
             var trimmed = p.Trim();
             if (trimmed.StartsWith("RAM/SSD:", StringComparison.OrdinalIgnoreCase))
                 return trimmed.Replace("RAM/SSD:", "", StringComparison.OrdinalIgnoreCase).Trim();
+        }
+        return "";
+    }
+
+    private static string ExtractGpuNotes(string notes)
+    {
+        if (string.IsNullOrWhiteSpace(notes)) return "";
+        var parts = notes.Split('|');
+        foreach (var p in parts)
+        {
+            var trimmed = p.Trim();
+            if (trimmed.StartsWith("GPU:", StringComparison.OrdinalIgnoreCase))
+                return trimmed.Replace("GPU:", "", StringComparison.OrdinalIgnoreCase).Trim();
+            if (trimmed.StartsWith("Graphics:", StringComparison.OrdinalIgnoreCase))
+                return trimmed.Replace("Graphics:", "", StringComparison.OrdinalIgnoreCase).Trim();
         }
         return "";
     }

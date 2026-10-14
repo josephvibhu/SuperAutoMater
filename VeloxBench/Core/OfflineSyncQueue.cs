@@ -160,6 +160,7 @@ namespace SuperAutoMater
                             Serial_Number    = record.Serial_Number,
                             Processor        = record.Processor,
                             Memory           = record.Memory,
+                            Gpu              = record.Gpu,
                             Battery_Health   = record.Battery_Health,
                             Storage_Health   = record.Storage_Health,
                             Status           = record.Status,
@@ -300,6 +301,7 @@ namespace SuperAutoMater
                     Model = root.TryGetProperty("Model", out var pMod) ? pMod.GetString() ?? "" : "",
                     Processor = root.TryGetProperty("Processor", out var pCpu) ? pCpu.GetString() ?? "" : "",
                     Memory = root.TryGetProperty("Memory", out var pMem) ? pMem.GetString() ?? "" : "",
+                    Gpu = root.TryGetProperty("Gpu", out var pGpu) ? pGpu.GetString() ?? "" : "",
                     Battery_Health = bHealth,
                     Storage_Health = sHealth,
                     Status = root.TryGetProperty("Status", out var pStat) ? pStat.GetString() ?? "RTS" : "RTS",
@@ -376,6 +378,7 @@ namespace SuperAutoMater
         public string Model { get; set; } = "";
         public string Processor { get; set; } = "";
         public string Memory { get; set; } = ""; // [ram/storage]
+        public string Gpu { get; set; } = "";
         public int Battery_Health { get; set; } = 100; // in 0-100 without percent symbol
         public int Storage_Health { get; set; } = 100; // in 0-100 without percent symbol
         public string Status { get; set; } = "RTS"; // RTS, WIP, SOLD, RFR, DEMO, RENT
