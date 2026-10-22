@@ -837,13 +837,26 @@ namespace SuperAutoMater.Wpf.ViewModels
                 System.Windows.Application.Current?.Dispatcher.InvokeAsync(() => PendingSyncCount = Math.Max(count, OfflineLedgerService.Instance.PendingCount));
             };
 
-            // Wire hardware probe updates
+            // Wire hardware probe updates (targeted property notifications for smooth UI)
             _hw.TelemetryUpdated += () =>
             {
                 System.Windows.Application.Current?.Dispatcher.InvokeAsync(() =>
                 {
                     SyncCollections();
-                    OnPropertyChanged("");
+                    OnPropertyChanged(nameof(CpuName));
+                    OnPropertyChanged(nameof(CoreSummary));
+                    OnPropertyChanged(nameof(ClockSummary));
+                    OnPropertyChanged(nameof(TempBadge));
+                    OnPropertyChanged(nameof(ThrottlingStatus));
+                    OnPropertyChanged(nameof(RamSummary));
+                    OnPropertyChanged(nameof(StorageSummary));
+                    OnPropertyChanged(nameof(PrimaryDriveModel));
+                    OnPropertyChanged(nameof(HealthBadge));
+                    OnPropertyChanged(nameof(BatteryHealth));
+                    OnPropertyChanged(nameof(BatteryCharge));
+                    OnPropertyChanged(nameof(BatteryWear));
+                    OnPropertyChanged(nameof(BatteryIntegrityBadge));
+                    OnPropertyChanged(nameof(BatteryCondition));
                 });
             };
 
@@ -1118,7 +1131,7 @@ namespace SuperAutoMater.Wpf.ViewModels
                         var fitted = await CloudSyncService.Instance.GetFittedComponentsAsync(localAsset.AssetTag);
                         if (fitted != null && fitted.Count > 0)
                         {
-                            var parts = fitted.Select(f => $"{f.Description} ({(f.PriceDelta >= 0 ? "+" : "")}₹{f.PriceDelta:N0})");
+                            var parts = fitted.Select(f => f.Description);
                             FittedComponentsBanner = $"⚡ FITTED UPGRADES: {string.Join(" | ", parts)}";
                             HasFittedBanner = true;
                         }

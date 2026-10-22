@@ -71,6 +71,7 @@ app.MapSseEndpoints();
 app.MapJobEndpoints();
 app.MapAdminEndpoints();
 app.MapShowroomEndpoints();
+app.MapAlphaEndpoints();
 
 app.Run();
 

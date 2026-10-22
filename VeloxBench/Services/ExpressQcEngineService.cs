@@ -460,47 +460,122 @@ namespace SuperAutoMater.Wpf.Services
                         return;
                     }
 
-                    // Pick best non-IR color camera
+                    // Check for Windows Camera Privacy blockage before testing
+                    if (CameraDeviceService.IsWindowsCameraPrivacyRestricted(out string privacyMsg))
+                    {
+                        res.Status = ExpressTestStatus.Failed;
+                        res.Headline = "✕ CAMERA ACCESS RESTRICTED BY WINDOWS";
+                        res.Detail = privacyMsg;
+                        res.MetricValue = "Blocked";
+                        return;
+                    }
+
+                    // Pick best non-IR color camera (prioritizes Dell Precision 5540/5550/5560 RGB-IR sensors)
                     int bestIdx = CameraDeviceService.SelectBestCameraIndex(devices);
                     int chosen = bestIdx >= 0 ? bestIdx : 0;
                     string moniker = devices[chosen].MonikerString;
                     string camName = devices[chosen].Name;
 
-                    var cam = new VideoCaptureDevice(moniker);
-                    CameraDeviceService.ConfigureOptimalResolution(cam);
-
                     Bitmap capturedFrame = null;
                     var frameEvent = new AutoResetEvent(false);
+                    int frameCount = 0;
 
-                    cam.NewFrame += (s, e) =>
+                    void OnNewFrame(object s, NewFrameEventArgs e)
                     {
+                        frameCount++;
                         if (capturedFrame == null)
                         {
-                            capturedFrame = (Bitmap)e.Frame.Clone();
-                            frameEvent.Set();
+                            var clone = (Bitmap)e.Frame.Clone();
+                            if (frameCount >= 3)
+                            {
+                                capturedFrame = clone;
+                                frameEvent.Set();
+                            }
+                            else
+                            {
+                                capturedFrame = clone;
+                            }
                         }
-                    };
+                    }
 
-                    cam.Start();
-                    // Give 4000ms timeout for camera power rails & auto-exposure to lock
-                    bool gotFrame = frameEvent.WaitOne(4000);
-                    cam.SignalToStop();
+                    // Attempt 1: Start with optimal resolution (720p @ 30 FPS target)
+                    var cam = new VideoCaptureDevice(moniker);
+                    cam.NewFrame += OnNewFrame;
+                    cam.VideoSourceError += (s, e) => { /* captured by watchdog */ };
+                    CameraDeviceService.ConfigureOptimalResolution(cam);
+
+                    try { cam.Start(); } catch { }
+                    bool gotFrame = frameEvent.WaitOne(2500);
+
+                    // Attempt 2: If custom resolution failed to deliver frames, retry with driver default pin format
+                    if (!gotFrame || capturedFrame == null)
+                    {
+                        try
+                        {
+                            cam.SignalToStop();
+                            cam.NewFrame -= OnNewFrame;
+                        }
+                        catch { }
+
+                        frameEvent.Reset();
+                        frameCount = 0;
+                        cam = new VideoCaptureDevice(moniker);
+                        cam.NewFrame += OnNewFrame;
+                        cam.VideoResolution = null; // Use driver default media type negotiation
+                        try { cam.Start(); } catch { }
+                        gotFrame = frameEvent.WaitOne(2500);
+                    }
+
+                    try { cam.SignalToStop(); } catch { }
+
+                    // Attempt 3: If selected camera failed and multiple devices exist, try next available non-IR device
+                    if ((!gotFrame || capturedFrame == null) && devices.Count > 1)
+                    {
+                        for (int altIdx = 0; altIdx < devices.Count; altIdx++)
+                        {
+                            if (altIdx == chosen) continue;
+                            if (CameraDeviceService.IsIrOrBiometricCamera(devices[altIdx].Name)) continue;
+
+                            frameEvent.Reset();
+                            frameCount = 0;
+                            var altCam = new VideoCaptureDevice(devices[altIdx].MonikerString);
+                            altCam.NewFrame += OnNewFrame;
+                            try { altCam.Start(); } catch { }
+                            gotFrame = frameEvent.WaitOne(2000);
+                            try { altCam.SignalToStop(); } catch { }
+
+                            if (gotFrame && capturedFrame != null)
+                            {
+                                camName = devices[altIdx].Name;
+                                break;
+                            }
+                        }
+                    }
 
                     if (!gotFrame || capturedFrame == null)
                     {
+                        if (CameraDeviceService.IsWindowsCameraPrivacyRestricted(out string privErr))
+                        {
+                            res.Status = ExpressTestStatus.Failed;
+                            res.Headline = "✕ CAMERA PRIVACY BLOCKED";
+                            res.Detail = privErr;
+                            res.MetricValue = "Blocked";
+                            return;
+                        }
+
                         var pnpCams = CameraDeviceService.GetPnpCameraHardware();
                         if (pnpCams.Count > 0)
                         {
                             res.Status = ExpressTestStatus.Warning;
                             res.Headline = "⚠ STREAM TIMEOUT · HARDWARE PRESENT";
-                            res.Detail = $"{camName} present in Windows, but frame stream timed out. Check privacy shutter.";
+                            res.Detail = $"{camName} present in Windows PnP, but DirectShow stream timed out. Camera may require Media Foundation or BIOS F2 enable.";
                             res.MetricValue = "Present";
                             return;
                         }
 
                         res.Status = ExpressTestStatus.Failed;
                         res.Headline = "✕ SENSOR CAPTURE TIMEOUT";
-                        res.Detail = $"{camName} failed to deliver video frames. Check privacy shutter.";
+                        res.Detail = $"{camName} failed to deliver video frames. Check Dell BIOS Camera setting or physical privacy slider.";
                         res.MetricValue = "0 FPS";
                         return;
                     }

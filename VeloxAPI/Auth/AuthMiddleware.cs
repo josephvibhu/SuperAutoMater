@@ -12,12 +12,22 @@ public sealed class ApiKeyMiddleware(RequestDelegate next)
     {
         var path = ctx.Request.Path.Value ?? "";
 
-        // Whenever X-API-Key is present, resolve and attach TenantId
+        // Whenever X-API-Key or X-License-Key is present, resolve and attach TenantId
         var apiKey = ctx.Request.Headers["X-API-Key"].FirstOrDefault();
+        var licKey = ctx.Request.Headers["X-License-Key"].FirstOrDefault();
+        var db = ctx.RequestServices.GetRequiredService<VeloxDb>();
+
         if (!string.IsNullOrWhiteSpace(apiKey))
         {
-            var db = ctx.RequestServices.GetRequiredService<VeloxDb>();
             var resolvedTenant = db.ResolveTenantFromApiKey(apiKey);
+            if (resolvedTenant != null)
+            {
+                ctx.Items["TenantId"] = resolvedTenant;
+            }
+        }
+        else if (!string.IsNullOrWhiteSpace(licKey))
+        {
+            var resolvedTenant = db.ResolveTenantFromLicenseKey(licKey);
             if (resolvedTenant != null)
             {
                 ctx.Items["TenantId"] = resolvedTenant;
@@ -44,11 +54,14 @@ public sealed class ApiKeyMiddleware(RequestDelegate next)
             return;
         }
 
-        // Unauthenticated routes (admin routes enforce X-Admin-Secret internally)
+        // Unauthenticated or license-protected routes (admin routes enforce X-Admin-Secret internally)
         if (path == "/health" ||
             path.StartsWith("/api/v1/auth", StringComparison.OrdinalIgnoreCase) ||
             path.StartsWith("/api/v1/admin", StringComparison.OrdinalIgnoreCase) ||
-            path.StartsWith("/api/v1/showroom", StringComparison.OrdinalIgnoreCase))
+            path.StartsWith("/api/v1/showroom", StringComparison.OrdinalIgnoreCase) ||
+            path.StartsWith("/api/v1/license", StringComparison.OrdinalIgnoreCase) ||
+            path.StartsWith("/api/v1/update", StringComparison.OrdinalIgnoreCase) ||
+            path.StartsWith("/api/v1/bench", StringComparison.OrdinalIgnoreCase))
         {
             await next(ctx);
             return;
@@ -64,10 +77,10 @@ public sealed class ApiKeyMiddleware(RequestDelegate next)
             return;
         }
 
-        if (string.IsNullOrWhiteSpace(apiKey))
+        if (string.IsNullOrWhiteSpace(apiKey) && string.IsNullOrWhiteSpace(licKey))
         {
             ctx.Response.StatusCode = 401;
-            await ctx.Response.WriteAsJsonAsync(new { error = "X-API-Key header is required." });
+            await ctx.Response.WriteAsJsonAsync(new { error = "X-API-Key or X-License-Key header is required." });
             return;
         }
 

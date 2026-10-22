@@ -13,6 +13,7 @@ using SuperAutoMater.Wpf.Services;
 using SuperAutoMater.Wpf.ViewModels;
 using Velox.Shared.Dtos;
 using Velox.Shared.Models;
+using Velox.Shared.Common;
 using VeloxBench.Services;
 
 namespace SuperAutoMater.Wpf.Views
@@ -403,97 +404,69 @@ namespace SuperAutoMater.Wpf.Views
 
         private async void BtnSubmit_Click(object sender, RoutedEventArgs e)
         {
+            var record = BuildCurrentRecord();
+            GeneratedRecord = record;
+
+            // Play affirmative confirmation chime
+            try { SystemSounds.Asterisk.Play(); } catch { }
+
+            // 1. Save to local SQLite database (always durable)
             try
             {
-                var record = BuildCurrentRecord();
-                GeneratedRecord = record;
+                var store = new QcRunStore();
+                store.SaveItamRecord(record);
+            }
+            catch (Exception dbEx)
+            {
+                AppLogger.Warn($"Failed to save ITAM record to SQLite: {dbEx.Message}");
+            }
 
-                // Play affirmative confirmation chime
-                try { SystemSounds.Asterisk.Play(); } catch { }
+            // 2. Automatically append to persistent local Excel/CSV backup
+            try
+            {
+                LocalSheetsBackupService.AppendRecord(record);
+            }
+            catch { }
 
-                // 1. Save to local SQLite database (ITAM system of record)
-                try
-                {
-                    var store = new QcRunStore();
-                    store.SaveItamRecord(record);
-                }
-                catch (Exception dbEx)
-                {
-                    AppLogger.Warn($"Failed to save ITAM record to SQLite: {dbEx.Message}");
-                }
-
-                // 2. Enqueue to persistent offline queue (Google Sheets)
-                OfflineSyncQueue.Instance.Enqueue(record);
-
-                // 2b. Automatically append to persistent local Excel/CSV sheets file backup
-                try
-                {
-                    LocalSheetsBackupService.AppendRecord(record);
-                }
-                catch { }
-
-                // 3. Flush queue to Google Sheets webhook
-                int flushed = await OfflineSyncQueue.Instance.FlushQueueAsync(OfflineSyncQueue.GetActiveWebhookUrl());
-
-                // 4. Synchronize with Velox Cloud API on Railway
-                try
-                {
-                    LifecycleQueue queue = record.Status?.ToUpperInvariant() switch
-                    {
-                        "RTS" or "PASS" or "READY" => LifecycleQueue.ReadyForSale,
-                        "WIP" => LifecycleQueue.ActiveTesting,
-                        "PARTS" or "AWAITING" => LifecycleQueue.AwaitingParts,
-                        "EXTERNAL" => LifecycleQueue.ExternalRepair,
-                        _ => LifecycleQueue.OnHold
-                    };
-
-                    AssetGrade grade = record.Physical_Grade?.ToUpperInvariant() switch
-                    {
-                        "A+" or "A" => AssetGrade.A,
-                        "B" => AssetGrade.B,
-                        "C" => AssetGrade.C,
-                        "FAULTY" or "FAIL" => AssetGrade.Faulty,
-                        "FOR PARTS" => AssetGrade.ForParts,
-                        _ => AssetGrade.Unknown
-                    };
-
-                    var patch = new PatchAssetRequest
-                    {
-                        CurrentLocation = record.Shelf_Location,
-                        LifecycleQueue = queue,
-                        Grade = grade,
-                        Supplier = record.Supplier,
-                        Customer = record.Customer,
-                        MissingComponents = record.Missing_Components,
-                        CosmeticGrade = record.Physical_Grade,
-                        BatteryHealth = record.Battery_Health,
-                        StorageHealth = record.Storage_Health,
-                        Notes = $"{record.Remarks} | WIP: {record.Work_In_Progress}",
-                        InDate = record.In_Date,
-                        OutDate = record.Out_Date,
-                        Actor = record.Technician
-                    };
-
-                    await CloudSyncService.Instance.PushAssetPatchAsync(record.Tag, patch);
-                }
-                catch (Exception cloudEx)
-                {
-                    AppLogger.Warn($"Failed to push asset patch to Velox Cloud API: {cloudEx.Message}");
-                }
-
-                string msg = flushed > 0
-                    ? $"Asset {record.Serial_Number} successfully synced to Velox Cloud API & Google Sheets!\n\nTag: {record.Tag} [Bold]\nStatus: {record.Status} | Grade: {record.Physical_Grade}\nBattery: {record.Battery_Health}% | Storage: {record.Storage_Health}%\nTechnician: {record.Technician}"
-                    : $"Asset {record.Serial_Number} saved to Local ITAM Ledger & Offline Queue ({OfflineSyncQueue.Instance.PendingCount} items pending).\nWill automatically sync to Velox Cloud & Google Sheets once online.";
-
-                VeloxMessageBox.Show(msg, "ITAM Asset Synchronization Success", MessageBoxButton.OK, MessageBoxImage.Information);
-
-                DialogResult = true;
-                Close();
+            // 3. Direct synchronous push to Velox Cloud API (No offline queue ambiguity)
+            VeloxResult syncResult;
+            try
+            {
+                syncResult = await CloudSyncService.Instance.PushAssetDirectAsync(record);
             }
             catch (Exception ex)
             {
-                VeloxMessageBox.Show("Cloud Sync Failed: " + ex.Message, "Sync Error", MessageBoxButton.OK, MessageBoxImage.Error);
+                syncResult = VeloxResult.Fail(VeloxErrorCode.ERR_INTERNAL_EXCEPTION, "Direct upload execution error.", ex.Message);
             }
+
+            // 4. Unambiguous user notification with standardized error codes
+            if (syncResult.Success)
+            {
+                string msg = $"✅ UPLOAD SUCCESS [{syncResult.CodeString}]\n\n" +
+                             $"Asset Tag: {record.Tag}\n" +
+                             $"Serial Number: {record.Serial_Number}\n" +
+                             $"Model: {record.Model}\n" +
+                             $"Status: {record.Status} | Grade: {record.Physical_Grade}\n" +
+                             $"Battery: {record.Battery_Health}% | Storage: {record.Storage_Health}%\n" +
+                             $"Technician: {record.Technician}\n\n" +
+                             $"✓ Live upload to Velox Cloud confirmed.\n" +
+                             $"✓ Saved to local offline ledger.";
+
+                VeloxMessageBox.Show(msg, "Upload Success", MessageBoxButton.OK, MessageBoxImage.Information);
+            }
+            else
+            {
+                string msg = $"⚠️ UPLOAD FAILED [{syncResult.CodeString}]\n\n" +
+                             $"Asset Tag: {record.Tag}\n" +
+                             $"Serial Number: {record.Serial_Number}\n\n" +
+                             $"Reason: {syncResult.Message}\n" +
+                             (string.IsNullOrWhiteSpace(syncResult.Details) ? "" : $"Details: {syncResult.Details}\n\n") +
+                             $"Notice: Asset was NOT uploaded to cloud, but was SAFELY SAVED to your local computer ledger.\nNo data was lost.";
+
+                VeloxMessageBox.Show(msg, "Upload Failed", MessageBoxButton.OK, MessageBoxImage.Warning);
+            }
+
+            SafeCloseDialog(true);
         }
 
         private AssetQueueRecord BuildCurrentRecord()
@@ -640,10 +613,28 @@ namespace SuperAutoMater.Wpf.Views
             }
         }
 
+        private void SafeCloseDialog(bool? result)
+        {
+            try
+            {
+                if (System.Windows.Interop.ComponentDispatcher.IsThreadModal)
+                {
+                    DialogResult = result;
+                }
+            }
+            catch
+            {
+                // Silently absorb InvalidOperationException if DialogResult cannot be set
+            }
+            finally
+            {
+                try { Close(); } catch { }
+            }
+        }
+
         private void BtnCancel_Click(object sender, RoutedEventArgs e)
         {
-            DialogResult = false;
-            Close();
+            SafeCloseDialog(false);
         }
     }
 }

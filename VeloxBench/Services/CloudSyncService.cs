@@ -6,6 +6,9 @@ using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
 using Velox.Shared.Dtos;
+using Velox.Shared.Common;
+using SuperAutoMater;
+using SuperAutoMater.Core;
 using SuperAutoMater.Wpf.Core;
 using VeloxBench.Core;
 
@@ -156,6 +159,148 @@ public sealed class CloudSyncService
         }
 
         return new LookupResult { Found = false, Source = SyncSource.None };
+    }
+
+    // ── Direct Synchronous Cloud Push (No Queue Ambiguity) ──────────────────
+
+    public async Task<VeloxResult> PushAssetDirectAsync(AssetQueueRecord record)
+    {
+        if (record == null)
+            return VeloxResult.Fail(VeloxErrorCode.ERR_CLOUD_BAD_REQUEST, "Asset record is empty or invalid.");
+
+        var cfg = BenchConfigService.Current;
+        var tag = string.IsNullOrWhiteSpace(record.Tag) ? record.Asset_Tag : record.Tag;
+        var sn = string.IsNullOrWhiteSpace(record.Serial_Number) ? tag : record.Serial_Number;
+
+        // High-throughput batch envelope mapped to /api/v1/bench/sync
+        var payloadObj = new
+        {
+            Tag = tag,
+            SerialNumber = sn,
+            Model = record.Model ?? "Generic Laptop",
+            Status = record.Status ?? "RTS",
+            Grade = record.Physical_Grade ?? "A",
+            Cpu = record.Processor ?? "",
+            RamGb = record.Memory ?? "",
+            StorageDetails = $"{record.Storage_Health}% Health",
+            BatteryHealth = record.Battery_Health,
+            StorageHealth = record.Storage_Health,
+            Technician = record.Technician ?? Environment.UserName,
+            Remarks = $"{record.Remarks} | WIP: {record.Work_In_Progress}",
+            Timestamp = string.IsNullOrWhiteSpace(record.Timestamp) ? DateTime.UtcNow.ToString("o") : record.Timestamp
+        };
+
+        var batch = new BenchSyncBatchRequest
+        {
+            MachineName = cfg.BenchName,
+            LicenseKey = cfg.LicenseKey,
+            AppVersion = "1.6.10-alpha",
+            Events = new List<BenchSyncItemDto>
+            {
+                new BenchSyncItemDto
+                {
+                    EventId = Guid.NewGuid().ToString("N"),
+                    EventType = "QC_DISPATCH_COMPLETE",
+                    AggregateId = tag,
+                    IdempotencyKey = $"QC-{tag}-{sn}-{DateTime.UtcNow:yyyyMMddHHmmss}",
+                    Timestamp = DateTime.UtcNow.ToString("o"),
+                    PayloadJson = JsonSerializer.Serialize(payloadObj)
+                }
+            }
+        };
+
+        var json = JsonSerializer.Serialize(batch);
+
+        try
+        {
+            using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(5));
+            var req = new HttpRequestMessage(HttpMethod.Post, $"{cfg.ApiUrl}/api/v1/bench/sync")
+            {
+                Content = new StringContent(json, Encoding.UTF8, "application/json")
+            };
+            req.Headers.Add("X-API-Key", cfg.ApiKey);
+            req.Headers.Add("X-License-Key", cfg.LicenseKey);
+
+            var resp = await _http.SendAsync(req, cts.Token);
+            var body = await resp.Content.ReadAsStringAsync();
+
+            if (resp.IsSuccessStatusCode)
+            {
+                _isOnline = true;
+                AppLogger.Info($"[DirectSync] [VLX-OK-200] Asset {tag} ({sn}) uploaded to Velox Cloud.");
+                return VeloxResult.Ok($"Asset {tag} ({sn}) successfully uploaded to Velox Cloud.");
+            }
+
+            if (resp.StatusCode == System.Net.HttpStatusCode.Unauthorized)
+            {
+                AppLogger.Warn($"[DirectSync] [VLX-AUTH-200] Unauthorized: Invalid API key or license key.");
+                return VeloxResult.Fail(VeloxErrorCode.ERR_AUTH_INVALID_KEY, "Authentication failed: Invalid API Key or License Key.", body);
+            }
+
+            if (resp.StatusCode == System.Net.HttpStatusCode.Forbidden)
+            {
+                AppLogger.Warn($"[DirectSync] [VLX-AUTH-201] Forbidden: License expired or quota exceeded.");
+                return VeloxResult.Fail(VeloxErrorCode.ERR_AUTH_FORBIDDEN, "Cloud access denied: License expired or monthly quota exceeded.", body);
+            }
+
+            if (resp.StatusCode == System.Net.HttpStatusCode.BadRequest)
+            {
+                AppLogger.Warn($"[DirectSync] [VLX-DATA-304] Validation Error: {body}");
+                return VeloxResult.Fail(VeloxErrorCode.ERR_CLOUD_BAD_REQUEST, "Cloud server rejected asset payload validation.", body);
+            }
+
+            AppLogger.Warn($"[DirectSync] [VLX-SRV-300] Server error: {resp.StatusCode} - {body}");
+            return VeloxResult.Fail(VeloxErrorCode.ERR_CLOUD_SERVER_ERROR, $"Cloud server returned error (HTTP {(int)resp.StatusCode}).", body);
+        }
+        catch (TaskCanceledException)
+        {
+            _isOnline = false;
+            AppLogger.Warn($"[DirectSync] [VLX-NET-101] Cloud sync timed out after 5s for {tag}.");
+            return VeloxResult.Fail(VeloxErrorCode.ERR_NET_TIMEOUT, "Cloud server timed out after 5 seconds.", "Check if cloud server or reverse proxy is running.");
+        }
+        catch (HttpRequestException httpEx)
+        {
+            _isOnline = false;
+            AppLogger.Warn($"[DirectSync] [VLX-NET-100] Network unreachable for {tag}: {httpEx.Message}");
+            return VeloxResult.Fail(VeloxErrorCode.ERR_NET_UNREACHABLE, "Cannot connect to Velox Cloud server (Network unreachable).", httpEx.Message);
+        }
+        catch (Exception ex)
+        {
+            AppLogger.Warn($"[DirectSync] [VLX-ERR-999] Unexpected error: {ex.Message}");
+            return VeloxResult.Fail(VeloxErrorCode.ERR_INTERNAL_EXCEPTION, "Unexpected internal upload exception.", ex.Message);
+        }
+    }
+
+    public async Task<VeloxResult> TestCloudConnectionAsync()
+    {
+        var cfg = BenchConfigService.Current;
+        var sw = System.Diagnostics.Stopwatch.StartNew();
+        try
+        {
+            using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(4));
+            var resp = await _http.GetAsync($"{cfg.ApiUrl}/health", cts.Token);
+            sw.Stop();
+            if (resp.IsSuccessStatusCode)
+            {
+                _isOnline = true;
+                return VeloxResult.Ok($"Connected to Velox Cloud API ({sw.ElapsedMilliseconds}ms latency)");
+            }
+            return VeloxResult.Fail(VeloxErrorCode.ERR_CLOUD_SERVER_ERROR, $"Cloud server returned HTTP {(int)resp.StatusCode} on health check.");
+        }
+        catch (TaskCanceledException)
+        {
+            _isOnline = false;
+            return VeloxResult.Fail(VeloxErrorCode.ERR_NET_TIMEOUT, "Cloud server health check timed out after 4 seconds.");
+        }
+        catch (HttpRequestException ex)
+        {
+            _isOnline = false;
+            return VeloxResult.Fail(VeloxErrorCode.ERR_NET_UNREACHABLE, $"Cannot reach cloud server at {cfg.ApiUrl}.", ex.Message);
+        }
+        catch (Exception ex)
+        {
+            return VeloxResult.Fail(VeloxErrorCode.ERR_INTERNAL_EXCEPTION, ex.Message);
+        }
     }
 
     // ── Instant State Push ───────────────────────────────────────────────────

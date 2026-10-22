@@ -295,4 +295,119 @@ public sealed class PurgeAssetsResponse
     public int PurgedAssets { get; set; }
 }
 
+// ─── Alpha Licensing System ──────────────────────────────────────────────────
+
+public sealed class LicenseValidateRequest
+{
+    public string LicenseKey { get; set; } = "";
+    public string MachineName { get; set; } = "";
+    public string MachineGuid { get; set; } = "";
+    public string AppVersion { get; set; } = "";
+}
+
+public sealed class LicenseValidateResponse
+{
+    public bool IsValid { get; set; }
+    public string CompanyName { get; set; } = "";
+    public string PlanTier { get; set; } = "Alpha";
+    public DateTimeOffset ExpiresAtUtc { get; set; }
+    public int DaysRemaining { get; set; }
+    public int OfflineGraceDays { get; set; } = 14;
+    public int DevicesUsedMonth { get; set; }
+    public int MaxDevicesMonth { get; set; }
+    public List<string> AllowedFeatures { get; set; } = new();
+    public string SignedLeaseToken { get; set; } = "";
+    public string Message { get; set; } = "";
+}
+
+public sealed class LicenseCreateRequest
+{
+    public string CompanyName { get; set; } = "";
+    public string? CustomKey { get; set; }
+    public string PlanTier { get; set; } = "Alpha-Pilot";
+    public int MaxDevicesMonth { get; set; } = 1500;
+    public int ValidDays { get; set; } = 45;
+    public List<string>? AllowedFeatures { get; set; }
+    public string? Notes { get; set; }
+}
+
+public sealed class LicenseStatusDto
+{
+    public string Id { get; set; } = "";
+    public string TenantId { get; set; } = "";
+    public string LicenseKey { get; set; } = "";
+    public string CompanyName { get; set; } = "";
+    public string PlanTier { get; set; } = "Alpha";
+    public int MaxDevicesMonth { get; set; }
+    public int DevicesUsedMonth { get; set; }
+    public string MonthPeriod { get; set; } = "";
+    public DateTimeOffset ExpiresAtUtc { get; set; }
+    public bool IsActive { get; set; }
+    public List<string> AllowedFeatures { get; set; } = new();
+    public string Notes { get; set; } = "";
+    public DateTimeOffset CreatedAtUtc { get; set; }
+}
+
+// ─── Dynamic Auto-Update System ──────────────────────────────────────────────
+
+public sealed class UpdateCheckRequest
+{
+    public string AppName { get; set; } = "VeloxBench";
+    public string CurrentVersion { get; set; } = "1.0.0";
+    public string Channel { get; set; } = "alpha";
+}
+
+public sealed class UpdateCheckResponse
+{
+    public bool UpdateAvailable { get; set; }
+    public string LatestVersion { get; set; } = "";
+    public string Channel { get; set; } = "alpha";
+    public bool IsMandatory { get; set; }
+    public string DownloadUrl { get; set; } = "";
+    public string FileSha256 { get; set; } = "";
+    public long FileSizeBytes { get; set; }
+    public string ReleaseNotes { get; set; } = "";
+    public DateTimeOffset PublishedAtUtc { get; set; }
+}
+
+public sealed class PublishReleaseRequest
+{
+    public string AppName { get; set; } = "VeloxBench";
+    public string Version { get; set; } = "";
+    public string Channel { get; set; } = "alpha";
+    public string DownloadUrl { get; set; } = "";
+    public string FileSha256 { get; set; } = "";
+    public long FileSizeBytes { get; set; }
+    public bool IsMandatory { get; set; }
+    public string ReleaseNotes { get; set; } = "";
+}
+
+// ─── High-Throughput Bench Cloud Sync ────────────────────────────────────────
+
+public sealed class BenchSyncBatchRequest
+{
+    public string LicenseKey { get; set; } = "";
+    public string MachineName { get; set; } = "";
+    public string AppVersion { get; set; } = "";
+    public List<BenchSyncItemDto> Events { get; set; } = new();
+}
+
+public sealed class BenchSyncItemDto
+{
+    public string EventId { get; set; } = "";
+    public string EventType { get; set; } = "";
+    public string AggregateId { get; set; } = "";
+    public string IdempotencyKey { get; set; } = "";
+    public string Timestamp { get; set; } = "";
+    public string PayloadJson { get; set; } = "{}";
+}
+
+public sealed class BenchSyncResponse
+{
+    public bool Success { get; set; }
+    public int IngestedCount { get; set; }
+    public string Message { get; set; } = "";
+}
+
+
 

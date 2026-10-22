@@ -1,5 +1,6 @@
 using System.Security.Cryptography;
 using System.Text;
+using System.Text.Json;
 using Microsoft.Data.Sqlite;
 using Velox.Shared.Dtos;
 using Velox.Shared.Models;
@@ -205,7 +206,57 @@ CREATE INDEX IF NOT EXISTS ix_asset_components_parent ON asset_components(parent
             try { Exec(conn, "ALTER TABLE assets ADD COLUMN hold_sales_rep TEXT DEFAULT ''"); } catch { }
             try { Exec(conn, "ALTER TABLE assets ADD COLUMN hold_expires_utc TEXT NULL"); } catch { }
 
-            // Auto-seed default depot tenant, primary API key, and technician if empty
+            // Migration: ensure licenses, license_heartbeats, and app_releases tables exist
+            try
+            {
+                Exec(conn, @"
+CREATE TABLE IF NOT EXISTS licenses (
+    id                 TEXT PRIMARY KEY,
+    tenant_id          TEXT NOT NULL,
+    license_key        TEXT NOT NULL UNIQUE COLLATE NOCASE,
+    company_name       TEXT NOT NULL,
+    plan_tier          TEXT NOT NULL DEFAULT 'Alpha-Pilot',
+    max_devices_month  INTEGER NOT NULL DEFAULT 1500,
+    devices_used_month INTEGER NOT NULL DEFAULT 0,
+    month_period       TEXT NOT NULL,
+    expires_at_utc     TEXT NOT NULL,
+    is_active          INTEGER NOT NULL DEFAULT 1,
+    allowed_features   TEXT NOT NULL DEFAULT '[""VeloxBench"",""Diagnostics"",""BatteryHealth"",""PdfReport""]',
+    notes              TEXT NULL,
+    created_at_utc     TEXT NOT NULL,
+    FOREIGN KEY(tenant_id) REFERENCES tenants(id)
+);
+CREATE UNIQUE INDEX IF NOT EXISTS ix_licenses_key ON licenses(license_key);
+
+CREATE TABLE IF NOT EXISTS license_heartbeats (
+    id              TEXT PRIMARY KEY,
+    license_key     TEXT NOT NULL,
+    machine_name    TEXT NOT NULL,
+    machine_guid    TEXT NOT NULL,
+    ip_address      TEXT NULL,
+    app_version     TEXT NOT NULL,
+    last_seen_utc   TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS ix_license_heartbeats_key ON license_heartbeats(license_key);
+
+CREATE TABLE IF NOT EXISTS app_releases (
+    id              TEXT PRIMARY KEY,
+    app_name        TEXT NOT NULL DEFAULT 'VeloxBench',
+    version         TEXT NOT NULL,
+    channel         TEXT NOT NULL DEFAULT 'alpha',
+    download_url    TEXT NOT NULL,
+    file_sha256     TEXT NOT NULL,
+    file_size_bytes INTEGER NOT NULL DEFAULT 0,
+    is_mandatory    INTEGER NOT NULL DEFAULT 0,
+    release_notes   TEXT NOT NULL DEFAULT '',
+    released_at_utc TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS ix_app_releases ON app_releases(app_name, channel, version);
+");
+            }
+            catch { }
+
+            // Auto-seed default depot tenant, primary API key, technician, and Alpha licenses if empty
             using var checkCmd = conn.CreateCommand();
             checkCmd.CommandText = "SELECT COUNT(*) FROM tenants";
             var tenantCount = Convert.ToInt64(checkCmd.ExecuteScalar());
@@ -232,6 +283,50 @@ CREATE INDEX IF NOT EXISTS ix_asset_components_parent ON asset_components(parent
                     P("@id", "emp-john-tech-01"), P("@tid", defaultTenantId), P("@name", "John Tech"),
                     P("@ph", pinHash), P("@role", "Technician"), P("@ts", now));
             }
+
+            // Seed default Alpha license if none exist
+            try
+            {
+                using var licCheck = conn.CreateCommand();
+                licCheck.CommandText = "SELECT COUNT(*) FROM licenses";
+                if (Convert.ToInt64(licCheck.ExecuteScalar()) == 0)
+                {
+                    var now = DateTimeOffset.UtcNow;
+                    var monthPeriod = now.ToString("yyyy-MM");
+                    var expiry = Iso(now.AddDays(60));
+                    Exec(conn, @"
+INSERT INTO licenses(id, tenant_id, license_key, company_name, plan_tier, max_devices_month, devices_used_month, month_period, expires_at_utc, is_active, allowed_features, notes, created_at_utc)
+VALUES(@id, @tid, @key, @comp, 'Alpha-Pilot', 2000, 0, @mp, @exp, 1, '[""VeloxBench"",""Diagnostics"",""BatteryHealth"",""PdfReport""]', 'Default Alpha Pilot License', @created)",
+                        P("@id", "lic-" + Guid.NewGuid().ToString("N")[..12]),
+                        P("@tid", "ten-d2428a4cb3da"),
+                        P("@key", "VLX-ALPHA-TEST-2026"),
+                        P("@comp", "Refurbishment Alpha Partner"),
+                        P("@mp", monthPeriod),
+                        P("@exp", expiry),
+                        P("@created", Iso(now)));
+
+                    // Seed Ritchie Street Partner License
+                    Exec(conn, @"
+INSERT INTO licenses(id, tenant_id, license_key, company_name, plan_tier, max_devices_month, devices_used_month, month_period, expires_at_utc, is_active, allowed_features, notes, created_at_utc)
+VALUES(@id, @tid, 'VLX-ALPHA-RITCHIE-01', 'Ritchie Street Depot Partner', 'Alpha-Pilot', 500, 0, @mp, @exp, 1, '[""VeloxBench"",""Diagnostics"",""BatteryHealth"",""PdfReport""]', 'Partner Pilot 1', @created)",
+                        P("@id", "lic-" + Guid.NewGuid().ToString("N")[..12]),
+                        P("@tid", "ten-d2428a4cb3da"),
+                        P("@mp", monthPeriod),
+                        P("@exp", expiry),
+                        P("@created", Iso(now)));
+
+                    // Seed GP Road Partner License
+                    Exec(conn, @"
+INSERT INTO licenses(id, tenant_id, license_key, company_name, plan_tier, max_devices_month, devices_used_month, month_period, expires_at_utc, is_active, allowed_features, notes, created_at_utc)
+VALUES(@id, @tid, 'VLX-ALPHA-GPROAD-02', 'GP Road Depot Partner', 'Alpha-Pilot', 500, 0, @mp, @exp, 1, '[""VeloxBench"",""Diagnostics"",""BatteryHealth"",""PdfReport""]', 'Partner Pilot 2', @created)",
+                        P("@id", "lic-" + Guid.NewGuid().ToString("N")[..12]),
+                        P("@tid", "ten-d2428a4cb3da"),
+                        P("@mp", monthPeriod),
+                        P("@exp", expiry),
+                        P("@created", Iso(now)));
+                }
+            }
+            catch { }
         }
     }
 
@@ -1509,6 +1604,533 @@ VALUES(@id, @tid, @sn, @tag, @model, @cat, 1, @grade, 'Depot Staging', 'ReadyFor
             tx.Commit();
             return (assetCount, compCount, eventCount);
         }
+    }
+
+    // ── Alpha Licensing Engine ──────────────────────────────────────────────
+
+    public LicenseValidateResponse ValidateLicense(string licenseKey, string machineName, string machineGuid, string appVersion, string? clientIp = null)
+    {
+        if (string.IsNullOrWhiteSpace(licenseKey))
+        {
+            return new LicenseValidateResponse
+            {
+                IsValid = false,
+                Message = "License key is missing or empty."
+            };
+        }
+
+        lock (_gate)
+        {
+            using var conn = Open();
+            using var cmd = conn.CreateCommand();
+            cmd.CommandText = "SELECT id, tenant_id, license_key, company_name, plan_tier, max_devices_month, devices_used_month, month_period, expires_at_utc, is_active, allowed_features FROM licenses WHERE license_key = @key COLLATE NOCASE LIMIT 1";
+            cmd.Parameters.AddWithValue("@key", licenseKey.Trim());
+
+            using var reader = cmd.ExecuteReader();
+            if (!reader.Read())
+            {
+                return new LicenseValidateResponse
+                {
+                    IsValid = false,
+                    Message = "Invalid license key. Check your depot license configuration."
+                };
+            }
+
+            var id = reader.GetString(0);
+            var tenantId = reader.GetString(1);
+            var key = reader.GetString(2);
+            var company = reader.GetString(3);
+            var planTier = reader.GetString(4);
+            var maxDevices = reader.GetInt32(5);
+            var usedDevices = reader.GetInt32(6);
+            var monthPeriod = reader.GetString(7);
+            var expiresStr = reader.GetString(8);
+            var isActive = reader.GetInt32(9) == 1;
+            var featuresJson = reader.GetString(10);
+            reader.Close();
+
+            if (!isActive)
+            {
+                return new LicenseValidateResponse
+                {
+                    IsValid = false,
+                    CompanyName = company,
+                    PlanTier = planTier,
+                    Message = "License has been deactivated by administrator."
+                };
+            }
+
+            if (!DateTimeOffset.TryParse(expiresStr, out var expiresAt))
+            {
+                expiresAt = DateTimeOffset.UtcNow.AddDays(30);
+            }
+
+            var now = DateTimeOffset.UtcNow;
+            if (expiresAt < now)
+            {
+                return new LicenseValidateResponse
+                {
+                    IsValid = false,
+                    CompanyName = company,
+                    PlanTier = planTier,
+                    ExpiresAtUtc = expiresAt,
+                    DaysRemaining = 0,
+                    Message = $"License expired on {expiresAt:yyyy-MM-dd}. Please renew your subscription."
+                };
+            }
+
+            // Check if month period rolled over
+            var currentMonth = now.ToString("yyyy-MM");
+            if (monthPeriod != currentMonth)
+            {
+                using var resetCmd = conn.CreateCommand();
+                resetCmd.CommandText = "UPDATE licenses SET devices_used_month = 0, month_period = @mp WHERE id = @id";
+                resetCmd.Parameters.AddWithValue("@mp", currentMonth);
+                resetCmd.Parameters.AddWithValue("@id", id);
+                resetCmd.ExecuteNonQuery();
+                usedDevices = 0;
+            }
+
+            if (maxDevices > 0 && usedDevices >= maxDevices)
+            {
+                return new LicenseValidateResponse
+                {
+                    IsValid = false,
+                    CompanyName = company,
+                    PlanTier = planTier,
+                    ExpiresAtUtc = expiresAt,
+                    DaysRemaining = (int)Math.Max(0, (expiresAt - now).TotalDays),
+                    DevicesUsedMonth = usedDevices,
+                    MaxDevicesMonth = maxDevices,
+                    Message = $"Device limit reached ({usedDevices}/{maxDevices} laptops tested). Please contact support to extend authorization."
+                };
+            }
+
+            // Record heartbeat
+            try
+            {
+                using var hbCmd = conn.CreateCommand();
+                hbCmd.CommandText = @"
+INSERT INTO license_heartbeats(id, license_key, machine_name, machine_guid, ip_address, app_version, last_seen_utc)
+VALUES(@id, @key, @name, @guid, @ip, @ver, @now)
+ON CONFLICT(id) DO UPDATE SET last_seen_utc = @now, ip_address = @ip, app_version = @ver";
+                hbCmd.Parameters.AddWithValue("@id", Sha256($"{key}:{machineGuid}"));
+                hbCmd.Parameters.AddWithValue("@key", key);
+                hbCmd.Parameters.AddWithValue("@name", machineName ?? "BENCH");
+                hbCmd.Parameters.AddWithValue("@guid", machineGuid ?? "DEFAULT");
+                hbCmd.Parameters.AddWithValue("@ip", (object?)clientIp ?? DBNull.Value);
+                hbCmd.Parameters.AddWithValue("@ver", appVersion ?? "1.0.0");
+                hbCmd.Parameters.AddWithValue("@now", Iso(now));
+                hbCmd.ExecuteNonQuery();
+            }
+            catch { }
+
+            var allowedFeatures = new List<string>();
+            try
+            {
+                allowedFeatures = JsonSerializer.Deserialize<List<string>>(featuresJson) ?? new List<string>();
+            }
+            catch { }
+
+            var daysRemaining = (int)Math.Max(0, (expiresAt - now).TotalDays);
+
+            // Generate tamper-evident HMAC lease signature for offline grace caching
+            var leasePayload = $"{key}|{company}|{planTier}|{expiresAt:O}|{now.AddDays(14):O}|{maxDevices}|{usedDevices}";
+            using var hmac = new HMACSHA256(Encoding.UTF8.GetBytes("velox-alpha-secret-seed-9821"));
+            var sig = Convert.ToBase64String(hmac.ComputeHash(Encoding.UTF8.GetBytes(leasePayload)));
+            var signedLeaseToken = $"{Convert.ToBase64String(Encoding.UTF8.GetBytes(leasePayload))}.{sig}";
+
+            return new LicenseValidateResponse
+            {
+                IsValid = true,
+                CompanyName = company,
+                PlanTier = planTier,
+                ExpiresAtUtc = expiresAt,
+                DaysRemaining = daysRemaining,
+                OfflineGraceDays = 14,
+                DevicesUsedMonth = usedDevices,
+                MaxDevicesMonth = maxDevices,
+                AllowedFeatures = allowedFeatures,
+                SignedLeaseToken = signedLeaseToken,
+                Message = $"System verified for {company}. {daysRemaining} days remaining."
+            };
+        }
+    }
+
+    public LicenseStatusDto CreateLicense(LicenseCreateRequest req, string? tenantId = null)
+    {
+        var targetTenant = tenantId ?? "ten-d2428a4cb3da";
+        var id = "lic-" + NewId();
+        var key = !string.IsNullOrWhiteSpace(req.CustomKey)
+            ? req.CustomKey.Trim().ToUpperInvariant()
+            : $"VLX-ALPHA-{CleanPrefix(req.CompanyName)}-{RandomNumberGenerator.GetInt32(1000, 9999)}-{DateTime.UtcNow.Year}";
+
+        var now = DateTimeOffset.UtcNow;
+        var expires = now.AddDays(req.ValidDays > 0 ? req.ValidDays : 45);
+        var monthPeriod = now.ToString("yyyy-MM");
+        var features = req.AllowedFeatures ?? new List<string> { "VeloxBench", "Diagnostics", "BatteryHealth", "PdfReport" };
+        var featuresJson = JsonSerializer.Serialize(features);
+
+        lock (_gate)
+        {
+            using var conn = Open();
+            using var cmd = conn.CreateCommand();
+            cmd.CommandText = @"
+INSERT INTO licenses(id, tenant_id, license_key, company_name, plan_tier, max_devices_month, devices_used_month, month_period, expires_at_utc, is_active, allowed_features, notes, created_at_utc)
+VALUES(@id, @tid, @key, @comp, @plan, @max, 0, @mp, @exp, 1, @feat, @notes, @created)";
+            cmd.Parameters.AddWithValue("@id", id);
+            cmd.Parameters.AddWithValue("@tid", targetTenant);
+            cmd.Parameters.AddWithValue("@key", key);
+            cmd.Parameters.AddWithValue("@comp", req.CompanyName.Trim());
+            cmd.Parameters.AddWithValue("@plan", string.IsNullOrWhiteSpace(req.PlanTier) ? "Alpha-Pilot" : req.PlanTier);
+            cmd.Parameters.AddWithValue("@max", req.MaxDevicesMonth > 0 ? req.MaxDevicesMonth : 1500);
+            cmd.Parameters.AddWithValue("@mp", monthPeriod);
+            cmd.Parameters.AddWithValue("@exp", Iso(expires));
+            cmd.Parameters.AddWithValue("@feat", featuresJson);
+            cmd.Parameters.AddWithValue("@notes", (object?)req.Notes ?? "");
+            cmd.Parameters.AddWithValue("@created", Iso(now));
+            cmd.ExecuteNonQuery();
+
+            return new LicenseStatusDto
+            {
+                Id = id,
+                TenantId = targetTenant,
+                LicenseKey = key,
+                CompanyName = req.CompanyName,
+                PlanTier = req.PlanTier,
+                MaxDevicesMonth = req.MaxDevicesMonth,
+                DevicesUsedMonth = 0,
+                MonthPeriod = monthPeriod,
+                ExpiresAtUtc = expires,
+                IsActive = true,
+                AllowedFeatures = features,
+                Notes = req.Notes ?? "",
+                CreatedAtUtc = now
+            };
+        }
+    }
+
+    public List<LicenseStatusDto> ListLicenses(string? tenantId = null)
+    {
+        var list = new List<LicenseStatusDto>();
+        lock (_gate)
+        {
+            using var conn = Open();
+            using var cmd = conn.CreateCommand();
+            if (string.IsNullOrWhiteSpace(tenantId))
+            {
+                cmd.CommandText = "SELECT id, tenant_id, license_key, company_name, plan_tier, max_devices_month, devices_used_month, month_period, expires_at_utc, is_active, allowed_features, notes, created_at_utc FROM licenses ORDER BY created_at_utc DESC";
+            }
+            else
+            {
+                cmd.CommandText = "SELECT id, tenant_id, license_key, company_name, plan_tier, max_devices_month, devices_used_month, month_period, expires_at_utc, is_active, allowed_features, notes, created_at_utc FROM licenses WHERE tenant_id = @tid ORDER BY created_at_utc DESC";
+                cmd.Parameters.AddWithValue("@tid", tenantId);
+            }
+
+            using var reader = cmd.ExecuteReader();
+            while (reader.Read())
+            {
+                var featJson = reader.GetString(10);
+                var feats = new List<string>();
+                try { feats = JsonSerializer.Deserialize<List<string>>(featJson) ?? new(); } catch { }
+
+                list.Add(new LicenseStatusDto
+                {
+                    Id = reader.GetString(0),
+                    TenantId = reader.GetString(1),
+                    LicenseKey = reader.GetString(2),
+                    CompanyName = reader.GetString(3),
+                    PlanTier = reader.GetString(4),
+                    MaxDevicesMonth = reader.GetInt32(5),
+                    DevicesUsedMonth = reader.GetInt32(6),
+                    MonthPeriod = reader.GetString(7),
+                    ExpiresAtUtc = DateTimeOffset.Parse(reader.GetString(8)),
+                    IsActive = reader.GetInt32(9) == 1,
+                    AllowedFeatures = feats,
+                    Notes = reader.IsDBNull(11) ? "" : reader.GetString(11),
+                    CreatedAtUtc = DateTimeOffset.Parse(reader.GetString(12))
+                });
+            }
+        }
+        return list;
+    }
+
+    public string? ResolveTenantFromLicenseKey(string licenseKey)
+    {
+        if (string.IsNullOrWhiteSpace(licenseKey)) return null;
+        lock (_gate)
+        {
+            using var conn = Open();
+            using var cmd = conn.CreateCommand();
+            cmd.CommandText = "SELECT tenant_id FROM licenses WHERE license_key = @key COLLATE NOCASE AND is_active = 1 LIMIT 1";
+            cmd.Parameters.AddWithValue("@key", licenseKey.Trim());
+            var res = cmd.ExecuteScalar();
+            return res?.ToString();
+        }
+    }
+
+    public void IncrementDeviceUsage(string licenseKey, int delta = 1)
+    {
+        if (string.IsNullOrWhiteSpace(licenseKey)) return;
+        lock (_gate)
+        {
+            using var conn = Open();
+            using var cmd = conn.CreateCommand();
+            cmd.CommandText = "UPDATE licenses SET devices_used_month = devices_used_month + @delta WHERE license_key = @key COLLATE NOCASE";
+            cmd.Parameters.AddWithValue("@delta", delta);
+            cmd.Parameters.AddWithValue("@key", licenseKey.Trim());
+            cmd.ExecuteNonQuery();
+        }
+    }
+
+    private static string CleanPrefix(string name)
+    {
+        if (string.IsNullOrWhiteSpace(name)) return "DEPOT";
+        var cleaned = new StringBuilder();
+        foreach (var c in name.Trim())
+        {
+            if (char.IsLetterOrDigit(c)) cleaned.Append(char.ToUpperInvariant(c));
+            if (cleaned.Length >= 6) break;
+        }
+        return cleaned.Length >= 3 ? cleaned.ToString() : "DEPOT";
+    }
+
+    // ── Dynamic Auto-Update Engine ───────────────────────────────────────────
+
+    public UpdateCheckResponse CheckForUpdate(string appName, string currentVersion, string channel, string baseUrl)
+    {
+        var app = string.IsNullOrWhiteSpace(appName) ? "VeloxBench" : appName.Trim();
+        var chan = string.IsNullOrWhiteSpace(channel) ? "alpha" : channel.Trim().ToLowerInvariant();
+
+        lock (_gate)
+        {
+            using var conn = Open();
+            using var cmd = conn.CreateCommand();
+            cmd.CommandText = "SELECT version, channel, download_url, file_sha256, file_size_bytes, is_mandatory, release_notes, released_at_utc FROM app_releases WHERE app_name = @app AND channel = @chan ORDER BY released_at_utc DESC LIMIT 1";
+            cmd.Parameters.AddWithValue("@app", app);
+            cmd.Parameters.AddWithValue("@chan", chan);
+
+            using var reader = cmd.ExecuteReader();
+            if (!reader.Read())
+            {
+                return new UpdateCheckResponse
+                {
+                    UpdateAvailable = false,
+                    LatestVersion = currentVersion,
+                    Channel = chan
+                };
+            }
+
+            var latestVer = reader.GetString(0);
+            var ch = reader.GetString(1);
+            var dlUrl = reader.GetString(2);
+            var sha = reader.GetString(3);
+            var size = reader.GetInt64(4);
+            var mandatory = reader.GetInt32(5) == 1;
+            var notes = reader.GetString(6);
+            var released = DateTimeOffset.Parse(reader.GetString(7));
+            reader.Close();
+
+            // Ensure absolute download URL
+            if (!dlUrl.StartsWith("http://", StringComparison.OrdinalIgnoreCase) &&
+                !dlUrl.StartsWith("https://", StringComparison.OrdinalIgnoreCase))
+            {
+                dlUrl = baseUrl.TrimEnd('/') + "/" + dlUrl.TrimStart('/');
+            }
+
+            bool isNewer = CompareVersions(latestVer, currentVersion) > 0;
+
+            return new UpdateCheckResponse
+            {
+                UpdateAvailable = isNewer,
+                LatestVersion = latestVer,
+                Channel = ch,
+                IsMandatory = mandatory,
+                DownloadUrl = dlUrl,
+                FileSha256 = sha,
+                FileSizeBytes = size,
+                ReleaseNotes = notes,
+                PublishedAtUtc = released
+            };
+        }
+    }
+
+    public bool PublishRelease(PublishReleaseRequest req)
+    {
+        var app = string.IsNullOrWhiteSpace(req.AppName) ? "VeloxBench" : req.AppName.Trim();
+        var ver = string.IsNullOrWhiteSpace(req.Version) ? "1.0.0" : req.Version.Trim();
+        var chan = string.IsNullOrWhiteSpace(req.Channel) ? "alpha" : req.Channel.Trim().ToLowerInvariant();
+        var now = Iso(DateTimeOffset.UtcNow);
+
+        lock (_gate)
+        {
+            using var conn = Open();
+            using var cmd = conn.CreateCommand();
+            cmd.CommandText = @"
+INSERT INTO app_releases(id, app_name, version, channel, download_url, file_sha256, file_size_bytes, is_mandatory, release_notes, released_at_utc)
+VALUES(@id, @app, @ver, @chan, @dl, @sha, @size, @mand, @notes, @now)";
+            cmd.Parameters.AddWithValue("@id", "rel-" + NewId());
+            cmd.Parameters.AddWithValue("@app", app);
+            cmd.Parameters.AddWithValue("@ver", ver);
+            cmd.Parameters.AddWithValue("@chan", chan);
+            cmd.Parameters.AddWithValue("@dl", req.DownloadUrl ?? "/api/v1/update/download/latest");
+            cmd.Parameters.AddWithValue("@sha", req.FileSha256 ?? "");
+            cmd.Parameters.AddWithValue("@size", req.FileSizeBytes);
+            cmd.Parameters.AddWithValue("@mand", req.IsMandatory ? 1 : 0);
+            cmd.Parameters.AddWithValue("@notes", req.ReleaseNotes ?? "");
+            cmd.Parameters.AddWithValue("@now", now);
+            cmd.ExecuteNonQuery();
+            return true;
+        }
+    }
+
+    public static int CompareVersions(string v1, string v2)
+    {
+        if (Version.TryParse(v1, out var ver1) && Version.TryParse(v2, out var ver2))
+        {
+            return ver1.CompareTo(ver2);
+        }
+        return string.Compare(v1, v2, StringComparison.OrdinalIgnoreCase);
+    }
+
+    // ── High-Throughput Bench Cloud Ingestion ────────────────────────────────
+
+    public BenchSyncResponse IngestBenchSyncBatch(BenchSyncBatchRequest batch, string? fallbackTenantId)
+    {
+        if (batch == null || batch.Events == null || batch.Events.Count == 0)
+        {
+            return new BenchSyncResponse { Success = true, IngestedCount = 0, Message = "No events in batch." };
+        }
+
+        var tenantId = ResolveTenantFromLicenseKey(batch.LicenseKey) ?? fallbackTenantId ?? "ten-d2428a4cb3da";
+        int ingested = 0;
+        int newAssets = 0;
+
+        lock (_gate)
+        {
+            using var conn = Open();
+            using var tx = conn.BeginTransaction();
+
+            foreach (var evt in batch.Events)
+            {
+                if (string.IsNullOrWhiteSpace(evt.AggregateId)) continue;
+                var serial = evt.AggregateId.Trim();
+                var nowIso = Iso(DateTimeOffset.UtcNow);
+
+                // Parse payload details if available
+                string model = "Generic Laptop";
+                int? batteryHealth = null;
+                int? storageHealth = null;
+                string grade = "Tested";
+                string notes = "";
+
+                if (!string.IsNullOrWhiteSpace(evt.PayloadJson))
+                {
+                    try
+                    {
+                        using var doc = JsonDocument.Parse(evt.PayloadJson);
+                        var root = doc.RootElement;
+                        if (root.TryGetProperty("Model", out var mProp)) model = mProp.GetString() ?? model;
+                        if (root.TryGetProperty("BatteryHealth", out var bhProp) && bhProp.TryGetInt32(out var bh)) batteryHealth = bh;
+                        if (root.TryGetProperty("StorageHealth", out var shProp) && shProp.TryGetInt32(out var sh)) storageHealth = sh;
+                        if (root.TryGetProperty("Grade", out var gProp)) grade = gProp.GetString() ?? grade;
+                        if (root.TryGetProperty("Notes", out var nProp)) notes = nProp.GetString() ?? notes;
+                    }
+                    catch { }
+                }
+
+                // Check if asset exists
+                string? existingAssetId = null;
+                using (var findCmd = conn.CreateCommand())
+                {
+                    findCmd.Transaction = tx;
+                    findCmd.CommandText = "SELECT id FROM assets WHERE tenant_id = @tid AND serial_number = @sn COLLATE NOCASE LIMIT 1";
+                    findCmd.Parameters.AddWithValue("@tid", tenantId);
+                    findCmd.Parameters.AddWithValue("@sn", serial);
+                    var res = findCmd.ExecuteScalar();
+                    if (res != null) existingAssetId = res.ToString();
+                }
+
+                string assetId;
+                if (existingAssetId != null)
+                {
+                    assetId = existingAssetId;
+                    using var updateCmd = conn.CreateCommand();
+                    updateCmd.Transaction = tx;
+                    updateCmd.CommandText = @"
+UPDATE assets SET
+    model = CASE WHEN @model <> '' THEN @model ELSE model END,
+    battery_health = COALESCE(@bh, battery_health),
+    storage_health = COALESCE(@sh, storage_health),
+    grade = CASE WHEN @grade <> '' THEN @grade ELSE grade END,
+    updated_at_utc = @now
+WHERE id = @id";
+                    updateCmd.Parameters.AddWithValue("@model", model);
+                    updateCmd.Parameters.AddWithValue("@bh", (object?)batteryHealth ?? DBNull.Value);
+                    updateCmd.Parameters.AddWithValue("@sh", (object?)storageHealth ?? DBNull.Value);
+                    updateCmd.Parameters.AddWithValue("@grade", grade);
+                    updateCmd.Parameters.AddWithValue("@now", nowIso);
+                    updateCmd.Parameters.AddWithValue("@id", assetId);
+                    updateCmd.ExecuteNonQuery();
+                }
+                else
+                {
+                    assetId = "ast-" + NewId();
+                    newAssets++;
+                    using var insertCmd = conn.CreateCommand();
+                    insertCmd.Transaction = tx;
+                    insertCmd.CommandText = @"
+INSERT INTO assets(id, tenant_id, serial_number, asset_tag, model, current_location, lifecycle_queue, grade, battery_health, storage_health, notes, created_at_utc, updated_at_utc)
+VALUES(@id, @tid, @sn, @sn, @model, 'QC Bench', 'QualityControl', @grade, @bh, @sh, @notes, @now, @now)";
+                    insertCmd.Parameters.AddWithValue("@id", assetId);
+                    insertCmd.Parameters.AddWithValue("@tid", tenantId);
+                    insertCmd.Parameters.AddWithValue("@sn", serial);
+                    insertCmd.Parameters.AddWithValue("@model", model);
+                    insertCmd.Parameters.AddWithValue("@grade", grade);
+                    insertCmd.Parameters.AddWithValue("@bh", (object?)batteryHealth ?? DBNull.Value);
+                    insertCmd.Parameters.AddWithValue("@sh", (object?)storageHealth ?? DBNull.Value);
+                    insertCmd.Parameters.AddWithValue("@notes", notes);
+                    insertCmd.Parameters.AddWithValue("@now", nowIso);
+                    insertCmd.ExecuteNonQuery();
+                }
+
+                // Insert event audit
+                var eventId = !string.IsNullOrWhiteSpace(evt.EventId) ? evt.EventId : ("evt-" + NewId());
+                using (var evCmd = conn.CreateCommand())
+                {
+                    evCmd.Transaction = tx;
+                    evCmd.CommandText = @"
+INSERT OR IGNORE INTO asset_events(id, asset_id, tenant_id, event_type, location, actor, notes_json, source_bench_id, recorded_at_utc)
+VALUES(@id, @aid, @tid, @et, 'QC Bench', @actor, @notes, @bench, @rec)";
+                    evCmd.Parameters.AddWithValue("@id", eventId);
+                    evCmd.Parameters.AddWithValue("@aid", assetId);
+                    evCmd.Parameters.AddWithValue("@tid", tenantId);
+                    evCmd.Parameters.AddWithValue("@et", string.IsNullOrWhiteSpace(evt.EventType) ? "AssetQcCompleted" : evt.EventType);
+                    evCmd.Parameters.AddWithValue("@actor", "VeloxBench");
+                    evCmd.Parameters.AddWithValue("@notes", string.IsNullOrWhiteSpace(evt.PayloadJson) ? "{}" : evt.PayloadJson);
+                    evCmd.Parameters.AddWithValue("@bench", batch.MachineName ?? "BENCH");
+                    evCmd.Parameters.AddWithValue("@rec", !string.IsNullOrWhiteSpace(evt.Timestamp) ? evt.Timestamp : nowIso);
+                    evCmd.ExecuteNonQuery();
+                }
+
+                ingested++;
+            }
+
+            tx.Commit();
+        }
+
+        // Increment device usage if new assets were certified
+        if (newAssets > 0 && !string.IsNullOrWhiteSpace(batch.LicenseKey))
+        {
+            IncrementDeviceUsage(batch.LicenseKey, newAssets);
+        }
+
+        return new BenchSyncResponse
+        {
+            Success = true,
+            IngestedCount = ingested,
+            Message = $"Successfully ingested {ingested} QC events to Velox Cloud."
+        };
     }
 
     public void Dispose()

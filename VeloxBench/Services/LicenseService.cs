@@ -1,5 +1,6 @@
 using System;
 using System.IO;
+using System.Management;
 using System.Net.Http;
 using System.Security.Cryptography;
 using System.Text;
@@ -7,6 +8,7 @@ using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
 using SuperAutoMater.Wpf.Core;
+using Velox.Shared.Common;
 using Velox.Shared.Dtos;
 using VeloxBench.Core;
 
@@ -17,13 +19,7 @@ public sealed class LicenseService
     private static readonly Lazy<LicenseService> _lazy = new(() => new LicenseService());
     public static LicenseService Instance => _lazy.Value;
 
-    private readonly HttpClient _http = new() { Timeout = TimeSpan.FromSeconds(6) };
-    private static readonly string LeasePath = Path.Combine(
-        Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-        "Velox", "VeloxBench", "license.lease");
-
-    private static readonly string PortableKeyPath = Path.Combine(
-        AppDomain.CurrentDomain.BaseDirectory, "license.key");
+    private readonly HttpClient _http = new() { Timeout = TimeSpan.FromSeconds(5) };
 
     public bool IsLicensed { get; private set; }
     public bool IsOfflineLeaseValid { get; private set; }
@@ -34,6 +30,7 @@ public sealed class LicenseService
     public int DevicesUsedMonth { get; private set; }
     public int MaxDevicesMonth { get; private set; }
     public string StatusMessage { get; private set; } = "Initializing license...";
+    public VeloxErrorCode LastErrorCode { get; private set; } = VeloxErrorCode.OK_SUCCESS;
 
     public event Action? LicenseStatusChanged;
 
@@ -41,17 +38,59 @@ public sealed class LicenseService
     {
     }
 
+    public static string GetExecutableDirectory()
+    {
+        var procPath = Environment.ProcessPath;
+        if (!string.IsNullOrWhiteSpace(procPath))
+        {
+            var dir = Path.GetDirectoryName(procPath);
+            if (!string.IsNullOrWhiteSpace(dir) && Directory.Exists(dir))
+                return dir;
+        }
+        return AppDomain.CurrentDomain.BaseDirectory;
+    }
+
+    public static string GetPortableKeyPath() =>
+        Path.Combine(GetExecutableDirectory(), "license.key");
+
+    public static string GetLeasePath()
+    {
+        var exeDir = GetExecutableDirectory();
+        var portableLease = Path.Combine(exeDir, "license.lease");
+
+        // If portable lease already exists, always use it
+        if (File.Exists(portableLease))
+            return portableLease;
+
+        // Test if directory is writable (e.g. USB flash drive or depot folder)
+        try
+        {
+            var testFile = Path.Combine(exeDir, $".lease_test_{Guid.NewGuid():N}.tmp");
+            File.WriteAllText(testFile, "test");
+            File.Delete(testFile);
+            return portableLease;
+        }
+        catch
+        {
+            // Fall back to LocalAppData if directory is read-only
+            return Path.Combine(
+                Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+                "Velox", "VeloxBench", "license.lease");
+        }
+    }
+
     public string DiscoverLicenseKey()
     {
         // 1. Check license.key beside the portable executable (USB stick portable mode)
         try
         {
-            if (File.Exists(PortableKeyPath))
+            var keyPath = GetPortableKeyPath();
+            if (File.Exists(keyPath))
             {
-                var key = File.ReadAllText(PortableKeyPath).Trim();
+                var key = File.ReadAllText(keyPath).Trim();
                 if (!string.IsNullOrWhiteSpace(key))
                 {
-                    AppLogger.Info("License", $"Discovered portable license key file at {PortableKeyPath}");
+                    AppLogger.Info("License", $"Discovered portable license key file at {keyPath}");
                     return key;
                 }
             }
@@ -71,15 +110,23 @@ public sealed class LicenseService
     public async Task<bool> InitializeAndValidateAsync()
     {
         var key = DiscoverLicenseKey();
-        LicenseKey = key;
+        var result = await ActivateKeyAsync(key, persistToDisk: false);
+        return result.Success;
+    }
 
-        if (string.IsNullOrWhiteSpace(key))
+    public async Task<VeloxResult> ActivateKeyAsync(string newKey, bool persistToDisk = true)
+    {
+        if (string.IsNullOrWhiteSpace(newKey))
         {
             IsLicensed = false;
-            StatusMessage = "No Alpha license key found. Place license.key in depot folder.";
+            LastErrorCode = VeloxErrorCode.ERR_LIC_NOT_FOUND;
+            StatusMessage = "No activation key provided.";
             LicenseStatusChanged?.Invoke();
-            return false;
+            return VeloxResult.Fail(VeloxErrorCode.ERR_LIC_NOT_FOUND, StatusMessage);
         }
+
+        var key = newKey.Trim();
+        LicenseKey = key;
 
         var cfg = BenchConfigService.Current;
         var request = new LicenseValidateRequest
@@ -90,7 +137,7 @@ public sealed class LicenseService
             AppVersion = "1.6.10"
         };
 
-        // Try Online Validation with Velox Cloud
+        // ── 1. Attempt Online Validation with Velox Cloud ───────────────────────
         try
         {
             using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(4));
@@ -113,53 +160,95 @@ public sealed class LicenseService
                     DaysRemaining = result.DaysRemaining;
                     DevicesUsedMonth = result.DevicesUsedMonth;
                     MaxDevicesMonth = result.MaxDevicesMonth;
-                    StatusMessage = $"Alpha Licensed to {CompanyName} ({PlanTier}) — {DaysRemaining} days remaining.";
+                    LastErrorCode = VeloxErrorCode.OK_SUCCESS;
+                    StatusMessage = $"System Verified: {CompanyName} — {DaysRemaining} days remaining.";
 
                     // Cache verified signed lease for offline usage
                     SaveOfflineLease(result.SignedLeaseToken);
 
-                    AppLogger.Info("License", $"Online license validated successfully: {StatusMessage}");
+                    // Persist license key to disk if requested
+                    if (persistToDisk)
+                    {
+                        PersistLicenseKey(key);
+                    }
+
+                    AppLogger.Info("License", $"[VLX-OK-200] Online license validated: {StatusMessage}");
                     LicenseStatusChanged?.Invoke();
-                    return true;
+                    return VeloxResult.Ok(StatusMessage);
                 }
             }
             else
             {
-                // Server rejected license
+                // Server rejected license (e.g. 403 Forbidden or 401 Unauthorized)
+                string failMsg;
                 try
                 {
                     var failResult = JsonSerializer.Deserialize<LicenseValidateResponse>(body, new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
-                    StatusMessage = failResult?.Message ?? "License validation rejected by cloud.";
+                    failMsg = failResult?.Message ?? $"License validation rejected by cloud (HTTP {resp.StatusCode}).";
                 }
                 catch
                 {
-                    StatusMessage = $"Cloud returned license rejection (HTTP {resp.StatusCode}).";
+                    failMsg = $"Cloud returned license rejection (HTTP {resp.StatusCode}).";
                 }
 
                 IsLicensed = false;
-                AppLogger.Warn("License", $"License rejected by cloud: {StatusMessage}");
+                LastErrorCode = resp.StatusCode == System.Net.HttpStatusCode.Unauthorized
+                    ? VeloxErrorCode.ERR_AUTH_INVALID_KEY
+                    : VeloxErrorCode.ERR_AUTH_FORBIDDEN;
+                StatusMessage = failMsg;
+
+                AppLogger.Warn("License", $"[{LastErrorCode}] License rejected: {StatusMessage}");
                 LicenseStatusChanged?.Invoke();
-                return false;
+                return VeloxResult.Fail(LastErrorCode, StatusMessage, body);
             }
         }
         catch (Exception ex)
         {
-            AppLogger.Warn("License", $"Online validation unreachable: {ex.Message}. Falling back to offline lease check.");
+            AppLogger.Warn("License", $"[VLX-NET-100] Online validation unreachable: {ex.Message}. Checking offline lease...");
         }
 
-        // Fallback: Verify local signed lease (Offline Grace Period)
+        // ── 2. Fallback: Verify Cryptographic Offline Lease (14-Day Grace) ────
         if (VerifyOfflineLease(key))
         {
             IsLicensed = true;
             IsOfflineLeaseValid = true;
+            LastErrorCode = VeloxErrorCode.OK_SUCCESS;
+
+            if (persistToDisk)
+            {
+                PersistLicenseKey(key);
+            }
+
             LicenseStatusChanged?.Invoke();
-            return true;
+            return VeloxResult.Ok($"Verified via Offline Grace ({CompanyName})");
         }
 
         IsLicensed = false;
-        StatusMessage = "License could not be verified online and no valid offline lease exists.";
+        LastErrorCode = VeloxErrorCode.ERR_NET_UNREACHABLE;
+        StatusMessage = "Authorization could not be verified online and no valid offline cache exists.";
         LicenseStatusChanged?.Invoke();
-        return false;
+        return VeloxResult.Fail(LastErrorCode, StatusMessage);
+    }
+
+    private void PersistLicenseKey(string key)
+    {
+        try
+        {
+            // 1. Write to portable license.key beside the executable
+            var portablePath = GetPortableKeyPath();
+            File.WriteAllText(portablePath, key.Trim());
+            AppLogger.Info("License", $"Persisted license key to {portablePath}");
+        }
+        catch { }
+
+        try
+        {
+            // 2. Update config.json
+            var cfg = BenchConfigService.Current;
+            cfg.LicenseKey = key.Trim();
+            BenchConfigService.Save(cfg);
+        }
+        catch { }
     }
 
     private void SaveOfflineLease(string signedToken)
@@ -167,9 +256,14 @@ public sealed class LicenseService
         if (string.IsNullOrWhiteSpace(signedToken)) return;
         try
         {
-            var dir = Path.GetDirectoryName(LeasePath);
-            if (!string.IsNullOrEmpty(dir)) Directory.CreateDirectory(dir);
-            File.WriteAllText(LeasePath, signedToken.Trim());
+            var leasePath = GetLeasePath();
+            var dir = Path.GetDirectoryName(leasePath);
+            if (!string.IsNullOrEmpty(dir) && !Directory.Exists(dir))
+            {
+                Directory.CreateDirectory(dir);
+            }
+            File.WriteAllText(leasePath, signedToken.Trim());
+            AppLogger.Info("License", $"Cached offline cryptographic lease to {leasePath}");
         }
         catch { }
     }
@@ -178,21 +272,22 @@ public sealed class LicenseService
     {
         try
         {
-            if (!File.Exists(LeasePath)) return false;
-            var token = File.ReadAllText(LeasePath).Trim();
+            var leasePath = GetLeasePath();
+            if (!File.Exists(leasePath)) return false;
+            var token = File.ReadAllText(leasePath).Trim();
             var parts = token.Split('.');
             if (parts.Length != 2) return false;
 
             var payloadBytes = Convert.FromBase64String(parts[0]);
             var payload = Encoding.UTF8.GetString(payloadBytes);
 
-            // Recompute HMAC signature
+            // Recompute HMAC signature using the shared secret
             using var hmac = new HMACSHA256(Encoding.UTF8.GetBytes("velox-alpha-secret-seed-9821"));
             var expectedSig = Convert.ToBase64String(hmac.ComputeHash(payloadBytes));
 
             if (parts[1] != expectedSig)
             {
-                AppLogger.Warn("License", "Offline lease signature mismatch (tampering detected).");
+                AppLogger.Warn("License", "[VLX-LIC-204] Offline lease signature mismatch (tampering detected).");
                 return false;
             }
 
@@ -222,7 +317,7 @@ public sealed class LicenseService
             PlanTier = plan;
             DaysRemaining = (int)Math.Max(0, (expiresAt - now).TotalDays);
             int graceDaysLeft = (int)Math.Max(0, (validUntil - now).TotalDays);
-            StatusMessage = $"Alpha Offline Grace Mode ({company}) — {graceDaysLeft} offline grace days left.";
+            StatusMessage = $"Offline Verified ({company}) — {graceDaysLeft} offline grace days left.";
             return true;
         }
         catch (Exception ex)
@@ -232,11 +327,26 @@ public sealed class LicenseService
         }
     }
 
-    private static string GetMachineIdentifier()
+    public static string GetMachineIdentifier()
     {
         try
         {
-            var raw = Environment.MachineName + Environment.UserName + Environment.ProcessorCount;
+            // Query BIOS Serial Number or Motherboard UUID via WMI
+            using var searcher = new ManagementObjectSearcher("SELECT UUID FROM Win32_ComputerSystemProduct");
+            foreach (ManagementObject obj in searcher.Get())
+            {
+                var uuid = obj["UUID"]?.ToString();
+                if (!string.IsNullOrWhiteSpace(uuid) && uuid.Length > 8 && !uuid.Contains("00000000"))
+                {
+                    return uuid.Trim();
+                }
+            }
+        }
+        catch { }
+
+        try
+        {
+            var raw = Environment.MachineName + Environment.ProcessorCount;
             using var sha = SHA256.Create();
             return Convert.ToHexString(sha.ComputeHash(Encoding.UTF8.GetBytes(raw)))[..16];
         }

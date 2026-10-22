@@ -54,7 +54,8 @@ namespace SuperAutoMater.Wpf
                 {
                     if (!e.Args.Contains("--smoke-test"))
                     {
-                        await VeloxBench.Services.AutoUpdateService.Instance.CheckForUpdatesAsync(autoApplyIfAvailable: false);
+                        // Cloud-backed dynamic auto-update: scan server on startup and update seamlessly
+                        await VeloxBench.Services.AutoUpdateService.Instance.CheckForUpdatesAsync(autoApplyIfAvailable: true);
                     }
                 }
                 catch { }

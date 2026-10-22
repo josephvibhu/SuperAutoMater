@@ -2,6 +2,7 @@ using System;
 using System.Diagnostics;
 using System.IO;
 using System.Threading.Tasks;
+using VeloxBench.Services;
 
 namespace SuperAutoMater
 {
@@ -65,16 +66,13 @@ namespace SuperAutoMater
                     // Step 5: Cleanup temp file
                     try { File.Delete(profilePath); } catch { }
 
-                    // Step 6: Flush any queued offline asset sync records after obtaining IP
+                    // Step 6: Verify Velox Cloud connectivity
                     _ = Task.Run(async () =>
                     {
                         try
                         {
-                            await Task.Delay(3000);
-                            if (OfflineSyncQueue.Instance.PendingCount > 0)
-                            {
-                                await OfflineSyncQueue.Instance.FlushQueueAsync(OfflineSyncQueue.DefaultSheetsUrl);
-                            }
+                            await Task.Delay(2000);
+                            await CloudSyncService.Instance.TestCloudConnectionAsync();
                         }
                         catch { }
                     });

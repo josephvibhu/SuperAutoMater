@@ -95,7 +95,7 @@
 
                     <!-- Station / Bay -->
                     <TextBlock Text="BENCH / QC STATION BAY" Style="{StaticResource TextBadgeMono}" Foreground="{StaticResource BrushTextVioletSubdued}" Margin="0,0,0,4"/>
-                    <TextBox x:Name="TxtTechStation" Background="#0D1117" Foreground="#FFFFFF" BorderBrush="#30363D" Padding="8,6" FontFamily="{StaticResource FontMono}" FontSize="12" Margin="0,0,12"/>
+                    <TextBox x:Name="TxtTechStation" Background="#0D1117" Foreground="#FFFFFF" BorderBrush="#30363D" Padding="8,6" FontFamily="{StaticResource FontMono}" FontSize="12" Margin="0,0,0,12"/>
 
                     <!-- Audit Trail Notice -->
                     <Border Background="#1C2128" BorderBrush="#21262D" BorderThickness="1" CornerRadius="6" Padding="10,8" Margin="0,0,0,0">

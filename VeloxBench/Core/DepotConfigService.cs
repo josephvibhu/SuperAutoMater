@@ -11,13 +11,14 @@ namespace SuperAutoMater.Wpf.Core
     /// </summary>
     public sealed class DepotConfig
     {
-        public string SiteId { get; set; } = "DEPOT-US-EAST-01";
-        public string FacilityName { get; set; } = "Newark Refurbishment Depot";
+        public string SiteId { get; set; } = "DEPOT-IN-MAA-01";
+        public string FacilityName { get; set; } = "Ritchie St Refurb Depot";
         public string BenchPrefix { get; set; } = "BENCH-";
+        public string CurrencySymbol { get; set; } = "₹";
         public string HmacSecretKey { get; set; } = "depot_secret_key_8f3a9e2d1c7b4a5f";
         public int EvidenceRetentionDays { get; set; } = 90;
         public string BackupStorageDirectory { get; set; } = "";
-        public string DefaultWebhookUrl { get; set; } = "https://script.google.com/macros/s/AKfycbweLRaXur7tAluRq4IIDjC2RDGDhBU52iss-zAKMau_Sd-yt2NJjlWNZfKEJ2sfYphfOw/exec";
+        public string DefaultWebhookUrl { get; set; } = "";
         public bool RequireSupervisorOverride { get; set; } = true;
         public DateTimeOffset LastModifiedUtc { get; set; } = DateTimeOffset.UtcNow;
     }

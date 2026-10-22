@@ -1,37 +1,27 @@
-# ── Stage 1: Build ────────────────────────────────────────────────────────────
 FROM mcr.microsoft.com/dotnet/sdk:10.0 AS build
 WORKDIR /src
 
-# Copy solution and project files first (layer cache optimization)
-COPY Velox.sln* .
-COPY Velox.Shared/Velox.Shared.csproj Velox.Shared/
-COPY VeloxAPI/VeloxAPI.csproj VeloxAPI/
-COPY VeloxAPI.Tests/VeloxAPI.Tests.csproj VeloxAPI.Tests/
+# Copy project files first for efficient Docker layer caching
+COPY ["Velox.Shared/Velox.Shared.csproj", "Velox.Shared/"]
+COPY ["VeloxAPI/VeloxAPI.csproj", "VeloxAPI/"]
+RUN dotnet restore "VeloxAPI/VeloxAPI.csproj"
 
-RUN dotnet restore VeloxAPI/VeloxAPI.csproj
+# Copy remaining source code and publish
+COPY . .
+WORKDIR "/src/VeloxAPI"
+RUN dotnet publish "VeloxAPI.csproj" -c Release -o /app/publish /p:UseAppHost=false
 
-# Copy source
-COPY Velox.Shared/ Velox.Shared/
-COPY VeloxAPI/ VeloxAPI/
-
-RUN dotnet publish VeloxAPI/VeloxAPI.csproj -c Release -o /app/publish --no-restore
-
-# ── Stage 2: Runtime ─────────────────────────────────────────────────────────
+# Runtime image
 FROM mcr.microsoft.com/dotnet/aspnet:10.0 AS runtime
 WORKDIR /app
+EXPOSE 8080
 
-# SQLite data directory — Railway mounts a persistent volume here
-ENV VELOX_DB_PATH=/data
-RUN mkdir -p /data
-
-# Low-memory GC configuration for Railway container hosting (Workstation GC ~40-60MB)
-ENV DOTNET_gcServer=0
-ENV DOTNET_GCHeapHardLimitPercent=30
-ENV DOTNET_EnableWriteXorExecute=0
+RUN mkdir -p /data /app/releases
 
 COPY --from=build /app/publish .
 
-EXPOSE 8080
+ENV ASPNETCORE_ENVIRONMENT=Production
 ENV ASPNETCORE_URLS=http://+:8080
+ENV VELOX_DB_PATH=/data
 
 ENTRYPOINT ["dotnet", "VeloxAPI.dll"]

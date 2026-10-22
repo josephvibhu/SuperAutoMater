@@ -1,0 +1,47 @@
+version: '3.8'
+
+services:
+  velox-api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: velox-api
+    restart: always
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Production
+      - ASPNETCORE_URLS=http://+:8080
+      - VELOX_DB_PATH=/data
+      - VELOX_ADMIN_SECRET=${VELOX_ADMIN_SECRET:-VeloxAlphaSecret2026!}
+      - VELOX_JWT_SECRET=${VELOX_JWT_SECRET:-VeloxProductionJwtSecret32CharactersLong2026!}
+      - DOTNET_gcServer=0
+    volumes:
+      - velox-data:/data
+      - velox-releases:/app/releases
+    networks:
+      - velox-net
+
+  caddy:
+    image: caddy:2-alpine
+    container_name: velox-caddy
+    restart: always
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+      - caddy-config:/config
+    networks:
+      - velox-net
+    depends_on:
+      - velox-api
+
+volumes:
+  velox-data:
+  velox-releases:
+  caddy-data:
+  caddy-config:
+
+networks:
+  velox-net:
+    driver: bridge

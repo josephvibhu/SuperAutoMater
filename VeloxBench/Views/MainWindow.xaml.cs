@@ -22,6 +22,7 @@ using SuperAutoMater.Wpf.Services;
 using SuperAutoMater.Wpf.ViewModels;
 using SuperAutoMater.Wpf.Core;
 using VeloxBench.Services;
+using Velox.Shared.Common;
 
 namespace SuperAutoMater.Wpf.Views
 {
@@ -39,6 +40,8 @@ namespace SuperAutoMater.Wpf.Views
         private string _activeWorkspace = "standby";
         private FilterInfoCollection _workspaceVideoDevices;
         private VideoCaptureDevice _workspaceVideoSource;
+        private int _workspaceCamFramesReceived = 0;
+        private CancellationTokenSource _workspaceCamWatchdogCts;
         private WaveInEvent _workspaceWaveIn;
         private DispatcherTimer _fpAnimTimer;
         private CancellationTokenSource _fpCts;
@@ -95,9 +98,32 @@ namespace SuperAutoMater.Wpf.Views
 
             // 0. Wire Alpha License & Auto-Update status indicators
             VeloxBench.Services.LicenseService.Instance.LicenseStatusChanged += UpdateLicenseUi;
-            VeloxBench.Services.AutoUpdateService.Instance.UpdateStatusChanged += (msg) => Dispatcher.Invoke(UpdateUpdateUi);
+            VeloxBench.Services.AutoUpdateService.Instance.UpdateStatusChanged += (msg) =>
+            {
+                Dispatcher.InvokeAsync(() =>
+                {
+                    UpdateUpdateUi();
+                    if (msg.Contains("Downloading") || msg.Contains("Applying") || msg.Contains("New update"))
+                    {
+                        ShowFeedback($"🚀 {msg}", "🚀", "#A855F7");
+                    }
+                });
+            };
+            VeloxBench.Services.AutoUpdateService.Instance.DownloadProgressChanged += (pct) =>
+            {
+                Dispatcher.InvokeAsync(() =>
+                {
+                    ShowFeedback($"⬇ Downloading update: {pct:F0}%...", "⬇", "#58A6FF");
+                });
+            };
             UpdateLicenseUi();
             UpdateUpdateUi();
+
+            // Check if launched after a dynamic auto-update
+            if (System.Linq.Enumerable.Any(Environment.GetCommandLineArgs(), a => a.Equals("--updated", StringComparison.OrdinalIgnoreCase)))
+            {
+                ShowFeedback($"✓ VeloxBench successfully updated to v{VeloxBench.Services.AutoUpdateService.Instance.CurrentVersion}", "🚀", "#3FB950");
+            }
 
             // 1. Hook low-level Windows message pump for USB hot-plug
             var helper = new WindowInteropHelper(this);
@@ -799,8 +825,21 @@ namespace SuperAutoMater.Wpf.Views
                             };
 
                             LocalSheetsBackupService.AppendRecord(queueRec);
-                            OfflineSyncQueue.Instance.Enqueue(queueRec);
-                            _ = Task.Run(async () => await OfflineSyncQueue.Instance.FlushQueueAsync());
+                            _ = Task.Run(async () =>
+                            {
+                                var syncRes = await CloudSyncService.Instance.PushAssetDirectAsync(queueRec);
+                                await Dispatcher.InvokeAsync(() =>
+                                {
+                                    if (syncRes.Success)
+                                    {
+                                        ShowFeedback($"[VLX-OK-200] Asset {queueRec.Tag} uploaded to Velox Cloud", "☁✓", "#3FB950");
+                                    }
+                                    else
+                                    {
+                                        ShowFeedback($"[{syncRes.CodeString}] Upload failed: {syncRes.Message} (Saved locally)", "⚠", "#F85149");
+                                    }
+                                });
+                            });
                         }
                         catch { }
                     }
@@ -1097,8 +1136,21 @@ namespace SuperAutoMater.Wpf.Views
                         };
 
                         LocalSheetsBackupService.AppendRecord(queueRec);
-                        OfflineSyncQueue.Instance.Enqueue(queueRec);
-                        _ = Task.Run(async () => await OfflineSyncQueue.Instance.FlushQueueAsync());
+                        _ = Task.Run(async () =>
+                        {
+                            var syncRes = await CloudSyncService.Instance.PushAssetDirectAsync(queueRec);
+                            await Dispatcher.InvokeAsync(() =>
+                            {
+                                if (syncRes.Success)
+                                {
+                                    ShowFeedback($"[VLX-OK-200] Asset {queueRec.Tag} uploaded to Velox Cloud", "☁✓", "#3FB950");
+                                }
+                                else
+                                {
+                                    ShowFeedback($"[{syncRes.CodeString}] Upload failed: {syncRes.Message} (Saved locally)", "⚠", "#F85149");
+                                }
+                            });
+                        });
                     }
                     catch { }
 
@@ -1649,6 +1701,9 @@ namespace SuperAutoMater.Wpf.Views
                 _workspaceVideoDevices = new FilterInfoCollection(FilterCategory.VideoInputDevice);
                 CmbWorkspaceCameras.Items.Clear();
 
+                bool isPrivacyRestricted = CameraDeviceService.IsWindowsCameraPrivacyRestricted(out string privacyMsg);
+                BtnCamUnblockPrivacy.Visibility = isPrivacyRestricted ? Visibility.Visible : Visibility.Collapsed;
+
                 if (_workspaceVideoDevices.Count == 0)
                 {
                     StackCamNoDevice.Visibility = Visibility.Visible;
@@ -1691,25 +1746,91 @@ namespace SuperAutoMater.Wpf.Views
         private void StartWorkspaceCamera(string monikerString)
         {
             StopWorkspaceCamera();
+            _workspaceCamFramesReceived = 0;
+            _workspaceCamWatchdogCts?.Cancel();
+            _workspaceCamWatchdogCts = new CancellationTokenSource();
+            var token = _workspaceCamWatchdogCts.Token;
+
             try
             {
                 _workspaceVideoSource = new VideoCaptureDevice(monikerString);
 
-                // Negotiate optimal crisp resolution (<= 1080p) to avoid DirectShow pin stream failure
+                // Negotiate optimal native resolution (720p @ 30 FPS target for Precision 5540/5550/5560)
                 CameraDeviceService.ConfigureOptimalResolution(_workspaceVideoSource);
 
                 _workspaceVideoSource.NewFrame += WorkspaceVideoSource_NewFrame;
+                _workspaceVideoSource.VideoSourceError += WorkspaceVideoSource_VideoSourceError;
                 _workspaceVideoSource.Start();
 
                 StackCamNoDevice.Visibility = Visibility.Collapsed;
                 TxtCamStatus.Text = "LIVE STREAM ACTIVE";
                 DotCamStatus.Fill = (Brush)FindResource("BrushAccentEmerald");
+
+                // Watchdog: If no frames arrive in 2.5s, retry with driver default resolution (fixes Dell Precision 5540/5550/5560 pin failures)
+                Task.Run(async () =>
+                {
+                    try
+                    {
+                        await Task.Delay(2500, token);
+                        if (!token.IsCancellationRequested && _workspaceCamFramesReceived == 0)
+                        {
+                            Dispatcher.Invoke(() =>
+                            {
+                                if (_workspaceVideoSource != null && _workspaceVideoSource.VideoResolution != null)
+                                {
+                                    // Fallback to driver default format
+                                    _workspaceVideoSource.SignalToStop();
+                                    _workspaceVideoSource.VideoResolution = null;
+                                    _workspaceVideoSource.Start();
+                                }
+                                else if (_workspaceCamFramesReceived == 0)
+                                {
+                                    StackCamNoDevice.Visibility = Visibility.Visible;
+                                    bool isBlocked = CameraDeviceService.IsWindowsCameraPrivacyRestricted(out string msg);
+                                    BtnCamUnblockPrivacy.Visibility = isBlocked ? Visibility.Visible : Visibility.Collapsed;
+                                    TxtCamMessage.Text = isBlocked ? $"⚠ {msg}\nClick UNBLOCK PRIVACY to enable." : "No video frames received from camera.\nCheck Dell BIOS (F2 > Camera) or privacy shutter switch.";
+                                    TxtCamStatus.Text = "STREAM TIMEOUT";
+                                    DotCamStatus.Fill = (Brush)FindResource("BrushTextAmber");
+                                }
+                            });
+                        }
+                    }
+                    catch { }
+                }, token);
             }
             catch (Exception ex)
             {
                 StackCamNoDevice.Visibility = Visibility.Visible;
                 TxtCamMessage.Text = "Camera Error: " + ex.Message;
+                bool isBlocked = CameraDeviceService.IsWindowsCameraPrivacyRestricted(out string msg);
+                BtnCamUnblockPrivacy.Visibility = isBlocked ? Visibility.Visible : Visibility.Collapsed;
             }
+        }
+
+        private void WorkspaceVideoSource_VideoSourceError(object sender, VideoSourceErrorEventArgs eventArgs)
+        {
+            Dispatcher.InvokeAsync(() =>
+            {
+                // If custom resolution failed, automatically retry with driver default
+                if (_workspaceVideoSource != null && _workspaceVideoSource.VideoResolution != null)
+                {
+                    try
+                    {
+                        _workspaceVideoSource.SignalToStop();
+                        _workspaceVideoSource.VideoResolution = null;
+                        _workspaceVideoSource.Start();
+                        return;
+                    }
+                    catch { }
+                }
+
+                StackCamNoDevice.Visibility = Visibility.Visible;
+                TxtCamMessage.Text = "Camera Stream Error: " + eventArgs.Description;
+                bool isBlocked = CameraDeviceService.IsWindowsCameraPrivacyRestricted(out string msg);
+                BtnCamUnblockPrivacy.Visibility = isBlocked ? Visibility.Visible : Visibility.Collapsed;
+                TxtCamStatus.Text = "ERROR";
+                DotCamStatus.Fill = (Brush)FindResource("BrushTextAmber");
+            });
         }
 
         private DateTime _lastCamOpticsAnalysisTime = DateTime.MinValue;
@@ -1718,10 +1839,21 @@ namespace SuperAutoMater.Wpf.Views
         {
             try
             {
+                Interlocked.Increment(ref _workspaceCamFramesReceived);
                 lock (_camFrameLock)
                 {
                     _latestCamFrame?.Dispose();
                     _latestCamFrame = (System.Drawing.Bitmap)eventArgs.Frame.Clone();
+                }
+
+                if (StackCamNoDevice.Visibility == Visibility.Visible)
+                {
+                    Dispatcher.InvokeAsync(() =>
+                    {
+                        StackCamNoDevice.Visibility = Visibility.Collapsed;
+                        TxtCamStatus.Text = "LIVE STREAM ACTIVE";
+                        DotCamStatus.Fill = (Brush)FindResource("BrushAccentEmerald");
+                    });
                 }
 
                 using var bitmap = (System.Drawing.Bitmap)eventArgs.Frame.Clone();
@@ -1767,6 +1899,7 @@ namespace SuperAutoMater.Wpf.Views
 
         private void StopWorkspaceCamera()
         {
+            _workspaceCamWatchdogCts?.Cancel();
             lock (_camFrameLock)
             {
                 _latestCamFrame?.Dispose();
@@ -1779,6 +1912,7 @@ namespace SuperAutoMater.Wpf.Views
                 {
                     _workspaceVideoSource.SignalToStop();
                     _workspaceVideoSource.NewFrame -= WorkspaceVideoSource_NewFrame;
+                    _workspaceVideoSource.VideoSourceError -= WorkspaceVideoSource_VideoSourceError;
                     _workspaceVideoSource = null;
                 }
                 catch { }
@@ -1787,6 +1921,30 @@ namespace SuperAutoMater.Wpf.Views
             {
                 ImgWorkspaceCam.Source = null;
             });
+        }
+
+        private void BtnUnblockCameraPrivacy_Click(object sender, RoutedEventArgs e)
+        {
+            if (CameraDeviceService.TryUnblockWindowsCameraPrivacy(out string msg))
+            {
+                ShowFeedback(msg, "✓", "#3FB950");
+                InitAndStartWorkspaceCamMic();
+            }
+            else
+            {
+                ShowFeedback(msg, "⚠", "#F85149");
+            }
+        }
+
+        private void BtnRescanCameras_Click(object sender, RoutedEventArgs e)
+        {
+            InitAndStartWorkspaceCamMic();
+            ShowFeedback("Camera devices rescanned", "🔄", "#58A6FF");
+        }
+
+        private void BtnLaunchWindowsCamera_Click(object sender, RoutedEventArgs e)
+        {
+            CameraDeviceService.LaunchWindowsCameraApp();
         }
 
         private void StartWorkspaceMic()
@@ -2412,17 +2570,24 @@ namespace SuperAutoMater.Wpf.Views
                 var lic = VeloxBench.Services.LicenseService.Instance;
                 if (lic.IsLicensed)
                 {
-                    TxtAlphaLicenseBadge.Text = $"{lic.CompanyName.ToUpperInvariant()} ({lic.DaysRemaining}d)";
-                    PillAlphaLicense.ToolTip = lic.StatusMessage;
+                    TxtAlphaLicenseBadge.Text = "SYSTEM ACTIVE";
+                    PillAlphaLicense.ToolTip = $"Verified: {lic.CompanyName}\nStation Authorized";
                     TxtAlphaLicenseBadge.Foreground = new SolidColorBrush(Color.FromRgb(56, 189, 248)); // #38BDF8
                 }
                 else
                 {
-                    TxtAlphaLicenseBadge.Text = "UNLICENSED (ALPHA)";
-                    PillAlphaLicense.ToolTip = lic.StatusMessage;
+                    TxtAlphaLicenseBadge.Text = "NOT ACTIVATED";
+                    PillAlphaLicense.ToolTip = "System not activated. Click to enter activation key.";
                     TxtAlphaLicenseBadge.Foreground = new SolidColorBrush(Color.FromRgb(248, 113, 113)); // #F87171
                 }
             });
+        }
+
+        private void BtnAlphaLicense_Click(object sender, MouseButtonEventArgs e)
+        {
+            var dlg = new VeloxBench.Views.LicenseActivationDialog { Owner = this };
+            dlg.ShowDialog();
+            UpdateLicenseUi();
         }
 
         private void UpdateUpdateUi()

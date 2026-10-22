@@ -1,0 +1,18 @@
+# Caddy Reverse Proxy for Velox Cloud API
+# When VELOX_DOMAIN is set (e.g. api.veloxbench.com), Caddy provisions automated HTTPS via Let's Encrypt.
+# When VELOX_DOMAIN is empty/unset, Caddy serves HTTP on port 80 directly on your Lightsail public IP.
+
+{$VELOX_DOMAIN::80} {
+    reverse_proxy velox-api:8080 {
+        header_up Host {host}
+        header_up X-Real-IP {remote_host}
+        header_up X-Forwarded-For {remote_host}
+        header_up X-Forwarded-Proto {scheme}
+    }
+
+    encode zstd gzip
+
+    handle /health {
+        reverse_proxy velox-api:8080
+    }
+}

@@ -34,6 +34,29 @@ if ($LASTEXITCODE -eq 0) {
         Copy-Item -Path $libSource -Destination $OutputDir -Recurse -Force
     }
 
+    # Seed portable license.key if not already present
+    $licFile = "$OutputDir/license.key"
+    if (-not (Test-Path $licFile)) {
+        "VLX-ALPHA-TEST-2026" | Out-File -FilePath $licFile -Encoding utf8 -NoNewline
+        Write-Host "Created portable license file: $licFile" -ForegroundColor Yellow
+    }
+
+    # Seed portable config.json template if not already present
+    $cfgFile = "$OutputDir/config.json"
+    if (-not (Test-Path $cfgFile)) {
+        @"
+{
+  "ApiUrl": "http://localhost:5000",
+  "ApiKey": "vx-2fe1479ad70dffd3017a0aa8c67b1c270fc9dd00bb9d4bdf",
+  "LicenseKey": "VLX-ALPHA-TEST-2026",
+  "BenchName": "BENCH-01",
+  "UpdateChannel": "alpha",
+  "AutoUpdateEnabled": true
+}
+"@ | Out-File -FilePath $cfgFile -Encoding utf8
+        Write-Host "Created portable config file: $cfgFile" -ForegroundColor Yellow
+    }
+
     Write-Host "==========================================" -ForegroundColor Green
     Write-Host "VeloxBench published successfully!" -ForegroundColor Green
     Write-Host "Binary: $OutputDir/VeloxBench.exe" -ForegroundColor Green

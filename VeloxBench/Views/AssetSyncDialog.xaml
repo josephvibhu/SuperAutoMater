@@ -1,7 +1,7 @@
 <Window x:Class="SuperAutoMater.Wpf.Views.AssetSyncDialog"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        Title="ITAM Asset Dispatch &amp; Google Sheets Synchronization"
+        Title="ITAM Asset Dispatch &amp; Velox Cloud Synchronization"
         Height="780" Width="980"
         WindowStartupLocation="CenterOwner"
         ResizeMode="CanResize"
@@ -26,7 +26,7 @@
                     </Border>
                 </StackPanel>
                 <Border DockPanel.Dock="Right" Background="#1D2430" BorderBrush="#388BFD" BorderThickness="1" CornerRadius="6" Padding="8,3">
-                    <TextBlock Text="TARGET: Google Sheets / SQLite ITAM Ledger" FontFamily="{StaticResource FontMono}" FontSize="11" Foreground="#58A6FF" FontWeight="SemiBold"/>
+                    <TextBlock Text="TARGET: Velox Cloud API &amp; Local Ledger" FontFamily="{StaticResource FontMono}" FontSize="11" Foreground="#58A6FF" FontWeight="SemiBold"/>
                 </Border>
             </DockPanel>
         </Border>
@@ -407,7 +407,7 @@
         <Border Grid.Row="2" Background="#161B22" BorderBrush="#2D333B" BorderThickness="1" CornerRadius="10" Padding="14,10" Margin="0,14,0,0">
             <DockPanel LastChildFill="False">
                 <Button DockPanel.Dock="Left" Content="CANCEL [ESC]" Style="{StaticResource StyleDarkActionBtn}" Click="BtnCancel_Click" Width="130"/>
-                <Button DockPanel.Dock="Right" Content="☁ SUBMIT TO GOOGLE SHEETS &amp; LEDGER [ENTER]" Style="{StaticResource StyleCloudPassButton}" Click="BtnSubmit_Click" Width="380"/>
+                <Button DockPanel.Dock="Right" Content="☁ DISPATCH &amp; SYNC TO VELOX CLOUD [ENTER]" Style="{StaticResource StyleCloudPassButton}" Click="BtnSubmit_Click" Width="380"/>
             </DockPanel>
         </Border>
     </Grid>

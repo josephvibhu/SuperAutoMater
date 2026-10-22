@@ -39,10 +39,15 @@
                 </WindowsFormsHost>
 
                 <!-- No Camera / Loading Overlay -->
-                <StackPanel x:Name="StackNoCamera" HorizontalAlignment="Center" VerticalAlignment="Center" Visibility="Collapsed">
+                <StackPanel x:Name="StackNoCamera" HorizontalAlignment="Center" VerticalAlignment="Center" Visibility="Collapsed" MaxWidth="440">
                     <TextBlock Text="📷" FontSize="36" HorizontalAlignment="Center" Margin="0,0,0,10"/>
-                    <TextBlock x:Name="TxtNoCameraMsg" Text="Searching for camera sensor..." FontFamily="{StaticResource FontMono}" FontSize="13" Foreground="#C9D1D9" HorizontalAlignment="Center"/>
-                    <TextBlock Text="Check physical privacy shutter switch on laptop bezel" FontFamily="{StaticResource FontMono}" FontSize="11" Foreground="#8B949E" HorizontalAlignment="Center" Margin="0,6,0,0"/>
+                    <TextBlock x:Name="TxtNoCameraMsg" Text="Searching for camera sensor..." FontFamily="{StaticResource FontMono}" FontSize="13" Foreground="#C9D1D9" HorizontalAlignment="Center" TextAlignment="Center" TextWrapping="Wrap"/>
+                    <TextBlock Text="Check Dell BIOS (F2 > Camera) or physical privacy switch" FontFamily="{StaticResource FontMono}" FontSize="11" Foreground="#8B949E" HorizontalAlignment="Center" Margin="0,6,0,12"/>
+                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
+                        <Button x:Name="BtnDlgUnblockPrivacy" Content="🔓 UNBLOCK PRIVACY" Style="{StaticResource StyleWarningActionBtn}" Click="BtnDlgUnblockPrivacy_Click" Margin="0,0,8,0" Visibility="Collapsed" Padding="10,5"/>
+                        <Button x:Name="BtnDlgRescan" Content="🔄 RESCAN" Style="{StaticResource StyleDarkActionBtn}" Click="BtnDlgRescan_Click" Margin="0,0,8,0" Padding="10,5"/>
+                        <Button x:Name="BtnDlgWindowsApp" Content="📷 CAMERA APP" Style="{StaticResource StyleDarkActionBtn}" Click="BtnDlgWindowsApp_Click" Padding="10,5"/>
+                    </StackPanel>
                 </StackPanel>
             </Grid>
         </Border>

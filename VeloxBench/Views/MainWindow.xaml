@@ -63,14 +63,14 @@
             <Grid>
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="Auto"/> <!-- Brand & Bay Info -->
-                    <ColumnDefinition Width="*"/>    <!-- Spacer -->
-                    <ColumnDefinition Width="Auto"/> <!-- Telemetry Chips & Express QC -->
+                    <ColumnDefinition Width="*"/>    <!-- Telemetry Chips (Adaptive/Middle) -->
+                    <ColumnDefinition Width="Auto"/> <!-- Right Actions: Fleet HUD & 1-Click Express QC -->
                 </Grid.ColumnDefinitions>
 
                 <!-- Left Zone: Brand & Operational State (Purple isolated to Logo ONLY) -->
                 <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center">
                     <!-- Pulsing Live Dot (Purple ONLY) -->
-                    <Grid Width="12" Height="12" Margin="0,0,10,0" VerticalAlignment="Center">
+                    <Grid Width="12" Height="12" Margin="0,0,8,0" VerticalAlignment="Center">
                         <Ellipse Width="12" Height="12" Fill="{StaticResource BrushLogoPurple}" Opacity="0.4"/>
                         <Ellipse Width="8" Height="8" Fill="{StaticResource BrushLogoPurpleLight}" Effect="{StaticResource EffectGlowPurpleSm}"/>
                     </Grid>
@@ -80,28 +80,28 @@
                         <TextBlock Text="BENCH" Style="{StaticResource TextHeaderBrand}" Foreground="{StaticResource BrushLogoPurpleLight}"/>
                     </StackPanel>
 
-                    <Border Background="#21262D" BorderBrush="#30363D" BorderThickness="1" CornerRadius="6" Padding="6,2" Margin="10,0,14,0" VerticalAlignment="Center">
+                    <Border Background="#21262D" BorderBrush="#30363D" BorderThickness="1" CornerRadius="6" Padding="5,2" Margin="8,0,10,0" VerticalAlignment="Center">
                         <TextBlock Text="v1.6.0" Style="{StaticResource TextBadgeMono}" Foreground="{StaticResource BrushTextVioletMuted}"/>
                     </Border>
 
-                    <Rectangle Width="1" Height="16" Fill="#30363D" Margin="0,0,14,0" VerticalAlignment="Center"/>
+                    <Rectangle Width="1" Height="16" Fill="#30363D" Margin="0,0,10,0" VerticalAlignment="Center"/>
 
                     <StackPanel Orientation="Horizontal" VerticalAlignment="Center" ToolTip="Bay: QC-TERMINAL-01 | Operator: Senior Refurb Tech">
-                        <TextBlock Text="● BENCH ONLINE" Style="{StaticResource TextBadgeMono}" Foreground="{StaticResource BrushTextEmerald}" FontWeight="Bold" Margin="0,0,8,0"/>
-                        <TextBlock Text="|" Style="{StaticResource TextBadgeMono}" Foreground="#30363D" Margin="0,0,8,0"/>
-                        <TextBlock Text="QC-01" Style="{StaticResource TextBadgeMono}" FontWeight="Bold" Foreground="{StaticResource BrushTextWhite}" Margin="0,0,10,0"/>
+                        <TextBlock Text="● BENCH ONLINE" Style="{StaticResource TextBadgeMono}" Foreground="{StaticResource BrushTextEmerald}" FontWeight="Bold" Margin="0,0,6,0"/>
+                        <TextBlock Text="|" Style="{StaticResource TextBadgeMono}" Foreground="#30363D" Margin="0,0,6,0"/>
+                        <TextBlock Text="QC-01" Style="{StaticResource TextBadgeMono}" FontWeight="Bold" Foreground="{StaticResource BrushTextWhite}" Margin="0,0,8,0"/>
                     </StackPanel>
 
-                    <!-- Alpha License Pill -->
-                    <Border x:Name="PillAlphaLicense" Background="#161B22" BorderBrush="#30363D" BorderThickness="1" CornerRadius="6" Padding="8,3" Margin="0,0,8,0" VerticalAlignment="Center" ToolTip="Alpha Pilot License Status">
+                    <!-- System Authorization Pill -->
+                    <Border x:Name="PillAlphaLicense" Background="#161B22" BorderBrush="#30363D" BorderThickness="1" CornerRadius="6" Padding="7,3" Margin="0,0,6,0" VerticalAlignment="Center" Cursor="Hand" MouseLeftButtonUp="BtnAlphaLicense_Click" ToolTip="System Authorization (Click to view status or enter key)">
                         <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
                             <TextBlock Text="🛡️ " FontSize="10" VerticalAlignment="Center"/>
-                            <TextBlock x:Name="TxtAlphaLicenseBadge" Text="ALPHA PILOT" Style="{StaticResource TextBadgeMono}" FontWeight="Bold" Foreground="#38BDF8"/>
+                            <TextBlock x:Name="TxtAlphaLicenseBadge" Text="SYSTEM ACTIVE" Style="{StaticResource TextBadgeMono}" FontWeight="Bold" Foreground="#38BDF8"/>
                         </StackPanel>
                     </Border>
 
                     <!-- Dynamic Auto-Update Ready Pill -->
-                    <Border x:Name="PillAlphaUpdate" Visibility="Collapsed" Background="#2E1065" BorderBrush="#A855F7" BorderThickness="1" CornerRadius="6" Padding="8,3" Margin="0,0,8,0" Cursor="Hand" MouseLeftButtonUp="BtnAlphaUpdate_Click" ToolTip="Click to download and restart with latest Alpha update" VerticalAlignment="Center">
+                    <Border x:Name="PillAlphaUpdate" Visibility="Collapsed" Background="#2E1065" BorderBrush="#A855F7" BorderThickness="1" CornerRadius="6" Padding="7,3" Margin="0,0,6,0" Cursor="Hand" MouseLeftButtonUp="BtnAlphaUpdate_Click" ToolTip="Click to download and restart with latest Alpha update" VerticalAlignment="Center">
                         <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
                             <TextBlock Text="🚀 " FontSize="10" VerticalAlignment="Center"/>
                             <TextBlock Text="UPDATE READY" Style="{StaticResource TextBadgeMono}" FontWeight="Bold" Foreground="#F3E8FF"/>
@@ -109,16 +109,16 @@
                     </Border>
 
                     <!-- Technician Operator Badge Pill [Alt+T] -->
-                    <Border x:Name="BtnTechnicianPill" Background="#161B22" BorderBrush="#30363D" BorderThickness="1" CornerRadius="6" Padding="8,3" Cursor="Hand" MouseLeftButtonUp="BtnTechnicianPill_Click" ToolTip="{Binding TechnicianDisplayBadge}" Margin="10,0,0,0" VerticalAlignment="Center">
+                    <Border x:Name="BtnTechnicianPill" Background="#161B22" BorderBrush="#30363D" BorderThickness="1" CornerRadius="6" Padding="7,3" Cursor="Hand" MouseLeftButtonUp="BtnTechnicianPill_Click" ToolTip="{Binding TechnicianDisplayBadge}" Margin="4,0,0,0" VerticalAlignment="Center">
                         <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
                             <TextBlock Text="👤 " FontSize="11" VerticalAlignment="Center"/>
                             <TextBlock Text="{Binding TechnicianShortBadge}" Style="{StaticResource TextBadgeMono}" FontWeight="Bold" Foreground="#58A6FF"/>
-                            <TextBlock Text=" 📷" FontSize="9" Foreground="#8B949E" Margin="4,0,0,0"/>
+                            <TextBlock Text=" 📷" FontSize="9" Foreground="#8B949E" Margin="3,0,0,0"/>
                         </StackPanel>
                     </Border>
 
                     <!-- Auto-Advance Pipeline Mode Toggle Pill -->
-                    <Border x:Name="BtnToggleAutoAdvance" Background="#161B22" BorderBrush="{Binding AutoAdvanceBadgeColor}" BorderThickness="1" CornerRadius="6" Padding="8,3" Cursor="Hand" MouseLeftButtonUp="BtnToggleAutoAdvance_Click" ToolTip="Click to toggle Pass Auto-Advance sequence on/off" Margin="10,0,0,0" VerticalAlignment="Center">
+                    <Border x:Name="BtnToggleAutoAdvance" Background="#161B22" BorderBrush="{Binding AutoAdvanceBadgeColor}" BorderThickness="1" CornerRadius="6" Padding="7,3" Cursor="Hand" MouseLeftButtonUp="BtnToggleAutoAdvance_Click" ToolTip="Click to toggle Pass Auto-Advance sequence on/off" Margin="6,0,0,0" VerticalAlignment="Center">
                         <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
                             <TextBlock Text="⏩ " FontSize="11" VerticalAlignment="Center"/>
                             <TextBlock Text="{Binding AutoAdvanceStatusText}" Style="{StaticResource TextBadgeMono}" FontWeight="Bold" Foreground="{Binding AutoAdvanceBadgeColor}"/>
@@ -126,10 +126,64 @@
                     </Border>
                 </StackPanel>
 
-                <!-- Right Zone: Telemetry Chips & Action Button -->
-                <DockPanel Grid.Column="2" LastChildFill="False" VerticalAlignment="Center">
-                    <!-- 1-Click Express QC Button (Anchored to the absolute right, guaranteed never to wrap) -->
-                    <Button DockPanel.Dock="Right" Style="{StaticResource StylePrimaryExpressQcButton}" Click="BtnExpressQc_Click" Margin="8,0,0,0" MinWidth="175" ToolTip="Run Autonomous 8-Subsystem Express Hardware Certification [F5]">
+                <!-- Center Zone: Telemetry Chips (Adaptive right-aligned in remaining space) -->
+                <ScrollViewer Grid.Column="1"
+                              HorizontalScrollBarVisibility="Hidden"
+                              VerticalScrollBarVisibility="Disabled"
+                              Focusable="False"
+                              HorizontalAlignment="Right"
+                              VerticalAlignment="Center">
+                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                        <!-- Battery Chip -->
+                        <Border Style="{StaticResource StyleTelemetryChip}" Margin="4,0,0,0">
+                            <StackPanel Orientation="Horizontal">
+                                <TextBlock Text="BATTERY " Style="{StaticResource TextAvionicsChip}" Foreground="{StaticResource BrushTextVioletMuted}"/>
+                                <TextBlock Text="{Binding BatteryCharge, StringFormat='{}{0}%'}" Style="{StaticResource TextAvionicsChip}" FontWeight="Bold" Foreground="{StaticResource BrushTextEmerald}"/>
+                                <TextBlock Text="{Binding BatteryFlowWatts, StringFormat=' · {0}'}" Style="{StaticResource TextAvionicsChip}" Foreground="{StaticResource BrushTextVioletSubdued}" TextTrimming="CharacterEllipsis" MaxWidth="100"/>
+                            </StackPanel>
+                        </Border>
+
+                        <!-- CPU Freq Chip -->
+                        <Border Style="{StaticResource StyleTelemetryChip}" Margin="4,0,0,0">
+                            <StackPanel Orientation="Horizontal">
+                                <TextBlock Text="CPU " Style="{StaticResource TextAvionicsChip}" Foreground="{StaticResource BrushTextVioletMuted}"/>
+                                <TextBlock Text="{Binding ClockSummary}" Style="{StaticResource TextAvionicsChip}" FontWeight="Bold" Foreground="{StaticResource BrushTextVioletLight}" TextTrimming="CharacterEllipsis" MaxWidth="90"/>
+                                <TextBlock Text=" TURBO" Style="{StaticResource TextBadgeMono}" Foreground="{StaticResource BrushTextEmerald}" Margin="3,0,0,0"/>
+                            </StackPanel>
+                        </Border>
+
+                        <!-- Wi-Fi Chip -->
+                        <Border Style="{StaticResource StyleTelemetryChip}" Margin="4,0,0,0">
+                            <StackPanel Orientation="Horizontal">
+                                <TextBlock Text="WI-FI " Style="{StaticResource TextAvionicsChip}" Foreground="{StaticResource BrushTextVioletMuted}"/>
+                                <TextBlock Text="{Binding WifiSummary}" Style="{StaticResource TextAvionicsChip}" FontWeight="Bold" Foreground="{StaticResource BrushTextVioletLight}" TextTrimming="CharacterEllipsis" MaxWidth="100"/>
+                            </StackPanel>
+                        </Border>
+
+                        <!-- Missing Drivers Chip -->
+                        <Border Style="{StaticResource StyleTelemetryChip}" Margin="4,0,0,0" ToolTip="{Binding MissingDriversSummary}">
+                            <StackPanel Orientation="Horizontal">
+                                <TextBlock Text="DRIVERS " Style="{StaticResource TextAvionicsChip}" Foreground="{StaticResource BrushTextVioletMuted}"/>
+                                <TextBlock Text="{Binding MissingDriversBadge}" Style="{StaticResource TextAvionicsChip}" FontWeight="Bold" Foreground="{Binding MissingDriversAccentHex}"/>
+                            </StackPanel>
+                        </Border>
+                    </StackPanel>
+                </ScrollViewer>
+
+                <!-- Right Zone: Anchored Action Buttons (Guaranteed never to wrap or clip) -->
+                <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center" Margin="8,0,0,0">
+                    <!-- Warehouse Fleet LAN HUD Button -->
+                    <Button Style="{StaticResource StyleDarkActionBtn}" Click="BtnFleetHud_Click" Margin="0,0,8,0" Padding="10,6" ToolTip="Open Warehouse Fleet Mesh &amp; Mobile Remote Cockpit [F11]">
+                        <StackPanel Orientation="Horizontal">
+                            <TextBlock Text="📡 FLEET " TextWrapping="NoWrap" FontFamily="{StaticResource FontSans}" FontWeight="Bold" FontSize="11" Foreground="#58A6FF"/>
+                            <Border Background="#21262D" CornerRadius="4" Padding="4,1">
+                                <TextBlock Text="[F11]" Style="{StaticResource TextBadgeMono}" Foreground="#BC8CFF"/>
+                            </Border>
+                        </StackPanel>
+                    </Button>
+
+                    <!-- 1-Click Express QC Button -->
+                    <Button Style="{StaticResource StylePrimaryExpressQcButton}" Click="BtnExpressQc_Click" MinWidth="160" ToolTip="Run Autonomous 8-Subsystem Express Hardware Certification [F5]">
                         <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
                             <TextBlock Text="⚡ 1-CLICK EXPRESS QC " TextWrapping="NoWrap" FontFamily="{StaticResource FontSans}" FontWeight="Bold" FontSize="11" Foreground="{StaticResource BrushTextWhite}"/>
                             <Border Background="#40000000" CornerRadius="4" Padding="4,1">
@@ -137,51 +191,7 @@
                             </Border>
                         </StackPanel>
                     </Button>
-
-                    <!-- Warehouse Fleet LAN HUD Button -->
-                    <Button DockPanel.Dock="Right" Style="{StaticResource StyleDarkActionBtn}" Click="BtnFleetHud_Click" Margin="8,0,0,0" Padding="10,6" ToolTip="Open Warehouse Fleet Mesh &amp; Mobile Remote Cockpit [F11]">
-                        <StackPanel Orientation="Horizontal">
-                            <TextBlock Text="📡 FLEET HUD " TextWrapping="NoWrap" FontFamily="{StaticResource FontSans}" FontWeight="Bold" FontSize="11" Foreground="#58A6FF"/>
-                            <Border Background="#21262D" CornerRadius="4" Padding="4,1">
-                                <TextBlock Text="[F11]" Style="{StaticResource TextBadgeMono}" Foreground="#BC8CFF"/>
-                            </Border>
-                        </StackPanel>
-                    </Button>
-
-                    <!-- Missing Drivers Chip -->
-                    <Border DockPanel.Dock="Right" Style="{StaticResource StyleTelemetryChip}" Margin="6,0,0,0" ToolTip="{Binding MissingDriversSummary}">
-                        <StackPanel Orientation="Horizontal">
-                            <TextBlock Text="DRIVERS " Style="{StaticResource TextAvionicsChip}" Foreground="{StaticResource BrushTextVioletMuted}"/>
-                            <TextBlock Text="{Binding MissingDriversBadge}" Style="{StaticResource TextAvionicsChip}" FontWeight="Bold" Foreground="{Binding MissingDriversAccentHex}"/>
-                        </StackPanel>
-                    </Border>
-
-                    <!-- Wi-Fi Chip -->
-                    <Border DockPanel.Dock="Right" Style="{StaticResource StyleTelemetryChip}" Margin="6,0,0,0">
-                        <StackPanel Orientation="Horizontal">
-                            <TextBlock Text="WI-FI " Style="{StaticResource TextAvionicsChip}" Foreground="{StaticResource BrushTextVioletMuted}"/>
-                            <TextBlock Text="{Binding WifiSummary}" Style="{StaticResource TextAvionicsChip}" FontWeight="Bold" Foreground="{StaticResource BrushTextVioletLight}" TextTrimming="CharacterEllipsis" MaxWidth="130"/>
-                        </StackPanel>
-                    </Border>
-
-                    <!-- CPU Freq Chip -->
-                    <Border DockPanel.Dock="Right" Style="{StaticResource StyleTelemetryChip}" Margin="6,0,0,0">
-                        <StackPanel Orientation="Horizontal">
-                            <TextBlock Text="CPU FREQ " Style="{StaticResource TextAvionicsChip}" Foreground="{StaticResource BrushTextVioletMuted}"/>
-                            <TextBlock Text="{Binding ClockSummary}" Style="{StaticResource TextAvionicsChip}" FontWeight="Bold" Foreground="{StaticResource BrushTextVioletLight}" TextTrimming="CharacterEllipsis" MaxWidth="110"/>
-                            <TextBlock Text=" TURBO" Style="{StaticResource TextBadgeMono}" Foreground="{StaticResource BrushTextEmerald}" Margin="4,0,0,0"/>
-                        </StackPanel>
-                    </Border>
-
-                    <!-- Battery Chip -->
-                    <Border DockPanel.Dock="Right" Style="{StaticResource StyleTelemetryChip}" Margin="0,0,0,0">
-                        <StackPanel Orientation="Horizontal">
-                            <TextBlock Text="BATTERY " Style="{StaticResource TextAvionicsChip}" Foreground="{StaticResource BrushTextVioletMuted}"/>
-                            <TextBlock Text="{Binding BatteryCharge, StringFormat='{}{0}%'}" Style="{StaticResource TextAvionicsChip}" FontWeight="Bold" Foreground="{StaticResource BrushTextEmerald}"/>
-                            <TextBlock Text="{Binding BatteryFlowWatts, StringFormat=' · {0}'}" Style="{StaticResource TextAvionicsChip}" Foreground="{StaticResource BrushTextVioletSubdued}" TextTrimming="CharacterEllipsis" MaxWidth="120"/>
-                        </StackPanel>
-                    </Border>
-                </DockPanel>
+                </StackPanel>
             </Grid>
         </Border>
 
@@ -607,9 +617,14 @@
                                                 </Border>
 
                                                 <!-- Overlay when no camera or searching -->
-                                                <StackPanel x:Name="StackCamNoDevice" HorizontalAlignment="Center" VerticalAlignment="Center" Visibility="Collapsed">
+                                                <StackPanel x:Name="StackCamNoDevice" HorizontalAlignment="Center" VerticalAlignment="Center" Visibility="Collapsed" MaxWidth="440">
                                                     <TextBlock Text="📷" FontSize="32" HorizontalAlignment="Center" Margin="0,0,0,6"/>
-                                                    <TextBlock x:Name="TxtCamMessage" Text="Searching for DirectShow camera..." Style="{StaticResource TextBadgeMono}" Foreground="{StaticResource BrushTextVioletMuted}" HorizontalAlignment="Center"/>
+                                                    <TextBlock x:Name="TxtCamMessage" Text="Searching for DirectShow camera..." Style="{StaticResource TextBadgeMono}" Foreground="{StaticResource BrushTextVioletMuted}" HorizontalAlignment="Center" TextAlignment="Center" TextWrapping="Wrap" Margin="0,0,0,10"/>
+                                                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
+                                                        <Button x:Name="BtnCamUnblockPrivacy" Content="🔓 UNBLOCK PRIVACY" Style="{StaticResource StyleWarningActionBtn}" Click="BtnUnblockCameraPrivacy_Click" Margin="0,0,8,0" Visibility="Collapsed" Padding="10,5"/>
+                                                        <Button x:Name="BtnCamRescan" Content="🔄 RESCAN" Style="{StaticResource StyleDarkActionBtn}" Click="BtnRescanCameras_Click" Margin="0,0,8,0" Padding="10,5"/>
+                                                        <Button x:Name="BtnCamWindowsApp" Content="📷 CAMERA APP" Style="{StaticResource StyleDarkActionBtn}" Click="BtnLaunchWindowsCamera_Click" Padding="10,5"/>
+                                                    </StackPanel>
                                                 </StackPanel>
                                             </Grid>
                                         </Border>

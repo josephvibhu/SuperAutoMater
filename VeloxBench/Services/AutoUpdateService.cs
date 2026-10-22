@@ -128,10 +128,18 @@ public sealed class AutoUpdateService
             var updateTmpPath = Path.Combine(baseDir, $"{Path.GetFileNameWithoutExtension(currentExe)}.update.tmp");
             var backupOldPath = Path.Combine(baseDir, $"{Path.GetFileName(currentExe)}.old");
 
-            AppLogger.Info("Update", $"Downloading v{update.LatestVersion} from {update.DownloadUrl}...");
+            var downloadUrl = update.DownloadUrl;
+            if (!downloadUrl.StartsWith("http://", StringComparison.OrdinalIgnoreCase) &&
+                !downloadUrl.StartsWith("https://", StringComparison.OrdinalIgnoreCase))
+            {
+                var cfg = BenchConfigService.Current;
+                downloadUrl = cfg.ApiUrl.TrimEnd('/') + "/" + downloadUrl.TrimStart('/');
+            }
+
+            AppLogger.Info("Update", $"Downloading v{update.LatestVersion} from {downloadUrl}...");
             UpdateStatusChanged?.Invoke($"Downloading v{update.LatestVersion}...");
 
-            using (var resp = await _http.GetAsync(update.DownloadUrl, HttpCompletionOption.ResponseHeadersRead))
+            using (var resp = await _http.GetAsync(downloadUrl, HttpCompletionOption.ResponseHeadersRead))
             {
                 resp.EnsureSuccessStatusCode();
                 var totalBytes = resp.Content.Headers.ContentLength ?? update.FileSizeBytes;
