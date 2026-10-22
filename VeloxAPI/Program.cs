@@ -6,6 +6,12 @@ using VeloxAPI.Realtime;
 
 var builder = WebApplication.CreateBuilder(args);
 
+// ── Kestrel Limits ────────────────────────────────────────────────────────────
+builder.WebHost.ConfigureKestrel(options =>
+{
+    options.Limits.MaxRequestBodySize = 250_000_000; // 250 MB for binary payload uploads
+});
+
 // ── JSON Options ──────────────────────────────────────────────────────────────
 builder.Services.ConfigureHttpJsonOptions(options =>
 {

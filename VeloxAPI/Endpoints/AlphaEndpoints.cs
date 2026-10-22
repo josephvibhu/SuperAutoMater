@@ -173,6 +173,58 @@ public static class AlphaEndpoints
                 release = req
             });
         });
+
+        // POST /api/v1/admin/update/upload-payload — upload binary payload and register in catalog
+        app.MapPost("/api/v1/admin/update/upload-payload", async (HttpRequest req, HttpContext ctx, VeloxDb db, IConfiguration config) =>
+        {
+            var adminSecret = config["VELOX_ADMIN_SECRET"] ?? Environment.GetEnvironmentVariable("VELOX_ADMIN_SECRET");
+            var provided = ctx.Request.Headers["X-Admin-Secret"].FirstOrDefault();
+
+            if (!string.IsNullOrWhiteSpace(adminSecret) && provided != adminSecret)
+            {
+                return Results.Json(new { error = "Invalid admin secret." }, statusCode: 403);
+            }
+
+            var appName = req.Query["app"].FirstOrDefault() ?? "VeloxHub";
+            var channel = req.Query["channel"].FirstOrDefault() ?? "alpha";
+            var version = req.Query["version"].FirstOrDefault() ?? "1.6.10";
+
+            var releasesDir = Path.Combine(AppContext.BaseDirectory, "releases");
+            Directory.CreateDirectory(releasesDir);
+            var destPath = Path.Combine(releasesDir, $"{appName}.exe");
+
+            using (var fileStream = File.Create(destPath))
+            {
+                await req.Body.CopyToAsync(fileStream);
+            }
+
+            var fileInfo = new FileInfo(destPath);
+            using var sha = System.Security.Cryptography.SHA256.Create();
+            using var fs = File.OpenRead(destPath);
+            var hashBytes = await sha.ComputeHashAsync(fs);
+            var hashHex = BitConverter.ToString(hashBytes).Replace("-", "").ToLowerInvariant();
+
+            var pubReq = new PublishReleaseRequest
+            {
+                AppName = appName,
+                Version = version,
+                Channel = channel,
+                DownloadUrl = $"/api/v1/update/download?app={appName}&channel={channel}",
+                FileSha256 = hashHex,
+                FileSizeBytes = fileInfo.Length,
+                IsMandatory = false,
+                ReleaseNotes = $"{appName} production payload v{version}"
+            };
+
+            db.PublishRelease(pubReq);
+
+            return Results.Ok(new
+            {
+                message = $"Successfully uploaded and published {appName} v{version} ({fileInfo.Length:N0} bytes)",
+                sha256 = hashHex,
+                path = destPath
+            });
+        });
     }
 
     // ── High-Throughput Bench Cloud Ingestion ────────────────────────────────
