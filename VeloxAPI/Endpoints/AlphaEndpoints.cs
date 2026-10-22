@@ -139,6 +139,8 @@ public static class AlphaEndpoints
             var searchPaths = new[]
             {
                 Path.Combine(AppContext.BaseDirectory, "releases", $"{app}.exe"),
+                Path.Combine(AppContext.BaseDirectory, "wwwroot", "downloads", $"{app}.exe"),
+                Path.Combine(AppContext.BaseDirectory, "wwwroot", $"{app}.exe"),
                 Path.Combine(AppContext.BaseDirectory, "..", "Releases", app, $"{app}.exe"),
                 Path.Combine(AppContext.BaseDirectory, "..", "Releases", $"{app}.exe"),
                 Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Velox", "Releases", $"{app}.exe")

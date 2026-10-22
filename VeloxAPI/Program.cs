@@ -57,8 +57,9 @@ app.UseMiddleware<JwtMiddleware>();
 app.MapGet("/health", (SseHub sse) => Results.Ok(new
 {
     status      = "healthy",
-    service     = "VeloxAPI",
-    version     = "1.0.0",
+    service     = "Velox Platform Cloud",
+    version     = "1.6.10",
+    cluster     = "ap-south-1 Mumbai",
     liveClients = sse.ConnectedCount,
     utc         = DateTimeOffset.UtcNow
 }));

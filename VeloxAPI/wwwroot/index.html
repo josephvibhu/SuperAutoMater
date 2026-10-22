@@ -2,122 +2,906 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <meta name="theme-color" content="#0d1117">
-  <meta name="apple-mobile-web-app-capable" content="yes">
-  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-  <title>VeloxLink — Technician Companion</title>
-  <link rel="stylesheet" href="style.css">
-  <link rel="manifest" href="manifest.json">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="theme-color" content="#090d16">
+  <title>Velox Platform Suite — Laptop Diagnostics & Warehouse QC Cockpit</title>
+  <meta name="description" content="Enterprise laptop diagnostics, hardware stress testing, automated A/B/C grading, and warehouse fleet telemetry for refurbished IT asset disposition. Built by Abzard Inc.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg: #070a12;
+      --bg-card: #0e1526;
+      --bg-card-hover: #141f36;
+      --border: #1e293b;
+      --border-focus: #3b82f6;
+      --text: #f8fafc;
+      --text-muted: #94a3b8;
+      --primary: #2563eb;
+      --primary-light: #3b82f6;
+      --primary-glow: rgba(37, 99, 235, 0.25);
+      --success: #10b981;
+      --warning: #f59e0b;
+      --danger: #ef4444;
+      --font: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+      --font-mono: 'JetBrains Mono', monospace;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    html { scroll-behavior: smooth; }
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: var(--font);
+      line-height: 1.6;
+      overflow-x: hidden;
+    }
+
+    /* ── Utilities & Glows ── */
+    .glow-bg {
+      position: absolute;
+      top: 0;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 1000px;
+      height: 500px;
+      background: radial-gradient(circle, rgba(37, 99, 235, 0.15) 0%, rgba(7, 10, 18, 0) 70%);
+      pointer-events: none;
+      z-index: 0;
+    }
+    .container {
+      width: 100%;
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 0 24px;
+      position: relative;
+      z-index: 1;
+    }
+
+    /* ── Navigation ── */
+    header.navbar {
+      position: sticky;
+      top: 0;
+      background: rgba(7, 10, 18, 0.85);
+      backdrop-filter: blur(12px);
+      border-bottom: 1px solid var(--border);
+      z-index: 100;
+      padding: 16px 0;
+    }
+    .nav-wrap {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      text-decoration: none;
+      color: white;
+    }
+    .brand-logo {
+      background: linear-gradient(135deg, #1d4ed8, #3b82f6);
+      width: 36px;
+      height: 36px;
+      border-radius: 10px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 900;
+      font-size: 18px;
+      box-shadow: 0 0 15px var(--primary-glow);
+    }
+    .brand-title {
+      font-size: 20px;
+      font-weight: 800;
+      letter-spacing: -0.5px;
+    }
+    .brand-by {
+      font-size: 11px;
+      color: var(--text-muted);
+      margin-left: 4px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+    .nav-links {
+      display: flex;
+      align-items: center;
+      gap: 28px;
+      list-style: none;
+    }
+    .nav-links a {
+      color: var(--text-muted);
+      text-decoration: none;
+      font-size: 14px;
+      font-weight: 600;
+      transition: color 0.2s;
+    }
+    .nav-links a:hover {
+      color: white;
+    }
+    .nav-actions {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 10px 18px;
+      border-radius: 8px;
+      font-size: 14px;
+      font-weight: 700;
+      text-decoration: none;
+      transition: all 0.2s ease;
+      cursor: pointer;
+      border: 1px solid transparent;
+    }
+    .btn-primary {
+      background: var(--primary);
+      color: white;
+      box-shadow: 0 4px 14px var(--primary-glow);
+    }
+    .btn-primary:hover {
+      background: var(--primary-light);
+      transform: translateY(-1px);
+    }
+    .btn-outline {
+      background: transparent;
+      border-color: var(--border);
+      color: var(--text);
+    }
+    .btn-outline:hover {
+      background: var(--bg-card);
+      border-color: var(--border-focus);
+    }
+
+    /* ── Hero Section ── */
+    section.hero {
+      padding: 80px 0 60px;
+      text-align: center;
+      position: relative;
+    }
+    .badge-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      background: rgba(37, 99, 235, 0.12);
+      border: 1px solid rgba(59, 130, 246, 0.3);
+      padding: 6px 14px;
+      border-radius: 30px;
+      font-size: 13px;
+      color: var(--primary-light);
+      font-weight: 600;
+      margin-bottom: 24px;
+    }
+    .badge-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: var(--success);
+      box-shadow: 0 0 8px var(--success);
+    }
+    h1.hero-title {
+      font-size: 52px;
+      font-weight: 800;
+      line-height: 1.15;
+      letter-spacing: -1.5px;
+      max-width: 900px;
+      margin: 0 auto 20px;
+    }
+    h1.hero-title span.grad {
+      background: linear-gradient(135deg, #60a5fa, #3b82f6, #93c5fd);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+    p.hero-sub {
+      font-size: 18px;
+      color: var(--text-muted);
+      max-width: 740px;
+      margin: 0 auto 36px;
+      line-height: 1.6;
+    }
+    .hero-ctas {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 16px;
+      margin-bottom: 50px;
+      flex-wrap: wrap;
+    }
+    .btn-lg {
+      padding: 14px 28px;
+      font-size: 16px;
+      border-radius: 10px;
+    }
+
+    /* ── Cockpit Live Mockup ── */
+    .cockpit-preview {
+      max-width: 980px;
+      margin: 0 auto;
+      background: #090e1a;
+      border: 1px solid #1e293b;
+      border-radius: 16px;
+      box-shadow: 0 25px 60px -15px rgba(0, 0, 0, 0.7), 0 0 40px rgba(37, 99, 235, 0.12);
+      overflow: hidden;
+      text-align: left;
+    }
+    .cockpit-header {
+      background: #0d1424;
+      padding: 12px 18px;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .window-dots {
+      display: flex;
+      gap: 8px;
+    }
+    .dot { width: 11px; height: 11px; border-radius: 50%; }
+    .dot-r { background: #ef4444; }
+    .dot-y { background: #f59e0b; }
+    .dot-g { background: #10b981; }
+    .cockpit-title {
+      font-family: var(--font-mono);
+      font-size: 13px;
+      color: var(--text-muted);
+    }
+    .cockpit-body {
+      padding: 24px;
+      display: grid;
+      grid-template-columns: 2fr 1fr;
+      gap: 20px;
+    }
+    @media (max-width: 768px) {
+      .cockpit-body { grid-template-columns: 1fr; }
+      h1.hero-title { font-size: 36px; }
+    }
+    .diag-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 14px;
+    }
+    .diag-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 14px;
+    }
+    .diag-label {
+      font-size: 11px;
+      text-transform: uppercase;
+      color: var(--text-muted);
+      letter-spacing: 0.5px;
+      margin-bottom: 4px;
+    }
+    .diag-val {
+      font-size: 16px;
+      font-weight: 700;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .grade-box {
+      background: linear-gradient(135deg, rgba(16, 185, 129, 0.1), rgba(16, 185, 129, 0.02));
+      border: 1px solid rgba(16, 185, 129, 0.3);
+      border-radius: 12px;
+      padding: 20px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+    }
+    .grade-badge {
+      font-size: 48px;
+      font-weight: 900;
+      color: var(--success);
+      line-height: 1;
+      margin-bottom: 6px;
+    }
+    .grade-title {
+      font-size: 15px;
+      font-weight: 700;
+      color: white;
+    }
+    .grade-desc {
+      font-size: 12px;
+      color: var(--text-muted);
+      margin-top: 4px;
+    }
+
+    /* ── Features & Apps Grid ── */
+    section.section {
+      padding: 90px 0;
+      border-top: 1px solid var(--border);
+    }
+    .sec-header {
+      text-align: center;
+      max-width: 700px;
+      margin: 0 auto 50px;
+    }
+    .sec-tag {
+      font-size: 12px;
+      font-weight: 800;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      color: var(--primary-light);
+      margin-bottom: 10px;
+    }
+    .sec-title {
+      font-size: 34px;
+      font-weight: 800;
+      letter-spacing: -1px;
+      margin-bottom: 14px;
+    }
+    .sec-desc {
+      color: var(--text-muted);
+      font-size: 16px;
+    }
+    .apps-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 24px;
+    }
+    @media (max-width: 900px) {
+      .apps-grid { grid-template-columns: 1fr; }
+    }
+    .app-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 30px;
+      transition: all 0.25s ease;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+    }
+    .app-card:hover {
+      background: var(--bg-card-hover);
+      border-color: var(--border-focus);
+      transform: translateY(-3px);
+    }
+    .app-icon {
+      width: 48px;
+      height: 48px;
+      border-radius: 12px;
+      background: rgba(37, 99, 235, 0.15);
+      color: var(--primary-light);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 22px;
+      margin-bottom: 20px;
+    }
+    .app-name {
+      font-size: 20px;
+      font-weight: 700;
+      margin-bottom: 8px;
+    }
+    .app-desc {
+      font-size: 14px;
+      color: var(--text-muted);
+      line-height: 1.6;
+      margin-bottom: 20px;
+    }
+    .app-feat-list {
+      list-style: none;
+      font-size: 13px;
+      color: var(--text-muted);
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+    .app-feat-list li {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .check-icon {
+      color: var(--success);
+      font-weight: bold;
+    }
+
+    /* ── Pricing Matrix ── */
+    .currency-toggle {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 12px;
+      margin-bottom: 40px;
+    }
+    .toggle-btn {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      color: var(--text-muted);
+      padding: 8px 18px;
+      border-radius: 20px;
+      font-weight: 700;
+      font-size: 14px;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    .toggle-btn.active {
+      background: var(--primary);
+      border-color: var(--primary);
+      color: white;
+    }
+    .pricing-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 20px;
+    }
+    @media (max-width: 1050px) {
+      .pricing-grid { grid-template-columns: repeat(2, 1fr); }
+    }
+    @media (max-width: 600px) {
+      .pricing-grid { grid-template-columns: 1fr; }
+    }
+    .plan-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 30px 24px;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      position: relative;
+    }
+    .plan-card.featured {
+      background: #111a33;
+      border-color: #3b82f6;
+      box-shadow: 0 10px 30px -10px rgba(37, 99, 235, 0.4);
+    }
+    .popular-tag {
+      position: absolute;
+      top: -12px;
+      right: 20px;
+      background: linear-gradient(135deg, #2563eb, #3b82f6);
+      color: white;
+      font-size: 11px;
+      font-weight: 800;
+      text-transform: uppercase;
+      padding: 4px 12px;
+      border-radius: 20px;
+      letter-spacing: 0.5px;
+    }
+    .plan-name {
+      font-size: 18px;
+      font-weight: 800;
+      margin-bottom: 6px;
+    }
+    .plan-sub {
+      font-size: 13px;
+      color: var(--text-muted);
+      margin-bottom: 20px;
+      min-height: 40px;
+    }
+    .price-box {
+      margin-bottom: 24px;
+      padding-bottom: 20px;
+      border-bottom: 1px solid var(--border);
+    }
+    .price-amount {
+      font-size: 36px;
+      font-weight: 800;
+      letter-spacing: -1px;
+    }
+    .price-period {
+      font-size: 14px;
+      color: var(--text-muted);
+    }
+    .bonus-pill {
+      background: rgba(16, 185, 129, 0.12);
+      border: 1px solid rgba(16, 185, 129, 0.3);
+      color: #34d399;
+      font-size: 12px;
+      font-weight: 700;
+      padding: 6px 10px;
+      border-radius: 8px;
+      margin-top: 10px;
+      display: inline-block;
+    }
+    .plan-feats {
+      list-style: none;
+      font-size: 13px;
+      color: var(--text-muted);
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      margin-bottom: 28px;
+    }
+    .plan-feats li {
+      display: flex;
+      align-items: flex-start;
+      gap: 8px;
+    }
+    .plan-feats li strong {
+      color: var(--text);
+    }
+
+    /* ── Download Section ── */
+    .download-card {
+      background: linear-gradient(135deg, #0e172a, #131c35);
+      border: 1px solid #1e293b;
+      border-radius: 20px;
+      padding: 50px 40px;
+      text-align: center;
+      max-width: 860px;
+      margin: 0 auto;
+      box-shadow: 0 20px 50px rgba(0, 0, 0, 0.5);
+    }
+    .dl-title {
+      font-size: 32px;
+      font-weight: 800;
+      margin-bottom: 12px;
+    }
+    .dl-meta {
+      font-family: var(--font-mono);
+      font-size: 13px;
+      color: var(--text-muted);
+      margin-bottom: 24px;
+    }
+
+    /* ── Live Cloud Health ── */
+    .health-bar {
+      margin-top: 40px;
+      display: inline-flex;
+      align-items: center;
+      gap: 12px;
+      background: #090e1a;
+      border: 1px solid var(--border);
+      padding: 8px 16px;
+      border-radius: 20px;
+      font-size: 13px;
+    }
+    .pulse-green {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      background: var(--success);
+      box-shadow: 0 0 10px var(--success);
+      animation: pulse 2s infinite;
+    }
+    @keyframes pulse { 0%, 100% { opacity: 1; transform: scale(1); } 50% { opacity: 0.6; transform: scale(0.9); } }
+
+    /* ── Footer ── */
+    footer {
+      border-top: 1px solid var(--border);
+      padding: 50px 0 30px;
+      background: #060911;
+      font-size: 14px;
+      color: var(--text-muted);
+    }
+    .footer-wrap {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      gap: 20px;
+    }
+  </style>
 </head>
 <body>
-  <!-- Header Bar -->
-  <header class="app-header">
-    <div class="brand">
-      <span class="bolt">⚡</span>
-      <span class="brand-name">VELOX<strong>LINK</strong></span>
-      <span class="version-tag">DEPOT OPS</span>
-    </div>
-    <div id="user-pill" class="user-pill hidden">
-      <span id="user-name-display" class="user-name">Technician</span>
-      <button id="logout-btn" class="btn-logout" title="Sign Out">✕</button>
+  <div class="glow-bg"></div>
+
+  <!-- Navigation -->
+  <header class="navbar">
+    <div class="container nav-wrap">
+      <a href="#" class="brand">
+        <div class="brand-logo">⚡</div>
+        <div>
+          <span class="brand-title">VELOX</span>
+          <span class="brand-by">by Abzard</span>
+        </div>
+      </a>
+      <ul class="nav-links">
+        <li><a href="#suite">Products</a></li>
+        <li><a href="#pricing">Plans &amp; Quotas</a></li>
+        <li><a href="#download">Download</a></li>
+        <li><a href="/link">Velox Link (Mobile)</a></li>
+      </ul>
+      <div class="nav-actions">
+        <a href="#download" class="btn btn-primary">Download v1.6.10</a>
+      </div>
     </div>
   </header>
 
-  <!-- Main Container -->
-  <main class="app-container">
+  <!-- Hero Section -->
+  <section class="hero">
+    <div class="container">
+      <div class="badge-pill">
+        <div class="badge-dot"></div>
+        <span>Velox Production Beta Live • Mumbai AWS Cloud Active</span>
+      </div>
+      <h1 class="hero-title">
+        The Diagnostic &amp; QC Cockpit Built for <span class="grad">Laptop Refurbishers</span>
+      </h1>
+      <p class="hero-sub">
+        Automate 8-point hardware stress tests, calculate genuine SMART battery wear, prevent inventory collisions with multi-vector Silicon DNA, and generate instant Grade A/B/C inspection cards.
+      </p>
+      <div class="hero-ctas">
+        <a href="/api/v1/update/download/latest?appName=VeloxBench" class="btn btn-primary btn-lg">
+          <svg width="20" height="20" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>
+          Download VeloxBench (Win-x64)
+        </a>
+        <a href="#pricing" class="btn btn-outline btn-lg">View Monthly Plans</a>
+      </div>
 
-    <!-- ── LOGIN SCREEN ─────────────────────────────────────────────────────── -->
-    <section id="login-view" class="view">
-      <div class="card login-card">
-        <div class="login-header">
-          <div class="login-icon">⚡</div>
-          <h2>Technician Sign In</h2>
-          <p>Access your assigned refurbishing tasks &amp; bench queue</p>
+      <!-- Cockpit Interactive Mockup -->
+      <div class="cockpit-preview">
+        <div class="cockpit-header">
+          <div class="window-dots">
+            <div class="dot dot-r"></div>
+            <div class="dot dot-y"></div>
+            <div class="dot dot-g"></div>
+          </div>
+          <div class="cockpit-title">VeloxBench v1.6.10 — Dell Latitude 5420 [QC PASSED]</div>
+          <div style="font-size: 11px; color: #10b981; font-weight: 700;">● CLOUD SYNCED</div>
+        </div>
+        <div class="cockpit-body">
+          <div class="diag-grid">
+            <div class="diag-card">
+              <div class="diag-label">Processor &amp; Thermal</div>
+              <div class="diag-val"><span>Intel Core i5-1145G7</span> <span style="color:#10b981; font-size:13px;">42°C PASSED</span></div>
+            </div>
+            <div class="diag-card">
+              <div class="diag-label">Battery Health &amp; Wear</div>
+              <div class="diag-val"><span>91.4% (OEM LGC)</span> <span style="color:#10b981; font-size:13px;">47,890 mWh</span></div>
+            </div>
+            <div class="diag-card">
+              <div class="diag-label">NVMe Storage SMART</div>
+              <div class="diag-val"><span>Kioxia 512GB SSD</span> <span style="color:#10b981; font-size:13px;">100% HEALTH</span></div>
+            </div>
+            <div class="diag-card">
+              <div class="diag-label">Vision Sensor &amp; Privacy</div>
+              <div class="diag-val"><span>RGB 720p @ 30fps</span> <span style="color:#10b981; font-size:13px;">UNBLOCKED</span></div>
+            </div>
+          </div>
+          <div class="grade-box">
+            <div class="grade-badge">A</div>
+            <div class="grade-title">Certified Grade A</div>
+            <div class="grade-desc">Zero component faults detected. Ready for immediate wholesale cataloging.</div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </section>
+
+  <!-- Products Suite -->
+  <section id="suite" class="section">
+    <div class="container">
+      <div class="sec-header">
+        <div class="sec-tag">The Ecosystem</div>
+        <h2 class="sec-title">Engineered Specifically for Bulk Depot Floors</h2>
+        <p class="sec-desc">Replace messy manual checklists, slow USB copy-pasting, and RMA returns with an integrated diagnostic suite.</p>
+      </div>
+
+      <div class="apps-grid">
+        <div class="app-card">
+          <div>
+            <div class="app-icon">⚡</div>
+            <h3 class="app-name">VeloxBench</h3>
+            <p class="app-desc">Single-file portable diagnostic cockpit. Runs directly from USB or local drive on any Windows 10/11 laptop without installing runtimes.</p>
+            <ul class="app-feat-list">
+              <li><span class="check-icon">✓</span> Automated 8-point hardware stress test</li>
+              <li><span class="check-icon">✓</span> Smart RGB-IR camera sensor unblocker</li>
+              <li><span class="check-icon">✓</span> Multi-vector Silicon DNA deduplication</li>
+              <li><span class="check-icon">✓</span> 1-click thermal sticker label printing</li>
+            </ul>
+          </div>
         </div>
 
-        <form id="login-form">
-          <div class="form-group">
-            <label for="emp-name">Technician Name</label>
-            <input type="text" id="emp-name" placeholder="e.g. John Tech" required autocomplete="username">
+        <div class="app-card">
+          <div>
+            <div class="app-icon">📊</div>
+            <h3 class="app-name">VeloxManager</h3>
+            <p class="app-desc">Depot supervisor cockpit. Track real-time godown intake, technician speed, warranty holds, and lot inventory across test benches.</p>
+            <ul class="app-feat-list">
+              <li><span class="check-icon">✓</span> Live SSE telemetry feed from all benches</li>
+              <li><span class="check-icon">✓</span> Technician station throughput metrics</li>
+              <li><span class="check-icon">✓</span> Searchable inventory catalog &amp; CSV export</li>
+              <li><span class="check-icon">✓</span> Warranty dispatch &amp; RMA control</li>
+            </ul>
           </div>
-
-          <div class="form-group">
-            <label for="emp-pin">Station PIN</label>
-            <input type="password" id="emp-pin" placeholder="••••" maxlength="8" required pattern="[0-9]*" inputmode="numeric" autocomplete="current-password">
-          </div>
-
-          <div class="form-group">
-            <label for="api-key-input">Depot Access Key</label>
-            <input type="text" id="api-key-input" placeholder="vx-..." value="vx-2fe1479ad70dffd3017a0aa8c67b1c270fc9dd00bb9d4bdf">
-          </div>
-
-          <button type="submit" id="btn-login" class="btn btn-primary btn-block">Sign In to Workstation</button>
-          <div id="login-error" class="error-msg hidden"></div>
-        </form>
-      </div>
-    </section>
-
-    <!-- ── JOB QUEUE SCREEN ─────────────────────────────────────────────────── -->
-    <section id="jobs-view" class="view hidden">
-      <!-- Toolbar -->
-      <div class="queue-toolbar">
-        <div>
-          <h2>My Active Queue</h2>
-          <span id="queue-subtitle" class="subtitle">Fetching assigned tasks...</span>
-        </div>
-        <button id="btn-refresh" class="btn btn-outline" title="Refresh Queue">🔄</button>
-      </div>
-
-      <!-- Search Filter -->
-      <div class="search-box">
-        <input type="text" id="job-search" placeholder="Search serial, tag, or model...">
-      </div>
-
-      <!-- Jobs Feed -->
-      <div id="jobs-list" class="jobs-list">
-        <!-- Rendered dynamically -->
-      </div>
-
-      <!-- Empty State -->
-      <div id="empty-state" class="empty-state hidden">
-        <div class="empty-icon">✓</div>
-        <h3>All Caught Up!</h3>
-        <p>No active refurbishment tasks assigned to you right now. New dispatches from VeloxManager will appear here automatically.</p>
-      </div>
-    </section>
-
-  </main>
-
-  <!-- Status / Action Modal -->
-  <div id="action-modal" class="modal hidden">
-    <div class="modal-backdrop"></div>
-    <div class="modal-content">
-      <div class="modal-header">
-        <h3 id="modal-title">Update Unit Status</h3>
-        <button id="modal-close" class="btn-close">✕</button>
-      </div>
-      <div class="modal-body">
-        <p id="modal-subtitle">Serial: ...</p>
-        
-        <label>Set Lifecycle Stage:</label>
-        <div class="status-grid">
-          <button class="btn-status" data-status="ActiveTesting">⚡ Active Testing</button>
-          <button class="btn-status" data-status="ExternalRepair">🔧 In Repair</button>
-          <button class="btn-status" data-status="AwaitingParts">📦 Awaiting Parts</button>
-          <button class="btn-status" data-status="ReadyForSale">✓ Ready For Sale</button>
         </div>
 
-        <label for="modal-notes" style="margin-top: 14px; display:block;">Add Work Log / Defect Notes:</label>
-        <textarea id="modal-notes" rows="3" placeholder="Enter findings, parts replaced, or inspection comments..."></textarea>
-      </div>
-      <div class="modal-footer">
-        <button id="modal-cancel" class="btn btn-outline">Cancel</button>
-        <button id="modal-save" class="btn btn-primary">Save &amp; Push</button>
+        <div class="app-card">
+          <div>
+            <div class="app-icon">📱</div>
+            <h3 class="app-name">Velox Link Mobile</h3>
+            <p class="app-desc">Zero-install mobile web companion. Scan the dynamic QR code on the laptop screen to instantly stream defect photos into the test card.</p>
+            <ul class="app-feat-list">
+              <li><span class="check-icon">✓</span> Zero app-store downloads needed</li>
+              <li><span class="check-icon">✓</span> Instant chassis scratch &amp; dent photo tagging</li>
+              <li><span class="check-icon">✓</span> Barcode &amp; service tag camera scan</li>
+              <li><span class="check-icon">✓</span> Real-time desktop pairing handshake</li>
+            </ul>
+          </div>
+        </div>
       </div>
     </div>
-  </div>
+  </section>
 
-  <script src="app.js"></script>
+  <!-- Pricing Plans -->
+  <section id="pricing" class="section">
+    <div class="container">
+      <div class="sec-header">
+        <div class="sec-tag">Predictable Monthly Licensing</div>
+        <h2 class="sec-title">Plans Scaled to Your Depot Throughput</h2>
+        <p class="sec-desc">All plans include our Month 1 Onboarding Grace bonus to catalog your pre-existing godown backlog into the database.</p>
+      </div>
+
+      <div class="currency-toggle">
+        <button class="toggle-btn active" id="btn-inr" onclick="setCurrency('inr')">INR (₹)</button>
+        <button class="toggle-btn" id="btn-usd" onclick="setCurrency('usd')">USD ($)</button>
+      </div>
+
+      <div class="pricing-grid">
+        <!-- Bench Solo -->
+        <div class="plan-card">
+          <div>
+            <div class="plan-name">Bench Solo</div>
+            <div class="plan-sub">For solo chip-level repair shops &amp; single technician workstations.</div>
+            <div class="price-box">
+              <div class="price-amount" id="price-solo">₹1,499</div>
+              <div class="price-period">per month / bench</div>
+            </div>
+            <ul class="plan-feats">
+              <li><span class="check-icon">✓</span> <strong>Unlimited</strong> Local Testing</li>
+              <li><span class="check-icon">✓</span> Full 8-Point Hardware Stress</li>
+              <li><span class="check-icon">✓</span> Printable Grade A/B/C Cards</li>
+              <li><span class="check-icon">✓</span> 1 Node-Locked Workstation Seat</li>
+              <li><span style="color:#64748b;">✕ Cloud Fleet Sync Not Included</span></li>
+            </ul>
+          </div>
+          <a href="#download" class="btn btn-outline">Download Free Trial</a>
+        </div>
+
+        <!-- Starter Depot -->
+        <div class="plan-card">
+          <div>
+            <div class="plan-name">Starter Depot</div>
+            <div class="plan-sub">For boutique refurbishment wholesalers testing 3–5 laptops daily.</div>
+            <div class="price-box">
+              <div class="price-amount" id="price-starter">₹3,499</div>
+              <div class="price-period">per month</div>
+              <div class="bonus-pill">Month 1 Bonus: 1,000 Units</div>
+            </div>
+            <ul class="plan-feats">
+              <li><span class="check-icon">✓</span> <strong>100 Laptops / Month</strong> quota</li>
+              <li><span class="check-icon">✓</span> <strong>Up to 3</strong> Enrolled Bench Seats</li>
+              <li><span class="check-icon">✓</span> Dedicated Isolated Tenant DB</li>
+              <li><span class="check-icon">✓</span> VeloxBench + VeloxManager</li>
+              <li><span class="check-icon">✓</span> 14-Day Offline Grace Lease</li>
+            </ul>
+          </div>
+          <a href="#contact" class="btn btn-outline">Activate Starter Key</a>
+        </div>
+
+        <!-- Pro Depot -->
+        <div class="plan-card featured">
+          <div class="popular-tag">Most Popular</div>
+          <div>
+            <div class="plan-name">Pro Depot</div>
+            <div class="plan-sub">For high-throughput wholesale godowns testing 30–50 laptops daily.</div>
+            <div class="price-box">
+              <div class="price-amount" id="price-pro">₹11,999</div>
+              <div class="price-period">per month</div>
+              <div class="bonus-pill">Month 1 Bonus: 5,000 Units</div>
+            </div>
+            <ul class="plan-feats">
+              <li><span class="check-icon">✓</span> <strong>1,000 Laptops / Month</strong> quota</li>
+              <li><span class="check-icon">✓</span> <strong>Up to 10</strong> Enrolled Bench Seats</li>
+              <li><span class="check-icon">✓</span> <strong>Velox Link Mobile</strong> QR Gateway</li>
+              <li><span class="check-icon">✓</span> Dedicated Isolated Tenant DB</li>
+              <li><span class="check-icon">✓</span> CSV &amp; Excel Inventory Exports</li>
+              <li><span class="check-icon">✓</span> Free Re-tests (30-day window)</li>
+            </ul>
+          </div>
+          <a href="#contact" class="btn btn-primary">Activate Pro Depot</a>
+        </div>
+
+        <!-- Enterprise Corporate -->
+        <div class="plan-card">
+          <div>
+            <div class="plan-name">Enterprise</div>
+            <div class="plan-sub">For multi-city ITAD facilities, corporate e-waste hubs, and e-commerce refurbishers.</div>
+            <div class="price-box">
+              <div class="price-amount" id="price-corp">₹34,999</div>
+              <div class="price-period">per month</div>
+              <div class="bonus-pill">Month 1 Bonus: 25,000 Units</div>
+            </div>
+            <ul class="plan-feats">
+              <li><span class="check-icon">✓</span> <strong>50,000+ Laptops / Month</strong> (Uncapped)</li>
+              <li><span class="check-icon">✓</span> <strong>Unlimited</strong> Bench Seats &amp; Godowns</li>
+              <li><span class="check-icon">✓</span> Custom Grade A/B/C Scoring Rules</li>
+              <li><span class="check-icon">✓</span> White-Label Dealer Branding</li>
+              <li><span class="check-icon">✓</span> ERP &amp; CRM Webhook Endpoints</li>
+              <li><span class="check-icon">✓</span> Priority Cloud Backup Snapshots</li>
+            </ul>
+          </div>
+          <a href="#contact" class="btn btn-outline">Contact Enterprise Sales</a>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Download Section -->
+  <section id="download" class="section">
+    <div class="container">
+      <div class="download-card">
+        <div class="app-icon" style="margin: 0 auto 16px;">💾</div>
+        <h2 class="dl-title">Download Velox Suite for Windows</h2>
+        <p class="sec-desc" style="margin-bottom: 24px;">Standalone, single-file executable for Windows 10 &amp; 11 (64-bit). No .NET installation or drivers required.</p>
+        
+        <div class="dl-meta">
+          <span>Version: <strong>v1.6.10</strong></span> • 
+          <span>File Size: <strong>~92.8 MB</strong></span> • 
+          <span>Architecture: <strong>win-x64</strong></span>
+        </div>
+
+        <div style="display:flex; justify-content:center; gap:16px; flex-wrap:wrap;">
+          <a href="/api/v1/update/download/latest?appName=VeloxBench" class="btn btn-primary btn-lg">
+            <svg width="20" height="20" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>
+            Download VeloxBench.exe
+          </a>
+          <a href="/link" class="btn btn-outline btn-lg">
+            📱 Open Velox Link Mobile
+          </a>
+        </div>
+
+        <div class="health-bar" id="cloudHealth">
+          <div class="pulse-green"></div>
+          <span id="healthText">Velox Cloud API: Checking connection...</span>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Footer -->
+  <footer>
+    <div class="container footer-wrap">
+      <div>
+        <strong>Velox Platform Suite</strong> — Built by <strong>Abzard Inc.</strong>
+        <p style="font-size: 12px; margin-top: 4px;">Engineered for wholesale laptop refurbishers and ITAD facilities.</p>
+      </div>
+      <div>
+        <span>Production Cluster: <code>13.206.106.146</code> (AWS Lightsail ap-south-1)</span>
+      </div>
+    </div>
+  </footer>
+
+  <script>
+    function setCurrency(curr) {
+      document.getElementById('btn-inr').classList.toggle('active', curr === 'inr');
+      document.getElementById('btn-usd').classList.toggle('active', curr === 'usd');
+
+      if (curr === 'inr') {
+        document.getElementById('price-solo').textContent = '₹1,499';
+        document.getElementById('price-starter').textContent = '₹3,499';
+        document.getElementById('price-pro').textContent = '₹11,999';
+        document.getElementById('price-corp').textContent = '₹34,999';
+      } else {
+        document.getElementById('price-solo').textContent = '$19';
+        document.getElementById('price-starter').textContent = '$45';
+        document.getElementById('price-pro').textContent = '$149';
+        document.getElementById('price-corp').textContent = '$420';
+      }
+    }
+
+    // Ping live API health
+    fetch('/health')
+      .then(r => r.json())
+      .then(d => {
+        document.getElementById('healthText').textContent = 'Velox Cloud API: Healthy (' + d.service + ' v1.6.10 • ' + d.cluster + ')';
+      })
+      .catch(() => {
+        document.getElementById('healthText').textContent = 'Velox Cloud API: Operational (ap-south-1 Mumbai)';
+      });
+  </script>
 </body>
 </html>

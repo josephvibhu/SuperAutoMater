@@ -22,3 +22,5 @@ test_*.db
 .env
 config.production.json
 *.tmp
+**/wwwroot/downloads/
+
