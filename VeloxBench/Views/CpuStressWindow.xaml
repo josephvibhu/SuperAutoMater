@@ -17,10 +17,13 @@
 
         <!-- Header -->
         <Border Grid.Row="0" Background="#161B22" BorderBrush="#2D333B" BorderThickness="1" CornerRadius="10" Padding="14,10" Margin="0,0,0,14">
-            <DockPanel LastChildFill="False">
-                <TextBlock Text="⚡ MULTI-CORE CPU &amp; RAM STRESS TEST" FontFamily="{StaticResource FontMono}" FontWeight="Bold" FontSize="12" Foreground="{StaticResource BrushTextWhite}" VerticalAlignment="Center"/>
-                <TextBlock x:Name="TxtThreads" Text="Threads: 8" FontFamily="{StaticResource FontMono}" FontSize="11" Foreground="#58A6FF" DockPanel.Dock="Right" VerticalAlignment="Center"/>
-            </DockPanel>
+            <StackPanel>
+                <DockPanel LastChildFill="False">
+                    <TextBlock x:Name="TxtCpuModel" Text="MULTI-CORE CPU &amp; RAM STRESS TEST" FontFamily="{StaticResource FontSans}" FontWeight="Bold" FontSize="13" Foreground="{StaticResource BrushTextWhite}" VerticalAlignment="Center"/>
+                    <TextBlock x:Name="TxtThreads" Text="Threads: 8" FontFamily="{StaticResource FontMono}" FontWeight="Bold" FontSize="11" Foreground="#58A6FF" DockPanel.Dock="Right" VerticalAlignment="Center"/>
+                </DockPanel>
+                <TextBlock x:Name="TxtCpuTopology" Text="Processor Topology Insights" FontFamily="{StaticResource FontMono}" FontSize="11" Foreground="#8B949E" Margin="0,4,0,0"/>
+            </StackPanel>
         </Border>
 
         <!-- Central Telemetry Card -->

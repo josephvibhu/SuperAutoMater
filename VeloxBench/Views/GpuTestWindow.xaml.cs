@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Diagnostics;
 using System.Media;
 using System.Windows;
@@ -37,9 +37,14 @@ namespace SuperAutoMater.Wpf.Views
                 {
                     TxtGpuName.Text = vm.GpuName;
                 }
-                if (!string.IsNullOrWhiteSpace(vm.GpuVram))
+                if (!string.IsNullOrWhiteSpace(vm.GpuMemoryDetails))
                 {
-                    TxtVram.Text = $"VRAM: {vm.GpuVram}";
+                    TxtGpuMem.Text = $"Memory: {vm.GpuMemoryDetails} ({vm.GpuMemoryType})";
+                    TxtVram.Text = vm.GpuMemoryType != "Shared" ? $"{vm.GpuVram} {vm.GpuMemoryType}" : vm.GpuVram;
+                }
+                if (!string.IsNullOrWhiteSpace(vm.GpuArchitecture))
+                {
+                    TxtGpuArch.Text = $"Architecture: {vm.GpuArchitecture}";
                 }
                 if (!string.IsNullOrWhiteSpace(vm.GpuDriver))
                 {

@@ -205,6 +205,10 @@ namespace SuperAutoMater.Wpf.ViewModels
         // CPU & Thermals
         public string CpuName => _hw.CpuTelemetry?.CpuName ?? "Detecting CPU...";
         public string CoreSummary => _hw.CpuTelemetry?.CoreSummary ?? "Cores: --";
+        public string CpuTopology => _hw.CpuTelemetry?.TopologySummary ?? CoreSummary;
+        public string CpuCacheSummary => _hw.CpuTelemetry?.CacheSummary ?? "L3 Cache: --";
+        public string CpuInstructionSets => _hw.CpuTelemetry?.InstructionSets ?? "x64";
+        public string CpuSocket => _hw.CpuTelemetry?.SocketPackage ?? "";
         public string ClockSummary => $"{_hw.CpuTelemetry?.CurrentClockGhz ?? 0.0:0.00} GHz Core Clock";
         public string TempBadge => $"{_hw.CpuTelemetry?.TemperatureC ?? 0}°C NOMINAL";
         public string ThrottlingStatus => _hw.CpuTelemetry?.ThrottlingStatus ?? "0% Throttling";
@@ -214,6 +218,9 @@ namespace SuperAutoMater.Wpf.ViewModels
         public string GpuDriver => _hw.GpuTelemetry?.DriverVersion ?? "";
         public string GpuVram => _hw.GpuTelemetry?.VramSummary ?? "Shared Memory";
         public string GpuTypeBadge => _hw.GpuTelemetry?.TypeBadge ?? "iGPU";
+        public string GpuMemoryType => _hw.GpuTelemetry?.MemoryType ?? "Shared";
+        public string GpuMemoryDetails => _hw.GpuTelemetry?.MemoryDetails ?? GpuVram;
+        public string GpuArchitecture => _hw.GpuTelemetry?.Architecture ?? "";
         public ObservableCollection<GpuInfo> AvailableGpus { get; } = new ObservableCollection<GpuInfo>();
         public bool HasMultipleGpus => AvailableGpus.Count > 1;
 
@@ -256,6 +263,9 @@ namespace SuperAutoMater.Wpf.ViewModels
                 OnPropertyChanged(nameof(GpuDriver));
                 OnPropertyChanged(nameof(GpuVram));
                 OnPropertyChanged(nameof(GpuTypeBadge));
+                OnPropertyChanged(nameof(GpuMemoryType));
+                OnPropertyChanged(nameof(GpuMemoryDetails));
+                OnPropertyChanged(nameof(GpuArchitecture));
                 OnPropertyChanged(nameof(GpuSummary));
             }
         }

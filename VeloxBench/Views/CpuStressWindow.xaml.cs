@@ -35,7 +35,17 @@ namespace SuperAutoMater.Wpf.Views
         private void CpuStressWindow_Loaded(object sender, RoutedEventArgs e)
         {
             int cores = Environment.ProcessorCount;
-            TxtThreads.Text = $"Threads: {cores} Cores";
+            var cpu = SuperAutoMater.Wpf.Services.HardwareDiagnosticsService.Instance.CpuTelemetry;
+            if (cpu != null && !string.IsNullOrWhiteSpace(cpu.CpuName) && !cpu.CpuName.Contains("Detecting"))
+            {
+                TxtCpuModel.Text = $"⚡ {cpu.CpuName}";
+                TxtThreads.Text = $"{cpu.PhysicalCores}C / {cpu.LogicalThreads}T ({cpu.CurrentClockGhz:0.00} GHz)";
+                TxtCpuTopology.Text = $"{cpu.TopologySummary} · {cpu.CacheSummary}";
+            }
+            else
+            {
+                TxtThreads.Text = $"Threads: {cores} Cores";
+            }
 
             _cts = new CancellationTokenSource();
             StartBurn(_cts.Token, cores);

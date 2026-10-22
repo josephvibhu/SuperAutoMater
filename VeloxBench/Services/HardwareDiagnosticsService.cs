@@ -27,11 +27,22 @@ namespace SuperAutoMater.Wpf.Services
     {
         public string CpuName { get; set; } = "Detecting CPU...";
         public string CoreSummary { get; set; } = "Cores: -- | Threads: --";
+        public int PhysicalCores { get; set; } = 0;
+        public int LogicalThreads { get; set; } = 0;
+        public int PerformanceCores { get; set; } = 0;
+        public int EfficientCores { get; set; } = 0;
+        public bool IsHybridArchitecture { get; set; } = false;
+        public string TopologySummary { get; set; } = "";
+        public string CacheSummary { get; set; } = "";
+        public int L3CacheMb { get; set; } = 0;
+        public double BaseClockGhz { get; set; } = 0.0;
         public double CurrentClockGhz { get; set; } = 0.0;
         public int UsagePercent { get; set; } = 0;
         public int TemperatureC { get; set; } = 0;
         public string TemperatureStatus { get; set; } = "NOMINAL";
         public string ThrottlingStatus { get; set; } = "0% Throttling";
+        public string SocketPackage { get; set; } = "";
+        public string InstructionSets { get; set; } = "x64 · AVX2 · FMA3";
     }
 
     public class GpuInfo
@@ -40,9 +51,13 @@ namespace SuperAutoMater.Wpf.Services
         public string DriverVersion { get; set; } = "";
         public ulong VramBytes { get; set; } = 0;
         public string VramSummary { get; set; } = "Shared Memory";
+        public string MemoryType { get; set; } = "Shared";
+        public string Architecture { get; set; } = "";
+        public string BusInterface { get; set; } = "PCIe";
+        public string MemoryDetails { get; set; } = "";
         public bool IsDedicated { get; set; } = false;
         public string TypeBadge => IsDedicated ? "dGPU (Dedicated)" : "iGPU (Integrated)";
-        public string DisplayPill => IsDedicated ? $"🎮 {Name} ({VramSummary})" : $"⚡ {Name} (Integrated)";
+        public string DisplayPill => IsDedicated ? $"🎮 {Name} ({VramSummary} {MemoryType})" : $"⚡ {Name} (Integrated)";
     }
 
     public class GpuTelemetryModel
@@ -50,6 +65,9 @@ namespace SuperAutoMater.Wpf.Services
         public string GpuName { get; set; } = "Detecting GPU...";
         public string DriverVersion { get; set; } = "";
         public string VramSummary { get; set; } = "Shared Memory";
+        public string MemoryType { get; set; } = "Shared";
+        public string MemoryDetails { get; set; } = "";
+        public string Architecture { get; set; } = "";
         public bool IsDedicated { get; set; } = false;
         public string TypeBadge => IsDedicated ? "dGPU" : "iGPU";
     }
@@ -401,7 +419,7 @@ namespace SuperAutoMater.Wpf.Services
         {
             try
             {
-                using (var searcher = new ManagementObjectSearcher("SELECT Name, NumberOfCores, NumberOfLogicalProcessors, MaxClockSpeed FROM Win32_Processor"))
+                using (var searcher = new ManagementObjectSearcher("SELECT Name, NumberOfCores, NumberOfLogicalProcessors, MaxClockSpeed, L2CacheSize, L3CacheSize, SocketDesignation, Architecture FROM Win32_Processor"))
                 using (var col = searcher.Get())
                 {
                     foreach (ManagementObject obj in col)
@@ -419,12 +437,54 @@ namespace SuperAutoMater.Wpf.Services
 
                             int cores = Convert.ToInt32(obj["NumberOfCores"] ?? 0);
                             int threads = Convert.ToInt32(obj["NumberOfLogicalProcessors"] ?? 0);
-                            CpuTelemetry.CoreSummary = $"{cores} Cores · {threads} Threads";
+                            CpuTelemetry.PhysicalCores = cores;
+                            CpuTelemetry.LogicalThreads = threads;
+
+                            // Calculate hybrid topology (P-Cores vs E-Cores) or hyperthreading
+                            if (threads > cores && (threads - cores) < cores)
+                            {
+                                int pCores = threads - cores;
+                                int eCores = cores - pCores;
+                                CpuTelemetry.PerformanceCores = pCores;
+                                CpuTelemetry.EfficientCores = eCores;
+                                CpuTelemetry.IsHybridArchitecture = true;
+                                CpuTelemetry.CoreSummary = $"{cores} Cores ({pCores}P + {eCores}E) · {threads} Threads";
+                                CpuTelemetry.TopologySummary = $"{cores} Cores ({pCores}P + {eCores}E) · {threads} Threads";
+                            }
+                            else if (threads == cores * 2)
+                            {
+                                CpuTelemetry.CoreSummary = $"{cores} Cores · {threads} Threads";
+                                CpuTelemetry.TopologySummary = $"{cores} Physical Cores · {threads} Threads (SMT)";
+                            }
+                            else
+                            {
+                                CpuTelemetry.CoreSummary = $"{cores} Cores · {threads} Threads";
+                                CpuTelemetry.TopologySummary = $"{cores} Physical Cores · {threads} Logical Threads";
+                            }
 
                             int mhz = Convert.ToInt32(obj["MaxClockSpeed"] ?? 0);
                             if (mhz > 0)
                             {
-                                CpuTelemetry.CurrentClockGhz = Math.Round(mhz / 1000.0, 2);
+                                CpuTelemetry.BaseClockGhz = Math.Round(mhz / 1000.0, 2);
+                                CpuTelemetry.CurrentClockGhz = CpuTelemetry.BaseClockGhz;
+                            }
+
+                            int l3Kb = Convert.ToInt32(obj["L3CacheSize"] ?? 0);
+                            int l2Kb = Convert.ToInt32(obj["L2CacheSize"] ?? 0);
+                            CpuTelemetry.L3CacheMb = l3Kb / 1024;
+                            if (l3Kb > 0 && l2Kb > 0)
+                            {
+                                CpuTelemetry.CacheSummary = $"L3: {l3Kb / 1024} MB · L2: {Math.Round(l2Kb / 1024.0, 1)} MB";
+                            }
+                            else if (l3Kb > 0)
+                            {
+                                CpuTelemetry.CacheSummary = $"L3 Cache: {l3Kb / 1024} MB";
+                            }
+
+                            string socket = obj["SocketDesignation"]?.ToString()?.Trim();
+                            if (!string.IsNullOrEmpty(socket))
+                            {
+                                CpuTelemetry.SocketPackage = socket;
                             }
                         }
                         break;
@@ -453,28 +513,45 @@ namespace SuperAutoMater.Wpf.Services
 
                             if (string.IsNullOrEmpty(name)) continue;
 
+                            // Check Registry for true 64-bit VRAM to overcome 32-bit WMI capping
+                            ulong regVram = QueryRegistryVramBytes(name);
+                            if (regVram > vramBytes)
+                            {
+                                vramBytes = regVram;
+                            }
+
                             string nameLower = name.ToLowerInvariant();
                             bool isDedicated = nameLower.Contains("nvidia") ||
                                                nameLower.Contains("geforce") ||
                                                nameLower.Contains("rtx") ||
                                                nameLower.Contains("gtx") ||
+                                               nameLower.Contains("quadro") ||
                                                nameLower.Contains("radeon rx") ||
                                                nameLower.Contains("discrete") ||
                                                vramBytes >= (ulong)1500 * 1024 * 1024;
 
+                            var (memType, arch, bus) = ClassifyGpuDetails(name, vramBytes);
+
                             string vramStr = "Shared System Memory";
-                            if (vramBytes > 0)
+                            string memDetails = "Dynamic Shared System RAM";
+                            if (vramBytes > 0 && isDedicated)
                             {
                                 double vramGb = vramBytes / (1024.0 * 1024.0 * 1024.0);
                                 if (vramGb >= 1.0)
                                 {
-                                    vramStr = $"{Math.Round(vramGb)} GB Dedicated VRAM";
+                                    vramStr = $"{Math.Round(vramGb)} GB Dedicated";
+                                    memDetails = $"{vramBytes / (1024 * 1024):N0} MB ({Math.Round(vramGb, 1)} GB) {memType}";
                                 }
                                 else
                                 {
                                     double vramMb = vramBytes / (1024.0 * 1024.0);
-                                    vramStr = $"{Math.Round(vramMb)} MB VRAM";
+                                    vramStr = $"{Math.Round(vramMb)} MB";
+                                    memDetails = $"{Math.Round(vramMb)} MB {memType}";
                                 }
+                            }
+                            else if (!isDedicated)
+                            {
+                                memDetails = $"Shared System Memory ({memType})";
                             }
 
                             var gpu = new GpuInfo
@@ -483,6 +560,10 @@ namespace SuperAutoMater.Wpf.Services
                                 DriverVersion = driver,
                                 VramBytes = vramBytes,
                                 VramSummary = vramStr,
+                                MemoryType = memType,
+                                Architecture = arch,
+                                BusInterface = bus,
+                                MemoryDetails = memDetails,
                                 IsDedicated = isDedicated
                             };
                             DetectedGpus.Add(gpu);
@@ -497,6 +578,9 @@ namespace SuperAutoMater.Wpf.Services
                     GpuTelemetry.GpuName = active.Name;
                     GpuTelemetry.DriverVersion = active.DriverVersion;
                     GpuTelemetry.VramSummary = active.VramSummary;
+                    GpuTelemetry.MemoryType = active.MemoryType;
+                    GpuTelemetry.MemoryDetails = active.MemoryDetails;
+                    GpuTelemetry.Architecture = active.Architecture;
                     GpuTelemetry.IsDedicated = active.IsDedicated;
                 }
             }
@@ -509,8 +593,128 @@ namespace SuperAutoMater.Wpf.Services
             GpuTelemetry.GpuName = gpu.Name;
             GpuTelemetry.DriverVersion = gpu.DriverVersion;
             GpuTelemetry.VramSummary = gpu.VramSummary;
+            GpuTelemetry.MemoryType = gpu.MemoryType;
+            GpuTelemetry.MemoryDetails = gpu.MemoryDetails;
+            GpuTelemetry.Architecture = gpu.Architecture;
             GpuTelemetry.IsDedicated = gpu.IsDedicated;
             TelemetryUpdated?.Invoke();
+        }
+
+        private static (string memType, string arch, string bus) ClassifyGpuDetails(string name, ulong vramBytes)
+        {
+            if (string.IsNullOrWhiteSpace(name))
+                return ("Shared", "Integrated", "System Bus");
+
+            string n = name.ToLowerInvariant();
+
+            // NVIDIA
+            if (n.Contains("nvidia") || n.Contains("geforce") || n.Contains("rtx") || n.Contains("gtx") || n.Contains("quadro"))
+            {
+                // RTX 40 series
+                if (n.Contains("4090") || n.Contains("4080"))
+                    return ("GDDR6X", "Ada Lovelace", "256-bit / 384-bit Bus");
+                if (n.Contains("4070") || n.Contains("4060") || n.Contains("4050"))
+                    return ("GDDR6", "Ada Lovelace", "128-bit / 192-bit Bus");
+
+                // RTX 30 series
+                if (n.Contains("3090") || n.Contains("3080 ti") || (n.Contains("3080") && !n.Contains("laptop")))
+                    return ("GDDR6X", "Ampere", "320-bit / 384-bit Bus");
+                if (n.Contains("3070") || n.Contains("3060") || n.Contains("3050") || n.Contains("3080"))
+                    return ("GDDR6", "Ampere", "128-bit / 192-bit / 256-bit Bus");
+
+                // RTX 20 series
+                if (n.Contains("2080") || n.Contains("2070") || n.Contains("2060"))
+                    return ("GDDR6", "Turing", "192-bit / 256-bit Bus");
+                if (n.Contains("2050"))
+                    return ("GDDR6", "Ampere (GA107)", "64-bit / 112 GB/s Bus");
+
+                // GTX 16 series
+                if (n.Contains("1660 ti") || n.Contains("1660 super") || n.Contains("1650 super") || n.Contains("1650 gddr6"))
+                    return ("GDDR6", "Turing", "128-bit / 192-bit Bus");
+                if (n.Contains("1660") || n.Contains("1650"))
+                    return ("GDDR5", "Turing", "128-bit / 192-bit Bus");
+
+                // GTX 10 series
+                if (n.Contains("1080 ti") || n.Contains("1080"))
+                    return ("GDDR5X", "Pascal", "256-bit / 352-bit Bus");
+                if (n.Contains("1070") || n.Contains("1060") || n.Contains("1050"))
+                    return ("GDDR5", "Pascal", "128-bit / 192-bit / 256-bit Bus");
+
+                // Quadro RTX / RTX A-series
+                if (n.Contains("rtx a") || (n.Contains("quadro") && n.Contains("rtx")) || n.Contains("ada generation"))
+                    return ("GDDR6 ECC", "Ampere / Ada", "PCIe Dedicated");
+                if (n.Contains("quadro p"))
+                    return ("GDDR5", "Pascal", "PCIe Dedicated");
+                if (n.Contains("quadro m") || n.Contains("quadro k"))
+                    return ("GDDR5", "Maxwell / Kepler", "PCIe Dedicated");
+
+                // MX Series
+                if (n.Contains("mx550") || n.Contains("mx570") || n.Contains("mx450"))
+                    return ("GDDR6", "Turing / Ampere", "64-bit Bus");
+                if (n.Contains("mx"))
+                    return ("GDDR5", "Pascal", "64-bit Bus");
+
+                return (vramBytes >= 3UL * 1024 * 1024 * 1024 ? "GDDR6" : "GDDR5", "NVIDIA Dedicated", "PCIe Bus");
+            }
+
+            // AMD
+            if (n.Contains("amd") || n.Contains("radeon"))
+            {
+                if (n.Contains("rx 7"))
+                    return ("GDDR6", "RDNA 3", "128-bit / 256-bit Bus");
+                if (n.Contains("rx 6"))
+                    return ("GDDR6", "RDNA 2", "128-bit / 256-bit Bus");
+                if (n.Contains("rx 5000") || n.Contains("rx 5500") || n.Contains("rx 5600") || n.Contains("rx 5700"))
+                    return ("GDDR6", "RDNA 1", "128-bit / 256-bit Bus");
+                if (n.Contains("vega 56") || n.Contains("vega 64") || n.Contains("vii"))
+                    return ("HBM2", "Vega", "2048-bit / 4096-bit Bus");
+                if (n.Contains("rx 5") || n.Contains("rx 4") || n.Contains("rx 580") || n.Contains("rx 570") || n.Contains("rx 560") || n.Contains("rx 550"))
+                    return ("GDDR5", "Polaris", "128-bit / 256-bit Bus");
+
+                if (n.Contains("680m") || n.Contains("780m") || n.Contains("890m") || n.Contains("vega") || n.Contains("graphics"))
+                    return ("System Shared (LPDDR5/DDR5)", "RDNA Integrated", "Unified Memory");
+
+                return ("GDDR6 / GDDR5", "AMD Dedicated", "PCIe Bus");
+            }
+
+            // Intel
+            if (n.Contains("arc"))
+                return ("GDDR6", "Alchemist (Xe-HPG)", "PCIe Dedicated");
+
+            if (n.Contains("iris") || n.Contains("uhd") || n.Contains("hd graphics"))
+                return ("System Shared (LPDDR4x/DDR4/DDR5)", "Intel Xe-LP / UHD", "Unified Architecture");
+
+            return ("Shared", "Integrated", "System Bus");
+        }
+
+        private static ulong QueryRegistryVramBytes(string gpuName)
+        {
+            try
+            {
+                using var key = Microsoft.Win32.Registry.LocalMachine.OpenSubKey(@"SYSTEM\CurrentControlSet\Control\Class\{4d36e968-e325-11ce-bfc1-08002be10318}");
+                if (key == null) return 0;
+
+                foreach (var subName in key.GetSubKeyNames())
+                {
+                    if (subName.Length != 4) continue;
+                    using var subKey = key.OpenSubKey(subName);
+                    if (subKey == null) continue;
+
+                    var desc = subKey.GetValue("DriverDesc")?.ToString() ?? "";
+                    if (desc.IndexOf(gpuName, StringComparison.OrdinalIgnoreCase) >= 0 ||
+                        gpuName.IndexOf(desc, StringComparison.OrdinalIgnoreCase) >= 0)
+                    {
+                        var qwMem = subKey.GetValue("HardwareInformation.qwMemorySize");
+                        if (qwMem != null)
+                        {
+                            ulong bytes = Convert.ToUInt64(qwMem);
+                            if (bytes > 0) return bytes;
+                        }
+                    }
+                }
+            }
+            catch { }
+            return 0;
         }
 
         public void ProbeMemory()
