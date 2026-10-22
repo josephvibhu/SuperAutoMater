@@ -30,7 +30,20 @@ public partial class MainWindow : Window
     private async void MainWindow_Loaded(object sender, RoutedEventArgs e)
     {
         ApplyFilter("All");
-        await RefreshLicenseStatusAsync();
+
+        if (string.IsNullOrWhiteSpace(_hubService.Config.LicenseKey))
+        {
+            // First time launch: prompt user to activate depot key
+            TxtLicensePill.Text = "Activation Required";
+            PillDot.Fill = new SolidColorBrush(Color.FromRgb(245, 158, 11)); // Amber
+            TxtStatusBanner.Text = "Welcome to Velox Hub. Please enter your organization license key to unlock your suite.";
+
+            ShowLicenseModal(isFirstTime: true);
+        }
+        else
+        {
+            await RefreshLicenseStatusAsync();
+        }
     }
 
     private async Task RefreshLicenseStatusAsync()
@@ -118,16 +131,51 @@ public partial class MainWindow : Window
 
     private void BtnChangeKey_Click(object sender, RoutedEventArgs e)
     {
+        ShowLicenseModal(isFirstTime: false);
+    }
+
+    private void ShowLicenseModal(bool isFirstTime)
+    {
         TxtModalKeyInput.Text = _hubService.Config.LicenseKey;
         TxtModalStatus.Text = "";
         PnlModalSuccess.Visibility = Visibility.Collapsed;
-        BtnModalCancel.Visibility = Visibility.Visible;
         BtnModalActivate.Content = "Activate Key";
         BtnModalActivate.IsEnabled = true;
+
+        if (isFirstTime)
+        {
+            TxtModalTitle.Text = "Welcome to Velox Platform Suite";
+            TxtModalSubtitle.Text = "Please enter your organization subscription key (e.g. VLX-START-..., VLX-PRO-..., VLX-SOLO-...) to unlock your applications.";
+            BtnModalCancel.Visibility = Visibility.Collapsed;
+        }
+        else
+        {
+            TxtModalTitle.Text = "Depot License Activation";
+            TxtModalSubtitle.Text = "Enter your organization subscription key to unlock entitled applications and bind this workstation to your depot cloud cluster.";
+            BtnModalCancel.Visibility = Visibility.Visible;
+        }
 
         LicenseModal.Visibility = Visibility.Visible;
         TxtModalKeyInput.Focus();
         TxtModalKeyInput.SelectAll();
+    }
+
+    private void BtnAppUninstall_Click(object sender, RoutedEventArgs e)
+    {
+        if (sender is FrameworkElement fe && fe.DataContext is HubAppItem app)
+        {
+            var res = MessageBox.Show(
+                $"Are you sure you want to uninstall {app.Title} from this workstation?\n\nThis will remove the local application binaries and Start Menu shortcut.",
+                $"Uninstall {app.Title}",
+                MessageBoxButton.YesNo,
+                MessageBoxImage.Question);
+
+            if (res == MessageBoxResult.Yes)
+            {
+                _hubService.UninstallApp(app);
+                ApplyFilter(_currentFilter);
+            }
+        }
     }
 
     private void BtnModalCancel_Click(object sender, RoutedEventArgs e)

@@ -217,13 +217,55 @@
                                             <TextBlock Text="{Binding StatusText}" FontSize="11" Foreground="#64748b" FontWeight="600"/>
                                         </StackPanel>
 
-                                        <!-- Action Column (Install/Launch Button) -->
+                                        <!-- Action Column (Install/Launch + Uninstall Buttons) -->
                                         <StackPanel Grid.Column="2" VerticalAlignment="Center" HorizontalAlignment="Right">
-                                            <Button Content="{Binding ActionButtonText}" 
-                                                    IsEnabled="{Binding CanInstallOrLaunch}" 
-                                                    Click="BtnAppAction_Click" 
-                                                    Style="{StaticResource ActionBtn}"
-                                                    Width="160"/>
+                                            <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+                                                <Button Content="{Binding ActionButtonText}" 
+                                                        IsEnabled="{Binding CanInstallOrLaunch}" 
+                                                        Click="BtnAppAction_Click" 
+                                                        Style="{StaticResource ActionBtn}"
+                                                        Width="120"/>
+
+                                                <!-- Uninstall Button (Visible only when installed and action is EXE) -->
+                                                <Button Content="Uninstall" 
+                                                        Click="BtnAppUninstall_Click" 
+                                                        Background="Transparent"
+                                                        Foreground="#ef4444"
+                                                        BorderBrush="#33ef4444"
+                                                        BorderThickness="1"
+                                                        FontSize="12"
+                                                        FontWeight="600"
+                                                        Padding="10,6"
+                                                        Margin="8,0,0,0"
+                                                        Cursor="Hand">
+                                                    <Button.Template>
+                                                        <ControlTemplate TargetType="Button">
+                                                            <Border Background="{TemplateBinding Background}" BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="{TemplateBinding BorderThickness}" CornerRadius="8" Padding="{TemplateBinding Padding}">
+                                                                <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                                            </Border>
+                                                            <ControlTemplate.Triggers>
+                                                                <Trigger Property="IsMouseOver" Value="True">
+                                                                    <Setter Property="Background" Value="#26ef4444"/>
+                                                                </Trigger>
+                                                            </ControlTemplate.Triggers>
+                                                        </ControlTemplate>
+                                                    </Button.Template>
+                                                    <Button.Style>
+                                                        <Style TargetType="Button">
+                                                            <Setter Property="Visibility" Value="Collapsed"/>
+                                                            <Style.Triggers>
+                                                                <MultiDataTrigger>
+                                                                    <MultiDataTrigger.Conditions>
+                                                                        <Condition Binding="{Binding State}" Value="Installed"/>
+                                                                        <Condition Binding="{Binding ActionType}" Value="EXE"/>
+                                                                    </MultiDataTrigger.Conditions>
+                                                                    <Setter Property="Visibility" Value="Visible"/>
+                                                                </MultiDataTrigger>
+                                                            </Style.Triggers>
+                                                        </Style>
+                                                    </Button.Style>
+                                                </Button>
+                                            </StackPanel>
                                             
                                             <!-- Progress Bar (shown when installing) -->
                                             <ProgressBar Value="{Binding Progress}" Maximum="100" Height="4" Margin="0,8,0,0"
@@ -258,10 +300,10 @@
                         <Border Background="#2563eb" CornerRadius="6" Width="28" Height="28" Margin="0,0,10,0">
                             <TextBlock Text="🔑" FontSize="14" HorizontalAlignment="Center" VerticalAlignment="Center"/>
                         </Border>
-                        <TextBlock Text="Depot License Activation" FontSize="20" FontWeight="800" Foreground="#ffffff" VerticalAlignment="Center"/>
+                        <TextBlock x:Name="TxtModalTitle" Text="Depot License Activation" FontSize="20" FontWeight="800" Foreground="#ffffff" VerticalAlignment="Center"/>
                     </StackPanel>
 
-                    <TextBlock Text="Enter your organization subscription key to unlock entitled applications and bind this workstation to your depot cloud cluster." 
+                    <TextBlock x:Name="TxtModalSubtitle" Text="Enter your organization subscription key to unlock entitled applications and bind this workstation to your depot cloud cluster." 
                                FontSize="13" Foreground="#94a3b8" TextWrapping="Wrap" Margin="0,0,0,20" LineHeight="18"/>
 
                     <!-- Key Input Box -->

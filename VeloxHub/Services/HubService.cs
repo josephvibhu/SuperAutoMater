@@ -107,7 +107,7 @@ public class HubAppItem : INotifyPropertyChanged
 public class HubConfig
 {
     public string ApiUrl { get; set; } = "http://13.206.106.146";
-    public string LicenseKey { get; set; } = "VLX-ALPHA-TEST-2026";
+    public string LicenseKey { get; set; } = "";
     public string MachineGuid { get; set; } = "";
 }
 
@@ -477,6 +477,16 @@ public class HubService : INotifyPropertyChanged
             var configPath = Path.Combine(appDir, "config.json");
             File.WriteAllText(configPath, JsonSerializer.Serialize(appConfig, new JsonSerializerOptions { WriteIndented = true }));
 
+            // Create Windows Start Menu shortcut
+            try
+            {
+                var startMenuDir = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.Programs), "Velox Suite");
+                Directory.CreateDirectory(startMenuDir);
+                var lnkPath = Path.Combine(startMenuDir, $"{app.Title}.lnk");
+                CreateShortcut(lnkPath, exePath, appDir, app.Description);
+            }
+            catch { }
+
             app.Progress = 100;
             app.State = AppInstallState.Installed;
             app.StatusText = "Installed • Ready to launch";
@@ -488,6 +498,53 @@ public class HubService : INotifyPropertyChanged
             app.StatusText = $"Download failed: {ex.Message}";
             MessageBox.Show($"Failed to download {app.Title}:\n\n{ex.Message}", "Download Error", MessageBoxButton.OK, MessageBoxImage.Error);
         }
+    }
+
+    public void UninstallApp(HubAppItem app)
+    {
+        if (app.ActionType == "WEB") return;
+
+        var appDir = Path.Combine(_appsRootDir, app.Id);
+        if (Directory.Exists(appDir))
+        {
+            try
+            {
+                Directory.Delete(appDir, recursive: true);
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Could not remove all files for {app.Title}: {ex.Message}", "Uninstall Warning", MessageBoxButton.OK, MessageBoxImage.Warning);
+            }
+        }
+
+        // Remove start menu shortcut
+        try
+        {
+            var startMenuDir = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.Programs), "Velox Suite");
+            var lnkPath = Path.Combine(startMenuDir, $"{app.Title}.lnk");
+            if (File.Exists(lnkPath)) File.Delete(lnkPath);
+        }
+        catch { }
+
+        app.State = AppInstallState.NotInstalled;
+        app.Progress = 0;
+        app.StatusText = "Uninstalled • Ready to install";
+    }
+
+    private static void CreateShortcut(string shortcutPath, string targetPath, string workingDir, string description)
+    {
+        try
+        {
+            var shellType = Type.GetTypeFromProgID("WScript.Shell");
+            if (shellType == null) return;
+            dynamic shell = Activator.CreateInstance(shellType);
+            var shortcut = shell.CreateShortcut(shortcutPath);
+            shortcut.TargetPath = targetPath;
+            shortcut.WorkingDirectory = workingDir;
+            shortcut.Description = description;
+            shortcut.Save();
+        }
+        catch { }
     }
 
     public event PropertyChangedEventHandler PropertyChanged;
