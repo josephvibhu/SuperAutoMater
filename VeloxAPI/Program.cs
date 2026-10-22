@@ -64,6 +64,13 @@ app.MapGet("/health", (SseHub sse) => Results.Ok(new
     utc         = DateTimeOffset.UtcNow
 }));
 
+// ── Velox Link Mobile Companion Direct Route ──────────────────────────────────
+app.MapGet("/link", (IWebHostEnvironment env) =>
+{
+    var path = Path.Combine(env.WebRootPath, "link", "index.html");
+    return Results.File(path, "text/html");
+});
+
 // ── API Endpoints ─────────────────────────────────────────────────────────────
 app.MapAuthEndpoints();
 app.MapAssetEndpoints();
