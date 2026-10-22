@@ -23,6 +23,8 @@ public enum VeloxErrorCode
     ERR_LIC_QUOTA_EXCEEDED = 203, // Monthly certified laptop scan limit reached
     ERR_LIC_LEASE_INVALID = 204,  // Offline lease HMAC signature invalid / tampered
     ERR_LIC_NOT_FOUND = 205,      // license.key missing beside portable executable
+    ERR_LIC_SEATS_EXCEEDED = 206, // Maximum workstation seats exceeded for plan
+    ERR_LIC_FEATURE_UNAVAILABLE = 207, // Feature not included in current plan (e.g. cloud sync on BenchSolo)
 
     // 300 - 399: Cloud Server & Payload Validation
     ERR_CLOUD_SERVER_ERROR = 300, // HTTP 500: Server internal error
@@ -65,6 +67,8 @@ public class VeloxResult
         VeloxErrorCode.ERR_LIC_QUOTA_EXCEEDED => "VLX-LIC-203",
         VeloxErrorCode.ERR_LIC_LEASE_INVALID => "VLX-LIC-204",
         VeloxErrorCode.ERR_LIC_NOT_FOUND => "VLX-LIC-205",
+        VeloxErrorCode.ERR_LIC_SEATS_EXCEEDED => "VLX-LIC-206",
+        VeloxErrorCode.ERR_LIC_FEATURE_UNAVAILABLE => "VLX-LIC-207",
         VeloxErrorCode.ERR_CLOUD_SERVER_ERROR => "VLX-SRV-300",
         VeloxErrorCode.ERR_CLOUD_BAD_GATEWAY => "VLX-SRV-302",
         VeloxErrorCode.ERR_CLOUD_BAD_REQUEST => "VLX-DATA-304",

@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Velox Link — Mobile Companion</title>
+    <style>
+        :root {
+            --bg-color: #0b0f19;
+            --card-bg: #141b2d;
+            --accent: #2563eb;
+            --accent-glow: #3b82f6;
+            --accent-green: #10b981;
+            --text-main: #f8fafc;
+            --text-sub: #94a3b8;
+            --border: #1e293b;
+            --danger: #ef4444;
+        }
+        * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; }
+        body { background: var(--bg-color); color: var(--text-main); min-height: 100vh; display: flex; flex-direction: column; align-items: center; padding: 16px; }
+        .header { width: 100%; max-width: 480px; display: flex; align-items: center; justify-content: space-between; padding: 12px 0 20px; border-bottom: 1px solid var(--border); }
+        .logo-box { display: flex; align-items: center; gap: 10px; }
+        .logo-badge { background: linear-gradient(135deg, #1d4ed8, #3b82f6); color: white; font-weight: 900; font-size: 16px; padding: 6px 12px; border-radius: 8px; letter-spacing: 1px; }
+        .logo-text { font-size: 18px; font-weight: 700; letter-spacing: -0.5px; }
+        .status-pill { display: flex; align-items: center; gap: 6px; background: rgba(16, 185, 129, 0.15); color: var(--accent-green); padding: 4px 10px; border-radius: 20px; font-size: 12px; font-weight: 600; }
+        .status-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--accent-green); animation: pulse 2s infinite; }
+        @keyframes pulse { 0%, 100% { opacity: 1; transform: scale(1); } 50% { opacity: 0.5; transform: scale(0.85); } }
+
+        .session-card { width: 100%; max-width: 480px; background: var(--card-bg); border: 1px solid var(--border); border-radius: 12px; padding: 16px; margin: 16px 0; }
+        .session-title { font-size: 12px; text-transform: uppercase; letter-spacing: 0.8px; color: var(--text-sub); margin-bottom: 4px; }
+        .session-bench { font-size: 17px; font-weight: 700; color: #60a5fa; }
+        .session-id { font-size: 11px; font-family: monospace; color: var(--text-sub); margin-top: 2px; }
+
+        .action-grid { width: 100%; max-width: 480px; display: flex; flex-direction: column; gap: 12px; }
+        .btn-capture { background: linear-gradient(135deg, #2563eb, #1d4ed8); color: white; border: none; padding: 16px; border-radius: 12px; font-size: 16px; font-weight: 700; display: flex; align-items: center; justify-content: center; gap: 10px; cursor: pointer; box-shadow: 0 4px 14px rgba(37, 99, 235, 0.3); transition: transform 0.1s ease; }
+        .btn-capture:active { transform: scale(0.98); }
+
+        .defect-chips { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
+        .chip { background: #1e293b; color: var(--text-sub); border: 1px solid #334155; padding: 6px 12px; border-radius: 20px; font-size: 12px; cursor: pointer; }
+        .chip.active { background: #2563eb; color: white; border-color: #3b82f6; font-weight: 600; }
+
+        .preview-box { width: 100%; max-width: 480px; margin-top: 16px; display: none; background: var(--card-bg); border: 1px solid var(--border); border-radius: 12px; padding: 12px; }
+        .preview-img { width: 100%; max-height: 280px; object-fit: cover; border-radius: 8px; }
+        .upload-status { margin-top: 10px; text-align: center; font-size: 14px; font-weight: 600; }
+        .notes-input { width: 100%; background: #0f172a; border: 1px solid var(--border); color: white; padding: 10px; border-radius: 8px; margin-top: 10px; font-size: 14px; }
+
+        input[type="file"] { display: none; }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <div class="logo-box">
+            <div class="logo-badge">VELOX</div>
+            <div class="logo-text">Link Mobile</div>
+        </div>
+        <div class="status-pill">
+            <div class="status-dot"></div>
+            <span>PAIRED</span>
+        </div>
+    </div>
+
+    <div class="session-card">
+        <div class="session-title">Active Diagnostic Workstation</div>
+        <div class="session-bench" id="benchDisplay">BENCH-QC-01</div>
+        <div class="session-id" id="sessionDisplay">Session: VLX-SES-SCANNING</div>
+    </div>
+
+    <div class="action-grid">
+        <label for="cameraInput" class="btn-capture">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"></path><circle cx="12" cy="13" r="4"></circle></svg>
+            <span>Take Chassis Defect Photo</span>
+        </label>
+        <input type="file" id="cameraInput" accept="image/*" capture="environment">
+
+        <div style="font-size: 13px; color: var(--text-sub); margin-top: 6px;">Select Defect Category:</div>
+        <div class="defect-chips">
+            <div class="chip active" onclick="selectChip(this, 'Scratch')">Chassis Scratch</div>
+            <div class="chip" onclick="selectChip(this, 'Dent')">Body Dent</div>
+            <div class="chip" onclick="selectChip(this, 'Hinge')">Loose Hinge</div>
+            <div class="chip" onclick="selectChip(this, 'Screen')">Screen Blemish</div>
+            <div class="chip" onclick="selectChip(this, 'Keyboard')">Worn Keys</div>
+        </div>
+
+        <input type="text" id="defectNotes" class="notes-input" placeholder="Optional notes (e.g. Left corner 2cm scratch)">
+    </div>
+
+    <div class="preview-box" id="previewBox">
+        <img id="previewImg" class="preview-img" alt="Captured Chassis Defect">
+        <div class="upload-status" id="uploadStatus">Uploading to active bench...</div>
+    </div>
+
+    <script>
+        const urlParams = new URLSearchParams(window.location.search);
+        const benchId = urlParams.get('bench') || 'BENCH-01';
+        const sessionId = urlParams.get('session') || ('VLX-SES-' + Math.random().toString(36).substring(2, 9).toUpperCase());
+        
+        document.getElementById('benchDisplay').textContent = benchId;
+        document.getElementById('sessionDisplay').textContent = 'Session: ' + sessionId;
+
+        let selectedDefect = 'Scratch';
+
+        function selectChip(el, type) {
+            document.querySelectorAll('.chip').forEach(c => c.classList.remove('active'));
+            el.classList.add('active');
+            selectedDefect = type;
+        }
+
+        const cameraInput = document.getElementById('cameraInput');
+        const previewBox = document.getElementById('previewBox');
+        const previewImg = document.getElementById('previewImg');
+        const uploadStatus = document.getElementById('uploadStatus');
+        const defectNotes = document.getElementById('defectNotes');
+
+        cameraInput.addEventListener('change', async (e) => {
+            const file = e.target.files[0];
+            if (!file) return;
+
+            const reader = new FileReader();
+            reader.onload = async (evt) => {
+                const base64 = evt.target.result;
+                previewImg.src = base64;
+                previewBox.style.display = 'block';
+                uploadStatus.style.color = '#3b82f6';
+                uploadStatus.textContent = 'Streaming photo to ' + benchId + '...';
+
+                try {
+                    const resp = await fetch('/api/v1/bench/link/upload', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            sessionId: sessionId,
+                            benchId: benchId,
+                            defectType: selectedDefect,
+                            notes: defectNotes.value || selectedDefect,
+                            imageBase64: base64
+                        })
+                    });
+
+                    if (resp.ok) {
+                        uploadStatus.style.color = '#10b981';
+                        uploadStatus.textContent = '✓ Successfully attached to Active Test Report!';
+                    } else {
+                        uploadStatus.style.color = '#ef4444';
+                        uploadStatus.textContent = 'Upload error (HTTP ' + resp.status + ')';
+                    }
+                } catch (err) {
+                    uploadStatus.style.color = '#ef4444';
+                    uploadStatus.textContent = 'Failed to reach cloud server.';
+                }
+            };
+            reader.readAsDataURL(file);
+        });
+    </script>
+</body>
+</html>

@@ -70,6 +70,33 @@ public static class AlphaEndpoints
             });
         });
 
+        // POST /api/v1/admin/tenants/provision — admin provisions full multi-tenant client with dedicated DB & plan key
+        app.MapPost("/api/v1/admin/tenants/provision", (TenantProvisionRequest req, HttpContext ctx, VeloxDb db, IConfiguration config) =>
+        {
+            var adminSecret = config["VELOX_ADMIN_SECRET"] ?? Environment.GetEnvironmentVariable("VELOX_ADMIN_SECRET");
+            var provided = ctx.Request.Headers["X-Admin-Secret"].FirstOrDefault();
+
+            if (!string.IsNullOrWhiteSpace(adminSecret) && provided != adminSecret)
+            {
+                return Results.Json(new { error = "Invalid admin secret." }, statusCode: 403);
+            }
+
+            if (string.IsNullOrWhiteSpace(req.CompanyName))
+            {
+                return Results.BadRequest(new { error = "CompanyName is required." });
+            }
+
+            try
+            {
+                var provision = db.ProvisionTenant(req);
+                return Results.Ok(provision);
+            }
+            catch (Exception ex)
+            {
+                return Results.BadRequest(new { error = ex.Message });
+            }
+        });
+
         // GET /api/v1/admin/license/list — admin lists all issued licenses
         app.MapGet("/api/v1/admin/license/list", (HttpContext ctx, VeloxDb db, IConfiguration config) =>
         {
@@ -168,5 +195,40 @@ public static class AlphaEndpoints
 
             return Results.Ok(res);
         });
+
+        // POST /api/v1/bench/link/upload — mobile companion uploads defect photo / barcode
+        app.MapPost("/api/v1/bench/link/upload", async (LinkUploadRequest req, SseHub sse) =>
+        {
+            if (string.IsNullOrWhiteSpace(req.SessionId) && string.IsNullOrWhiteSpace(req.BenchId))
+            {
+                return Results.BadRequest(new { error = "SessionId or BenchId is required." });
+            }
+
+            await sse.BroadcastAsync(SseEventType.AssetUpdated, new
+            {
+                source = "VeloxLink",
+                sessionId = req.SessionId,
+                benchId = req.BenchId,
+                defectType = req.DefectType,
+                notes = req.Notes,
+                timestamp = DateTimeOffset.UtcNow
+            });
+
+            return Results.Ok(new
+            {
+                success = true,
+                message = "Defect photo successfully linked to active inspection session.",
+                sessionId = req.SessionId
+            });
+        });
     }
+}
+
+public sealed class LinkUploadRequest
+{
+    public string SessionId { get; set; } = "";
+    public string BenchId { get; set; } = "";
+    public string DefectType { get; set; } = "Scratch";
+    public string Notes { get; set; } = "";
+    public string ImageBase64 { get; set; } = "";
 }

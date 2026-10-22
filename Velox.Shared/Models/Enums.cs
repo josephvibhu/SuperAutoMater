@@ -57,4 +57,14 @@ public enum AssetCategory
     Display
 }
 
+[JsonConverter(typeof(JsonStringEnumConverter))]
+public enum PlanTier
+{
+    BenchSolo,
+    Starter,
+    Pro,
+    Enterprise
+}
+
+
 

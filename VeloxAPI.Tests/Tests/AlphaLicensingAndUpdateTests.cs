@@ -198,4 +198,215 @@ public class AlphaLicensingAndUpdateTests : IClassFixture<VeloxApiFactory>
         Assert.Equal("Dell Latitude 5420", asset.GetProperty("model").GetString());
         Assert.Equal(89, asset.GetProperty("batteryHealth").GetInt32());
     }
+
+    [Fact]
+    public async Task Admin_ProvisionTenant_CreatesDedicatedTenantWithPlanKey()
+    {
+        var provReq = new TenantProvisionRequest
+        {
+            CompanyName = "Chennai Ritchie Refurb Hub",
+            SiteCode = "RITCHIE",
+            PlanTier = "Starter",
+            ContactEmail = "ops@ritchiehub.com",
+            Notes = "Pilot warehouse Ritchie Street"
+        };
+
+        var adminMsg = new HttpRequestMessage(HttpMethod.Post, "/api/v1/admin/tenants/provision");
+        adminMsg.Headers.Add("X-Admin-Secret", "test-admin-secret");
+        adminMsg.Content = JsonContent.Create(provReq);
+
+        var resp = await _client.SendAsync(adminMsg);
+        Assert.Equal(HttpStatusCode.OK, resp.StatusCode);
+
+        var result = await resp.Content.ReadFromJsonAsync<TenantProvisionResponse>();
+        Assert.NotNull(result);
+        Assert.True(result.Success);
+        Assert.StartsWith("VLX-START-", result.LicenseKey);
+        Assert.Equal("Starter", result.PlanTier);
+        Assert.Equal(100, result.MonthlyQuota);
+        Assert.Equal(1000, result.Month1MigrationQuota);
+        Assert.Equal(3, result.MaxWorkstationSeats);
+
+        // Validate the provisioned license key
+        var valReq = new LicenseValidateRequest
+        {
+            LicenseKey = result.LicenseKey,
+            MachineName = "BENCH-01",
+            MachineGuid = "GUID-BENCH-01",
+            AppVersion = "1.6.10"
+        };
+        var valResp = await _client.PostAsJsonAsync("/api/v1/license/validate", valReq);
+        Assert.Equal(HttpStatusCode.OK, valResp.StatusCode);
+
+        var valResult = await valResp.Content.ReadFromJsonAsync<LicenseValidateResponse>();
+        Assert.NotNull(valResult);
+        Assert.True(valResult.IsValid);
+        Assert.Equal("Starter", valResult.PlanTier);
+        Assert.Equal(1000, valResult.MaxDevicesMonth); // Month 1 migration quota is active!
+        Assert.True(valResult.IsMonth1MigrationActive);
+        Assert.Equal(3, valResult.MaxWorkstationSeats);
+    }
+
+    [Fact]
+    public async Task ValidateLicense_EnforcesWorkstationSeatLimits()
+    {
+        // Create a license with max 2 seats
+        var licReq = new LicenseCreateRequest
+        {
+            CompanyName = "Limited Seat Depot",
+            PlanTier = "Starter",
+            MaxWorkstationSeats = 2,
+            MaxDevicesMonth = 100
+        };
+
+        var adminMsg = new HttpRequestMessage(HttpMethod.Post, "/api/v1/admin/license/create");
+        adminMsg.Headers.Add("X-Admin-Secret", "test-admin-secret");
+        adminMsg.Content = JsonContent.Create(licReq);
+        var createResp = await _client.SendAsync(adminMsg);
+        using var doc = JsonDocument.Parse(await createResp.Content.ReadAsStringAsync());
+        var licKey = doc.RootElement.GetProperty("license").GetProperty("licenseKey").GetString()!;
+
+        // Seat 1 enrolls -> OK
+        var s1 = await _client.PostAsJsonAsync("/api/v1/license/validate", new LicenseValidateRequest
+        {
+            LicenseKey = licKey,
+            MachineName = "PC-01",
+            MachineGuid = "GUID-PC-01",
+            AppVersion = "1.6.10"
+        });
+        Assert.Equal(HttpStatusCode.OK, s1.StatusCode);
+
+        // Seat 2 enrolls -> OK
+        var s2 = await _client.PostAsJsonAsync("/api/v1/license/validate", new LicenseValidateRequest
+        {
+            LicenseKey = licKey,
+            MachineName = "PC-02",
+            MachineGuid = "GUID-PC-02",
+            AppVersion = "1.6.10"
+        });
+        Assert.Equal(HttpStatusCode.OK, s2.StatusCode);
+
+        // Seat 3 tries to enroll -> Rejected (Seat limit exceeded)
+        var s3 = await _client.PostAsJsonAsync("/api/v1/license/validate", new LicenseValidateRequest
+        {
+            LicenseKey = licKey,
+            MachineName = "PC-03",
+            MachineGuid = "GUID-PC-03",
+            AppVersion = "1.6.10"
+        });
+        Assert.Equal(HttpStatusCode.Forbidden, s3.StatusCode);
+        var s3Res = await s3.Content.ReadFromJsonAsync<LicenseValidateResponse>();
+        Assert.False(s3Res!.IsValid);
+        Assert.Contains("seat limit reached", s3Res.Message, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public async Task BenchSync_MissingSerial_SiliconDnaDeduplicatesWithoutExtraQuota()
+    {
+        // Ingest a laptop with missing/generic serial e.g. "Default string" and a Silicon DNA hash
+        var dnaHash = "DNA-SILICON-FINGERPRINT-TEST-99";
+        var batch1 = new BenchSyncBatchRequest
+        {
+            LicenseKey = "VLX-ALPHA-TEST-2026",
+            MachineName = "BENCH-QC-01",
+            AppVersion = "1.6.10",
+            Events = new List<BenchSyncItemDto>
+            {
+                new BenchSyncItemDto
+                {
+                    EventId = "evt-dna-001",
+                    EventType = "AssetQcCompleted",
+                    AggregateId = "Default string",
+                    SiliconDnaHash = dnaHash,
+                    HardwareQuorumJson = "{\"mac\":\"00:1A:2B:3C:4D:5E\",\"edid\":\"BOE0982\"}",
+                    PayloadJson = JsonSerializer.Serialize(new
+                    {
+                        Model = "Dell Precision 5540",
+                        BatteryHealth = 82,
+                        StorageHealth = 95,
+                        Grade = "Grade B"
+                    })
+                }
+            }
+        };
+
+        var resp1 = await _client.PostAsJsonAsync("/api/v1/bench/sync", batch1);
+        Assert.Equal(HttpStatusCode.OK, resp1.StatusCode);
+        var res1 = await resp1.Content.ReadFromJsonAsync<BenchSyncResponse>();
+        Assert.True(res1!.Success);
+        Assert.Equal(1, res1.IngestedCount);
+
+        // Re-test the exact same laptop (with SSD upgraded to 100% health, still generic serial)
+        var batch2 = new BenchSyncBatchRequest
+        {
+            LicenseKey = "VLX-ALPHA-TEST-2026",
+            MachineName = "BENCH-QC-01",
+            AppVersion = "1.6.10",
+            Events = new List<BenchSyncItemDto>
+            {
+                new BenchSyncItemDto
+                {
+                    EventId = "evt-dna-002",
+                    EventType = "AssetQcCompleted",
+                    AggregateId = "Default string", // Missing/generic serial
+                    SiliconDnaHash = dnaHash,        // Matched by Silicon DNA quorum!
+                    HardwareQuorumJson = "{\"mac\":\"00:1A:2B:3C:4D:5E\",\"edid\":\"BOE0982\"}",
+                    PayloadJson = JsonSerializer.Serialize(new
+                    {
+                        Model = "Dell Precision 5540 Upgraded",
+                        BatteryHealth = 82,
+                        StorageHealth = 100,
+                        Grade = "Grade A"
+                    })
+                }
+            }
+        };
+
+        var resp2 = await _client.PostAsJsonAsync("/api/v1/bench/sync", batch2);
+        Assert.Equal(HttpStatusCode.OK, resp2.StatusCode);
+        var res2 = await resp2.Content.ReadFromJsonAsync<BenchSyncResponse>();
+        Assert.True(res2!.Success);
+        Assert.Equal(1, res2.IngestedCount);
+    }
+
+    [Fact]
+    public async Task BenchSync_BenchSoloPlan_RejectsCloudSync()
+    {
+        // Create a BenchSolo license
+        var licReq = new LicenseCreateRequest
+        {
+            CompanyName = "Solo Repair Technician",
+            PlanTier = "BenchSolo"
+        };
+
+        var adminMsg = new HttpRequestMessage(HttpMethod.Post, "/api/v1/admin/license/create");
+        adminMsg.Headers.Add("X-Admin-Secret", "test-admin-secret");
+        adminMsg.Content = JsonContent.Create(licReq);
+        var createResp = await _client.SendAsync(adminMsg);
+        using var doc = JsonDocument.Parse(await createResp.Content.ReadAsStringAsync());
+        var licKey = doc.RootElement.GetProperty("license").GetProperty("licenseKey").GetString()!;
+
+        // Attempt cloud sync with BenchSolo key -> Rejected
+        var batch = new BenchSyncBatchRequest
+        {
+            LicenseKey = licKey,
+            MachineName = "BENCH-SOLO-PC",
+            AppVersion = "1.6.10",
+            Events = new List<BenchSyncItemDto>
+            {
+                new BenchSyncItemDto
+                {
+                    EventId = "evt-solo-01",
+                    AggregateId = "SN-SOLO-01"
+                }
+            }
+        };
+
+        var syncResp = await _client.PostAsJsonAsync("/api/v1/bench/sync", batch);
+        Assert.Equal(HttpStatusCode.OK, syncResp.StatusCode);
+        var syncResult = await syncResp.Content.ReadFromJsonAsync<BenchSyncResponse>();
+        Assert.NotNull(syncResult);
+        Assert.False(syncResult.Success);
+        Assert.Contains("VLX-LIC-207", syncResult.Message);
+    }
 }

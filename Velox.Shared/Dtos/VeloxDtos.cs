@@ -28,6 +28,8 @@ public sealed class AssetDto
     public int? BatteryHealth { get; set; }
     public int? StorageHealth { get; set; }
     public string Notes { get; set; } = "";
+    public string SiliconDnaHash { get; set; } = "";
+    public string HardwareQuorumJson { get; set; } = "{}";
     public string InDate { get; set; } = "";
     public string OutDate { get; set; } = "";
     public string LatestEventType { get; set; } = "";
@@ -309,12 +311,16 @@ public sealed class LicenseValidateResponse
 {
     public bool IsValid { get; set; }
     public string CompanyName { get; set; } = "";
-    public string PlanTier { get; set; } = "Alpha";
+    public string PlanTier { get; set; } = "Starter";
     public DateTimeOffset ExpiresAtUtc { get; set; }
     public int DaysRemaining { get; set; }
     public int OfflineGraceDays { get; set; } = 14;
     public int DevicesUsedMonth { get; set; }
     public int MaxDevicesMonth { get; set; }
+    public int Month1MigrationQuota { get; set; }
+    public bool IsMonth1MigrationActive { get; set; }
+    public int MaxWorkstationSeats { get; set; } = 3;
+    public int WorkstationSeatsUsed { get; set; } = 1;
     public List<string> AllowedFeatures { get; set; } = new();
     public string SignedLeaseToken { get; set; } = "";
     public string Message { get; set; } = "";
@@ -324,9 +330,11 @@ public sealed class LicenseCreateRequest
 {
     public string CompanyName { get; set; } = "";
     public string? CustomKey { get; set; }
-    public string PlanTier { get; set; } = "Alpha-Pilot";
-    public int MaxDevicesMonth { get; set; } = 1500;
-    public int ValidDays { get; set; } = 45;
+    public string PlanTier { get; set; } = "Starter";
+    public int MaxDevicesMonth { get; set; } = 100;
+    public int Month1MigrationQuota { get; set; } = 1000;
+    public int MaxWorkstationSeats { get; set; } = 3;
+    public int ValidDays { get; set; } = 30;
     public List<string>? AllowedFeatures { get; set; }
     public string? Notes { get; set; }
 }
@@ -337,8 +345,12 @@ public sealed class LicenseStatusDto
     public string TenantId { get; set; } = "";
     public string LicenseKey { get; set; } = "";
     public string CompanyName { get; set; } = "";
-    public string PlanTier { get; set; } = "Alpha";
+    public string PlanTier { get; set; } = "Starter";
     public int MaxDevicesMonth { get; set; }
+    public int Month1MigrationQuota { get; set; }
+    public bool IsMonth1MigrationActive { get; set; }
+    public int MaxWorkstationSeats { get; set; }
+    public int WorkstationSeatsUsed { get; set; }
     public int DevicesUsedMonth { get; set; }
     public string MonthPeriod { get; set; } = "";
     public DateTimeOffset ExpiresAtUtc { get; set; }
@@ -346,6 +358,37 @@ public sealed class LicenseStatusDto
     public List<string> AllowedFeatures { get; set; } = new();
     public string Notes { get; set; } = "";
     public DateTimeOffset CreatedAtUtc { get; set; }
+}
+
+public sealed class TenantProvisionRequest
+{
+    public string CompanyName { get; set; } = "";
+    public string? SiteCode { get; set; }
+    public string PlanTier { get; set; } = "Starter"; // BenchSolo, Starter, Pro, Enterprise
+    public string? CustomKey { get; set; }
+    public int? CustomMonthlyQuota { get; set; }
+    public int? CustomMonth1Quota { get; set; }
+    public int? CustomSeats { get; set; }
+    public int ValidDays { get; set; } = 30;
+    public string? ContactEmail { get; set; }
+    public string? ContactPhone { get; set; }
+    public string? Notes { get; set; }
+}
+
+public sealed class TenantProvisionResponse
+{
+    public bool Success { get; set; }
+    public string TenantId { get; set; } = "";
+    public string CompanyName { get; set; } = "";
+    public string LicenseKey { get; set; } = "";
+    public string ApiKey { get; set; } = "";
+    public string PlanTier { get; set; } = "";
+    public int MonthlyQuota { get; set; }
+    public int Month1MigrationQuota { get; set; }
+    public int MaxWorkstationSeats { get; set; }
+    public DateTimeOffset ExpiresAtUtc { get; set; }
+    public string TenantDbFile { get; set; } = "";
+    public string Message { get; set; } = "";
 }
 
 // ─── Dynamic Auto-Update System ──────────────────────────────────────────────
@@ -397,6 +440,8 @@ public sealed class BenchSyncItemDto
     public string EventId { get; set; } = "";
     public string EventType { get; set; } = "";
     public string AggregateId { get; set; } = "";
+    public string SiliconDnaHash { get; set; } = "";
+    public string HardwareQuorumJson { get; set; } = "{}";
     public string IdempotencyKey { get; set; } = "";
     public string Timestamp { get; set; } = "";
     public string PayloadJson { get; set; } = "{}";
