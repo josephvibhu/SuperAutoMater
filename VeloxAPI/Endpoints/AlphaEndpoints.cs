@@ -129,31 +129,34 @@ public static class AlphaEndpoints
             return Results.Ok(res);
         });
 
-        // GET /api/v1/update/download/latest — download latest portable VeloxHub or suite binary
-        app.MapGet("/api/v1/update/download/latest", (string? appName, string? channel, HttpContext ctx, VeloxDb db) =>
+        // GET/HEAD /api/v1/update/download and /api/v1/update/download/latest — download latest portable VeloxHub or suite binary
+        var downloadHandler = (string? appName, string? app, string? channel, HttpContext ctx, VeloxDb db) =>
         {
-            var app = appName ?? "VeloxHub";
+            var targetApp = !string.IsNullOrWhiteSpace(appName) ? appName : (!string.IsNullOrWhiteSpace(app) ? app : "VeloxHub");
             var chan = channel ?? "alpha";
 
             // Search possible binary release directories
             var searchPaths = new[]
             {
-                Path.Combine(AppContext.BaseDirectory, "releases", $"{app}.exe"),
-                Path.Combine(AppContext.BaseDirectory, "wwwroot", "downloads", $"{app}.exe"),
-                Path.Combine(AppContext.BaseDirectory, "wwwroot", $"{app}.exe"),
-                Path.Combine(AppContext.BaseDirectory, "..", "Releases", app, $"{app}.exe"),
-                Path.Combine(AppContext.BaseDirectory, "..", "Releases", $"{app}.exe"),
-                Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Velox", "Releases", $"{app}.exe")
+                Path.Combine(AppContext.BaseDirectory, "releases", $"{targetApp}.exe"),
+                Path.Combine(AppContext.BaseDirectory, "wwwroot", "downloads", $"{targetApp}.exe"),
+                Path.Combine(AppContext.BaseDirectory, "wwwroot", $"{targetApp}.exe"),
+                Path.Combine(AppContext.BaseDirectory, "..", "Releases", targetApp, $"{targetApp}.exe"),
+                Path.Combine(AppContext.BaseDirectory, "..", "Releases", $"{targetApp}.exe"),
+                Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Velox", "Releases", $"{targetApp}.exe")
             };
 
             string? foundFile = searchPaths.FirstOrDefault(File.Exists);
             if (foundFile == null)
             {
-                return Results.NotFound(new { error = $"No binary payload found on server for {app}." });
+                return Results.NotFound(new { error = $"No binary payload found on server for {targetApp}." });
             }
 
-            return Results.File(foundFile, "application/vnd.microsoft.portable-executable", $"{app}.exe");
-        });
+            return Results.File(foundFile, "application/vnd.microsoft.portable-executable", $"{targetApp}.exe");
+        };
+
+        app.MapMethods("/api/v1/update/download", new[] { "GET", "HEAD" }, downloadHandler);
+        app.MapMethods("/api/v1/update/download/latest", new[] { "GET", "HEAD" }, downloadHandler);
 
         // POST /api/v1/admin/update/publish — publish or register new version metadata
         app.MapPost("/api/v1/admin/update/publish", (PublishReleaseRequest req, HttpContext ctx, VeloxDb db, IConfiguration config) =>
