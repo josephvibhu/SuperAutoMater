@@ -9,6 +9,7 @@ using System.Net.Http.Json;
 using System.Runtime.CompilerServices;
 using System.Text.Json;
 using System.Threading.Tasks;
+using System.Windows;
 using Velox.Shared.Dtos;
 
 namespace VeloxHub.Services;
@@ -41,7 +42,13 @@ public class HubAppItem : INotifyPropertyChanged
     public bool IsEntitled
     {
         get => _isEntitled;
-        set { _isEntitled = value; OnPropertyChanged(); OnPropertyChanged(nameof(CanInstallOrLaunch)); }
+        set
+        {
+            _isEntitled = value;
+            OnPropertyChanged();
+            OnPropertyChanged(nameof(CanInstallOrLaunch));
+            OnPropertyChanged(nameof(EntitlementBadge));
+        }
     }
 
     public string EntitlementBadge => IsEntitled ? "INCLUDED IN PLAN" : "PLAN UPGRADE REQUIRED";
@@ -49,25 +56,40 @@ public class HubAppItem : INotifyPropertyChanged
     public AppInstallState State
     {
         get => _state;
-        set { _state = value; OnPropertyChanged(); OnPropertyChanged(nameof(ActionButtonText)); OnPropertyChanged(nameof(CanInstallOrLaunch)); }
+        set
+        {
+            _state = value;
+            OnPropertyChanged();
+            OnPropertyChanged(nameof(ActionButtonText));
+            OnPropertyChanged(nameof(CanInstallOrLaunch));
+        }
     }
 
     public int Progress
     {
         get => _progress;
-        set { _progress = value; OnPropertyChanged(); }
+        set
+        {
+            _progress = value;
+            OnPropertyChanged();
+            OnPropertyChanged(nameof(ActionButtonText));
+        }
     }
 
     public string StatusText
     {
         get => _statusText;
-        set { _statusText = value; OnPropertyChanged(); }
+        set
+        {
+            _statusText = value;
+            OnPropertyChanged();
+        }
     }
 
-    public bool CanInstallOrLaunch => IsEntitled && State != AppInstallState.Installing;
+    public bool CanInstallOrLaunch => IsEntitled && (ActionType == "WEB" || State != AppInstallState.Installing);
 
-    public string ActionButtonText => ActionType == "WEB" 
-        ? "Launch Web" 
+    public string ActionButtonText => ActionType == "WEB"
+        ? "Launch Web"
         : State switch
         {
             AppInstallState.NotInstalled => "Install",
@@ -166,11 +188,11 @@ public class HubService : INotifyPropertyChanged
             Id = "VeloxBench",
             Title = "VeloxBench",
             Tagline = "Laptop Diagnostics & Auto-Grading Cockpit",
-            Description = "Automated 8-point hardware stress testing, battery SMART health analysis, display EDID, and instant Grade A/B/C inspection cards.",
+            Description = "Full hardware automated testing suite. 60-second multi-threaded diagnostic run across Battery, Display, RAM, NVMe, Keyboard, Audio, and Motherboard components.",
             IconSymbol = "⚡",
-            Category = "Hardware QC",
+            Category = "Core Testing",
             LocalVersion = "v1.6.10",
-            RequiredPlanTier = "All Plans (Solo / Starter / Pro / Enterprise)",
+            RequiredPlanTier = "All Plans",
             ActionType = "EXE"
         });
 
@@ -198,7 +220,7 @@ public class HubService : INotifyPropertyChanged
             IconSymbol = "📱",
             Category = "Mobile Companion",
             LocalVersion = "Web Companion",
-            RequiredPlanTier = "Pro / Enterprise",
+            RequiredPlanTier = "Starter / Pro / Enterprise",
             ActionType = "WEB"
         });
 
@@ -209,6 +231,12 @@ public class HubService : INotifyPropertyChanged
     {
         foreach (var app in Apps)
         {
+            // NEVER modify state of an app actively downloading in the background!
+            if (app.State == AppInstallState.Installing)
+            {
+                continue;
+            }
+
             if (app.ActionType == "WEB")
             {
                 app.State = AppInstallState.Installed;
@@ -218,11 +246,18 @@ public class HubService : INotifyPropertyChanged
 
             var appDir = Path.Combine(_appsRootDir, app.Id);
             var exeFile = Path.Combine(appDir, $"{app.Id}.exe");
+            var downloadTempFile = Path.Combine(appDir, $"{app.Id}.exe.download");
+
+            // Clean up any stale temp download file if not installing
+            if (File.Exists(downloadTempFile))
+            {
+                try { File.Delete(downloadTempFile); } catch { }
+            }
 
             if (File.Exists(exeFile))
             {
                 app.State = AppInstallState.Installed;
-                app.StatusText = "Installed • Up to date";
+                app.StatusText = "Installed • Ready to launch";
             }
             else
             {
@@ -241,6 +276,15 @@ public class HubService : INotifyPropertyChanged
         {
             Config.LicenseKey = newKey.Trim().ToUpperInvariant();
             SaveConfig();
+        }
+
+        if (string.IsNullOrWhiteSpace(Config.LicenseKey))
+        {
+            StatusBanner = "No active license. Click 'Activate Key' to enter your organization credentials.";
+            CurrentLicense = null;
+            ApplyPlanEntitlements();
+            IsBusy = false;
+            return false;
         }
 
         try
@@ -268,6 +312,7 @@ public class HubService : INotifyPropertyChanged
             {
                 var errObj = await resp.Content.ReadFromJsonAsync<LicenseValidateResponse>();
                 StatusBanner = errObj?.Message ?? "License validation failed (VLX-AUTH-200).";
+                CurrentLicense = null;
                 ApplyPlanEntitlements();
                 IsBusy = false;
                 return false;
@@ -276,16 +321,21 @@ public class HubService : INotifyPropertyChanged
         catch (Exception ex)
         {
             StatusBanner = $"Cloud unreachable: {ex.Message}";
+            CurrentLicense = null;
+            ApplyPlanEntitlements();
             IsBusy = false;
             return false;
         }
     }
 
-    private void ApplyPlanEntitlements()
+    public void ApplyPlanEntitlements()
     {
         if (CurrentLicense == null || !CurrentLicense.IsValid)
         {
-            foreach (var app in Apps) app.IsEntitled = false;
+            foreach (var app in Apps)
+            {
+                app.IsEntitled = false;
+            }
             return;
         }
 
@@ -296,18 +346,18 @@ public class HubService : INotifyPropertyChanged
             switch (app.Id)
             {
                 case "VeloxBench":
-                    // VeloxBench is included in every plan
+                    // VeloxBench is included in every valid plan
                     app.IsEntitled = true;
                     break;
 
                 case "VeloxManager":
-                    // Included in Starter, Pro, Enterprise
+                    // Included in Starter, Pro, Enterprise (excluded from Bench Solo)
                     app.IsEntitled = !tier.Contains("solo");
                     break;
 
                 case "VeloxLink":
-                    // Included in Pro, Enterprise
-                    app.IsEntitled = tier.Contains("pro") || tier.Contains("enterprise") || tier.Contains("corp");
+                    // Included in Starter, Pro, Enterprise (excluded from Bench Solo)
+                    app.IsEntitled = !tier.Contains("solo");
                     break;
 
                 default:
@@ -324,30 +374,57 @@ public class HubService : INotifyPropertyChanged
         if (app.ActionType == "WEB")
         {
             // Open Velox Link in browser
-            var linkUrl = $"{Config.ApiUrl.TrimEnd('/')}/link";
-            Process.Start(new ProcessStartInfo(linkUrl) { UseShellExecute = true });
+            try
+            {
+                var linkUrl = $"{Config.ApiUrl.TrimEnd('/')}/link";
+                Process.Start(new ProcessStartInfo(linkUrl) { UseShellExecute = true });
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Unable to open browser: {ex.Message}", "Velox Link", MessageBoxButton.OK, MessageBoxImage.Warning);
+            }
             return;
         }
 
         var appDir = Path.Combine(_appsRootDir, app.Id);
         Directory.CreateDirectory(appDir);
         var exePath = Path.Combine(appDir, $"{app.Id}.exe");
+        var downloadTempPath = Path.Combine(appDir, $"{app.Id}.exe.download");
 
         if (app.State == AppInstallState.Installed)
         {
-            // Launch the application
+            // Launch the application safely
             if (File.Exists(exePath))
             {
-                Process.Start(new ProcessStartInfo(exePath)
+                try
                 {
-                    WorkingDirectory = appDir,
-                    UseShellExecute = true
-                });
+                    Process.Start(new ProcessStartInfo(exePath)
+                    {
+                        WorkingDirectory = appDir,
+                        UseShellExecute = true
+                    });
+                    app.StatusText = "Running • Background diagnostic session";
+                }
+                catch (Exception ex)
+                {
+                    app.StatusText = $"Launch failed: {ex.Message}";
+                    MessageBox.Show($"Could not launch {app.Title}:\n\n{ex.Message}", "Launch Error", MessageBoxButton.OK, MessageBoxImage.Warning);
+                }
+            }
+            else
+            {
+                app.State = AppInstallState.NotInstalled;
+                app.StatusText = "Binary missing. Please click Install.";
             }
             return;
         }
 
-        // Install or Update: Download from API
+        if (app.State == AppInstallState.Installing)
+        {
+            return; // Ignore redundant clicks while downloading
+        }
+
+        // Install: Download to isolated temporary file
         app.State = AppInstallState.Installing;
         app.Progress = 5;
         app.StatusText = "Connecting to download server...";
@@ -359,23 +436,34 @@ public class HubService : INotifyPropertyChanged
             response.EnsureSuccessStatusCode();
 
             var totalBytes = response.Content.Headers.ContentLength ?? 90_000_000;
-            using var stream = await response.Content.ReadAsStreamAsync();
-            using var fileStream = new FileStream(exePath, FileMode.Create, FileAccess.Write, FileShare.None);
 
-            var buffer = new byte[81920];
-            long totalRead = 0;
-            int bytesRead;
-
-            while ((bytesRead = await stream.ReadAsync(buffer, 0, buffer.Length)) > 0)
+            // Stream directly into temporary file
+            using (var stream = await response.Content.ReadAsStreamAsync())
+            using (var fileStream = new FileStream(downloadTempPath, FileMode.Create, FileAccess.Write, FileShare.None))
             {
-                await fileStream.WriteAsync(buffer, 0, bytesRead);
-                totalRead += bytesRead;
-                var pct = (int)Math.Min(95, (totalRead * 100) / totalBytes);
-                app.Progress = pct;
-                app.StatusText = $"Downloading {app.Title}... ({pct}%)";
+                var buffer = new byte[81920];
+                long totalRead = 0;
+                int bytesRead;
+
+                while ((bytesRead = await stream.ReadAsync(buffer, 0, buffer.Length)) > 0)
+                {
+                    await fileStream.WriteAsync(buffer, 0, bytesRead);
+                    totalRead += bytesRead;
+                    var pct = (int)Math.Min(98, (totalRead * 100) / totalBytes);
+                    app.Progress = pct;
+                    app.StatusText = $"Downloading {app.Title}... ({pct}%)";
+                }
+
+                await fileStream.FlushAsync();
             }
 
-            fileStream.Close();
+            // Atomic file move into production position
+            app.StatusText = "Finalizing installation...";
+            if (File.Exists(exePath))
+            {
+                try { File.Delete(exePath); } catch { }
+            }
+            File.Move(downloadTempPath, exePath, overwrite: true);
 
             // Auto-provision config.json in installed app directory
             var appConfig = new
@@ -395,8 +483,10 @@ public class HubService : INotifyPropertyChanged
         }
         catch (Exception ex)
         {
+            try { if (File.Exists(downloadTempPath)) File.Delete(downloadTempPath); } catch { }
             app.State = AppInstallState.NotInstalled;
             app.StatusText = $"Download failed: {ex.Message}";
+            MessageBox.Show($"Failed to download {app.Title}:\n\n{ex.Message}", "Download Error", MessageBoxButton.OK, MessageBoxImage.Error);
         }
     }
 

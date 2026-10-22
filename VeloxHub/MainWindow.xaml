@@ -1,30 +1,30 @@
 <Window x:Class="VeloxHub.MainWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        Title="Velox Hub — Enterprise Refurbishment Suite" 
-        Height="720" Width="1080"
-        MinHeight="600" MinWidth="900"
+        Title="Velox Hub — Refurbishing &amp; Diagnostics Application Suite" 
+        Height="760" Width="1180"
+        WindowStartupLocation="CenterScreen"
         Background="#070a12"
-        WindowStartupLocation="CenterScreen">
-    
+        Foreground="#f8fafc"
+        FontFamily="Segoe UI, Inter, Arial">
+
     <Window.Resources>
-        <!-- Converter or Triggers if needed -->
-        <BooleanToVisibilityConverter x:Key="BoolToVis"/>
-        
+        <!-- Sidebar Button Style -->
         <Style x:Key="SidebarBtn" TargetType="Button">
             <Setter Property="Background" Value="Transparent"/>
             <Setter Property="Foreground" Value="#94a3b8"/>
-            <Setter Property="FontSize" Value="14"/>
+            <Setter Property="FontSize" Value="13"/>
             <Setter Property="FontWeight" Value="600"/>
-            <Setter Property="BorderThickness" Value="0"/>
             <Setter Property="HorizontalContentAlignment" Value="Left"/>
-            <Setter Property="Padding" Value="14,10"/>
+            <Setter Property="Padding" Value="12,10"/>
+            <Setter Property="Margin" Value="0,0,0,4"/>
             <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="BorderThickness" Value="0"/>
             <Setter Property="Template">
                 <Setter.Value>
                     <ControlTemplate TargetType="Button">
                         <Border Background="{TemplateBinding Background}" CornerRadius="8" Padding="{TemplateBinding Padding}">
-                            <ContentPresenter VerticalAlignment="Center"/>
+                            <ContentPresenter HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}" VerticalAlignment="Center"/>
                         </Border>
                         <ControlTemplate.Triggers>
                             <Trigger Property="IsMouseOver" Value="True">
@@ -131,9 +131,9 @@
 
                     <StackPanel Grid.Row="0">
                         <TextBlock Text="APPLICATIONS" FontSize="11" FontWeight="800" Foreground="#64748b" Margin="10,0,0,10"/>
-                        <Button Content="⚡ All Applications" Style="{StaticResource SidebarBtn}" Background="#141f36" Foreground="#ffffff" Margin="0,0,0,4"/>
-                        <Button Content="✓ Installed" Click="BtnFilterInstalled_Click" Style="{StaticResource SidebarBtn}" Margin="0,0,0,4"/>
-                        <Button Content="🔄 Refresh Status" Click="BtnRefresh_Click" Style="{StaticResource SidebarBtn}"/>
+                        <Button x:Name="BtnNavAll" Content="⚡ All Applications" Click="BtnNavAll_Click" Style="{StaticResource SidebarBtn}" Background="#141f36" Foreground="#ffffff"/>
+                        <Button x:Name="BtnNavInstalled" Content="✓ Installed" Click="BtnNavInstalled_Click" Style="{StaticResource SidebarBtn}"/>
+                        <Button x:Name="BtnNavRefresh" Content="🔄 Refresh Status" Click="BtnNavRefresh_Click" Style="{StaticResource SidebarBtn}"/>
                     </StackPanel>
 
                     <!-- Bottom Depot Workstation Info -->
@@ -171,12 +171,12 @@
                                             <TextBlock Text="{Binding IconSymbol}" FontSize="24" HorizontalAlignment="Center" VerticalAlignment="Center"/>
                                         </Border>
 
-                                        <!-- App Info -->
-                                        <StackPanel Grid.Column="1" Margin="10,0,20,0">
+                                        <!-- App Details -->
+                                        <StackPanel Grid.Column="1" Margin="16,0,20,0" VerticalAlignment="Center">
                                             <StackPanel Orientation="Horizontal" Margin="0,0,0,4">
                                                 <TextBlock Text="{Binding Title}" FontSize="18" FontWeight="800" Foreground="#ffffff" Margin="0,0,10,0"/>
                                                 <TextBlock Text="{Binding LocalVersion}" FontSize="12" Foreground="#64748b" VerticalAlignment="Center" Margin="0,0,12,0"/>
-                                                
+
                                                 <!-- Entitlement Pill -->
                                                 <Border CornerRadius="10" Padding="8,2" VerticalAlignment="Center">
                                                     <Border.Style>
@@ -223,7 +223,7 @@
                                                     IsEnabled="{Binding CanInstallOrLaunch}" 
                                                     Click="BtnAppAction_Click" 
                                                     Style="{StaticResource ActionBtn}"
-                                                    Width="150"/>
+                                                    Width="160"/>
                                             
                                             <!-- Progress Bar (shown when installing) -->
                                             <ProgressBar Value="{Binding Progress}" Maximum="100" Height="4" Margin="0,8,0,0"
@@ -250,18 +250,53 @@
             </ScrollViewer>
         </Grid>
 
-        <!-- ── LICENSE KEY INPUT MODAL (OVERLAY) ── -->
+        <!-- ── LICENSE KEY INPUT & ACTIVATION MODAL (OVERLAY) ── -->
         <Grid x:Name="LicenseModal" Grid.RowSpan="2" Background="#D9070a12" Visibility="Collapsed">
-            <Border Background="#0e1526" BorderBrush="#1e293b" BorderThickness="1" CornerRadius="16" Width="480" VerticalAlignment="Center" HorizontalAlignment="Center" Padding="30">
+            <Border Background="#0e1526" BorderBrush="#1e293b" BorderThickness="1" CornerRadius="16" Width="520" VerticalAlignment="Center" HorizontalAlignment="Center" Padding="32">
                 <StackPanel>
-                    <TextBlock Text="Enter Organization License Key" FontSize="20" FontWeight="800" Foreground="#ffffff" Margin="0,0,0,6"/>
-                    <TextBlock Text="Paste your depot license key (e.g. VLX-START-..., VLX-PRO-...) to unlock your applications." FontSize="13" Foreground="#94a3b8" TextWrapping="Wrap" Margin="0,0,0,20"/>
+                    <StackPanel Orientation="Horizontal" Margin="0,0,0,8">
+                        <Border Background="#2563eb" CornerRadius="6" Width="28" Height="28" Margin="0,0,10,0">
+                            <TextBlock Text="🔑" FontSize="14" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        </Border>
+                        <TextBlock Text="Depot License Activation" FontSize="20" FontWeight="800" Foreground="#ffffff" VerticalAlignment="Center"/>
+                    </StackPanel>
 
-                    <TextBox x:Name="TxtModalKeyInput" Background="#070a12" Foreground="#ffffff" BorderBrush="#1e293b" BorderThickness="1" Padding="12" FontSize="15" FontWeight="700" Margin="0,0,0,16"/>
+                    <TextBlock Text="Enter your organization subscription key to unlock entitled applications and bind this workstation to your depot cloud cluster." 
+                               FontSize="13" Foreground="#94a3b8" TextWrapping="Wrap" Margin="0,0,0,20" LineHeight="18"/>
 
+                    <!-- Key Input Box -->
+                    <TextBox x:Name="TxtModalKeyInput" 
+                             Background="#070a12" Foreground="#ffffff" 
+                             BorderBrush="#2563eb" BorderThickness="1.5" 
+                             Padding="12,10" FontSize="15" FontWeight="700" 
+                             FontFamily="Consolas, monospace"
+                             Margin="0,0,0,12"/>
+
+                    <!-- Status / Feedback Message -->
+                    <TextBlock x:Name="TxtModalStatus" 
+                               Text="" 
+                               FontSize="12" FontWeight="600" 
+                               Foreground="#f59e0b" 
+                               TextWrapping="Wrap" 
+                               Margin="0,0,0,16"/>
+
+                    <!-- Success Details Card (Hidden until verified) -->
+                    <Border x:Name="PnlModalSuccess" Background="#141f36" BorderBrush="#10b981" BorderThickness="1" CornerRadius="10" Padding="16" Margin="0,0,0,20" Visibility="Collapsed">
+                        <StackPanel>
+                            <StackPanel Orientation="Horizontal" Margin="0,0,0,8">
+                                <TextBlock Text="✓ LICENSE VERIFIED" FontSize="12" FontWeight="800" Foreground="#10b981"/>
+                                <TextBlock x:Name="TxtSuccessTier" Text=" • Starter Depot Plan" FontSize="12" FontWeight="800" Foreground="#38bdf8"/>
+                            </StackPanel>
+                            <TextBlock x:Name="TxtSuccessCompany" Text="Abzard Electronics Depot" FontSize="14" FontWeight="700" Foreground="#ffffff" Margin="0,0,0,4"/>
+                            <TextBlock x:Name="TxtSuccessQuota" Text="Monthly Quota: 100 laptops (1,000 onboarding allowance)" FontSize="12" Foreground="#94a3b8" Margin="0,0,0,2"/>
+                            <TextBlock x:Name="TxtSuccessSeats" Text="Workstations: 1 of 5 active seats" FontSize="12" Foreground="#94a3b8"/>
+                        </StackPanel>
+                    </Border>
+
+                    <!-- Buttons -->
                     <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
-                        <Button Content="Cancel" Click="BtnModalCancel_Click" Style="{StaticResource SidebarBtn}" Margin="0,0,10,0"/>
-                        <Button Content="Activate Key" Click="BtnModalActivate_Click" Style="{StaticResource ActionBtn}"/>
+                        <Button x:Name="BtnModalCancel" Content="Cancel" Click="BtnModalCancel_Click" Style="{StaticResource SidebarBtn}" Margin="0,0,10,0" Padding="16,8"/>
+                        <Button x:Name="BtnModalActivate" Content="Activate Key" Click="BtnModalActivate_Click" Style="{StaticResource ActionBtn}" Padding="20,8"/>
                     </StackPanel>
                 </StackPanel>
             </Border>
