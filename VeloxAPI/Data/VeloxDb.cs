@@ -336,6 +336,22 @@ VALUES(@id, @tid, 'VLX-ALPHA-GPROAD-02', 'GP Road Depot Partner', 'Alpha-Pilot',
                 }
             }
             catch { }
+
+            // Ensure VeloxHub and VeloxBench releases are registered in catalog
+            try
+            {
+                using var relCheck = conn.CreateCommand();
+                relCheck.CommandText = "SELECT COUNT(*) FROM app_releases WHERE app_name = 'VeloxHub'";
+                if (Convert.ToInt64(relCheck.ExecuteScalar()) == 0)
+                {
+                    Exec(conn, @"
+INSERT INTO app_releases(id, app_name, version, channel, download_url, file_sha256, file_size_bytes, is_mandatory, release_notes, released_at_utc)
+VALUES(@id, 'VeloxHub', '1.6.10', 'alpha', '/api/v1/update/download/latest?appName=VeloxHub', '', 69441570, 0, 'Velox Hub Creative Cloud Launcher', @now)",
+                        P("@id", "rel-hub-1610"),
+                        P("@now", Iso(DateTimeOffset.UtcNow)));
+                }
+            }
+            catch { }
         }
     }
 

@@ -1,0 +1,30 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+	<PropertyGroup>
+		<OutputType>WinExe</OutputType>
+		<TargetFramework>net10.0-windows</TargetFramework>
+		<Nullable>disable</Nullable>
+		<UseWPF>true</UseWPF>
+		<AssemblyName>VeloxHub</AssemblyName>
+		<Product>Velox Hub — Unified Diagnostic Platform Launcher</Product>
+		<Company>Abzard Inc.</Company>
+		<Version>1.6.10</Version>
+		<AssemblyVersion>1.6.10.0</AssemblyVersion>
+		<FileVersion>1.6.10.0</FileVersion>
+		<NoWarn>NU1701;WFO1000;NU1903</NoWarn>
+
+		<!-- Standalone single EXE publish settings -->
+		<PublishSingleFile>true</PublishSingleFile>
+		<SelfContained>true</SelfContained>
+		<PublishReadyToRun>true</PublishReadyToRun>
+		<EnableCompressionInSingleFile>true</EnableCompressionInSingleFile>
+		<TieredCompilation>true</TieredCompilation>
+		<Optimize>true</Optimize>
+		<IncludeNativeLibrariesForSelfExtract>true</IncludeNativeLibrariesForSelfExtract>
+	</PropertyGroup>
+
+	<ItemGroup>
+		<ProjectReference Include="..\Velox.Shared\Velox.Shared.csproj" />
+	</ItemGroup>
+
+</Project>

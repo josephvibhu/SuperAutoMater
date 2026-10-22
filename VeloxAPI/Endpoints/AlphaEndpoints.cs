@@ -129,10 +129,10 @@ public static class AlphaEndpoints
             return Results.Ok(res);
         });
 
-        // GET /api/v1/update/download/latest — download latest portable VeloxBench binary
+        // GET /api/v1/update/download/latest — download latest portable VeloxHub or suite binary
         app.MapGet("/api/v1/update/download/latest", (string? appName, string? channel, HttpContext ctx, VeloxDb db) =>
         {
-            var app = appName ?? "VeloxBench";
+            var app = appName ?? "VeloxHub";
             var chan = channel ?? "alpha";
 
             // Search possible binary release directories

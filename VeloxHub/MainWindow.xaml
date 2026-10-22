@@ -1,0 +1,270 @@
+<Window x:Class="VeloxHub.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Velox Hub — Enterprise Refurbishment Suite" 
+        Height="720" Width="1080"
+        MinHeight="600" MinWidth="900"
+        Background="#070a12"
+        WindowStartupLocation="CenterScreen">
+    
+    <Window.Resources>
+        <!-- Converter or Triggers if needed -->
+        <BooleanToVisibilityConverter x:Key="BoolToVis"/>
+        
+        <Style x:Key="SidebarBtn" TargetType="Button">
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="Foreground" Value="#94a3b8"/>
+            <Setter Property="FontSize" Value="14"/>
+            <Setter Property="FontWeight" Value="600"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="HorizontalContentAlignment" Value="Left"/>
+            <Setter Property="Padding" Value="14,10"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border Background="{TemplateBinding Background}" CornerRadius="8" Padding="{TemplateBinding Padding}">
+                            <ContentPresenter VerticalAlignment="Center"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter Property="Background" Value="#141f36"/>
+                                <Setter Property="Foreground" Value="#ffffff"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <Style x:Key="ActionBtn" TargetType="Button">
+            <Setter Property="Background" Value="#2563eb"/>
+            <Setter Property="Foreground" Value="#ffffff"/>
+            <Setter Property="FontWeight" Value="700"/>
+            <Setter Property="FontSize" Value="13"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="Padding" Value="20,10"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border Background="{TemplateBinding Background}" CornerRadius="8" Padding="{TemplateBinding Padding}">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter Property="Background" Value="#3b82f6"/>
+                            </Trigger>
+                            <Trigger Property="IsEnabled" Value="False">
+                                <Setter Property="Background" Value="#1e293b"/>
+                                <Setter Property="Foreground" Value="#64748b"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+    </Window.Resources>
+
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="64"/> <!-- Top Header -->
+            <RowDefinition Height="*"/>   <!-- Workspace -->
+        </Grid.RowDefinitions>
+
+        <!-- ── TOP GLOBAL HEADER ── -->
+        <Border Grid.Row="0" Background="#0b101d" BorderBrush="#1e293b" BorderThickness="0,0,0,1" Padding="20,0">
+            <Grid VerticalAlignment="Center">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+
+                <!-- Brand -->
+                <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center">
+                    <Border Background="#2563eb" CornerRadius="8" Width="34" Height="34" Margin="0,0,12,0">
+                        <TextBlock Text="⚡" FontSize="18" Foreground="White" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                    </Border>
+                    <StackPanel VerticalAlignment="Center">
+                        <StackPanel Orientation="Horizontal">
+                            <TextBlock Text="VELOX " FontWeight="800" FontSize="18" Foreground="#ffffff"/>
+                            <TextBlock Text="HUB" FontWeight="800" FontSize="18" Foreground="#3b82f6"/>
+                        </StackPanel>
+                        <TextBlock Text="Creative Cloud for Refurbishers" FontSize="10" Foreground="#64748b" FontWeight="600"/>
+                    </StackPanel>
+                </StackPanel>
+
+                <!-- Center Banner / Status -->
+                <TextBlock Grid.Column="1" x:Name="TxtStatusBanner" Text="Connecting to Velox Cloud..." 
+                           Foreground="#94a3b8" FontSize="13" FontWeight="500" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+
+                <!-- Right Actions: License Pill & Change Key -->
+                <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center">
+                    <Border Background="#141f36" BorderBrush="#1e293b" BorderThickness="1" CornerRadius="20" Padding="12,6" Margin="0,0,10,0">
+                        <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                            <Ellipse x:Name="PillDot" Width="8" Height="8" Fill="#10b981" Margin="0,0,8,0"/>
+                            <TextBlock x:Name="TxtLicensePill" Text="Verified License" FontSize="12" FontWeight="700" Foreground="#f8fafc"/>
+                        </StackPanel>
+                    </Border>
+
+                    <Button Content="Change Key" Click="BtnChangeKey_Click" Style="{StaticResource SidebarBtn}" Padding="10,6" FontSize="12"/>
+                </StackPanel>
+            </Grid>
+        </Border>
+
+        <!-- ── MAIN WORKSPACE ── -->
+        <Grid Grid.Row="1">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="220"/> <!-- Left Sidebar -->
+                <ColumnDefinition Width="*"/>   <!-- Apps Catalog -->
+            </Grid.ColumnDefinitions>
+
+            <!-- ── LEFT SIDEBAR ── -->
+            <Border Grid.Column="0" Background="#090e1a" BorderBrush="#1e293b" BorderThickness="0,0,1,0" Padding="16,20">
+                <Grid>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="*"/>
+                        <RowDefinition Height="Auto"/>
+                    </Grid.RowDefinitions>
+
+                    <StackPanel Grid.Row="0">
+                        <TextBlock Text="APPLICATIONS" FontSize="11" FontWeight="800" Foreground="#64748b" Margin="10,0,0,10"/>
+                        <Button Content="⚡ All Applications" Style="{StaticResource SidebarBtn}" Background="#141f36" Foreground="#ffffff" Margin="0,0,0,4"/>
+                        <Button Content="✓ Installed" Click="BtnFilterInstalled_Click" Style="{StaticResource SidebarBtn}" Margin="0,0,0,4"/>
+                        <Button Content="🔄 Refresh Status" Click="BtnRefresh_Click" Style="{StaticResource SidebarBtn}"/>
+                    </StackPanel>
+
+                    <!-- Bottom Depot Workstation Info -->
+                    <Border Grid.Row="2" Background="#0e1526" BorderBrush="#1e293b" BorderThickness="1" CornerRadius="10" Padding="12">
+                        <StackPanel>
+                            <TextBlock Text="WORKSTATION ID" FontSize="10" FontWeight="800" Foreground="#64748b" Margin="0,0,0,4"/>
+                            <TextBlock x:Name="TxtMachineGuid" Text="BENCH-QC-01" FontSize="12" FontWeight="700" Foreground="#f8fafc" Margin="0,0,0,8"/>
+                            <TextBlock Text="CLOUD CLUSTER" FontSize="10" FontWeight="800" Foreground="#64748b" Margin="0,0,0,4"/>
+                            <TextBlock Text="13.206.106.146 (ap-south-1)" FontSize="11" Foreground="#38bdf8"/>
+                        </StackPanel>
+                    </Border>
+                </Grid>
+            </Border>
+
+            <!-- ── APPS CATALOG VIEW (CREATIVE CLOUD STYLE) ── -->
+            <ScrollViewer Grid.Column="1" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" Padding="30">
+                <StackPanel>
+                    <TextBlock Text="Apps in Your Depot Suite" FontSize="26" FontWeight="800" Foreground="#ffffff" Margin="0,0,0,6"/>
+                    <TextBlock Text="Install, launch, and update applications entitled by your organization's subscription key." FontSize="14" Foreground="#94a3b8" Margin="0,0,0,24"/>
+
+                    <!-- Items Control for Apps -->
+                    <ItemsControl x:Name="AppsItemsControl">
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate>
+                                <Border Background="#0e1526" BorderBrush="#1e293b" BorderThickness="1" CornerRadius="12" Padding="20" Margin="0,0,0,16">
+                                    <Grid>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="56"/>
+                                            <ColumnDefinition Width="*"/>
+                                            <ColumnDefinition Width="220"/>
+                                        </Grid.ColumnDefinitions>
+
+                                        <!-- App Icon Box -->
+                                        <Border Grid.Column="0" Background="#141f36" CornerRadius="10" Width="48" Height="48" HorizontalAlignment="Left" VerticalAlignment="Top">
+                                            <TextBlock Text="{Binding IconSymbol}" FontSize="24" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                        </Border>
+
+                                        <!-- App Info -->
+                                        <StackPanel Grid.Column="1" Margin="10,0,20,0">
+                                            <StackPanel Orientation="Horizontal" Margin="0,0,0,4">
+                                                <TextBlock Text="{Binding Title}" FontSize="18" FontWeight="800" Foreground="#ffffff" Margin="0,0,10,0"/>
+                                                <TextBlock Text="{Binding LocalVersion}" FontSize="12" Foreground="#64748b" VerticalAlignment="Center" Margin="0,0,12,0"/>
+                                                
+                                                <!-- Entitlement Pill -->
+                                                <Border CornerRadius="10" Padding="8,2" VerticalAlignment="Center">
+                                                    <Border.Style>
+                                                        <Style TargetType="Border">
+                                                            <Style.Triggers>
+                                                                <DataTrigger Binding="{Binding IsEntitled}" Value="True">
+                                                                    <Setter Property="Background" Value="rgba(16, 185, 129, 0.15)"/>
+                                                                    <Setter Property="BorderBrush" Value="#10b981"/>
+                                                                    <Setter Property="BorderThickness" Value="1"/>
+                                                                </DataTrigger>
+                                                                <DataTrigger Binding="{Binding IsEntitled}" Value="False">
+                                                                    <Setter Property="Background" Value="rgba(239, 68, 68, 0.15)"/>
+                                                                    <Setter Property="BorderBrush" Value="#ef4444"/>
+                                                                    <Setter Property="BorderThickness" Value="1"/>
+                                                                </DataTrigger>
+                                                            </Style.Triggers>
+                                                        </Style>
+                                                    </Border.Style>
+                                                    <TextBlock Text="{Binding EntitlementBadge}" FontSize="10" FontWeight="800">
+                                                        <TextBlock.Style>
+                                                            <Style TargetType="TextBlock">
+                                                                <Style.Triggers>
+                                                                    <DataTrigger Binding="{Binding IsEntitled}" Value="True">
+                                                                        <Setter Property="Foreground" Value="#10b981"/>
+                                                                    </DataTrigger>
+                                                                    <DataTrigger Binding="{Binding IsEntitled}" Value="False">
+                                                                        <Setter Property="Foreground" Value="#ef4444"/>
+                                                                    </DataTrigger>
+                                                                </Style.Triggers>
+                                                            </Style>
+                                                        </TextBlock.Style>
+                                                    </TextBlock>
+                                                </Border>
+                                            </StackPanel>
+
+                                            <TextBlock Text="{Binding Tagline}" FontSize="13" FontWeight="600" Foreground="#60a5fa" Margin="0,0,0,6"/>
+                                            <TextBlock Text="{Binding Description}" FontSize="12" Foreground="#94a3b8" TextWrapping="Wrap" Margin="0,0,0,8" LineHeight="18"/>
+                                            <TextBlock Text="{Binding StatusText}" FontSize="11" Foreground="#64748b" FontWeight="600"/>
+                                        </StackPanel>
+
+                                        <!-- Action Column (Install/Launch Button) -->
+                                        <StackPanel Grid.Column="2" VerticalAlignment="Center" HorizontalAlignment="Right">
+                                            <Button Content="{Binding ActionButtonText}" 
+                                                    IsEnabled="{Binding CanInstallOrLaunch}" 
+                                                    Click="BtnAppAction_Click" 
+                                                    Style="{StaticResource ActionBtn}"
+                                                    Width="150"/>
+                                            
+                                            <!-- Progress Bar (shown when installing) -->
+                                            <ProgressBar Value="{Binding Progress}" Maximum="100" Height="4" Margin="0,8,0,0"
+                                                         Foreground="#3b82f6" Background="#141f36" BorderThickness="0">
+                                                <ProgressBar.Style>
+                                                    <Style TargetType="ProgressBar">
+                                                        <Style.Triggers>
+                                                            <DataTrigger Binding="{Binding State}" Value="Installing">
+                                                                <Setter Property="Visibility" Value="Visible"/>
+                                                            </DataTrigger>
+                                                        </Style.Triggers>
+                                                        <Setter Property="Visibility" Value="Collapsed"/>
+                                                    </Style>
+                                                </ProgressBar.Style>
+                                            </ProgressBar>
+                                        </StackPanel>
+                                    </Grid>
+                                </Border>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+
+                </StackPanel>
+            </ScrollViewer>
+        </Grid>
+
+        <!-- ── LICENSE KEY INPUT MODAL (OVERLAY) ── -->
+        <Grid x:Name="LicenseModal" Grid.RowSpan="2" Background="rgba(7, 10, 18, 0.85)" Visibility="Collapsed">
+            <Border Background="#0e1526" BorderBrush="#1e293b" BorderThickness="1" CornerRadius="16" Width="480" VerticalAlignment="Center" HorizontalAlignment="Center" Padding="30">
+                <StackPanel>
+                    <TextBlock Text="Enter Organization License Key" FontSize="20" FontWeight="800" Foreground="#ffffff" Margin="0,0,0,6"/>
+                    <TextBlock Text="Paste your depot license key (e.g. VLX-START-..., VLX-PRO-...) to unlock your applications." FontSize="13" Foreground="#94a3b8" TextWrapping="Wrap" Margin="0,0,0,20"/>
+
+                    <TextBox x:Name="TxtModalKeyInput" Background="#070a12" Foreground="#ffffff" BorderBrush="#1e293b" BorderThickness="1" Padding="12" FontSize="15" FontWeight="700" Margin="0,0,0,16"/>
+
+                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+                        <Button Content="Cancel" Click="BtnModalCancel_Click" Style="{StaticResource SidebarBtn}" Margin="0,0,10,0"/>
+                        <Button Content="Activate Key" Click="BtnModalActivate_Click" Style="{StaticResource ActionBtn}"/>
+                    </StackPanel>
+                </StackPanel>
+            </Border>
+        </Grid>
+    </Grid>
+</Window>
