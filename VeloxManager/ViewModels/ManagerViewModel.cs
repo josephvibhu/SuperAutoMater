@@ -384,7 +384,7 @@ public class ManagerViewModel : INotifyPropertyChanged
     public double DepotProjectedMarginValue => Math.Max(0, DepotProjectedSaleValue - Assets.Where(a => a.Status == LifecycleQueue.ReadyForSale).Sum(a => a.LandedCost));
     public double DepotMarginPercent => DepotProjectedSaleValue > 0 ? (DepotProjectedMarginValue / DepotProjectedSaleValue) * 100.0 : 0.0;
 
-    public string CloudStatusText => _api.IsConnected ? "☁ CLOUD LIVE (Railway)" : "⚠ CONNECTING TO CLOUD...";
+    public string CloudStatusText => _api.IsConnected ? "☁ CLOUD LIVE (AWS Lightsail)" : "⚠ CONNECTING TO CLOUD...";
     public string CloudStatusColor => _api.IsConnected ? "#3FB950" : "#D29922";
 
     public string LanStatusText => _lan.IsRunning ? $"🌐 LAN MIRROR (Port {ManagerConfigService.Current.LanPort})" : "LAN SERVER INACTIVE";
@@ -1796,7 +1796,7 @@ public class ManagerViewModel : INotifyPropertyChanged
     {
         try
         {
-            // Point directly to Railway cloud API showroom (matching VeloxLink architecture)
+            // Point directly to AWS cloud API showroom (matching VeloxLink architecture)
             var cloudBase = ManagerConfigService.Current.ApiUrl.TrimEnd('/');
             var showroomUrl = $"{cloudBase}/showroom";
 
@@ -1965,7 +1965,7 @@ public class ManagerViewModel : INotifyPropertyChanged
             var json = await _api.DownloadBackupJsonAsync();
             if (string.IsNullOrWhiteSpace(json))
             {
-                VeloxMessageBox.Show("Failed to download database backup from Railway Cloud. Check internet connection.", "Backup Failed", MessageBoxButton.OK, MessageBoxImage.Error);
+                VeloxMessageBox.Show("Failed to download database backup from AWS Cloud. Check internet connection.", "Backup Failed", MessageBoxButton.OK, MessageBoxImage.Error);
                 return;
             }
 
@@ -1991,7 +1991,7 @@ public class ManagerViewModel : INotifyPropertyChanged
             if (ofd.ShowDialog() != true) return;
 
             var confirm = VeloxMessageBox.Show(
-                $"Are you sure you want to restore Railway Cloud from this backup file?\n\n{ofd.FileName}\n\nThis will synchronize cloud assets with the contents of the file.",
+                $"Are you sure you want to restore AWS Cloud from this backup file?\n\n{ofd.FileName}\n\nThis will synchronize cloud assets with the contents of the file.",
                 "Confirm Cloud Restore", MessageBoxButton.YesNo, MessageBoxImage.Question);
             if (confirm != MessageBoxResult.Yes) return;
 
@@ -2019,7 +2019,7 @@ public class ManagerViewModel : INotifyPropertyChanged
         try
         {
             var confirm = VeloxMessageBox.Show(
-                "⚠️ DANGER: Are you sure you want to permanently delete all previous test devices and history logs from Railway Cloud?\n\nThis will wipe existing test assets so you can intake real warehouse inventory starting clean at 0.\n\nTechnician user logins, station configs, and API keys are preserved.\n\nDo you want to proceed?",
+                "⚠️ DANGER: Are you sure you want to permanently delete all previous test devices and history logs from AWS Cloud?\n\nThis will wipe existing test assets so you can intake real warehouse inventory starting clean at 0.\n\nTechnician user logins, station configs, and API keys are preserved.\n\nDo you want to proceed?",
                 "Confirm Database Purge / Reset", MessageBoxButton.YesNo, MessageBoxImage.Warning);
             if (confirm != MessageBoxResult.Yes) return;
 
@@ -2027,7 +2027,7 @@ public class ManagerViewModel : INotifyPropertyChanged
             if (success)
             {
                 LiveActivityFeed.Insert(0, $"[{DateTime.Now:HH:mm:ss}] Cloud database purged: {purged} previous devices deleted.");
-                VeloxMessageBox.Show($"Cloud inventory successfully reset to 0!\n\n{purged} previous asset entries and associated test records have been deleted from Railway.\n\nYou can now intake real inventory.", "Cloud Inventory Reset", MessageBoxButton.OK, MessageBoxImage.Information);
+                VeloxMessageBox.Show($"Cloud inventory successfully reset to 0!\n\n{purged} previous asset entries and associated test records have been deleted from AWS Cloud.\n\nYou can now intake real inventory.", "Cloud Inventory Reset", MessageBoxButton.OK, MessageBoxImage.Information);
                 await LoadAssetsAndEmployeesAsync();
             }
             else

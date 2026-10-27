@@ -6,7 +6,7 @@ namespace VeloxBench.Core;
 
 public sealed class BenchConfig
 {
-    public string ApiUrl { get; set; } = "http://localhost:5000";
+    public string ApiUrl { get; set; } = "http://13.206.106.146";
     public string ApiKey { get; set; } = "vx-2fe1479ad70dffd3017a0aa8c67b1c270fc9dd00bb9d4bdf";
     public string LicenseKey { get; set; } = "VLX-ALPHA-TEST-2026";
     public string TenantId { get; set; } = "ten-d2428a4cb3da";

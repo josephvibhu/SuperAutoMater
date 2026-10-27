@@ -16,7 +16,7 @@ public partial class CloudOperationsModalWindow : Window
         InitializeComponent();
         _onDatabaseMutatedAsync = onDatabaseMutatedAsync;
         TxtApiUrl.Text = ManagerConfigService.Current.ApiUrl;
-        TxtCloudStatus.Text = ManagerApiClient.Instance.IsConnected ? "● RAILWAY LIVE" : "○ OFFLINE / DISCONNECTED";
+        TxtCloudStatus.Text = ManagerApiClient.Instance.IsConnected ? "● AWS CLOUD LIVE" : "○ OFFLINE / DISCONNECTED";
     }
 
     private void Header_MouseDown(object sender, MouseButtonEventArgs e)
@@ -36,7 +36,7 @@ public partial class CloudOperationsModalWindow : Window
     {
         try
         {
-            TxtStatus.Text = "Connecting to Railway Cloud to create full database backup...";
+            TxtStatus.Text = "Connecting to AWS Cloud to create full database backup...";
             TxtStatus.Foreground = System.Windows.Media.Brushes.LightSkyBlue;
 
             var sfd = new SaveFileDialog
@@ -56,9 +56,9 @@ public partial class CloudOperationsModalWindow : Window
             var json = await ManagerApiClient.Instance.DownloadBackupJsonAsync();
             if (string.IsNullOrWhiteSpace(json))
             {
-                TxtStatus.Text = "Failed to download backup from Railway. Check internet / API key.";
+                TxtStatus.Text = "Failed to download backup from AWS Cloud. Check internet / API key.";
                 TxtStatus.Foreground = System.Windows.Media.Brushes.OrangeRed;
-                VeloxMessageBox.Show("Failed to download cloud database backup from Railway Cloud.", "Backup Error", MessageBoxButton.OK, MessageBoxImage.Error, this);
+                VeloxMessageBox.Show("Failed to download cloud database backup from AWS Cloud.", "Backup Error", MessageBoxButton.OK, MessageBoxImage.Error, this);
                 return;
             }
 
@@ -90,12 +90,12 @@ public partial class CloudOperationsModalWindow : Window
             if (ofd.ShowDialog() != true) return;
 
             var confirm = VeloxMessageBox.Show(
-                $"Are you sure you want to restore Railway Cloud from this backup file?\n\n{ofd.FileName}\n\nThis will synchronize cloud assets with the contents of the file.",
+                $"Are you sure you want to restore AWS Cloud from this backup file?\n\n{ofd.FileName}\n\nThis will synchronize cloud assets with the contents of the file.",
                 "Confirm Cloud Restore", MessageBoxButton.YesNo, MessageBoxImage.Question, this);
 
             if (confirm != MessageBoxResult.Yes) return;
 
-            TxtStatus.Text = "Uploading backup and restoring database on Railway Cloud...";
+            TxtStatus.Text = "Uploading backup and restoring database on AWS Cloud...";
             TxtStatus.Foreground = System.Windows.Media.Brushes.LightSkyBlue;
 
             var json = await File.ReadAllTextAsync(ofd.FileName);
@@ -131,12 +131,12 @@ public partial class CloudOperationsModalWindow : Window
         try
         {
             var confirm = VeloxMessageBox.Show(
-                "⚠️ DANGER: Are you sure you want to permanently delete all previous test devices and history logs from Railway Cloud?\n\nThis will wipe existing test assets so you can intake real warehouse inventory starting clean at 0.\n\nTechnician user logins, station configs, and API keys are preserved.\n\nDo you want to proceed?",
+                "⚠️ DANGER: Are you sure you want to permanently delete all previous test devices and history logs from AWS Cloud?\n\nThis will wipe existing test assets so you can intake real warehouse inventory starting clean at 0.\n\nTechnician user logins, station configs, and API keys are preserved.\n\nDo you want to proceed?",
                 "Confirm Database Purge / Reset", MessageBoxButton.YesNo, MessageBoxImage.Warning, this);
 
             if (confirm != MessageBoxResult.Yes) return;
 
-            TxtStatus.Text = "Purging previous test devices from Railway Cloud...";
+            TxtStatus.Text = "Purging previous test devices from AWS Cloud...";
             TxtStatus.Foreground = System.Windows.Media.Brushes.Orange;
 
             var (success, msg, purged) = await ManagerApiClient.Instance.PurgeAssetsAsync();
@@ -144,7 +144,7 @@ public partial class CloudOperationsModalWindow : Window
             {
                 TxtStatus.Text = $"Database wiped clean: {purged} previous asset entries purged.";
                 TxtStatus.Foreground = System.Windows.Media.Brushes.LightGreen;
-                VeloxMessageBox.Show($"Cloud inventory successfully reset to 0!\n\n{purged} previous asset entries and associated test records have been deleted from Railway.\n\nYou can now intake real inventory.",
+                VeloxMessageBox.Show($"Cloud inventory successfully reset to 0!\n\n{purged} previous asset entries and associated test records have been deleted from AWS Cloud.\n\nYou can now intake real inventory.",
                     "Cloud Inventory Reset", MessageBoxButton.OK, MessageBoxImage.Information, this);
 
                 if (_onDatabaseMutatedAsync != null)

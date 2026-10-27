@@ -29,6 +29,6 @@ dotnet test Velox.slnx
 ```
 
 Deploying VeloxAPI:
-- Deploys to Railway via `Dockerfile` and `railway.toml`.
+- Deploys to AWS Lightsail / EC2 via Docker Compose (`docker-compose.yml`) and `scripts/deploy-lightsail.sh`.
 - Persistent storage mounted at `/data` for SQLite database.
-- Health check available at `/health`.
+- Health check available at `/health` (`http://13.206.106.146/health`).

@@ -1,5 +1,5 @@
 param (
-    [string]$ApiUrl = "https://velox-api-production.up.railway.app",
+    [string]$ApiUrl = "http://13.206.106.146",
     [string]$ApiKey = "vx-2fe1479ad70dffd3017a0aa8c67b1c270fc9dd00bb9d4bdf"
 )
 

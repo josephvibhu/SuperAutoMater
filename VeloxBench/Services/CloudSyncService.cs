@@ -118,7 +118,7 @@ public sealed class CloudSyncService
         }
         catch { }
 
-        // Tier 2: Cloud Authoritative (VeloxAPI on Railway)
+        // Tier 2: Cloud Authoritative (VeloxAPI on AWS Lightsail)
         try
         {
             using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(5));

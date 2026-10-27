@@ -32,7 +32,7 @@ if (Test-Path $ConfigPath) {
     }
 }
 
-$ApiUrl = if ($Config.apiUrl) { $Config.apiUrl } else { "https://velox-api-production.up.railway.app" }
+$ApiUrl = if ($Config.apiUrl) { $Config.apiUrl } else { "http://13.206.106.146" }
 $LanUrl = if ($Config.lanApiUrl) { $Config.lanApiUrl } else { "" }
 $ApiKey = if ($Config.apiKey) { $Config.apiKey } else { "vx-2fe1479ad70dffd3017a0aa8c67b1c270fc9dd00bb9d4bdf" }
 $Actor  = if ($Config.actor) { $Config.actor } else { "VeloxLink-AutoIntake" }

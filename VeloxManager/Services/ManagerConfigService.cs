@@ -6,7 +6,7 @@ namespace VeloxManager.Services;
 
 public class ManagerConfig
 {
-    public string ApiUrl { get; set; } = "https://velox-api-production.up.railway.app";
+    public string ApiUrl { get; set; } = "http://13.206.106.146";
     public string ApiKey { get; set; } = "vx-2fe1479ad70dffd3017a0aa8c67b1c270fc9dd00bb9d4bdf";
     public string SiteCode { get; set; } = "MAIN";
     public int LanPort { get; set; } = 9000;
@@ -50,9 +50,9 @@ public static class ManagerConfigService
                 var doc = JsonDocument.Parse(File.ReadAllText(devProdPath));
                 _current = new ManagerConfig
                 {
-                    ApiUrl = doc.RootElement.TryGetProperty("apiUrl", out var u) ? u.GetString() ?? "" : "https://velox-api-production.up.railway.app",
-                    ApiKey = doc.RootElement.TryGetProperty("primaryApiKey", out var k) ? k.GetString() ?? "" : "",
-                    SiteCode = doc.RootElement.TryGetProperty("siteCode", out var s) ? s.GetString() ?? "MAIN" : "MAIN"
+                    ApiUrl = doc.RootElement.TryGetProperty("apiUrl", out var u) ? u.GetString() ?? "" : (doc.RootElement.TryGetProperty("VeloxApiUrl", out var vu) ? vu.GetString() ?? "" : "http://13.206.106.146"),
+                    ApiKey = doc.RootElement.TryGetProperty("primaryApiKey", out var k) ? k.GetString() ?? "" : (doc.RootElement.TryGetProperty("ApiKey", out var ak) ? ak.GetString() ?? "" : ""),
+                    SiteCode = doc.RootElement.TryGetProperty("siteCode", out var s) ? s.GetString() ?? "MAIN" : (doc.RootElement.TryGetProperty("SiteCode", out var sc) ? sc.GetString() ?? "MAIN" : "MAIN")
                 };
                 Save();
                 return;
