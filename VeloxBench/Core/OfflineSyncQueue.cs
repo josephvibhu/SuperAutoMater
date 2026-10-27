@@ -405,6 +405,8 @@ namespace SuperAutoMater
         public string Out_Date { get; set; } = "";
         public string Customer { get; set; } = "";
         public string Timestamp { get; set; } = "";
+        public string Silicon_Dna_Hash { get; set; } = "";
+        public string Hardware_Quorum_Json { get; set; } = "{}";
 
         public DateTime QueuedAt { get; set; } = DateTime.Now;
     }

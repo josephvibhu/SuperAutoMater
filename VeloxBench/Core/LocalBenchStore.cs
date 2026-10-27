@@ -183,6 +183,21 @@ public sealed class LocalBenchStore
                 AppLogger.Error("Failed queuing outbox item", ex);
             }
         }
+
+        try
+        {
+            var dna = Services.SiliconDnaService.Instance.GetSiliconDna();
+            string idemp = $"local-bench-{Guid.NewGuid():N}";
+            OutboxStore.Instance.Enqueue(
+                eventType: $"Http_{method}_{endpoint}",
+                aggregateId: endpoint,
+                idempotencyKey: idemp,
+                payloadJson: payloadJson,
+                siliconDnaHash: dna.SiliconDnaHash,
+                hardwareQuorumJson: dna.HardwareQuorumJson
+            );
+        }
+        catch { }
     }
 
     public List<OutboxRecord> GetPendingOutbox(int limit = 50)

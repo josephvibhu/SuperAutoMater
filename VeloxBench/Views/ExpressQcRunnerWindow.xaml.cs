@@ -82,6 +82,11 @@ namespace SuperAutoMater.Wpf.Views
                 _viewModel,
                 SelectedProfile,
                 TechnicianProfileService.Instance.CurrentProfile.Name);
+
+            if (ExpressQcEngineService.Instance.RestoredPriorSubtestCount > 0)
+            {
+                TxtStatusDetail.Text = $"Restored {ExpressQcEngineService.Instance.RestoredPriorSubtestCount} subtests from SQLite WAL crash-recovery log ✓";
+            }
         }
 
         private async void BtnRerunQc_Click(object sender, RoutedEventArgs e)

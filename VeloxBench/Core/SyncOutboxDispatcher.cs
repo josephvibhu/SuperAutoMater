@@ -26,6 +26,7 @@ namespace SuperAutoMater.Wpf.Core
         public static SyncOutboxDispatcher Instance => _instance.Value;
 
         private readonly QcRunStore _store;
+        private readonly OutboxStore _outboxDb = OutboxStore.Instance;
         private readonly SemaphoreSlim _flushLock = new SemaphoreSlim(1, 1);
         private readonly Timer _syncTimer;
         private volatile bool _isSyncing = false;
@@ -41,7 +42,7 @@ namespace SuperAutoMater.Wpf.Core
 
         public event Action<int> OutboxCountChanged;
 
-        public int PendingCount => _store.GetPendingOutboxCount();
+        public int PendingCount => _outboxDb.GetPendingCount() + _store.GetPendingOutboxCount();
 
         public SyncOutboxDispatcher(QcRunStore store = null)
         {
@@ -50,8 +51,34 @@ namespace SuperAutoMater.Wpf.Core
             // Run one-time migration of legacy queues on boot
             MigrateLegacyQueues();
 
-            // Poll every 30 seconds for background sync
-            _syncTimer = new Timer(async _ => await BackgroundSyncCallback(), null, TimeSpan.FromSeconds(15), TimeSpan.FromSeconds(30));
+            // Network State Listeners: Replay outbox automatically when Wi-Fi/Ethernet connectivity returns
+            try
+            {
+                NetworkChange.NetworkAvailabilityChanged += (s, e) =>
+                {
+                    if (e.IsAvailable)
+                    {
+                        AppLogger.Info("[Network] Connectivity restored (NetworkAvailabilityChanged) - replaying outbox.db queue.");
+                        _ = Task.Run(async () => await FlushPendingAsync());
+                    }
+                };
+
+                NetworkChange.NetworkAddressChanged += (s, e) =>
+                {
+                    if (NetworkInterface.GetIsNetworkAvailable())
+                    {
+                        AppLogger.Info("[Network] Network address changed - replaying outbox.db queue.");
+                        _ = Task.Run(async () => await FlushPendingAsync());
+                    }
+                };
+            }
+            catch (Exception ex)
+            {
+                AppLogger.Warn($"Failed to register NetworkChange listeners: {ex.Message}");
+            }
+
+            // Periodic replay every 10 seconds for erratic warehouse Wi-Fi
+            _syncTimer = new Timer(async _ => await BackgroundSyncCallback(), null, TimeSpan.FromSeconds(5), TimeSpan.FromSeconds(10));
         }
 
         public void MigrateLegacyQueues()
@@ -146,12 +173,16 @@ namespace SuperAutoMater.Wpf.Core
 
             try
             {
-                var pendingEvents = _store.GetPendingOutboxEvents(50);
-                if (pendingEvents.Count == 0) return 0;
+                var durableEvents = _outboxDb.GetPending(50);
+                var legacyStoreEvents = _store.GetPendingOutboxEvents(50);
+
+                if (durableEvents.Count == 0 && legacyStoreEvents.Count == 0) return 0;
 
                 var cfg = BenchConfigService.Current;
                 var licKey = LicenseService.Instance.LicenseKey;
                 if (string.IsNullOrWhiteSpace(licKey)) licKey = cfg.LicenseKey;
+
+                var defaultDna = SiliconDnaService.Instance.GetSiliconDna();
 
                 // Priority 1: Solid Authoritative Velox Cloud Backend (/api/v1/bench/sync)
                 if (!string.IsNullOrWhiteSpace(cfg.ApiUrl) && string.IsNullOrWhiteSpace(webhookUrl))
@@ -159,13 +190,31 @@ namespace SuperAutoMater.Wpf.Core
                     try
                     {
                         var batchItems = new List<BenchSyncItemDto>();
-                        foreach (var evt in pendingEvents)
+
+                        foreach (var evt in durableEvents)
                         {
                             batchItems.Add(new BenchSyncItemDto
                             {
                                 EventId = evt.Id,
                                 EventType = evt.EventType,
                                 AggregateId = evt.AggregateId,
+                                SiliconDnaHash = !string.IsNullOrWhiteSpace(evt.SiliconDnaHash) ? evt.SiliconDnaHash : defaultDna.SiliconDnaHash,
+                                HardwareQuorumJson = !string.IsNullOrWhiteSpace(evt.HardwareQuorumJson) && evt.HardwareQuorumJson != "{}" ? evt.HardwareQuorumJson : defaultDna.HardwareQuorumJson,
+                                IdempotencyKey = evt.IdempotencyKey,
+                                Timestamp = evt.CreatedAtUtc.ToString("yyyy-MM-dd HH:mm:ss"),
+                                PayloadJson = evt.PayloadJson
+                            });
+                        }
+
+                        foreach (var evt in legacyStoreEvents)
+                        {
+                            batchItems.Add(new BenchSyncItemDto
+                            {
+                                EventId = evt.Id,
+                                EventType = evt.EventType,
+                                AggregateId = evt.AggregateId,
+                                SiliconDnaHash = defaultDna.SiliconDnaHash,
+                                HardwareQuorumJson = defaultDna.HardwareQuorumJson,
                                 IdempotencyKey = evt.IdempotencyKey,
                                 Timestamp = evt.CreatedAtUtc.ToString("yyyy-MM-dd HH:mm:ss"),
                                 PayloadJson = evt.PayloadJson
@@ -191,23 +240,32 @@ namespace SuperAutoMater.Wpf.Core
                         var resp = await _httpClient.SendAsync(reqMsg);
                         if (resp.IsSuccessStatusCode)
                         {
-                            foreach (var evt in pendingEvents)
+                            foreach (var evt in durableEvents)
+                            {
+                                _outboxDb.MarkDispatched(evt.Id);
+                                dispatched++;
+                            }
+                            foreach (var evt in legacyStoreEvents)
                             {
                                 _store.MarkOutboxEventDispatched(evt.Id);
                                 dispatched++;
                             }
-                            AppLogger.Info($"[CloudSync] Dispatched batch of {dispatched} QC events to Velox Cloud API.");
+                            AppLogger.Info($"[Outbox] Replayed {dispatched} queued test records to Velox Cloud from outbox.db.");
                             return dispatched;
                         }
                         else
                         {
                             var errBody = await resp.Content.ReadAsStringAsync();
-                            AppLogger.Warn($"[CloudSync] Cloud sync rejected (HTTP {resp.StatusCode}): {errBody}");
+                            AppLogger.Warn($"[Outbox] Cloud sync rejected (HTTP {resp.StatusCode}): {errBody}");
+                            foreach (var evt in durableEvents)
+                            {
+                                _outboxDb.RecordFailure(evt.Id, $"HTTP {resp.StatusCode}: {errBody}");
+                            }
                         }
                     }
                     catch (Exception ex)
                     {
-                        AppLogger.Warn($"[CloudSync] Cloud sync request failed: {ex.Message}");
+                        AppLogger.Warn($"[Outbox] Cloud sync request failed: {ex.Message}");
                     }
                 }
 
@@ -215,7 +273,7 @@ namespace SuperAutoMater.Wpf.Core
                 string fallbackUrl = webhookUrl ?? GoogleSheetsDispatcher.DefaultSheetsUrl;
                 if (!string.IsNullOrWhiteSpace(fallbackUrl))
                 {
-                    foreach (var evt in pendingEvents)
+                    foreach (var evt in legacyStoreEvents)
                     {
                         try
                         {

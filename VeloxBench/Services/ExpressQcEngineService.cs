@@ -14,11 +14,15 @@ using System.Threading;
 using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Media.Imaging;
+using System.Text.Json;
 using AForge.Video;
 using AForge.Video.DirectShow;
 using NAudio.Wave;
 using NAudio.CoreAudioApi;
+using SuperAutoMater.Wpf.Core;
 using SuperAutoMater.Wpf.ViewModels;
+using VeloxBench.Core;
+using VeloxBench.Services;
 
 namespace SuperAutoMater.Wpf.Services
 {
@@ -91,6 +95,10 @@ namespace SuperAutoMater.Wpf.Services
             new Lazy<ExpressQcEngineService>(() => new ExpressQcEngineService());
         public static ExpressQcEngineService Instance => _instance.Value;
 
+        private readonly QcRunStore _store = new QcRunStore();
+        public string? ActiveRunId { get; private set; }
+        public int RestoredPriorSubtestCount { get; private set; }
+
         private CancellationTokenSource _cts;
         public bool IsRunning { get; private set; } = false;
 
@@ -99,6 +107,26 @@ namespace SuperAutoMater.Wpf.Services
         public event Action<ExpressQcFullReport> Completed;
 
         private ExpressQcEngineService() { }
+
+        private void FlushSubtestWal(string runId, ExpressSubsystemResult res)
+        {
+            try
+            {
+                _store.FlushSubtest(
+                    runId: runId,
+                    testKey: res.Key,
+                    testName: res.Name,
+                    status: res.Status.ToString(),
+                    headline: res.Headline,
+                    detail: res.Detail,
+                    metricValue: res.MetricValue
+                );
+            }
+            catch (Exception ex)
+            {
+                AppLogger.Warn($"Failed to flush subtest {res.Key} to WAL: {ex.Message}");
+            }
+        }
 
         public static bool IsIrOrNightVisionCamera(string name)
         {
@@ -151,250 +179,407 @@ namespace SuperAutoMater.Wpf.Services
 
             try
             {
-                // ==============================================================
-                // STAGE 1: CAMERA SENSOR & OPTICAL FRAME CAPTURE
-                // ==============================================================
-                var camResult = results["Camera"];
-                camResult.Status = ExpressTestStatus.Running;
-                SubsystemUpdated?.Invoke(camResult);
+                // ── Crash & Power-Loss Recovery Initialization ────────────────────────
+                var dna = SiliconDnaService.Instance.GetSiliconDna();
+                string assetSn = vm?.Serial ?? HardwareDiagnosticsService.Instance.SystemIdentity.Serial;
+                string assetTag = vm?.AssetTag ?? "";
+                string activeIdentifier = !string.IsNullOrWhiteSpace(assetTag) ? assetTag : assetSn;
 
-                if (profile == QcProfile.QuickComponentAudit)
+                string? activeRunId = _store.FindActiveRunId(activeIdentifier);
+                if (string.IsNullOrWhiteSpace(activeRunId) && !string.IsNullOrWhiteSpace(dna.SiliconDnaHash))
                 {
-                    ReportProgress(10, "Auditing webcam device presence...");
-                    var devices = new FilterInfoCollection(FilterCategory.VideoInputDevice);
-                    if (devices.Count > 0)
+                    activeRunId = _store.FindActiveRunId(dna.SiliconDnaHash);
+                }
+
+                string currentRunId;
+                int restoredCount = 0;
+
+                if (!string.IsNullOrWhiteSpace(activeRunId))
+                {
+                    currentRunId = activeRunId;
+                    ActiveRunId = activeRunId;
+                    var recovered = _store.GetRecoveredSubtests(activeRunId);
+                    if (recovered.Count > 0)
                     {
-                        int bestIdx = CameraDeviceService.SelectBestCameraIndex(devices);
-                        string name = devices[bestIdx >= 0 ? bestIdx : 0].Name;
-                        camResult.Status = ExpressTestStatus.Passed;
-                        camResult.Headline = "✓ OPTICAL SENSOR PRESENT";
-                        camResult.Detail = $"{name} detected.";
-                        camResult.MetricValue = $"{devices.Count} Camera(s)";
-                    }
-                    else
-                    {
-                        var pnpCams = CameraDeviceService.GetPnpCameraHardware();
-                        if (pnpCams.Count > 0)
+                        foreach (var (subKey, (status, headline, detail, metric)) in recovered)
                         {
-                            camResult.Status = ExpressTestStatus.Passed;
-                            camResult.Headline = "✓ OPTICAL HARDWARE DETECTED (PnP)";
-                            camResult.Detail = $"{pnpCams[0].Name} ({pnpCams[0].Manufacturer}) detected.";
-                            camResult.MetricValue = $"{pnpCams.Count} Hardware Sensor(s)";
+                            if (results.TryGetValue(subKey, out var subResult) && status == "Passed")
+                            {
+                                subResult.Status = ExpressTestStatus.Passed;
+                                subResult.Headline = headline;
+                                subResult.Detail = detail;
+                                subResult.MetricValue = metric;
+                                restoredCount++;
+                                SubsystemUpdated?.Invoke(subResult);
+                            }
                         }
-                        else
-                        {
-                            camResult.Status = ExpressTestStatus.Warning;
-                            camResult.Headline = "⚠ NO CAMERA DETECTED";
-                            camResult.Detail = CameraDeviceService.GetDiagnosticsSummary();
-                            camResult.MetricValue = "None";
-                        }
+                        RestoredPriorSubtestCount = restoredCount;
+                        AppLogger.Info($"[CrashRecovery] Restored {restoredCount} passed subtests from previous power interruption (RunId={activeRunId}).");
                     }
                 }
                 else
                 {
-                    ReportProgress(10, "Auditing webcam sensor, optical lens & frame capture...");
-                    await TestCameraAsync(camResult, token);
+                    var identity = new QcRunIdentity
+                    {
+                        AssetTag = assetTag,
+                        SerialNumber = assetSn,
+                        SiliconDnaHash = dna.SiliconDnaHash,
+                        HardwareQuorumJson = dna.HardwareQuorumJson,
+                        Model = vm?.Model ?? "Generic Laptop",
+                        Technician = report.TechnicianName,
+                        PolicyVersion = profile.ToString()
+                    };
+                    currentRunId = _store.StartRun(identity);
+                    ActiveRunId = currentRunId;
+                    RestoredPriorSubtestCount = 0;
                 }
-                SubsystemUpdated?.Invoke(camResult);
+
+                // ==============================================================
+                // STAGE 1: CAMERA SENSOR & OPTICAL FRAME CAPTURE
+                // ==============================================================
+                var camResult = results["Camera"];
+                if (camResult.Status != ExpressTestStatus.Passed)
+                {
+                    camResult.Status = ExpressTestStatus.Running;
+                    SubsystemUpdated?.Invoke(camResult);
+
+                    if (profile == QcProfile.QuickComponentAudit)
+                    {
+                        ReportProgress(10, "Auditing webcam device presence...");
+                        var devices = new FilterInfoCollection(FilterCategory.VideoInputDevice);
+                        if (devices.Count > 0)
+                        {
+                            int bestIdx = CameraDeviceService.SelectBestCameraIndex(devices);
+                            string name = devices[bestIdx >= 0 ? bestIdx : 0].Name;
+                            camResult.Status = ExpressTestStatus.Passed;
+                            camResult.Headline = "✓ OPTICAL SENSOR PRESENT";
+                            camResult.Detail = $"{name} detected.";
+                            camResult.MetricValue = $"{devices.Count} Camera(s)";
+                        }
+                        else
+                        {
+                            var pnpCams = CameraDeviceService.GetPnpCameraHardware();
+                            if (pnpCams.Count > 0)
+                            {
+                                camResult.Status = ExpressTestStatus.Passed;
+                                camResult.Headline = "✓ OPTICAL HARDWARE DETECTED (PnP)";
+                                camResult.Detail = $"{pnpCams[0].Name} ({pnpCams[0].Manufacturer}) detected.";
+                                camResult.MetricValue = $"{pnpCams.Count} Hardware Sensor(s)";
+                            }
+                            else
+                            {
+                                camResult.Status = ExpressTestStatus.Warning;
+                                camResult.Headline = "⚠ NO CAMERA DETECTED";
+                                camResult.Detail = CameraDeviceService.GetDiagnosticsSummary();
+                                camResult.MetricValue = "None";
+                            }
+                        }
+                    }
+                    else
+                    {
+                        ReportProgress(10, "Auditing webcam sensor, optical lens & frame capture...");
+                        await TestCameraAsync(camResult, token);
+                    }
+                    FlushSubtestWal(currentRunId, camResult);
+                    SubsystemUpdated?.Invoke(camResult);
+                }
+                else
+                {
+                    ReportProgress(10, $"✓ [Preserved] Optical sensor verified prior to power loss.");
+                }
 
                 // ==============================================================
                 // STAGE 2: MICROPHONE ARRAY TRANSDUCTION
                 // ==============================================================
                 var micResult = results["Mic"];
-                micResult.Status = ExpressTestStatus.Running;
-                SubsystemUpdated?.Invoke(micResult);
-
-                if (profile == QcProfile.QuickComponentAudit)
+                if (micResult.Status != ExpressTestStatus.Passed)
                 {
-                    ReportProgress(25, "Sampling microphone audio presence...");
-                    int waveInCount = WaveIn.DeviceCount;
-                    if (waveInCount > 0)
+                    micResult.Status = ExpressTestStatus.Running;
+                    SubsystemUpdated?.Invoke(micResult);
+
+                    if (profile == QcProfile.QuickComponentAudit)
                     {
-                        micResult.Status = ExpressTestStatus.Passed;
-                        micResult.Headline = "✓ MIC TRANSDUCER ACTIVE";
-                        micResult.Detail = $"{WaveIn.GetCapabilities(0).ProductName} ready.";
-                        micResult.MetricValue = $"{waveInCount} Endpoint(s)";
+                        ReportProgress(25, "Sampling microphone audio presence...");
+                        int waveInCount = WaveIn.DeviceCount;
+                        if (waveInCount > 0)
+                        {
+                            micResult.Status = ExpressTestStatus.Passed;
+                            micResult.Headline = "✓ MIC TRANSDUCER ACTIVE";
+                            micResult.Detail = $"{WaveIn.GetCapabilities(0).ProductName} ready.";
+                            micResult.MetricValue = $"{waveInCount} Endpoint(s)";
+                        }
+                        else
+                        {
+                            micResult.Status = ExpressTestStatus.Warning;
+                            micResult.Headline = "⚠ NO MIC ENDPOINT";
+                            micResult.Detail = "No recording audio endpoints detected.";
+                            micResult.MetricValue = "None";
+                        }
                     }
                     else
                     {
-                        micResult.Status = ExpressTestStatus.Warning;
-                        micResult.Headline = "⚠ NO MIC ENDPOINT";
-                        micResult.Detail = "No recording audio endpoints detected.";
-                        micResult.MetricValue = "None";
+                        ReportProgress(25, "Sampling microphone array transduction & noise floor...");
+                        await TestMicrophoneAsync(micResult, token);
                     }
+                    FlushSubtestWal(currentRunId, micResult);
+                    SubsystemUpdated?.Invoke(micResult);
                 }
                 else
                 {
-                    ReportProgress(25, "Sampling microphone array transduction & noise floor...");
-                    await TestMicrophoneAsync(micResult, token);
+                    ReportProgress(25, $"✓ [Preserved] Microphone array verified prior to power loss.");
                 }
-                SubsystemUpdated?.Invoke(micResult);
 
                 // ==============================================================
                 // STAGE 3: SPEAKER ACOUSTIC HARMONIC LOOPBACK & THD
                 // ==============================================================
                 var spkResult = results["Speaker"];
-                spkResult.Status = ExpressTestStatus.Running;
-                SubsystemUpdated?.Invoke(spkResult);
-
-                if (profile == QcProfile.QuickComponentAudit)
+                if (spkResult.Status != ExpressTestStatus.Passed)
                 {
-                    ReportProgress(40, "Checking audio playback endpoints...");
-                    int waveOutCount = WaveOut.DeviceCount;
-                    if (waveOutCount > 0)
+                    spkResult.Status = ExpressTestStatus.Running;
+                    SubsystemUpdated?.Invoke(spkResult);
+
+                    if (profile == QcProfile.QuickComponentAudit)
                     {
-                        spkResult.Status = ExpressTestStatus.Passed;
-                        spkResult.Headline = "✓ AUDIO OUTPUT PRESENT";
-                        spkResult.Detail = $"{WaveOut.GetCapabilities(0).ProductName} ready.";
-                        spkResult.MetricValue = $"{waveOutCount} Device(s)";
+                        ReportProgress(40, "Checking audio playback endpoints...");
+                        int waveOutCount = WaveOut.DeviceCount;
+                        if (waveOutCount > 0)
+                        {
+                            spkResult.Status = ExpressTestStatus.Passed;
+                            spkResult.Headline = "✓ AUDIO OUTPUT PRESENT";
+                            spkResult.Detail = $"{WaveOut.GetCapabilities(0).ProductName} ready.";
+                            spkResult.MetricValue = $"{waveOutCount} Device(s)";
+                        }
+                        else
+                        {
+                            spkResult.Status = ExpressTestStatus.Warning;
+                            spkResult.Headline = "⚠ NO AUDIO OUTPUT";
+                            spkResult.Detail = "No playback audio endpoints detected.";
+                            spkResult.MetricValue = "None";
+                        }
                     }
                     else
                     {
-                        spkResult.Status = ExpressTestStatus.Warning;
-                        spkResult.Headline = "⚠ NO AUDIO OUTPUT";
-                        spkResult.Detail = "No playback audio endpoints detected.";
-                        spkResult.MetricValue = "None";
+                        ReportProgress(40, "Playing calibrated acoustic chirp sweep & calculating THD %...");
+                        await TestSpeakerLoopbackAsync(spkResult, token);
                     }
+                    FlushSubtestWal(currentRunId, spkResult);
+                    SubsystemUpdated?.Invoke(spkResult);
                 }
                 else
                 {
-                    ReportProgress(40, "Playing calibrated acoustic chirp sweep & calculating THD %...");
-                    await TestSpeakerLoopbackAsync(spkResult, token);
+                    ReportProgress(40, $"✓ [Preserved] Stereo speakers verified prior to power loss.");
                 }
-                SubsystemUpdated?.Invoke(spkResult);
 
                 // ==============================================================
                 // STAGE 4: STORAGE S.M.A.R.T. & 16MB SEQUENTIAL I/O SPEED
                 // ==============================================================
-                ReportProgress(55, "Testing storage subsystem & profile criteria...");
                 var storageResult = results["Storage"];
-                storageResult.Status = ExpressTestStatus.Running;
-                SubsystemUpdated?.Invoke(storageResult);
+                if (storageResult.Status != ExpressTestStatus.Passed)
+                {
+                    ReportProgress(55, "Testing storage subsystem & profile criteria...");
+                    storageResult.Status = ExpressTestStatus.Running;
+                    SubsystemUpdated?.Invoke(storageResult);
 
-                if (profile == QcProfile.BarebonesNoStorage)
-                {
-                    storageResult.Status = ExpressTestStatus.Passed;
-                    storageResult.Headline = "✓ [AWAITING SSD] BAREBONES VERIFIED";
-                    storageResult.Detail = "Barebones profile active - storage audit skipped for diskless intake.";
-                    storageResult.MetricValue = "NO SSD";
-                }
-                else if (profile == QcProfile.WinPeLiveUsb)
-                {
-                    storageResult.Status = ExpressTestStatus.Passed;
-                    storageResult.Headline = "✓ [LIVE USB] WINPE ENVIRONMENT";
-                    storageResult.Detail = "Running from portable Live USB environment - write benchmark bypassed.";
-                    storageResult.MetricValue = "WINPE USB";
+                    if (profile == QcProfile.BarebonesNoStorage)
+                    {
+                        storageResult.Status = ExpressTestStatus.Passed;
+                        storageResult.Headline = "✓ [AWAITING SSD] BAREBONES VERIFIED";
+                        storageResult.Detail = "Barebones profile active - storage audit skipped for diskless intake.";
+                        storageResult.MetricValue = "NO SSD";
+                    }
+                    else if (profile == QcProfile.WinPeLiveUsb)
+                    {
+                        storageResult.Status = ExpressTestStatus.Passed;
+                        storageResult.Headline = "✓ [LIVE USB] WINPE ENVIRONMENT";
+                        storageResult.Detail = "Running from portable Live USB environment - write benchmark bypassed.";
+                        storageResult.MetricValue = "WINPE USB";
+                    }
+                    else
+                    {
+                        await TestStorageAsync(storageResult, vm, token);
+                    }
+                    FlushSubtestWal(currentRunId, storageResult);
+                    SubsystemUpdated?.Invoke(storageResult);
                 }
                 else
                 {
-                    await TestStorageAsync(storageResult, vm, token);
+                    ReportProgress(55, $"✓ [Preserved] Storage NVMe drive verified prior to power loss.");
                 }
-                SubsystemUpdated?.Invoke(storageResult);
 
                 // ==============================================================
                 // STAGE 5: CPU MULTI-CORE & 64MB RAM BIT-FLIP INTEGRITY
                 // ==============================================================
                 var cpuResult = results["CpuRam"];
-                cpuResult.Status = ExpressTestStatus.Running;
-                SubsystemUpdated?.Invoke(cpuResult);
-
-                if (profile == QcProfile.QuickComponentAudit)
+                if (cpuResult.Status != ExpressTestStatus.Passed)
                 {
-                    ReportProgress(70, "Auditing processor & RAM topology...");
-                    int cores = Environment.ProcessorCount;
-                    cpuResult.Status = ExpressTestStatus.Passed;
-                    cpuResult.Headline = "✓ PROCESSOR & MEMORY NOMINAL";
-                    cpuResult.Detail = $"{vm?.CpuName ?? "CPU"} ({cores} Cores) · {vm?.RamSummary ?? "RAM"}.";
-                    cpuResult.MetricValue = $"{cores} Cores";
+                    cpuResult.Status = ExpressTestStatus.Running;
+                    SubsystemUpdated?.Invoke(cpuResult);
+
+                    if (profile == QcProfile.QuickComponentAudit)
+                    {
+                        ReportProgress(70, "Auditing processor & RAM topology...");
+                        int cores = Environment.ProcessorCount;
+                        cpuResult.Status = ExpressTestStatus.Passed;
+                        cpuResult.Headline = "✓ PROCESSOR & MEMORY NOMINAL";
+                        cpuResult.Detail = $"{vm?.CpuName ?? "CPU"} ({cores} Cores) · {vm?.RamSummary ?? "RAM"}.";
+                        cpuResult.MetricValue = $"{cores} Cores";
+                    }
+                    else
+                    {
+                        ReportProgress(70, "Executing multi-core compute workload & RAM cell bit-flip audit...");
+                        await TestCpuRamAsync(cpuResult, token);
+                    }
+                    FlushSubtestWal(currentRunId, cpuResult);
+                    SubsystemUpdated?.Invoke(cpuResult);
                 }
                 else
                 {
-                    ReportProgress(70, "Executing multi-core compute workload & RAM cell bit-flip audit...");
-                    await TestCpuRamAsync(cpuResult, token);
+                    ReportProgress(70, $"✓ [Preserved] Processor & RAM cells verified prior to power loss.");
                 }
-                SubsystemUpdated?.Invoke(cpuResult);
 
                 // ==============================================================
                 // STAGE 6: BATTERY DEGRADATION, CAPACITY & POWER FLOW
                 // ==============================================================
                 var batResult = results["Battery"];
-                batResult.Status = ExpressTestStatus.Running;
-                SubsystemUpdated?.Invoke(batResult);
+                if (batResult.Status != ExpressTestStatus.Passed)
+                {
+                    batResult.Status = ExpressTestStatus.Running;
+                    SubsystemUpdated?.Invoke(batResult);
 
-                if (profile == QcProfile.AcOnlyNoBattery)
-                {
-                    ReportProgress(80, "Auditing AC mains power adapter...");
-                    batResult.Status = ExpressTestStatus.Passed;
-                    batResult.Headline = "✓ [AC ONLY] MAINS POWER VERIFIED";
-                    batResult.Detail = "Unit operating on AC adapter - internal battery not installed.";
-                    batResult.MetricValue = "AC ONLY";
-                }
-                else if (profile == QcProfile.QuickComponentAudit)
-                {
-                    ReportProgress(80, "Sampling battery presence...");
-                    var bat = HardwareDiagnosticsService.Instance.BatteryTelemetry;
-                    if (bat != null && bat.IsPresent)
+                    if (profile == QcProfile.AcOnlyNoBattery)
                     {
+                        ReportProgress(80, "Auditing AC mains power adapter...");
                         batResult.Status = ExpressTestStatus.Passed;
-                        batResult.Headline = "✓ BATTERY DETECTED";
-                        batResult.Detail = $"Wear: {100 - bat.HealthPercent}% · {bat.FullChargeCapacityMwh}/{bat.DesignCapacityMwh} mWh.";
-                        batResult.MetricValue = $"{bat.HealthPercent}%";
+                        batResult.Headline = "✓ [AC ONLY] MAINS POWER VERIFIED";
+                        batResult.Detail = "Unit operating on AC adapter - internal battery not installed.";
+                        batResult.MetricValue = "AC ONLY";
+                    }
+                    else if (profile == QcProfile.QuickComponentAudit)
+                    {
+                        ReportProgress(80, "Sampling battery presence...");
+                        var bat = HardwareDiagnosticsService.Instance.BatteryTelemetry;
+                        if (bat != null && bat.IsPresent)
+                        {
+                            batResult.Status = ExpressTestStatus.Passed;
+                            batResult.Headline = "✓ BATTERY DETECTED";
+                            batResult.Detail = $"Wear: {100 - bat.HealthPercent}% · {bat.FullChargeCapacityMwh}/{bat.DesignCapacityMwh} mWh.";
+                            batResult.MetricValue = $"{bat.HealthPercent}%";
+                        }
+                        else
+                        {
+                            batResult.Status = ExpressTestStatus.Passed;
+                            batResult.Headline = "✓ [AC MAINS] NO BATTERY";
+                            batResult.Detail = "Running on AC adapter.";
+                            batResult.MetricValue = "AC ONLY";
+                        }
                     }
                     else
                     {
-                        batResult.Status = ExpressTestStatus.Passed;
-                        batResult.Headline = "✓ [AC MAINS] NO BATTERY";
-                        batResult.Detail = "Running on AC adapter.";
-                        batResult.MetricValue = "AC ONLY";
+                        ReportProgress(80, "Auditing battery wear level, mWh capacity & AC charging state...");
+                        await TestBatteryAsync(batResult, vm, token);
                     }
+                    FlushSubtestWal(currentRunId, batResult);
+                    SubsystemUpdated?.Invoke(batResult);
                 }
                 else
                 {
-                    ReportProgress(80, "Auditing battery wear level, mWh capacity & AC charging state...");
-                    await TestBatteryAsync(batResult, vm, token);
+                    ReportProgress(80, $"✓ [Preserved] Battery capacity & wear verified prior to power loss.");
                 }
-                SubsystemUpdated?.Invoke(batResult);
 
                 // ==============================================================
                 // STAGE 7: DISPLAY VSYNC REFRESH RATE & GPU ACCELERATION
                 // ==============================================================
                 var dispResult = results["Display"];
-                dispResult.Status = ExpressTestStatus.Running;
-                SubsystemUpdated?.Invoke(dispResult);
-
-                if (profile == QcProfile.QuickComponentAudit)
+                if (dispResult.Status != ExpressTestStatus.Passed)
                 {
-                    ReportProgress(90, "Verifying display resolution & rendering...");
-                    double w = SystemParameters.PrimaryScreenWidth;
-                    double h = SystemParameters.PrimaryScreenHeight;
-                    dispResult.Status = ExpressTestStatus.Passed;
-                    dispResult.Headline = "✓ DISPLAY RESOLUTION VERIFIED";
-                    dispResult.Detail = $"Primary screen: {w}x{h} · D3D acceleration nominal.";
-                    dispResult.MetricValue = $"{w}x{h}";
+                    dispResult.Status = ExpressTestStatus.Running;
+                    SubsystemUpdated?.Invoke(dispResult);
+
+                    if (profile == QcProfile.QuickComponentAudit)
+                    {
+                        ReportProgress(90, "Verifying display resolution & rendering...");
+                        double w = SystemParameters.PrimaryScreenWidth;
+                        double h = SystemParameters.PrimaryScreenHeight;
+                        dispResult.Status = ExpressTestStatus.Passed;
+                        dispResult.Headline = "✓ DISPLAY RESOLUTION VERIFIED";
+                        dispResult.Detail = $"Primary screen: {w}x{h} · D3D acceleration nominal.";
+                        dispResult.MetricValue = $"{w}x{h}";
+                    }
+                    else
+                    {
+                        ReportProgress(90, "Profiling hardware VSync delivery, microsecond jitter & D3D...");
+                        await TestDisplayAsync(dispResult, token);
+                    }
+                    FlushSubtestWal(currentRunId, dispResult);
+                    SubsystemUpdated?.Invoke(dispResult);
                 }
                 else
                 {
-                    ReportProgress(90, "Profiling hardware VSync delivery, microsecond jitter & D3D...");
-                    await TestDisplayAsync(dispResult, token);
+                    ReportProgress(90, $"✓ [Preserved] Display VSync & resolution verified prior to power loss.");
                 }
-                SubsystemUpdated?.Invoke(dispResult);
 
                 // ==============================================================
                 // STAGE 8: WI-FI 6 RF & GATEWAY ICMP PING LATENCY
                 // ==============================================================
-                ReportProgress(95, "Verifying Wi-Fi adapter, gateway routing & Bluetooth transceiver...");
                 var netResult = results["Network"];
-                netResult.Status = ExpressTestStatus.Running;
-                SubsystemUpdated?.Invoke(netResult);
+                if (netResult.Status != ExpressTestStatus.Passed)
+                {
+                    ReportProgress(95, "Verifying Wi-Fi adapter, gateway routing & Bluetooth transceiver...");
+                    netResult.Status = ExpressTestStatus.Running;
+                    SubsystemUpdated?.Invoke(netResult);
 
-                await TestNetworkAsync(netResult, vm, token);
-                SubsystemUpdated?.Invoke(netResult);
+                    await TestNetworkAsync(netResult, vm, token);
+                    FlushSubtestWal(currentRunId, netResult);
+                    SubsystemUpdated?.Invoke(netResult);
+                }
+                else
+                {
+                    ReportProgress(95, $"✓ [Preserved] Network adapters verified prior to power loss.");
+                }
 
                 // ==============================================================
                 // FINAL: SMART QC GRADING CALCULATION
                 // ==============================================================
                 CalculateSmartGrade(report);
                 ReportProgress(100, $"Express QC Complete: {report.PassedCount}/{report.TotalCount} Certified Nominal · {report.CalculatedGrade}");
+
+                try
+                {
+                    _store.TryCompleteRun(currentRunId, dna.SiliconDnaHash, report.CalculatedGrade, out _);
+                }
+                catch { }
+
+                // Enqueue to dedicated outbox.db for offline replay resilience
+                try
+                {
+                    var idempKey = $"express-qc-{currentRunId}";
+                    var payload = JsonSerializer.Serialize(new
+                    {
+                        RunId = currentRunId,
+                        Tag = activeIdentifier,
+                        SerialNumber = assetSn,
+                        Model = vm?.Model ?? "Generic Laptop",
+                        Grade = report.CalculatedGrade,
+                        PassedCount = report.PassedCount,
+                        TotalCount = report.TotalCount,
+                        Profile = profile.ToString(),
+                        Technician = report.TechnicianName,
+                        Summary = report.SummaryText
+                    });
+
+                    OutboxStore.Instance.Enqueue(
+                        eventType: "ExpressQcCompleted",
+                        aggregateId: !string.IsNullOrWhiteSpace(assetSn) ? assetSn : activeIdentifier,
+                        idempotencyKey: idempKey,
+                        payloadJson: payload,
+                        siliconDnaHash: dna.SiliconDnaHash,
+                        hardwareQuorumJson: dna.HardwareQuorumJson
+                    );
+                }
+                catch (Exception ex)
+                {
+                    AppLogger.Warn($"Failed to enqueue outbox event for run {currentRunId}: {ex.Message}");
+                }
 
                 Completed?.Invoke(report);
                 return report;

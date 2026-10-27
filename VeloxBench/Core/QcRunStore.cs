@@ -280,6 +280,16 @@ VALUES
                 AddColumnIfNotExists(connection, "assets", "commercial_disposition", "TEXT NULL");
 
                 Execute(connection, "INSERT OR IGNORE INTO schema_migrations(version, applied_at_utc) VALUES(6, CURRENT_TIMESTAMP);");
+
+                // Migration 7: Power-loss crash safety (per-subtest headline/detail/metrics) & Silicon DNA Quorum
+                AddColumnIfNotExists(connection, "qc_test_results", "headline", "TEXT NULL");
+                AddColumnIfNotExists(connection, "qc_test_results", "detail", "TEXT NULL");
+                AddColumnIfNotExists(connection, "qc_test_results", "metric_value", "TEXT NULL");
+                AddColumnIfNotExists(connection, "assets", "silicon_dna_hash", "TEXT NULL");
+                AddColumnIfNotExists(connection, "assets", "hardware_quorum_json", "TEXT NULL");
+                Execute(connection, "CREATE INDEX IF NOT EXISTS ix_assets_silicon_dna ON assets(silicon_dna_hash);");
+
+                Execute(connection, "INSERT OR IGNORE INTO schema_migrations(version, applied_at_utc) VALUES(7, CURRENT_TIMESTAMP);");
             }
         }
 
@@ -407,6 +417,109 @@ override_reason=excluded.override_reason, approved_by=excluded.approved_by, reco
                     "{\"runId\":\"" + runId + "\",\"testKey\":\"" + EscapeJson(result.TestKey) + "\",\"status\":\"" + result.Status + "\"}", UtcNow());
                 transaction.Commit();
             }
+        }
+
+        /// <summary>
+        /// Flushes an individual subtest result immediately to SQLite with Write-Ahead Logging (WAL) mode.
+        /// Guarantees that if a laptop loses power or crashes at second 48, all prior subtest results are preserved.
+        /// </summary>
+        public void FlushSubtest(string runId, string testKey, string testName, string status, string headline, string detail, string metricValue, string metricsJson = null)
+        {
+            if (string.IsNullOrWhiteSpace(runId) || string.IsNullOrWhiteSpace(testKey)) return;
+            lock (_gate)
+            {
+                try
+                {
+                    using var connection = Open();
+                    using var tx = connection.BeginTransaction();
+                    using (var cmd = connection.CreateCommand())
+                    {
+                        cmd.Transaction = tx;
+                        cmd.CommandText = @"INSERT INTO qc_test_results(id, qc_run_id, test_key, test_name, status, is_automated, metrics_json, headline, detail, metric_value, recorded_at_utc)
+VALUES($id, $runId, $key, $name, $status, 1, $metrics, $headline, $detail, $metricValue, $recorded)
+ON CONFLICT(qc_run_id, test_key) DO UPDATE SET
+test_name=excluded.test_name, status=excluded.status, headline=excluded.headline, detail=excluded.detail,
+metric_value=excluded.metric_value, metrics_json=excluded.metrics_json, recorded_at_utc=excluded.recorded_at_utc;";
+                        cmd.Parameters.AddWithValue("$id", Guid.NewGuid().ToString("N"));
+                        cmd.Parameters.AddWithValue("$runId", runId);
+                        cmd.Parameters.AddWithValue("$key", testKey);
+                        cmd.Parameters.AddWithValue("$name", testName ?? testKey);
+                        cmd.Parameters.AddWithValue("$status", status);
+                        cmd.Parameters.AddWithValue("$metrics", metricsJson ?? "");
+                        cmd.Parameters.AddWithValue("$headline", headline ?? "");
+                        cmd.Parameters.AddWithValue("$detail", detail ?? "");
+                        cmd.Parameters.AddWithValue("$metricValue", metricValue ?? "");
+                        cmd.Parameters.AddWithValue("$recorded", DateTime.UtcNow.ToString("O", CultureInfo.InvariantCulture));
+                        cmd.ExecuteNonQuery();
+                    }
+                    tx.Commit();
+
+                    // Physical crash durability: force WAL checkpoint to sync dirty pages to disk
+                    Execute(connection, "PRAGMA wal_checkpoint(PASSIVE);");
+                }
+                catch (Exception ex)
+                {
+                    AppLogger.Warn($"Failed to flush subtest {testKey} to WAL: {ex.Message}");
+                }
+            }
+        }
+
+        public string? FindActiveRunId(string assetIdentifier)
+        {
+            if (string.IsNullOrWhiteSpace(assetIdentifier)) return null;
+            lock (_gate)
+            {
+                try
+                {
+                    using var conn = Open();
+                    using var cmd = conn.CreateCommand();
+                    cmd.CommandText = @"
+                        SELECT r.id 
+                        FROM qc_runs r 
+                        JOIN assets a ON r.asset_id = a.id
+                        WHERE (a.serial_number = $id COLLATE NOCASE OR a.asset_tag = $id COLLATE NOCASE OR a.asset_uuid = $id OR a.silicon_dna_hash = $id)
+                          AND r.status = 'InProgress'
+                          AND r.started_at_utc >= $cutoff
+                        ORDER BY r.started_at_utc DESC LIMIT 1;
+                    ";
+                    cmd.Parameters.AddWithValue("$id", assetIdentifier.Trim());
+                    cmd.Parameters.AddWithValue("$cutoff", DateTime.UtcNow.AddHours(-24).ToString("O"));
+                    return cmd.ExecuteScalar() as string;
+                }
+                catch { return null; }
+            }
+        }
+
+        public Dictionary<string, (string Status, string Headline, string Detail, string MetricValue)> GetRecoveredSubtests(string runId)
+        {
+            var dict = new Dictionary<string, (string Status, string Headline, string Detail, string MetricValue)>(StringComparer.OrdinalIgnoreCase);
+            if (string.IsNullOrWhiteSpace(runId)) return dict;
+            lock (_gate)
+            {
+                try
+                {
+                    using var conn = Open();
+                    using var cmd = conn.CreateCommand();
+                    cmd.CommandText = @"
+                        SELECT test_key, status, COALESCE(headline, ''), COALESCE(detail, ''), COALESCE(metric_value, '')
+                        FROM qc_test_results
+                        WHERE qc_run_id = $runId;
+                    ";
+                    cmd.Parameters.AddWithValue("$runId", runId);
+                    using var reader = cmd.ExecuteReader();
+                    while (reader.Read())
+                    {
+                        dict[reader.GetString(0)] = (
+                            reader.GetString(1),
+                            reader.GetString(2),
+                            reader.GetString(3),
+                            reader.GetString(4)
+                        );
+                    }
+                }
+                catch { }
+            }
+            return dict;
         }
 
         public void RecordOverride(string runId, QcOverride ov)
@@ -1381,6 +1494,7 @@ FROM custody_events WHERE asset_id=$assetId ORDER BY recorded_at_utc ASC;";
         {
             var connection = new SqliteConnection(_connectionString);
             connection.Open();
+            Execute(connection, "PRAGMA journal_mode=WAL; PRAGMA synchronous=NORMAL; PRAGMA busy_timeout=5000;");
             return connection;
         }
 
@@ -1482,10 +1596,34 @@ FROM custody_events WHERE asset_id=$assetId ORDER BY recorded_at_utc ASC;";
                 {
                     using var update = connection.CreateCommand();
                     update.Transaction = transaction;
-                    update.CommandText = "UPDATE assets SET serial_number=COALESCE(NULLIF($serial, ''), serial_number), model=COALESCE(NULLIF($model, ''), model), asset_uuid=COALESCE(NULLIF($uuid, ''), asset_uuid), updated_at_utc=$updated WHERE id=$id;";
+                    update.CommandText = "UPDATE assets SET serial_number=COALESCE(NULLIF($serial, ''), serial_number), model=COALESCE(NULLIF($model, ''), model), asset_uuid=COALESCE(NULLIF($uuid, ''), asset_uuid), silicon_dna_hash=COALESCE(NULLIF($dna, ''), silicon_dna_hash), updated_at_utc=$updated WHERE id=$id;";
                     update.Parameters.AddWithValue("$serial", string.IsNullOrEmpty(serial) ? (object)DBNull.Value : serial);
                     update.Parameters.AddWithValue("$model", identity.Model ?? "");
                     update.Parameters.AddWithValue("$uuid", assetUuid);
+                    update.Parameters.AddWithValue("$dna", !string.IsNullOrEmpty(identity.SiliconDnaHash) ? identity.SiliconDnaHash : (object)DBNull.Value);
+                    update.Parameters.AddWithValue("$updated", now);
+                    update.Parameters.AddWithValue("$id", found);
+                    update.ExecuteNonQuery();
+                    return found;
+                }
+            }
+
+            // 2.5. Match by Silicon DNA Quorum (Crucial for generic motherboards reporting "Default string" or missing serial)
+            if (!string.IsNullOrWhiteSpace(identity.SiliconDnaHash))
+            {
+                using var findDna = connection.CreateCommand();
+                findDna.Transaction = transaction;
+                findDna.CommandText = "SELECT id FROM assets WHERE silicon_dna_hash=$dna LIMIT 1;";
+                findDna.Parameters.AddWithValue("$dna", identity.SiliconDnaHash);
+                var found = findDna.ExecuteScalar() as string;
+                if (!string.IsNullOrEmpty(found))
+                {
+                    using var update = connection.CreateCommand();
+                    update.Transaction = transaction;
+                    update.CommandText = "UPDATE assets SET asset_tag=COALESCE(NULLIF($tag, ''), asset_tag), model=COALESCE(NULLIF($model, ''), model), hardware_quorum_json=COALESCE(NULLIF($quorum, ''), hardware_quorum_json), updated_at_utc=$updated WHERE id=$id;";
+                    update.Parameters.AddWithValue("$tag", tagNormalized);
+                    update.Parameters.AddWithValue("$model", identity.Model ?? "");
+                    update.Parameters.AddWithValue("$quorum", identity.HardwareQuorumJson ?? "{}");
                     update.Parameters.AddWithValue("$updated", now);
                     update.Parameters.AddWithValue("$id", found);
                     update.ExecuteNonQuery();
@@ -1520,13 +1658,15 @@ FROM custody_events WHERE asset_id=$assetId ORDER BY recorded_at_utc ASC;";
             var id = Guid.NewGuid().ToString("N");
             using var insert = connection.CreateCommand();
             insert.Transaction = transaction;
-            insert.CommandText = @"INSERT INTO assets(id, serial_number, asset_tag, model, asset_uuid, serial_confidence, serial_source, is_serial_missing, created_at_utc, updated_at_utc)
-VALUES($id, $serial, $tag, $model, $uuid, $conf, $src, $isMissing, $created, $updated);";
+            insert.CommandText = @"INSERT INTO assets(id, serial_number, asset_tag, model, asset_uuid, silicon_dna_hash, hardware_quorum_json, serial_confidence, serial_source, is_serial_missing, created_at_utc, updated_at_utc)
+VALUES($id, $serial, $tag, $model, $uuid, $dna, $quorum, $conf, $src, $isMissing, $created, $updated);";
             insert.Parameters.AddWithValue("$id", id);
             insert.Parameters.AddWithValue("$serial", string.IsNullOrEmpty(serial) ? (object)DBNull.Value : serial);
             insert.Parameters.AddWithValue("$tag", tagNormalized);
             insert.Parameters.AddWithValue("$model", identity.Model ?? "");
             insert.Parameters.AddWithValue("$uuid", assetUuid);
+            insert.Parameters.AddWithValue("$dna", !string.IsNullOrEmpty(identity.SiliconDnaHash) ? identity.SiliconDnaHash : (object)DBNull.Value);
+            insert.Parameters.AddWithValue("$quorum", identity.HardwareQuorumJson ?? "{}");
             insert.Parameters.AddWithValue("$conf", identity.Confidence.ToString());
             insert.Parameters.AddWithValue("$src", identity.IdentifierSource ?? "Win32_BIOS");
             insert.Parameters.AddWithValue("$isMissing", string.IsNullOrEmpty(serial) ? 1 : 0);

@@ -255,19 +255,47 @@ public sealed class CloudSyncService
         catch (TaskCanceledException)
         {
             _isOnline = false;
-            AppLogger.Warn($"[DirectSync] [VLX-NET-101] Cloud sync timed out after 5s for {tag}.");
-            return VeloxResult.Fail(VeloxErrorCode.ERR_NET_TIMEOUT, "Cloud server timed out after 5 seconds.", "Check if cloud server or reverse proxy is running.");
+            AppLogger.Warn($"[DirectSync] [VLX-NET-101] Cloud sync timed out after 5s for {tag}. Queuing to outbox.db.");
+            EnqueueDirectSyncToOutbox(record, json);
+            return VeloxResult.Fail(VeloxErrorCode.ERR_NET_TIMEOUT, "Cloud server timed out after 5s (Saved to outbox.db for auto-replay).", "Check if cloud server or reverse proxy is running.");
         }
         catch (HttpRequestException httpEx)
         {
             _isOnline = false;
-            AppLogger.Warn($"[DirectSync] [VLX-NET-100] Network unreachable for {tag}: {httpEx.Message}");
-            return VeloxResult.Fail(VeloxErrorCode.ERR_NET_UNREACHABLE, "Cannot connect to Velox Cloud server (Network unreachable).", httpEx.Message);
+            AppLogger.Warn($"[DirectSync] [VLX-NET-100] Network unreachable for {tag}: {httpEx.Message}. Queuing to outbox.db.");
+            EnqueueDirectSyncToOutbox(record, json);
+            return VeloxResult.Fail(VeloxErrorCode.ERR_NET_UNREACHABLE, "Cannot connect to Velox Cloud server (Saved to outbox.db for auto-replay).", httpEx.Message);
         }
         catch (Exception ex)
         {
             AppLogger.Warn($"[DirectSync] [VLX-ERR-999] Unexpected error: {ex.Message}");
             return VeloxResult.Fail(VeloxErrorCode.ERR_INTERNAL_EXCEPTION, "Unexpected internal upload exception.", ex.Message);
+        }
+    }
+
+    private static void EnqueueDirectSyncToOutbox(AssetQueueRecord record, string payloadJson)
+    {
+        try
+        {
+            var dna = SiliconDnaService.Instance.GetSiliconDna();
+            string sn = record.Serial_Number?.Trim() ?? "";
+            string tag = record.Tag?.Trim() ?? "";
+            string aggId = !string.IsNullOrWhiteSpace(sn) ? sn : tag;
+            string idempKey = $"asset-sync-{aggId}-{dna.SiliconDnaHash}-{record.Timestamp ?? DateTime.UtcNow.ToString("yyyyMMdd")}";
+
+            OutboxStore.Instance.Enqueue(
+                eventType: "AssetQueueDirectSync",
+                aggregateId: aggId,
+                idempotencyKey: idempKey,
+                payloadJson: payloadJson,
+                siliconDnaHash: dna.SiliconDnaHash,
+                hardwareQuorumJson: dna.HardwareQuorumJson
+            );
+            AppLogger.Info($"[Outbox] Enqueued asset {aggId} to outbox.db for offline replay. (Key={idempKey})");
+        }
+        catch (Exception ex)
+        {
+            AppLogger.Warn($"Failed to enqueue direct sync to outbox.db: {ex.Message}");
         }
     }
 

@@ -51,6 +51,8 @@ namespace SuperAutoMater.Wpf.Core
         public string AssetTag { get; set; } = "";
         public string SerialNumber { get; set; } = "";
         public string AssetUuid { get; set; } = "";
+        public string SiliconDnaHash { get; set; } = "";
+        public string HardwareQuorumJson { get; set; } = "{}";
         public string Model { get; set; } = "";
         public string Technician { get; set; } = "";
         public string Station { get; set; } = "";
@@ -91,6 +93,9 @@ namespace SuperAutoMater.Wpf.Core
         public string MetricsJson { get; set; } = "";
         public string OverrideReason { get; set; } = "";
         public string ApprovedBy { get; set; } = "";
+        public string Headline { get; set; } = "";
+        public string Detail { get; set; } = "";
+        public string MetricValue { get; set; } = "";
         public DateTimeOffset RecordedAtUtc { get; set; } = DateTimeOffset.UtcNow;
     }
 

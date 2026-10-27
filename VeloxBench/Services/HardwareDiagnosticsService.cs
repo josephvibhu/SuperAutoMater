@@ -9,6 +9,7 @@ using System.Runtime.InteropServices;
 using System.Text;
 using System.Text.RegularExpressions;
 using System.Threading.Tasks;
+using VeloxBench.Services;
 
 namespace SuperAutoMater.Wpf.Services
 {
@@ -19,6 +20,9 @@ namespace SuperAutoMater.Wpf.Services
         public string Serial { get; set; } = "Detecting...";
         public string Uuid { get; set; } = "";
         public bool IsSerialMissing { get; set; } = false;
+        public bool IsGenericMotherboard { get; set; } = false;
+        public string SiliconDnaHash { get; set; } = "";
+        public string HardwareQuorumJson { get; set; } = "{}";
         public string BiosVersion { get; set; } = "";
         public string Grade { get; set; } = "GRADE PENDING";
     }
@@ -400,10 +404,18 @@ namespace SuperAutoMater.Wpf.Services
 
                 // Check if serial is missing or generic
                 bool isGeneric = Core.QcRunStore.IsGenericSerial(SystemIdentity.Serial);
+                SystemIdentity.IsGenericMotherboard = isGeneric;
+
+                // Silicon DNA Quorum Deduplication
+                var dna = SiliconDnaService.Instance.GetSiliconDna();
+                SystemIdentity.SiliconDnaHash = dna.SiliconDnaHash;
+                SystemIdentity.HardwareQuorumJson = dna.HardwareQuorumJson;
+
                 if (isGeneric || string.IsNullOrWhiteSpace(SystemIdentity.Serial))
                 {
                     SystemIdentity.IsSerialMissing = true;
-                    SystemIdentity.Serial = "";
+                    // Provide the deterministic Silicon DNA Quorum as fallback identifier
+                    SystemIdentity.Serial = dna.SiliconDnaHash;
                 }
                 else
                 {

@@ -796,6 +796,8 @@ namespace SuperAutoMater.Wpf.Views
                             Storage_Details = ViewModel.PrimaryDriveModel,
                             Battery_Health = ViewModel.BatteryIntegrityBadge,
                             GPU_Model = ViewModel.GpuName,
+                            Silicon_Dna_Hash = ViewModel.SiliconDnaHash,
+                            Hardware_Quorum_Json = ViewModel.HardwareQuorumJson,
                             Technician_Notes = "Certified via 1-Click Autopilot QC [F10]"
                         });
 
@@ -815,6 +817,8 @@ namespace SuperAutoMater.Wpf.Views
                                 Status = "RTS",
                                 Work_In_Progress = "All Okay",
                                 Remarks = "Certified via 1-Click Autopilot QC [F10]",
+                                Silicon_Dna_Hash = ViewModel.SiliconDnaHash,
+                                Hardware_Quorum_Json = ViewModel.HardwareQuorumJson,
                                 Technician = "AUTOPILOT",
                                 QC_Tech = "AUTOPILOT",
                                 QC_Profile = "Autopilot",
@@ -1084,6 +1088,8 @@ namespace SuperAutoMater.Wpf.Views
                         Storage_Details = ViewModel.PrimaryDriveModel,
                         Battery_Health = ViewModel.BatteryIntegrityBadge,
                         GPU_Model = ViewModel.GpuName,
+                        Silicon_Dna_Hash = ViewModel.SiliconDnaHash,
+                        Hardware_Quorum_Json = ViewModel.HardwareQuorumJson,
                         Technician = activeQcTech,
                         QC_Tech = activeQcTech,
                         QC_Profile = rep.ProfileUsed.ToString(),
@@ -1122,6 +1128,8 @@ namespace SuperAutoMater.Wpf.Views
                             Status = rep.AllPassed ? "RTS" : "WIP",
                             Work_In_Progress = rep.AllPassed ? "All Okay" : rep.SummaryText,
                             Remarks = $"Express QC [{rep.ProfileUsed}]: {rep.PassedCount}/{rep.TotalCount} Subsystems Nominal.",
+                            Silicon_Dna_Hash = ViewModel.SiliconDnaHash,
+                            Hardware_Quorum_Json = ViewModel.HardwareQuorumJson,
                             Technician = activeQcTech,
                             QC_Tech = activeQcTech,
                             QC_Profile = rep.ProfileUsed.ToString(),
@@ -1249,6 +1257,8 @@ namespace SuperAutoMater.Wpf.Views
                         Out_Date = rec.Out_Date,
                         Customer = rec.Customer,
                         GPU_Model = ViewModel.GpuName,
+                        Silicon_Dna_Hash = ViewModel.SiliconDnaHash,
+                        Hardware_Quorum_Json = ViewModel.HardwareQuorumJson,
                         Technician_Notes = rec.Remarks
                     });
                 }

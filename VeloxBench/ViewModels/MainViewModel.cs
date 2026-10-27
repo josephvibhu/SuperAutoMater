@@ -93,6 +93,9 @@ namespace SuperAutoMater.Wpf.ViewModels
         public string Model => _hw.SystemIdentity?.Model ?? "Detecting Chassis...";
         public string Serial => _hw.SystemIdentity?.Serial ?? "Detecting...";
         public bool IsSerialMissing => _hw.SystemIdentity?.IsSerialMissing ?? false;
+        public bool IsGenericMotherboard => _hw.SystemIdentity?.IsGenericMotherboard ?? false;
+        public string SiliconDnaHash => _hw.SystemIdentity?.SiliconDnaHash ?? "";
+        public string HardwareQuorumJson => _hw.SystemIdentity?.HardwareQuorumJson ?? "{}";
 
         private string _assetTag = "";
         public string AssetTag

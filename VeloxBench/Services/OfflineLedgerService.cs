@@ -7,6 +7,7 @@ using System.Text;
 using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
+using VeloxBench.Core;
 
 namespace SuperAutoMater.Wpf.Services
 {
@@ -42,6 +43,8 @@ namespace SuperAutoMater.Wpf.Services
         public string Battery_Capacity { get; set; } = "";
         public string GPU_Model { get; set; } = "";
         public string Passed_Tests { get; set; } = "";
+        public string Silicon_Dna_Hash { get; set; } = "";
+        public string Hardware_Quorum_Json { get; set; } = "{}";
         public bool IsSyncedToCloud { get; set; } = false;
         public DateTime? SyncedAt { get; set; }
     }
@@ -82,15 +85,33 @@ namespace SuperAutoMater.Wpf.Services
         public void SaveRecord(QcAuditRecord record)
         {
             if (record == null) return;
+            string json = "";
             lock (_fileLock)
             {
                 try
                 {
-                    string json = JsonSerializer.Serialize(record);
+                    json = JsonSerializer.Serialize(record);
                     File.AppendAllLines(_ledgerFilePath, new[] { json }, Encoding.UTF8);
                 }
                 catch { }
             }
+
+            // Durable Outbox Replication into outbox.db
+            try
+            {
+                string aggId = !string.IsNullOrWhiteSpace(record.Serial_Number) ? record.Serial_Number : record.Tag;
+                string idempKey = $"ledger-record-{record.Id}";
+                OutboxStore.Instance.Enqueue(
+                    eventType: "QcAuditRecordSaved",
+                    aggregateId: aggId,
+                    idempotencyKey: idempKey,
+                    payloadJson: json,
+                    siliconDnaHash: record.Silicon_Dna_Hash,
+                    hardwareQuorumJson: record.Hardware_Quorum_Json
+                );
+            }
+            catch { }
+
             RefreshPendingCount();
         }
 
