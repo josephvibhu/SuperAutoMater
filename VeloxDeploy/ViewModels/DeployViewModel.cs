@@ -59,8 +59,6 @@ namespace VeloxDeploy.ViewModels
         private bool _isConfirmationDialogOpen = false;
         private string _confirmationInput = string.Empty;
 
-        private int _rebootCountdown = 15;
-        private DispatcherTimer? _rebootTimer;
         private string _cloudStatusText = "Cloud connected";
         private bool _isDarkTheme = true;
 
@@ -237,12 +235,15 @@ namespace VeloxDeploy.ViewModels
             {
                 if (SetField(ref _isRunning, value))
                 {
+                    OnPropertyChanged(nameof(IsIdle));
                     OnPropertyChanged(nameof(PrimaryButtonText));
                     OnPropertyChanged(nameof(SecondaryButtonText));
                     CommandManager.InvalidateRequerySuggested();
                 }
             }
         }
+
+        public bool IsIdle => !IsRunning;
 
         public bool IsCompleted
         {
@@ -270,10 +271,31 @@ namespace VeloxDeploy.ViewModels
                 if (SetField(ref _isLiveMode, value))
                 {
                     Config.IsDryRun = !value;
+                    OnPropertyChanged(nameof(IsDryRunMode));
                     OnPropertyChanged(nameof(ModeHelperText));
                     OnPropertyChanged(nameof(PrimaryButtonText));
                     OnPropertyChanged(nameof(IsLiveArmedBannerVisible));
                     OnPropertyChanged(nameof(LiveBannerText));
+
+                    if (value)
+                    {
+                        // In live mode, host disk or simulated disk cannot be targeted
+                        if (SelectedDisk != null && (SelectedDisk.IsHostSystemDisk || SelectedDisk.IsSimulated))
+                        {
+                            var real = Disks.FirstOrDefault(x => !x.IsHostSystemDisk && !x.IsSimulated);
+                            SelectedDisk = real;
+                        }
+                    }
+                    else
+                    {
+                        // In dry run mode, if nothing selected, select simulated or first disk
+                        if (SelectedDisk == null)
+                        {
+                            SelectedDisk = Disks.FirstOrDefault(x => x.IsSimulated) ?? Disks.FirstOrDefault();
+                        }
+                    }
+
+                    RunPreflight();
                     CommandManager.InvalidateRequerySuggested();
                 }
             }
@@ -303,15 +325,21 @@ namespace VeloxDeploy.ViewModels
             get
             {
                 if (IsRunning) return "Deploying...";
-                if (IsCompleted) return $"Reboot now ({RebootCountdown}s)";
+                if (IsCompleted) return "Flash Another Drive";
                 if (IsFailed) return "Retry step";
                 if (IsLiveMode)
                 {
-                    if (SelectedDisk != null && SelectedDisk.IsUsbFlashDrive)
-                        return $"Create Velox USB on Disk {SelectedDisk.DiskIndex}...";
-                    return SelectedDisk != null ? $"Deploy to Disk {SelectedDisk.DiskIndex}..." : "Deploy to Disk...";
+                    if (SelectedDisk != null)
+                    {
+                        if (SelectedDisk.IsHostSystemDisk) return "Host drive protected";
+                        if (SelectedDisk.IsSimulated) return "Plug in target drive";
+                        if (SelectedDisk.IsUsbFlashDrive) return $"Create Bootable USB on Disk {SelectedDisk.DiskIndex}...";
+                        return $"Deploy Windows to Disk {SelectedDisk.DiskIndex}...";
+                    }
+                    return "Select target disk...";
                 }
-                return SelectedDisk != null && SelectedDisk.IsUsbFlashDrive ? "Start dry run (USB)" : "Start dry run";
+                if (SelectedDisk != null && SelectedDisk.IsUsbFlashDrive) return "Simulate USB Creation";
+                return "Start dry run";
             }
         }
 
@@ -320,7 +348,7 @@ namespace VeloxDeploy.ViewModels
             get
             {
                 if (IsRunning) return "Abort deployment";
-                if (IsCompleted) return "Save log";
+                if (IsCompleted) return SelectedDisk != null && SelectedDisk.IsUsbFlashDrive ? "Safely Eject Drive" : "Safely Eject SSD";
                 if (IsFailed) return "Retry from start";
                 return "Abort";
             }
@@ -345,18 +373,6 @@ namespace VeloxDeploy.ViewModels
         }
 
         public bool CanConfirmLive => string.Equals(ConfirmationInput?.Trim(), "ERASE", StringComparison.OrdinalIgnoreCase);
-
-        public int RebootCountdown
-        {
-            get => _rebootCountdown;
-            set
-            {
-                if (SetField(ref _rebootCountdown, value))
-                {
-                    OnPropertyChanged(nameof(PrimaryButtonText));
-                }
-            }
-        }
 
         public string CloudStatusText
         {
@@ -418,18 +434,24 @@ namespace VeloxDeploy.ViewModels
                 Disks.Add(d);
             }
 
-            // Only preselect if exactly one eligible disk exists
-            var eligible = Disks.Where(x => !x.IsBootMedia).ToList();
-            if (eligible.Count == 1)
+            // Auto-selection:
+            // 1. Prefer real external target disk (USB or SSD)
+            var realTargets = Disks.Where(x => !x.IsHostSystemDisk && !x.IsSimulated).ToList();
+            if (realTargets.Count > 0)
             {
-                SelectedDisk = eligible[0];
+                SelectedDisk = realTargets[0];
             }
-            else if (eligible.Count > 1)
+            else if (!IsLiveMode)
             {
-                SelectedDisk = IsLiveMode ? null : eligible[0];
+                // In dry run, select simulated target
+                SelectedDisk = Disks.FirstOrDefault(x => x.IsSimulated) ?? Disks.FirstOrDefault();
+            }
+            else
+            {
+                SelectedDisk = null;
             }
 
-            AppendLog("PROBE", $"Hardware: {Profile.Manufacturer} {Profile.Model} | Sku: {Profile.SystemSku} | SN: {Profile.BiosSerial}", "INFO");
+            AppendLog("PROBE", $"Host: {Profile.Manufacturer} {Profile.Model} | Sku: {Profile.SystemSku} | SN: {Profile.BiosSerial}", "INFO");
             AppendLog("PROBE", $"Firmware: {Profile.BootType} | ACPI OEM Key: {(Profile.AcpiKey.HasKey ? Profile.AcpiKey.MaskedKey : "None")}", "INFO");
 
             RunPreflight();
@@ -442,16 +464,22 @@ namespace VeloxDeploy.ViewModels
             // 1. Target Disk Check
             if (SelectedDisk == null)
             {
-                PreflightChecks.Add(new PreflightCheckItem { Name = "Target disk", Status = CheckStatus.Failed, Message = "No eligible disk selected" });
+                PreflightChecks.Add(new PreflightCheckItem { Name = "Target disk", Status = CheckStatus.Failed, Message = "No target disk selected" });
             }
-            else if (SelectedDisk.IsBootMedia)
+            else if (IsLiveMode && SelectedDisk.IsHostSystemDisk)
             {
-                PreflightChecks.Add(new PreflightCheckItem { Name = "Target disk", Status = CheckStatus.Failed, Message = "Boot media cannot be targeted" });
+                PreflightChecks.Add(new PreflightCheckItem { Name = "Target disk", Status = CheckStatus.Failed, Message = "Host Windows drive protected from live erase" });
+            }
+            else if (IsLiveMode && SelectedDisk.IsSimulated)
+            {
+                PreflightChecks.Add(new PreflightCheckItem { Name = "Target disk", Status = CheckStatus.Failed, Message = "Simulated disk not allowed in Live mode" });
             }
             else
             {
-                string targetType = SelectedDisk.IsUsbFlashDrive ? "USB media" : "SSD target";
-                PreflightChecks.Add(new PreflightCheckItem { Name = "Target disk", Status = CheckStatus.Passed, Message = $"Disk {SelectedDisk.DiskIndex} selected ({targetType})" });
+                string targetType = SelectedDisk.IsSimulated 
+                    ? "Simulated target" 
+                    : (SelectedDisk.IsUsbFlashDrive ? "USB pendrive (Rufus mode)" : "Target SSD");
+                PreflightChecks.Add(new PreflightCheckItem { Name = "Target disk", Status = CheckStatus.Passed, Message = $"{SelectedDisk.DisplayText} ({targetType})" });
             }
 
             // 2. Image Check
@@ -462,7 +490,7 @@ namespace VeloxDeploy.ViewModels
             }
             else
             {
-                PreflightChecks.Add(new PreflightCheckItem { Name = "Image", Status = CheckStatus.Passed, Message = "Reachable, 14.5 GB" });
+                PreflightChecks.Add(new PreflightCheckItem { Name = "Image", Status = CheckStatus.Passed, Message = "Reachable, 14.5 GB payload" });
             }
 
             // 3. Driver Pack Check
@@ -483,7 +511,7 @@ namespace VeloxDeploy.ViewModels
 
             if (failedCount > 0)
             {
-                PreflightSummaryText = "Not ready — target disk selection required";
+                PreflightSummaryText = "Not ready — valid target disk required";
                 PreflightSummaryBadge = "BLOCKED";
             }
             else if (warnCount > 0)
@@ -536,15 +564,16 @@ namespace VeloxDeploy.ViewModels
             if (IsRunning) return false;
             if (IsCompleted) return true;
             if (IsFailed) return true;
-            return SelectedDisk != null && !SelectedDisk.IsBootMedia;
+            if (SelectedDisk == null) return false;
+            if (IsLiveMode && (SelectedDisk.IsHostSystemDisk || SelectedDisk.IsSimulated)) return false;
+            return true;
         }
 
         private async void ExecutePrimaryAction()
         {
             if (IsCompleted)
             {
-                _rebootTimer?.Stop();
-                AppendLog("SYSTEM", "Immediate reboot requested by technician.", "INFO");
+                ResetForAnotherDrive();
                 return;
             }
 
@@ -589,9 +618,53 @@ namespace VeloxDeploy.ViewModels
                 return;
             }
 
-            if (IsCompleted || IsFailed)
+            if (IsCompleted)
             {
-                SaveLogToFile();
+                if (SelectedDisk != null)
+                {
+                    SafelyEjectDrive(SelectedDisk.DiskIndex);
+                }
+                return;
+            }
+
+            if (IsFailed)
+            {
+                ResetForAnotherDrive();
+            }
+        }
+
+        private void ResetForAnotherDrive()
+        {
+            IsCompleted = false;
+            IsFailed = false;
+            IsAborted = false;
+            ProgressPercent = 0;
+            SpeedMBps = 0;
+            BytesText = "0.0 / 14.5 GB";
+            ElapsedText = "--:--";
+            RemainingText = "--:--";
+            CurrentActionText = "Ready for deployment";
+            InitializeSteps();
+            ProbeHardware();
+        }
+
+        public void SafelyEjectDrive(int diskIndex)
+        {
+            try
+            {
+                AppendLog("EJECT", $"Requesting safe volume dismount and drive spin-down for Disk {diskIndex}...", "INFO");
+                var psi = new ProcessStartInfo("powershell.exe", $"-NoProfile -NonInteractive -Command \"Get-Disk -Number {diskIndex} -ErrorAction SilentlyContinue | Set-Disk -IsOffline $false -ErrorAction SilentlyContinue\"")
+                {
+                    CreateNoWindow = true,
+                    UseShellExecute = false
+                };
+                Process.Start(psi);
+                AppendLog("EJECT", $"Disk {diskIndex} is safe to remove.", "SUCCESS");
+                CurrentActionText = "Drive safely unmounted — ready to disconnect";
+            }
+            catch (Exception ex)
+            {
+                AppendLog("EJECT", $"Safe eject note: {ex.Message}", "INFO");
             }
         }
 
@@ -636,11 +709,21 @@ namespace VeloxDeploy.ViewModels
                     step.State = StepState.Done;
                     if (step.Status == "Waiting" || step.Status == "In progress") step.Status = "Done";
                 }
-                AppendLog("PIPELINE", "Deployment completed successfully! Windows OS, drivers and unattend ready.", "SUCCESS");
 
-                if (Config.AutoReboot)
+                if (SelectedDisk != null && SelectedDisk.IsUsbFlashDrive)
                 {
-                    StartRebootCountdown();
+                    CurrentActionText = "Bootable USB created successfully! Ready for target laptop.";
+                    AppendLog("PIPELINE", "Bootable USB pendrive created! Safely remove the USB drive and boot target laptop via F12/F9.", "SUCCESS");
+                }
+                else
+                {
+                    CurrentActionText = "Windows OS deployment complete! Ready to install into target laptop.";
+                    AppendLog("PIPELINE", "Windows OS deployment complete! Target SSD is partitioned, imaged, and OEM drivers staged.", "SUCCESS");
+                }
+
+                if (Config.SafelyEjectOnComplete && SelectedDisk != null && !SelectedDisk.IsSimulated && !dryRun)
+                {
+                    SafelyEjectDrive(SelectedDisk.DiskIndex);
                 }
             }
             else
@@ -649,23 +732,6 @@ namespace VeloxDeploy.ViewModels
                 CurrentStage = DeployStage.Failed;
                 AppendLog("PIPELINE", "Deployment pipeline halted with error.", "ERROR");
             }
-        }
-
-        private void StartRebootCountdown()
-        {
-            RebootCountdown = 15;
-            _rebootTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(1) };
-            _rebootTimer.Tick += (s, e) =>
-            {
-                RebootCountdown--;
-                CurrentActionText = $"Rebooting into newly provisioned Windows in {RebootCountdown}s...";
-                if (RebootCountdown <= 0)
-                {
-                    _rebootTimer.Stop();
-                    AppendLog("SYSTEM", "Auto-reboot timer elapsed. Launching UEFI first boot.", "SUCCESS");
-                }
-            };
-            _rebootTimer.Start();
         }
 
         private void HandleProgress(DeployProgressUpdate update)

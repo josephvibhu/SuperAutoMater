@@ -6,8 +6,8 @@
         xmlns:vm="clr-namespace:VeloxDeploy.ViewModels"
         mc:Ignorable="d"
         Title="Velox Deploy" 
-        Height="780" Width="1360"
-        MinHeight="680" MinWidth="1024"
+        Height="700" Width="1240"
+        MinHeight="560" MinWidth="960"
         WindowStartupLocation="CenterScreen"
         FontFamily="Source Sans 3, Segoe UI, system-ui, sans-serif"
         FontSize="14"
@@ -18,7 +18,39 @@
         <vm:DeployViewModel />
     </Window.DataContext>
 
+    <Window.InputBindings>
+        <KeyBinding Key="F5" Command="{Binding RescanDisksCommand}" />
+        <KeyBinding Modifiers="Control" Key="S" Command="{Binding SaveLogCommand}" />
+        <KeyBinding Key="Esc" Command="{Binding CancelConfirmationCommand}" />
+    </Window.InputBindings>
+
     <Window.Resources>
+        <!-- Segmented Radio Button Style for Log Filters -->
+        <Style x:Key="SegmentedRadio" TargetType="RadioButton">
+            <Setter Property="Cursor" Value="Hand" />
+            <Setter Property="FontSize" Value="13" />
+            <Setter Property="FontWeight" Value="SemiBold" />
+            <Setter Property="Foreground" Value="{DynamicResource Text2Brush}" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="RadioButton">
+                        <Border x:Name="Bd" Background="Transparent" CornerRadius="6" Padding="{TemplateBinding Padding}">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsChecked" Value="True">
+                                <Setter TargetName="Bd" Property="Background" Value="{DynamicResource BrandSubtleBrush}" />
+                                <Setter Property="Foreground" Value="{DynamicResource BrandBrush}" />
+                            </Trigger>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Bd" Property="Background" Value="{DynamicResource HoverBgBrush}" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
         <!-- Toggle Switch Style per spec (36x20, radius 10, knob 16px) -->
         <Style x:Key="SpecToggleSwitch" TargetType="CheckBox">
             <Setter Property="Cursor" Value="Hand" />
@@ -335,9 +367,62 @@
                             <!-- Select: height 40, radius 8, background -inset, 1 px -bd2, padding 0 12, weight 600 -->
                             <Border Height="40" CornerRadius="8" Background="{DynamicResource InsetBgBrush}" BorderBrush="{DynamicResource Border2Brush}" BorderThickness="1" Padding="12,0">
                                 <Grid VerticalAlignment="Center">
-                                    <ComboBox ItemsSource="{Binding Disks}" SelectedItem="{Binding SelectedDisk}" DisplayMemberPath="DisplayText"
-                                              Background="Transparent" BorderThickness="0" Foreground="{DynamicResource Text1Brush}" FontWeight="SemiBold" FontSize="13.5"
-                                              IsEnabled="{Binding IsRunning, Converter={x:Null}}" />
+                                    <ComboBox ItemsSource="{Binding Disks}" SelectedItem="{Binding SelectedDisk}"
+                                              IsEnabled="{Binding IsIdle}"
+                                              Background="Transparent" BorderThickness="0" Foreground="{DynamicResource Text1Brush}" FontWeight="SemiBold" FontSize="13.5">
+                                        <ComboBox.ItemTemplate>
+                                            <DataTemplate>
+                                                <Grid Margin="0,2">
+                                                    <Grid.ColumnDefinitions>
+                                                        <ColumnDefinition Width="*" />
+                                                        <ColumnDefinition Width="Auto" />
+                                                    </Grid.ColumnDefinitions>
+                                                    <TextBlock Grid.Column="0" Text="{Binding DisplayText}" Foreground="{DynamicResource Text1Brush}" FontWeight="SemiBold" VerticalAlignment="Center" />
+                                                    <Border Grid.Column="1" Height="20" CornerRadius="10" Padding="8,0" Margin="10,0,0,0" VerticalAlignment="Center">
+                                                        <Border.Style>
+                                                            <Style TargetType="Border">
+                                                                <Setter Property="Background" Value="{DynamicResource HoverBgBrush}" />
+                                                                <Setter Property="BorderBrush" Value="{DynamicResource Border2Brush}" />
+                                                                <Setter Property="BorderThickness" Value="1" />
+                                                                <Style.Triggers>
+                                                                    <DataTrigger Binding="{Binding IsHostSystemDisk}" Value="True">
+                                                                        <Setter Property="Background" Value="{DynamicResource WarnBgBrush}" />
+                                                                        <Setter Property="BorderBrush" Value="{DynamicResource WarnBdBrush}" />
+                                                                    </DataTrigger>
+                                                                    <DataTrigger Binding="{Binding IsUsbFlashDrive}" Value="True">
+                                                                        <Setter Property="Background" Value="{DynamicResource BrandSubtleBrush}" />
+                                                                        <Setter Property="BorderBrush" Value="{DynamicResource BrandBrush}" />
+                                                                    </DataTrigger>
+                                                                    <DataTrigger Binding="{Binding IsDirectTargetSsd}" Value="True">
+                                                                        <Setter Property="Background" Value="{DynamicResource OkBgBrush}" />
+                                                                        <Setter Property="BorderBrush" Value="{DynamicResource OkBdBrush}" />
+                                                                    </DataTrigger>
+                                                                </Style.Triggers>
+                                                            </Style>
+                                                        </Border.Style>
+                                                        <TextBlock Text="{Binding TargetModeBadge}" FontSize="11" FontWeight="SemiBold" VerticalAlignment="Center">
+                                                            <TextBlock.Style>
+                                                                <Style TargetType="TextBlock">
+                                                                    <Setter Property="Foreground" Value="{DynamicResource Text2Brush}" />
+                                                                    <Style.Triggers>
+                                                                        <DataTrigger Binding="{Binding IsHostSystemDisk}" Value="True">
+                                                                            <Setter Property="Foreground" Value="{DynamicResource WarnBrush}" />
+                                                                        </DataTrigger>
+                                                                        <DataTrigger Binding="{Binding IsUsbFlashDrive}" Value="True">
+                                                                            <Setter Property="Foreground" Value="{DynamicResource BrandBrush}" />
+                                                                        </DataTrigger>
+                                                                        <DataTrigger Binding="{Binding IsDirectTargetSsd}" Value="True">
+                                                                            <Setter Property="Foreground" Value="{DynamicResource OkBrush}" />
+                                                                        </DataTrigger>
+                                                                    </Style.Triggers>
+                                                                </Style>
+                                                            </TextBlock.Style>
+                                                        </TextBlock>
+                                                    </Border>
+                                                </Grid>
+                                            </DataTemplate>
+                                        </ComboBox.ItemTemplate>
+                                    </ComboBox>
                                 </Grid>
                             </Border>
 
@@ -422,10 +507,10 @@
                             </Border>
 
                             <!-- Toggle Grid (Two columns, gap 6 by 14, vertical padding 4) -->
-                            <CheckBox Style="{StaticResource SpecToggleSwitch}" Content="Skip Microsoft account sign-in" IsChecked="{Binding Config.SkipMicrosoftAccount}" IsEnabled="{Binding IsRunning, Converter={x:Null}}" />
-                            <CheckBox Style="{StaticResource SpecToggleSwitch}" Content="Auto-logon (User)" IsChecked="{Binding Config.AutoLogonUser}" IsEnabled="{Binding IsRunning, Converter={x:Null}}" />
-                            <CheckBox Style="{StaticResource SpecToggleSwitch}" Content="Launch Velox Bench after first boot" IsChecked="{Binding Config.LaunchVeloxBench}" IsEnabled="{Binding IsRunning, Converter={x:Null}}" />
-                            <CheckBox Style="{StaticResource SpecToggleSwitch}" Content="Reboot automatically when done (15 s)" IsChecked="{Binding Config.AutoReboot}" IsEnabled="{Binding IsRunning, Converter={x:Null}}" />
+                            <CheckBox Style="{StaticResource SpecToggleSwitch}" Content="Skip Microsoft account sign-in" IsChecked="{Binding Config.SkipMicrosoftAccount}" IsEnabled="{Binding IsIdle}" />
+                            <CheckBox Style="{StaticResource SpecToggleSwitch}" Content="Auto-logon default user account" IsChecked="{Binding Config.AutoLogonUser}" IsEnabled="{Binding IsIdle}" />
+                            <CheckBox Style="{StaticResource SpecToggleSwitch}" Content="Launch Velox Bench on target first boot" IsChecked="{Binding Config.LaunchVeloxBench}" IsEnabled="{Binding IsIdle}" />
+                            <CheckBox Style="{StaticResource SpecToggleSwitch}" Content="Safely eject drive when deployment finishes" IsChecked="{Binding Config.SafelyEjectOnComplete}" IsEnabled="{Binding IsIdle}" />
                         </StackPanel>
                     </Border>
                 </Grid>
@@ -876,12 +961,9 @@
                                     <!-- Segmented Filter (1 px -bd2, radius 8, items padding 4 12, 13 px weight 600 -t2) -->
                                     <Border Grid.Column="1" HorizontalAlignment="Center" BorderBrush="{DynamicResource Border2Brush}" BorderThickness="1" CornerRadius="8" Padding="2">
                                         <StackPanel Orientation="Horizontal">
-                                            <RadioButton Content="All" IsChecked="{Binding IsFilterAll, Mode=TwoWay}" GroupName="LogFilterGrp" Height="26" Padding="12,0" 
-                                                         Foreground="{DynamicResource BrandBrush}" Background="{DynamicResource BrandSubtleBrush}" FontSize="13" FontWeight="SemiBold" />
-                                            <RadioButton Content="Warnings" IsChecked="{Binding IsFilterWarnings, Mode=TwoWay}" GroupName="LogFilterGrp" Height="26" Padding="12,0" 
-                                                         Foreground="{DynamicResource Text2Brush}" Background="Transparent" FontSize="13" FontWeight="SemiBold" />
-                                            <RadioButton Content="Errors" IsChecked="{Binding IsFilterErrors, Mode=TwoWay}" GroupName="LogFilterGrp" Height="26" Padding="12,0" 
-                                                         Foreground="{DynamicResource Text2Brush}" Background="Transparent" FontSize="13" FontWeight="SemiBold" />
+                                            <RadioButton Content="All" IsChecked="{Binding IsFilterAll, Mode=TwoWay}" GroupName="LogFilterGrp" Style="{StaticResource SegmentedRadio}" Height="26" Padding="12,0" Margin="2,0" />
+                                            <RadioButton Content="Warnings" IsChecked="{Binding IsFilterWarnings, Mode=TwoWay}" GroupName="LogFilterGrp" Style="{StaticResource SegmentedRadio}" Height="26" Padding="12,0" Margin="2,0" />
+                                            <RadioButton Content="Errors" IsChecked="{Binding IsFilterErrors, Mode=TwoWay}" GroupName="LogFilterGrp" Style="{StaticResource SegmentedRadio}" Height="26" Padding="12,0" Margin="2,0" />
                                         </StackPanel>
                                     </Border>
 
@@ -951,8 +1033,8 @@
                         <Border Height="42" CornerRadius="10" BorderBrush="{DynamicResource Border2Brush}" BorderThickness="1" Background="{DynamicResource InsetBgBrush}" Padding="3" Margin="0,0,16,0">
                             <StackPanel Orientation="Horizontal">
                                 <!-- Dry run segment (Selected: -bs background, -brand text) -->
-                                <RadioButton Content="Dry run" IsChecked="{Binding IsDryRunMode}" Height="34" Padding="18,0" GroupName="ExactModeGrp"
-                                             IsEnabled="{Binding IsRunning, Converter={x:Null}}"
+                                <RadioButton Content="Dry run" IsChecked="{Binding IsDryRunMode, Mode=TwoWay}" Height="34" Padding="18,0" GroupName="ExactModeGrp"
+                                             IsEnabled="{Binding IsIdle}"
                                              FontSize="14" FontWeight="SemiBold">
                                     <RadioButton.Style>
                                         <Style TargetType="RadioButton">
@@ -969,8 +1051,8 @@
                                 </RadioButton>
 
                                 <!-- Live, writes to disk segment (Selected: -errb background, white text) -->
-                                <RadioButton Content="Live, writes to disk" IsChecked="{Binding IsLiveMode}" Height="34" Padding="18,0" GroupName="ExactModeGrp"
-                                             IsEnabled="{Binding IsRunning, Converter={x:Null}}"
+                                <RadioButton Content="Live, writes to disk" IsChecked="{Binding IsLiveMode, Mode=TwoWay}" Height="34" Padding="18,0" GroupName="ExactModeGrp"
+                                             IsEnabled="{Binding IsIdle}"
                                              FontSize="14" FontWeight="SemiBold">
                                     <RadioButton.Style>
                                         <Style TargetType="RadioButton">
@@ -994,26 +1076,35 @@
 
                     <!-- Right Side Buttons (gap 16, height 40) -->
                     <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center">
-                        <!-- Abort Button (height 40, padding 0 18, radius 8, 14.5 px weight 600, transparent bg, -err text, 1 px -errbd border) -->
-                        <Button Content="Abort" Command="{Binding SecondaryActionCommand}" Height="40" Padding="18,0" Margin="0,0,16,0"
+                        <!-- Abort / Safe Eject Button -->
+                        <Button Content="{Binding SecondaryButtonText}" Command="{Binding SecondaryActionCommand}" Height="40" Padding="18,0" Margin="0,0,16,0"
                                 Background="Transparent" Foreground="{DynamicResource ErrBrush}" BorderBrush="{DynamicResource ErrBdBrush}" BorderThickness="1"
                                 FontSize="14.5" FontWeight="SemiBold" Cursor="Hand">
                             <Button.Style>
                                 <Style TargetType="Button">
-                                    <Setter Property="Opacity" Value="0.45" />
+                                    <Setter Property="Opacity" Value="0.4" />
                                     <Setter Property="IsEnabled" Value="False" />
                                     <Style.Triggers>
                                         <DataTrigger Binding="{Binding IsRunning}" Value="True">
                                             <Setter Property="Opacity" Value="1.0" />
                                             <Setter Property="IsEnabled" Value="True" />
-                                            <Setter Property="Content" Value="Abort deployment" />
+                                        </DataTrigger>
+                                        <DataTrigger Binding="{Binding IsCompleted}" Value="True">
+                                            <Setter Property="Opacity" Value="1.0" />
+                                            <Setter Property="IsEnabled" Value="True" />
+                                            <Setter Property="Foreground" Value="{DynamicResource OkBrush}" />
+                                            <Setter Property="BorderBrush" Value="{DynamicResource OkBdBrush}" />
+                                        </DataTrigger>
+                                        <DataTrigger Binding="{Binding IsFailed}" Value="True">
+                                            <Setter Property="Opacity" Value="1.0" />
+                                            <Setter Property="IsEnabled" Value="True" />
                                         </DataTrigger>
                                     </Style.Triggers>
                                 </Style>
                             </Button.Style>
                         </Button>
 
-                        <!-- Primary Button (Start dry run in -bb fill / Deploy to Disk 0... in -errb fill) -->
+                        <!-- Primary Button (Start dry run in -bb fill / Deploy to Disk... in -errb fill / Flash Another in -bb) -->
                         <Button Content="{Binding PrimaryButtonText}" Command="{Binding PrimaryActionCommand}" Height="40" Padding="18,0"
                                 FontSize="14.5" FontWeight="SemiBold" Cursor="Hand" BorderThickness="0">
                             <Button.Style>
@@ -1024,10 +1115,15 @@
                                         <DataTrigger Binding="{Binding IsLiveMode}" Value="True">
                                             <Setter Property="Background" Value="{DynamicResource ErrBtnBrush}" />
                                         </DataTrigger>
+                                        <DataTrigger Binding="{Binding IsCompleted}" Value="True">
+                                            <Setter Property="Background" Value="{DynamicResource BrandBtnBrush}" />
+                                        </DataTrigger>
                                         <DataTrigger Binding="{Binding IsRunning}" Value="True">
                                             <Setter Property="Opacity" Value="0.45" />
-                                            <Setter Property="IsEnabled" Value="False" />
                                         </DataTrigger>
+                                        <Trigger Property="IsEnabled" Value="False">
+                                            <Setter Property="Opacity" Value="0.4" />
+                                        </Trigger>
                                     </Style.Triggers>
                                 </Style>
                             </Button.Style>
@@ -1041,12 +1137,23 @@
         <Grid Background="#9E05070A" Visibility="{Binding IsConfirmationDialogOpen, Converter={StaticResource BoolToVis}}">
             <Border Width="560" Background="{DynamicResource PanelBgBrush}" BorderBrush="{DynamicResource Border2Brush}" BorderThickness="1" CornerRadius="14" Padding="24,22" HorizontalAlignment="Center" VerticalAlignment="Center">
                 <StackPanel>
-                    <!-- Title Row: 40 px circle with -errbg, red exclamation 22 px weight 800, title Erase Disk 0 and deploy? 21 px weight 700 -->
+                    <!-- Title Row -->
                     <StackPanel Orientation="Horizontal" Margin="0,0,0,16">
                         <Border Width="40" Height="40" CornerRadius="20" Background="{DynamicResource ErrBgBrush}" BorderBrush="{DynamicResource ErrBdBrush}" BorderThickness="1" Margin="0,0,14,0">
                             <TextBlock Text="!" FontSize="22" FontWeight="ExtraBold" Foreground="{DynamicResource ErrBrush}" HorizontalAlignment="Center" VerticalAlignment="Center" />
                         </Border>
-                        <TextBlock Text="Erase Disk 0 and deploy?" FontSize="21" FontWeight="Bold" Foreground="{DynamicResource Text1Brush}" VerticalAlignment="Center" />
+                        <TextBlock FontSize="21" FontWeight="Bold" Foreground="{DynamicResource Text1Brush}" VerticalAlignment="Center">
+                            <TextBlock.Style>
+                                <Style TargetType="TextBlock">
+                                    <Setter Property="Text" Value="Erase Target Disk and Deploy?" />
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding SelectedDisk.IsUsbFlashDrive}" Value="True">
+                                            <Setter Property="Text" Value="Format USB and Create Bootable Media?" />
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </TextBlock.Style>
+                        </TextBlock>
                     </StackPanel>
 
                     <!-- Summary: label and value rows (label column 90 px): Disk, Image, Unit -->
@@ -1088,7 +1195,7 @@
                             <Border Width="18" Height="18" CornerRadius="9" Background="{DynamicResource OkBrush}" Margin="0,0,8,0">
                                 <TextBlock Text="✓" Foreground="#FFFFFF" FontSize="11" FontWeight="Bold" HorizontalAlignment="Center" VerticalAlignment="Center" />
                             </Border>
-                            <TextBlock Text="Disk 0 is not the boot media" FontSize="13" Foreground="{DynamicResource Text2Brush}" VerticalAlignment="Center" />
+                            <TextBlock Text="Target disk is not host boot/system drive" FontSize="13" Foreground="{DynamicResource Text2Brush}" VerticalAlignment="Center" />
                         </StackPanel>
                         <StackPanel Orientation="Horizontal" Margin="0,3">
                             <Border Width="18" Height="18" CornerRadius="9" Background="{DynamicResource OkBrush}" Margin="0,0,8,0">

@@ -87,26 +87,40 @@ namespace VeloxDeploy.Models
         public string SerialNumber { get; set; } = string.Empty;
         public string InterfaceType { get; set; } = "NVMe";
         public long SizeBytes { get; set; }
+        public bool IsBoot { get; set; } = false;
+        public bool IsSystem { get; set; } = false;
+        public bool IsHostSystemDisk => IsBoot || IsSystem;
+        public bool IsSimulated { get; set; } = false;
+        public bool HasExistingData { get; set; } = true;
+
         public string SizeFormatted => SizeBytes > 0 
             ? $"{(SizeBytes / (1024.0 * 1024.0 * 1024.0)):F0} GB" 
             : "Unknown";
+
         public bool IsNvme => InterfaceType.Contains("NVMe", StringComparison.OrdinalIgnoreCase) || Model.Contains("NVMe", StringComparison.OrdinalIgnoreCase);
         public bool IsUsb => InterfaceType.Contains("USB", StringComparison.OrdinalIgnoreCase);
-        public bool IsBootMedia { get; set; } = false;
-        public bool HasExistingData { get; set; } = true;
 
         // Smart Target Identification
-        public bool IsUsbFlashDrive => IsUsb && SizeBytes < (128L * 1024 * 1024 * 1024) && 
-            (Model.Contains("Flash", StringComparison.OrdinalIgnoreCase) || 
-             Model.Contains("SanDisk", StringComparison.OrdinalIgnoreCase) ||
-             Model.Contains("Cruzer", StringComparison.OrdinalIgnoreCase) ||
-             Model.Contains("Kingston", StringComparison.OrdinalIgnoreCase));
+        public bool IsUsbFlashDrive => !IsSimulated && IsUsb && (SizeBytes < (135L * 1024 * 1024 * 1024));
+        public bool IsDirectTargetSsd => !IsUsbFlashDrive && !IsSimulated;
 
-        public bool IsDirectTargetSsd => IsNvme || !IsUsbFlashDrive;
+        public string TargetModeBadge => IsSimulated 
+            ? "Dry Run Simulation" 
+            : (IsHostSystemDisk ? "Host Windows (Protected)" : (IsUsbFlashDrive ? "Bootable USB Pendrive" : "Direct SSD Target"));
 
-        public string TargetModeBadge => IsUsbFlashDrive ? "Bootable USB Pendrive" : "Direct SSD Target";
-        public string SafetyBadge => IsBootMedia ? "Boot media (Excluded)" : (HasExistingData ? "Has data" : "Unformatted");
-        public string DisplayText => $"Disk {DiskIndex}: {Model} ({SizeFormatted} {InterfaceType})";
+        public string SafetyBadge => IsHostSystemDisk 
+            ? "Host OS (Protected)" 
+            : (IsSimulated ? "Simulated Target" : (HasExistingData ? "Will be erased" : "Unformatted"));
+
+        public string DisplayText
+        {
+            get
+            {
+                if (IsSimulated) return $"[SIMULATION] {Model} ({SizeFormatted})";
+                string tag = IsHostSystemDisk ? " [Host Windows - Protected]" : (IsUsbFlashDrive ? " [USB Media]" : " [Target SSD]");
+                return $"Disk {DiskIndex}: {Model} ({SizeFormatted} {InterfaceType}){tag}";
+            }
+        }
     }
 
     public class HardwareProfile
@@ -170,12 +184,11 @@ namespace VeloxDeploy.Models
         public bool IsDryRun { get; set; } = true; // Always start in Dry run per handoff spec
         public string ApiEndpoint { get; set; } = "http://13.206.106.146";
 
-        // Automation Toggles
+        // Automation Toggles (Target Laptop & Bench Workflow)
         public bool SkipMicrosoftAccount { get; set; } = true;
         public bool AutoLogonUser { get; set; } = true;
         public bool LaunchVeloxBench { get; set; } = true;
-        public bool AutoReboot { get; set; } = true;
-        public int AutoRebootCountdownSecs { get; set; } = 15;
+        public bool SafelyEjectOnComplete { get; set; } = true;
         public string AdminUsername { get; set; } = "User";
 
         // Image display details
