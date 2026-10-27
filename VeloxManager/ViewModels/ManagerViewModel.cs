@@ -30,8 +30,26 @@ public class ManagerViewModel : INotifyPropertyChanged
     public int SelectedTabIndex
     {
         get => _selectedTabIndex;
-        set { _selectedTabIndex = value; OnPropertyChanged(); }
+        set
+        {
+            if (_selectedTabIndex != value)
+            {
+                _selectedTabIndex = value;
+                OnPropertyChanged();
+                OnPropertyChanged(nameof(IsNavTab0));
+                OnPropertyChanged(nameof(IsNavTab1));
+                OnPropertyChanged(nameof(IsNavTab2));
+                OnPropertyChanged(nameof(IsNavTab3));
+                OnPropertyChanged(nameof(IsNavTab4));
+            }
+        }
     }
+
+    public bool IsNavTab0 => SelectedTabIndex == 0;
+    public bool IsNavTab1 => SelectedTabIndex == 1;
+    public bool IsNavTab2 => SelectedTabIndex == 2;
+    public bool IsNavTab3 => SelectedTabIndex == 3;
+    public bool IsNavTab4 => SelectedTabIndex == 4;
 
     // ── Collections ────────────────────────────────────────────────────────────
     public ObservableCollection<AssetItemViewModel> Assets { get; } = new();
@@ -249,6 +267,117 @@ public class ManagerViewModel : INotifyPropertyChanged
     public int WipCount => Assets.Count(a => a.Status != LifecycleQueue.ReadyForSale && a.Status != LifecycleQueue.Sold);
     public int ReadyForSaleCount => Assets.Count(a => a.Status == LifecycleQueue.ReadyForSale);
     public int SoldCount => Assets.Count(a => a.Status == LifecycleQueue.Sold);
+
+    // Status Tab Counts
+    public int AllCount => Assets.Count;
+    public int IntakeCount => Assets.Count(a => a.Status == LifecycleQueue.IntakeStaging);
+    public int OnBenchCount => Assets.Count(a => a.Status == LifecycleQueue.ActiveTesting || a.Status == LifecycleQueue.ExternalRepair || a.Status == LifecycleQueue.AwaitingParts);
+    public int ReadyCount => Assets.Count(a => a.Status == LifecycleQueue.ReadyForSale);
+    public int ReservedCount => Assets.Count(a => a.IsOnHold);
+
+    private string _activeStatusTab = "ALL";
+    public string ActiveStatusTab
+    {
+        get => _activeStatusTab;
+        set
+        {
+            if (_activeStatusTab != value)
+            {
+                _activeStatusTab = value;
+                OnPropertyChanged();
+                OnPropertyChanged(nameof(IsAllTabActive));
+                OnPropertyChanged(nameof(IsIntakeTabActive));
+                OnPropertyChanged(nameof(IsOnBenchTabActive));
+                OnPropertyChanged(nameof(IsReadyTabActive));
+                OnPropertyChanged(nameof(IsReservedTabActive));
+                OnPropertyChanged(nameof(IsSoldTabActive));
+
+                StatusFilter = value switch
+                {
+                    "INTAKE" => "INTAKE",
+                    "ON_BENCH" => "ON_BENCH",
+                    "READY" => "READY_FOR_SALE",
+                    "RESERVED" => "RESERVED",
+                    "SOLD" => "SOLD",
+                    _ => "ALL"
+                };
+            }
+        }
+    }
+
+    public bool IsAllTabActive => ActiveStatusTab == "ALL";
+    public bool IsIntakeTabActive => ActiveStatusTab == "INTAKE";
+    public bool IsOnBenchTabActive => ActiveStatusTab == "ON_BENCH";
+    public bool IsReadyTabActive => ActiveStatusTab == "READY";
+    public bool IsReservedTabActive => ActiveStatusTab == "RESERVED";
+    public bool IsSoldTabActive => ActiveStatusTab == "SOLD";
+
+    // ── Bulk Selection ───────────────────────────────────────────────────────────
+    public void NotifySelectionChanged()
+    {
+        OnPropertyChanged(nameof(SelectedCount));
+        OnPropertyChanged(nameof(HasBulkSelection));
+        OnPropertyChanged(nameof(SelectedCountText));
+    }
+
+    public int SelectedCount => FilteredAssets.Count(a => a.IsSelected);
+    public bool HasBulkSelection => SelectedCount > 0;
+    public string SelectedCountText => $"{SelectedCount} selected";
+
+    public void ClearSelection()
+    {
+        foreach (var item in Assets)
+        {
+            if (item.IsSelected) item.IsSelected = false;
+        }
+        NotifySelectionChanged();
+    }
+
+    public void SelectAll(bool select)
+    {
+        foreach (var item in FilteredAssets)
+        {
+            item.IsSelected = select;
+        }
+        NotifySelectionChanged();
+    }
+
+    // ── Left Navigation Rail ───────────────────────────────────────────────────
+    private bool _isNavExpanded = true;
+    public bool IsNavExpanded
+    {
+        get => _isNavExpanded;
+        set
+        {
+            if (_isNavExpanded != value)
+            {
+                _isNavExpanded = value;
+                OnPropertyChanged();
+                OnPropertyChanged(nameof(NavRailWidth));
+            }
+        }
+    }
+    public double NavRailWidth => IsNavExpanded ? 216 : 56;
+
+    public void ToggleNav()
+    {
+        IsNavExpanded = !IsNavExpanded;
+    }
+
+    // ── Quick Intake Drawer ─────────────────────────────────────────────────────
+    private bool _isQuickIntakeOpen = false;
+    public bool IsQuickIntakeOpen
+    {
+        get => _isQuickIntakeOpen;
+        set
+        {
+            if (_isQuickIntakeOpen != value)
+            {
+                _isQuickIntakeOpen = value;
+                OnPropertyChanged();
+            }
+        }
+    }
 
     public double DepotInventoryCostValue => Assets.Where(a => a.Status != LifecycleQueue.Sold && a.Status != LifecycleQueue.Disposed).Sum(a => a.PurchasePrice ?? 0);
     public double DepotProjectedSaleValue => Assets.Where(a => a.Status == LifecycleQueue.ReadyForSale).Sum(a => a.SalePrice ?? 0);
@@ -637,10 +766,29 @@ public class ManagerViewModel : INotifyPropertyChanged
     public ICommand RestoreCloudDatabaseCommand { get; }
     public ICommand PurgeCloudDatabaseCommand { get; }
     public ICommand UpdateSelectedAssetLocationCommand { get; }
+    public ICommand ToggleNavCommand { get; }
+    public ICommand SelectStatusTabCommand { get; }
+    public ICommand ClearSelectionCommand { get; }
+    public ICommand SelectAllCommand { get; }
+    public ICommand OpenQuickIntakeDrawerCommand { get; }
+    public ICommand CloseQuickIntakeDrawerCommand { get; }
+    public ICommand ToggleThemeCommand { get; }
+    public ICommand SetThemeCommand { get; }
+    public ICommand NavigateToTabCommand { get; }
 
     public ManagerViewModel()
     {
         _instance = this;
+
+        ToggleNavCommand = new RelayCommand(_ => ToggleNav());
+        SelectStatusTabCommand = new RelayCommand(p => { if (p is string s) ActiveStatusTab = s; });
+        ClearSelectionCommand = new RelayCommand(_ => ClearSelection());
+        SelectAllCommand = new RelayCommand(p => SelectAll(p is bool b ? b : true));
+        OpenQuickIntakeDrawerCommand = new RelayCommand(_ => IsQuickIntakeOpen = true);
+        CloseQuickIntakeDrawerCommand = new RelayCommand(_ => IsQuickIntakeOpen = false);
+        ToggleThemeCommand = new RelayCommand(_ => ThemeService.Instance.ToggleTheme());
+        SetThemeCommand = new RelayCommand(p => { if (p is string s && Enum.TryParse<AppThemeMode>(s, true, out var m)) ThemeService.Instance.SetTheme(m); });
+        NavigateToTabCommand = new RelayCommand(p => { if (p != null && int.TryParse(p.ToString(), out var idx)) SelectedTabIndex = idx; });
 
         RefreshAssetsCommand = new RelayCommand(async _ => await LoadAssetsAndEmployeesAsync());
         UpdateStatusCommand = new RelayCommand(async p => await UpdateSelectedAssetStatusAsync(p as string));
@@ -841,7 +989,10 @@ public class ManagerViewModel : INotifyPropertyChanged
             // Status check
             if (StatusFilter != "ALL")
             {
-                if (StatusFilter == "READY_FOR_SALE" && item.Status != LifecycleQueue.ReadyForSale) continue;
+                if ((StatusFilter == "READY_FOR_SALE" || StatusFilter == "READY") && item.Status != LifecycleQueue.ReadyForSale) continue;
+                if (StatusFilter == "INTAKE" && item.Status != LifecycleQueue.IntakeStaging) continue;
+                if (StatusFilter == "ON_BENCH" && item.Status != LifecycleQueue.ActiveTesting && item.Status != LifecycleQueue.ExternalRepair && item.Status != LifecycleQueue.AwaitingParts) continue;
+                if (StatusFilter == "RESERVED" && !item.IsOnHold) continue;
                 if (StatusFilter == "WIP" && (item.Status == LifecycleQueue.ReadyForSale || item.Status == LifecycleQueue.Sold)) continue;
                 if (StatusFilter == "TESTING" && item.Status != LifecycleQueue.ActiveTesting) continue;
                 if (StatusFilter == "REPAIR" && item.Status != LifecycleQueue.ExternalRepair) continue;
@@ -872,12 +1023,18 @@ public class ManagerViewModel : INotifyPropertyChanged
         OnPropertyChanged(nameof(WipCount));
         OnPropertyChanged(nameof(ReadyForSaleCount));
         OnPropertyChanged(nameof(SoldCount));
+        OnPropertyChanged(nameof(AllCount));
+        OnPropertyChanged(nameof(IntakeCount));
+        OnPropertyChanged(nameof(OnBenchCount));
+        OnPropertyChanged(nameof(ReadyCount));
+        OnPropertyChanged(nameof(ReservedCount));
         OnPropertyChanged(nameof(DepotInventoryCostValue));
         OnPropertyChanged(nameof(DepotProjectedSaleValue));
         OnPropertyChanged(nameof(DepotProjectedMarginValue));
         OnPropertyChanged(nameof(DepotMarginPercent));
         OnPropertyChanged(nameof(CloudStatusText));
         OnPropertyChanged(nameof(CloudStatusColor));
+        NotifySelectionChanged();
     }
 
     // ── Quick Stock Intake ───────────────────────────────────────────────────────

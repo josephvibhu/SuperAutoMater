@@ -30,10 +30,17 @@ public class NullToVisibilityConverter : IValueConverter
 {
     public object Convert(object? value, Type targetType, object? parameter, CultureInfo culture)
     {
-        if (value == null) return Visibility.Collapsed;
-        if (value is bool b && !b) return Visibility.Collapsed;
-        if (value is string s && string.IsNullOrWhiteSpace(s)) return Visibility.Collapsed;
-        return Visibility.Visible;
+        bool isVisible = true;
+        if (value == null) isVisible = false;
+        else if (value is bool b) isVisible = b;
+        else if (value is string s && string.IsNullOrWhiteSpace(s)) isVisible = false;
+
+        if (parameter is string p && p.Equals("invert", StringComparison.OrdinalIgnoreCase))
+        {
+            isVisible = !isVisible;
+        }
+
+        return isVisible ? Visibility.Visible : Visibility.Collapsed;
     }
 
     public object ConvertBack(object? value, Type targetType, object? parameter, CultureInfo culture) => throw new NotImplementedException();

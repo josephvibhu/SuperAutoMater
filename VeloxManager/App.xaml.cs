@@ -14,6 +14,8 @@ public partial class App : Application
     {
         base.OnStartup(e);
 
+        VeloxManager.Services.ThemeService.Instance.Initialize();
+
         DispatcherUnhandledException += App_DispatcherUnhandledException;
         AppDomain.CurrentDomain.UnhandledException += CurrentDomain_UnhandledException;
     }

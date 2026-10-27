@@ -12,6 +12,7 @@ public class ManagerConfig
     public int LanPort { get; set; } = 9000;
     public bool EnableLanServer { get; set; } = true;
     public string ManagerName { get; set; } = "Depot Operations Manager";
+    public string Theme { get; set; } = "dark";
     public string GoogleSheetsWebhookUrl { get; set; } = "https://script.google.com/macros/s/AKfycbweLRaXur7tAluRq4IIDjC2RDGDhBU52iss-zAKMau_Sd-yt2NJjlWNZfKEJ2sfYphfOw/exec";
     public int AutoSyncSheetsMinutes { get; set; } = 30;
 }

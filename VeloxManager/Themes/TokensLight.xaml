@@ -1,0 +1,151 @@
+<ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+
+    <!-- ============================================================== -->
+    <!-- VELOX MANAGER LIGHT THEME DESIGN TOKENS (Developer UI Handoff) -->
+    <!-- ============================================================== -->
+
+    <!-- Surfaces (Crisp Light Studio) -->
+    <Color x:Key="ColorBgApp">#F3F4F7</Color>
+    <Color x:Key="ColorBgPanel">#FFFFFF</Color>
+    <Color x:Key="ColorBgCard">#FFFFFF</Color>
+    <Color x:Key="ColorBgHover">#ECEEF3</Color>
+    <Color x:Key="ColorBgInset">#EEF0F4</Color>
+
+    <Color x:Key="ColorBorderSubtle">#DDE0E8</Color>
+    <Color x:Key="ColorBorderStrong">#C4C9D4</Color>
+
+    <!-- Typography (Dark Charcoal & Slate) -->
+    <Color x:Key="ColorTextPrimary">#14171F</Color>
+    <Color x:Key="ColorTextSecondary">#4A5163</Color>
+    <Color x:Key="ColorTextMuted">#6B7385</Color>
+
+    <!-- Brand & Selection (Manager Violet) -->
+    <Color x:Key="ColorBrand">#6B4CE0</Color>
+    <Color x:Key="ColorBrandSolid">#5B3FE0</Color>
+    <Color x:Key="ColorBrandSubtle">#EAE6FC</Color>
+
+    <!-- Semantic Status Colors -->
+    <Color x:Key="ColorSuccess">#12805C</Color>
+    <Color x:Key="ColorSuccessBg">#E6F5EF</Color>
+    <Color x:Key="ColorSuccessBorder">#A8DEC9</Color>
+    <Color x:Key="ColorSuccessSolid">#12805C</Color>
+
+    <Color x:Key="ColorWarning">#9A5B00</Color>
+    <Color x:Key="ColorWarningBg">#FFF5E6</Color>
+    <Color x:Key="ColorWarningBorder">#F0CC94</Color>
+
+    <Color x:Key="ColorDanger">#C9302C</Color>
+    <Color x:Key="ColorDangerBg">#FCEBEA</Color>
+    <Color x:Key="ColorDangerBorder">#EDA4A2</Color>
+
+    <Color x:Key="ColorInfo">#0B66C3</Color>
+    <Color x:Key="ColorInfoBg">#E8F2FC</Color>
+    <Color x:Key="ColorInfoBorder">#9CC6F0</Color>
+
+    <!-- Grade Ramp -->
+    <Color x:Key="ColorGradeAPlus">#12805C</Color>
+    <Color x:Key="ColorGradeA">#2C9C7E</Color>
+    <Color x:Key="ColorGradeB">#D98A00</Color>
+    <Color x:Key="ColorGradeC">#D9631A</Color>
+
+    <!-- App Identity Colors -->
+    <Color x:Key="ColorAppBench">#0E8FB0</Color>
+    <Color x:Key="ColorAppManager">#6B4CE0</Color>
+    <Color x:Key="ColorAppHub">#C23A8E</Color>
+    <Color x:Key="ColorAppLink">#3A63E0</Color>
+    <Color x:Key="ColorAppFleet">#C98410</Color>
+
+    <!-- ============================================================== -->
+    <!-- SEMANTIC SOLID BRUSHES                                         -->
+    <!-- ============================================================== -->
+    <SolidColorBrush x:Key="TokenBgAppBrush" Color="{StaticResource ColorBgApp}"/>
+    <SolidColorBrush x:Key="TokenBgPanelBrush" Color="{StaticResource ColorBgPanel}"/>
+    <SolidColorBrush x:Key="TokenBgCardBrush" Color="{StaticResource ColorBgCard}"/>
+    <SolidColorBrush x:Key="TokenBgHoverBrush" Color="{StaticResource ColorBgHover}"/>
+    <SolidColorBrush x:Key="TokenBgInsetBrush" Color="{StaticResource ColorBgInset}"/>
+
+    <SolidColorBrush x:Key="TokenBorderSubtleBrush" Color="{StaticResource ColorBorderSubtle}"/>
+    <SolidColorBrush x:Key="TokenBorderStrongBrush" Color="{StaticResource ColorBorderStrong}"/>
+
+    <SolidColorBrush x:Key="TokenTextPrimaryBrush" Color="{StaticResource ColorTextPrimary}"/>
+    <SolidColorBrush x:Key="TokenTextSecondaryBrush" Color="{StaticResource ColorTextSecondary}"/>
+    <SolidColorBrush x:Key="TokenTextMutedBrush" Color="{StaticResource ColorTextMuted}"/>
+
+    <SolidColorBrush x:Key="TokenBrandBrush" Color="{StaticResource ColorBrand}"/>
+    <SolidColorBrush x:Key="TokenBrandSolidBrush" Color="{StaticResource ColorBrandSolid}"/>
+    <SolidColorBrush x:Key="TokenBrandSubtleBrush" Color="{StaticResource ColorBrandSubtle}"/>
+
+    <SolidColorBrush x:Key="TokenSuccessBrush" Color="{StaticResource ColorSuccess}"/>
+    <SolidColorBrush x:Key="TokenSuccessBgBrush" Color="{StaticResource ColorSuccessBg}"/>
+    <SolidColorBrush x:Key="TokenSuccessBorderBrush" Color="{StaticResource ColorSuccessBorder}"/>
+    <SolidColorBrush x:Key="TokenSuccessSolidBrush" Color="{StaticResource ColorSuccessSolid}"/>
+
+    <SolidColorBrush x:Key="TokenWarningBrush" Color="{StaticResource ColorWarning}"/>
+    <SolidColorBrush x:Key="TokenWarningBgBrush" Color="{StaticResource ColorWarningBg}"/>
+    <SolidColorBrush x:Key="TokenWarningBorderBrush" Color="{StaticResource ColorWarningBorder}"/>
+
+    <SolidColorBrush x:Key="TokenDangerBrush" Color="{StaticResource ColorDanger}"/>
+    <SolidColorBrush x:Key="TokenDangerBgBrush" Color="{StaticResource ColorDangerBg}"/>
+    <SolidColorBrush x:Key="TokenDangerBorderBrush" Color="{StaticResource ColorDangerBorder}"/>
+
+    <SolidColorBrush x:Key="TokenInfoBrush" Color="{StaticResource ColorInfo}"/>
+    <SolidColorBrush x:Key="TokenInfoBgBrush" Color="{StaticResource ColorInfoBg}"/>
+    <SolidColorBrush x:Key="TokenInfoBorderBrush" Color="{StaticResource ColorInfoBorder}"/>
+
+    <SolidColorBrush x:Key="TokenGradeAPlusBrush" Color="{StaticResource ColorGradeAPlus}"/>
+    <SolidColorBrush x:Key="TokenGradeABrush" Color="{StaticResource ColorGradeA}"/>
+    <SolidColorBrush x:Key="TokenGradeBBrush" Color="{StaticResource ColorGradeB}"/>
+    <SolidColorBrush x:Key="TokenGradeCBrush" Color="{StaticResource ColorGradeC}"/>
+
+    <SolidColorBrush x:Key="TokenAppColorBrush" Color="{StaticResource ColorAppManager}"/>
+    <SolidColorBrush x:Key="TokenAppManagerBrush" Color="{StaticResource ColorAppManager}"/>
+
+    <!-- ============================================================== -->
+    <!-- COMPATIBILITY BRUSHES (LIGHT THEME)                            -->
+    <!-- ============================================================== -->
+    <SolidColorBrush x:Key="BrushObsidianVoid" Color="#F3F4F7"/>
+    <SolidColorBrush x:Key="BrushObsidianMid" Color="#FFFFFF"/>
+    <SolidColorBrush x:Key="BrushObsidianTop" Color="#FFFFFF"/>
+
+    <SolidColorBrush x:Key="BrushCardBgTop" Color="#FFFFFF"/>
+    <SolidColorBrush x:Key="BrushCardBgBottom" Color="#F8F9FA"/>
+    <SolidColorBrush x:Key="BrushActiveCardTop" Color="#ECEEF3"/>
+    <SolidColorBrush x:Key="BrushActiveCardBottom" Color="#E2E5ED"/>
+
+    <SolidColorBrush x:Key="BrushTextWhite" Color="#14171F"/>
+    <SolidColorBrush x:Key="BrushTextVioletLight" Color="#4A5163"/>
+    <SolidColorBrush x:Key="BrushTextVioletMuted" Color="#6B7385"/>
+    <SolidColorBrush x:Key="BrushTextVioletSubdued" Color="#6B7385"/>
+    <SolidColorBrush x:Key="BrushTextEmerald" Color="#12805C"/>
+    <SolidColorBrush x:Key="BrushTextAmber" Color="#9A5B00"/>
+    <SolidColorBrush x:Key="BrushTextRed" Color="#C9302C"/>
+
+    <SolidColorBrush x:Key="BrushHairlineViolet" Color="#DDE0E8"/>
+    <SolidColorBrush x:Key="BrushHairlineDark" Color="#C4C9D4"/>
+    <SolidColorBrush x:Key="BrushHairlineActive" Color="#6B4CE0"/>
+    <SolidColorBrush x:Key="BrushHairlineSubtle" Color="#DDE0E8"/>
+    <SolidColorBrush x:Key="BrushHairlineEmerald" Color="#A8DEC9"/>
+
+    <SolidColorBrush x:Key="BrushAccentEmerald" Color="#12805C"/>
+    <SolidColorBrush x:Key="BrushAccentEmeraldLight" Color="#12805C"/>
+    <SolidColorBrush x:Key="BrushAccentAmber" Color="#9A5B00"/>
+    <SolidColorBrush x:Key="BrushAccentRed" Color="#C9302C"/>
+    <SolidColorBrush x:Key="BrushAccentBlue" Color="#0B66C3"/>
+    <SolidColorBrush x:Key="BrushAccentViolet" Color="#6B4CE0"/>
+    <SolidColorBrush x:Key="BrushAccentVioletLight" Color="#6B4CE0"/>
+    <SolidColorBrush x:Key="BrushLogoPurple" Color="#6B4CE0"/>
+    <SolidColorBrush x:Key="BrushLogoPurpleLight" Color="#6B4CE0"/>
+
+    <!-- Gradients -->
+    <LinearGradientBrush x:Key="BrushPrimaryGlowButton" StartPoint="0,0" EndPoint="1,0">
+        <GradientStop Color="#5B3FE0" Offset="0.0"/>
+        <GradientStop Color="#6B4CE0" Offset="1.0"/>
+    </LinearGradientBrush>
+
+    <LinearGradientBrush x:Key="BrushPassQcButton" StartPoint="0,0" EndPoint="1,0">
+        <GradientStop Color="#0E6A4C" Offset="0.0"/>
+        <GradientStop Color="#12805C" Offset="1.0"/>
+    </LinearGradientBrush>
+
+</ResourceDictionary>

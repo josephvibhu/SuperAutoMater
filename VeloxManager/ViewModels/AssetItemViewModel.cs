@@ -323,6 +323,42 @@ public class AssetItemViewModel : INotifyPropertyChanged
         _ => "PENDING"
     };
 
+    public string GradeLetter => Grade switch
+    {
+        AssetGrade.A => "A",
+        AssetGrade.B => "B",
+        AssetGrade.C => "C",
+        AssetGrade.Faulty => "F",
+        _ => "—"
+    };
+
+    public string GradeDotColorHex => Grade switch
+    {
+        AssetGrade.A => "#3DD68C",
+        AssetGrade.B => "#F5B94A",
+        AssetGrade.C => "#FF9A4D",
+        AssetGrade.Faulty => "#FF6B6B",
+        _ => "#8A92A3"
+    };
+
+    public string DiskHealthColorHex => StorageHealth >= 90 ? "#3DD68C" : (StorageHealth >= 70 ? "#F5B94A" : "#FF6B6B");
+    public string DiskHealthDisplay => StorageHealth > 0 ? $"{StorageHealth}%" : "—";
+
+    private bool _isSelected = false;
+    public bool IsSelected
+    {
+        get => _isSelected;
+        set
+        {
+            if (_isSelected != value)
+            {
+                _isSelected = value;
+                OnPropertyChanged();
+                ManagerViewModel.Instance.NotifySelectionChanged();
+            }
+        }
+    }
+
     public AssetItemViewModel(AssetDto model)
     {
         Model = model;
