@@ -1,102 +1,80 @@
 <ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
                     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
 
-    <!-- Neutral Modern Dark Mode Palette (Clean Grey/Black Mix) -->
-    <Color x:Key="ColorObsidianVoid">#0B0C10</Color>
-    <Color x:Key="ColorObsidianMid">#101217</Color>
-    <Color x:Key="ColorObsidianTop">#14171F</Color>
-    
-    <Color x:Key="ColorCardBgTop">#161B22</Color>
-    <Color x:Key="ColorCardBgBottom">#13161C</Color>
+    <ResourceDictionary.MergedDictionaries>
+        <!-- Default Dark Palette (Swapped dynamically by ThemeService) -->
+        <ResourceDictionary Source="TokensDark.xaml"/>
+    </ResourceDictionary.MergedDictionaries>
 
-    <Color x:Key="ColorActiveCardTop">#21262D</Color>
-    <Color x:Key="ColorActiveCardBottom">#1A1F26</Color>
+    <!-- Semantic Status & Surface Aliases (Forwarding to active tokens) -->
+    <SolidColorBrush x:Key="BrushObsidianVoid" Color="{DynamicResource ColorBgApp}"/>
+    <SolidColorBrush x:Key="BrushObsidianMid" Color="{DynamicResource ColorBgPanel}"/>
+    <SolidColorBrush x:Key="BrushObsidianTop" Color="{DynamicResource ColorBgCard}"/>
 
-    <!-- Logo Accent ONLY (Neon Purple) -->
-    <Color x:Key="ColorLogoPurple">#A855F7</Color>
-    <Color x:Key="ColorLogoPurpleLight">#C084FC</Color>
+    <SolidColorBrush x:Key="BrushCardBgTop" Color="{DynamicResource ColorBgCard}"/>
+    <SolidColorBrush x:Key="BrushCardBgBottom" Color="{DynamicResource ColorBgPanel}"/>
+    <SolidColorBrush x:Key="BrushActiveCardTop" Color="{DynamicResource ColorBgHover}"/>
+    <SolidColorBrush x:Key="BrushActiveCardBottom" Color="{DynamicResource ColorBgCard}"/>
 
-    <!-- Functional Status Colors -->
-    <Color x:Key="ColorAccentEmerald">#2EA043</Color>
-    <Color x:Key="ColorAccentEmeraldLight">#3FB950</Color>
-    <Color x:Key="ColorAccentAmber">#D29922</Color>
-    <Color x:Key="ColorAccentRed">#F85149</Color>
-    <Color x:Key="ColorAccentBlue">#58A6FF</Color>
-
-    <!-- Hairline Borders -->
-    <Color x:Key="ColorHairlineDark">#262C36</Color>
-    <Color x:Key="ColorHairlineActive">#388BFD</Color>
-    <Color x:Key="ColorHairlineSubtle">#1F242C</Color>
-    <Color x:Key="ColorHairlineEmerald">#2EA043</Color>
-
-    <!-- Solid Brushes -->
-    <SolidColorBrush x:Key="BrushObsidianVoid" Color="{StaticResource ColorObsidianVoid}"/>
-    <SolidColorBrush x:Key="BrushObsidianMid" Color="{StaticResource ColorObsidianMid}"/>
-    <SolidColorBrush x:Key="BrushObsidianTop" Color="{StaticResource ColorObsidianTop}"/>
-
-    <!-- Logo Purple Brushes (ONLY for logo) -->
-    <SolidColorBrush x:Key="BrushLogoPurple" Color="{StaticResource ColorLogoPurple}"/>
-    <SolidColorBrush x:Key="BrushLogoPurpleLight" Color="{StaticResource ColorLogoPurpleLight}"/>
+    <!-- Logo & Accent Aliases (Cyan for Bench, Violet for Suite) -->
+    <SolidColorBrush x:Key="BrushLogoPurple" Color="{DynamicResource ColorAppBench}"/>
+    <SolidColorBrush x:Key="BrushLogoPurpleLight" Color="{DynamicResource ColorAppBench}"/>
+    <SolidColorBrush x:Key="BrushAccentViolet" Color="{DynamicResource ColorBrand}"/>
+    <SolidColorBrush x:Key="BrushAccentVioletLight" Color="{DynamicResource ColorBrand}"/>
 
     <!-- Functional Status Brushes -->
-    <SolidColorBrush x:Key="BrushAccentEmerald" Color="{StaticResource ColorAccentEmerald}"/>
-    <SolidColorBrush x:Key="BrushAccentEmeraldLight" Color="{StaticResource ColorAccentEmeraldLight}"/>
-    <SolidColorBrush x:Key="BrushAccentAmber" Color="{StaticResource ColorAccentAmber}"/>
-    <SolidColorBrush x:Key="BrushAccentRed" Color="{StaticResource ColorAccentRed}"/>
-    <SolidColorBrush x:Key="BrushAccentBlue" Color="{StaticResource ColorAccentBlue}"/>
+    <SolidColorBrush x:Key="BrushAccentEmerald" Color="{DynamicResource ColorSuccess}"/>
+    <SolidColorBrush x:Key="BrushAccentEmeraldLight" Color="{DynamicResource ColorSuccess}"/>
+    <SolidColorBrush x:Key="BrushAccentAmber" Color="{DynamicResource ColorWarning}"/>
+    <SolidColorBrush x:Key="BrushAccentRed" Color="{DynamicResource ColorDanger}"/>
+    <SolidColorBrush x:Key="BrushAccentBlue" Color="{DynamicResource ColorInfo}"/>
 
-    <!-- Compatibility Accent Aliases -->
-    <Color x:Key="ColorAccentViolet">#262C36</Color>
-    <Color x:Key="ColorAccentVioletLight">#58A6FF</Color>
-    <SolidColorBrush x:Key="BrushAccentViolet" Color="#262C36"/>
-    <SolidColorBrush x:Key="BrushAccentVioletLight" Color="#58A6FF"/>
-
-    <!-- Hairline Border Brushes -->
-    <SolidColorBrush x:Key="BrushHairlineViolet" Color="#262C36"/> <!-- Alias mapped to clean dark slate -->
-    <SolidColorBrush x:Key="BrushHairlineDark" Color="{StaticResource ColorHairlineDark}"/>
-    <SolidColorBrush x:Key="BrushHairlineActive" Color="{StaticResource ColorHairlineActive}"/>
-    <SolidColorBrush x:Key="BrushHairlineSubtle" Color="{StaticResource ColorHairlineSubtle}"/>
-    <SolidColorBrush x:Key="BrushHairlineEmerald" Color="{StaticResource ColorHairlineEmerald}"/>
+    <!-- Hairline Borders -->
+    <SolidColorBrush x:Key="BrushHairlineViolet" Color="{DynamicResource ColorBorderSubtle}"/>
+    <SolidColorBrush x:Key="BrushHairlineDark" Color="{DynamicResource ColorBorderStrong}"/>
+    <SolidColorBrush x:Key="BrushHairlineActive" Color="{DynamicResource ColorBrand}"/>
+    <SolidColorBrush x:Key="BrushHairlineSubtle" Color="{DynamicResource ColorBorderSubtle}"/>
+    <SolidColorBrush x:Key="BrushHairlineEmerald" Color="{DynamicResource ColorSuccessBorder}"/>
 
     <!-- High-Contrast Readable Text Brushes -->
-    <SolidColorBrush x:Key="BrushTextWhite" Color="#FFFFFF"/>
-    <SolidColorBrush x:Key="BrushTextVioletLight" Color="#E1E4E8"/> <!-- Alias mapped to high contrast light gray -->
-    <SolidColorBrush x:Key="BrushTextVioletMuted" Color="#C9D1D9"/> <!-- Alias mapped to crisp off-white/gray -->
-    <SolidColorBrush x:Key="BrushTextVioletSubdued" Color="#8B949E"/> <!-- Alias mapped to neutral gray -->
-    <SolidColorBrush x:Key="BrushTextEmerald" Color="#3FB950"/>
-    <SolidColorBrush x:Key="BrushTextAmber" Color="#D29922"/>
-    <SolidColorBrush x:Key="BrushTextRed" Color="#F85149"/>
+    <SolidColorBrush x:Key="BrushTextWhite" Color="{DynamicResource ColorTextPrimary}"/>
+    <SolidColorBrush x:Key="BrushTextVioletLight" Color="{DynamicResource ColorTextSecondary}"/>
+    <SolidColorBrush x:Key="BrushTextVioletMuted" Color="{DynamicResource ColorTextMuted}"/>
+    <SolidColorBrush x:Key="BrushTextVioletSubdued" Color="{DynamicResource ColorTextMuted}"/>
+    <SolidColorBrush x:Key="BrushTextEmerald" Color="{DynamicResource ColorSuccess}"/>
+    <SolidColorBrush x:Key="BrushTextAmber" Color="{DynamicResource ColorWarning}"/>
+    <SolidColorBrush x:Key="BrushTextRed" Color="{DynamicResource ColorDanger}"/>
 
-    <!-- Neutral Dark Gradient Backgrounds -->
+    <!-- Gradient Backgrounds -->
     <RadialGradientBrush x:Key="BrushObsidianRadial" Center="0.5,0.0" GradientOrigin="0.5,0.0" RadiusX="0.9" RadiusY="0.9">
-        <GradientStop Color="{StaticResource ColorObsidianTop}" Offset="0.0"/>
-        <GradientStop Color="{StaticResource ColorObsidianMid}" Offset="0.5"/>
-        <GradientStop Color="{StaticResource ColorObsidianVoid}" Offset="1.0"/>
+        <GradientStop Color="{DynamicResource ColorBgPanel}" Offset="0.0"/>
+        <GradientStop Color="{DynamicResource ColorBgCard}" Offset="0.5"/>
+        <GradientStop Color="{DynamicResource ColorBgApp}" Offset="1.0"/>
     </RadialGradientBrush>
 
     <LinearGradientBrush x:Key="BrushCardVioletGlass" StartPoint="0,0" EndPoint="0,1">
-        <GradientStop Color="#181C24" Offset="0.0"/>
-        <GradientStop Color="#12151C" Offset="1.0"/>
+        <GradientStop Color="{DynamicResource ColorBgCard}" Offset="0.0"/>
+        <GradientStop Color="{DynamicResource ColorBgPanel}" Offset="1.0"/>
     </LinearGradientBrush>
 
     <LinearGradientBrush x:Key="BrushActiveCardViolet" StartPoint="0,0" EndPoint="0,1">
-        <GradientStop Color="#242A35" Offset="0.0"/>
-        <GradientStop Color="#1C2129" Offset="1.0"/>
+        <GradientStop Color="{DynamicResource ColorBgHover}" Offset="0.0"/>
+        <GradientStop Color="{DynamicResource ColorBgCard}" Offset="1.0"/>
     </LinearGradientBrush>
 
     <LinearGradientBrush x:Key="BrushTopBarGradient" StartPoint="0,0" EndPoint="1,0">
-        <GradientStop Color="#13161D" Offset="0.0"/>
-        <GradientStop Color="#181D26" Offset="1.0"/>
+        <GradientStop Color="{DynamicResource ColorBgPanel}" Offset="0.0"/>
+        <GradientStop Color="{DynamicResource ColorBgCard}" Offset="1.0"/>
     </LinearGradientBrush>
 
     <LinearGradientBrush x:Key="BrushPrimaryGlowButton" StartPoint="0,0" EndPoint="1,0">
-        <GradientStop Color="#21262D" Offset="0.0"/>
-        <GradientStop Color="#30363D" Offset="1.0"/>
+        <GradientStop Color="{DynamicResource ColorBrandSolid}" Offset="0.0"/>
+        <GradientStop Color="{DynamicResource ColorBrand}" Offset="1.0"/>
     </LinearGradientBrush>
 
     <LinearGradientBrush x:Key="BrushPassQcButton" StartPoint="0,0" EndPoint="1,0">
-        <GradientStop Color="#2EA043" Offset="0.0"/>
-        <GradientStop Color="#238636" Offset="1.0"/>
+        <GradientStop Color="{DynamicResource ColorSuccessSolid}" Offset="0.0"/>
+        <GradientStop Color="{DynamicResource ColorSuccess}" Offset="1.0"/>
     </LinearGradientBrush>
 
 </ResourceDictionary>

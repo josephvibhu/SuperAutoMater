@@ -2,6 +2,7 @@
 using System;
 using System.IO;
 using System.Windows;
+using VeloxHub.Services;
 
 namespace VeloxHub;
 
@@ -20,6 +21,12 @@ public partial class App : Application
             MessageBox.Show($"Velox Hub encountered an issue:\n\n{args.Exception?.Message}\n\nDetails saved to %localappdata%\\Velox\\hub_crash.log", "Velox Hub Error", MessageBoxButton.OK, MessageBoxImage.Error);
             args.Handled = true;
         };
+
+        try
+        {
+            ThemeService.Instance.Initialize("Dark");
+        }
+        catch { }
 
         base.OnStartup(e);
     }

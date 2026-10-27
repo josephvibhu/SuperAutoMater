@@ -79,6 +79,7 @@ namespace SuperAutoMater.Wpf.Services
     {
         public bool AllPassed => Subsystems.All(s => s.Status == ExpressTestStatus.Passed);
         public int PassedCount => Subsystems.Count(s => s.Status == ExpressTestStatus.Passed);
+        public int FailedCount => Subsystems.Count(s => s.Status == ExpressTestStatus.Failed);
         public int TotalCount => Subsystems.Count;
         public string CalculatedGrade { get; set; } = "GRADE A+";
         public string SummaryText { get; set; } = "";
@@ -542,6 +543,19 @@ namespace SuperAutoMater.Wpf.Services
                 // ==============================================================
                 CalculateSmartGrade(report);
                 ReportProgress(100, $"Express QC Complete: {report.PassedCount}/{report.TotalCount} Certified Nominal · {report.CalculatedGrade}");
+
+                try
+                {
+                    if (report.FailedCount == 0)
+                    {
+                        AudioFeedbackService.Instance.PlayPassChime();
+                    }
+                    else
+                    {
+                        AudioFeedbackService.Instance.PlayFailChime();
+                    }
+                }
+                catch { }
 
                 try
                 {

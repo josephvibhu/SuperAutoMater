@@ -1,4 +1,4 @@
-<Window x:Class="SuperAutoMater.Wpf.Views.OverrideModalDialog"
+﻿<Window x:Class="SuperAutoMater.Wpf.Views.OverrideModalDialog"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         Title="Diagnostic Test Manual Override Audit"

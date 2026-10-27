@@ -11,7 +11,8 @@
 		<Version>1.6.10</Version>
 		<AssemblyVersion>1.6.10.0</AssemblyVersion>
 		<FileVersion>1.6.10.0</FileVersion>
-		<NoWarn>NU1701;WFO1000;NU1903</NoWarn>
+		<ApplicationIcon>app.ico</ApplicationIcon>
+		<NoWarn>NU1701;WFO1000;NU1903;CS8632</NoWarn>
 
 		<!-- Standalone single EXE publish settings -->
 		<PublishSingleFile>true</PublishSingleFile>
@@ -22,6 +23,10 @@
 		<Optimize>true</Optimize>
 		<IncludeNativeLibrariesForSelfExtract>true</IncludeNativeLibrariesForSelfExtract>
 	</PropertyGroup>
+
+	<ItemGroup>
+		<Resource Include="app.ico" />
+	</ItemGroup>
 
 	<ItemGroup>
 		<ProjectReference Include="..\Velox.Shared\Velox.Shared.csproj" />

@@ -38,6 +38,8 @@ public class HubAppItem : INotifyPropertyChanged
     public string LocalVersion { get; set; } = "1.6.10";
     public string RequiredPlanTier { get; set; } = "All Plans";
     public string ActionType { get; set; } = "EXE"; // EXE, WEB
+    public string AppLetter { get; set; } = "V";
+    public string AccentColorHex { get; set; } = "#9279FF";
 
     public bool IsEntitled
     {
@@ -109,6 +111,7 @@ public class HubConfig
     public string ApiUrl { get; set; } = "http://13.206.106.146";
     public string LicenseKey { get; set; } = "";
     public string MachineGuid { get; set; } = "";
+    public string Theme { get; set; } = "Dark";
 }
 
 public class HubService : INotifyPropertyChanged
@@ -193,7 +196,9 @@ public class HubService : INotifyPropertyChanged
             Category = "Core Testing",
             LocalVersion = "v1.6.10",
             RequiredPlanTier = "All Plans",
-            ActionType = "EXE"
+            ActionType = "EXE",
+            AppLetter = "B",
+            AccentColorHex = "#19B5D8"
         });
 
         // 2. VeloxManager
@@ -207,7 +212,9 @@ public class HubService : INotifyPropertyChanged
             Category = "Fleet Telemetry",
             LocalVersion = "v1.0.2",
             RequiredPlanTier = "Starter / Pro / Enterprise",
-            ActionType = "EXE"
+            ActionType = "EXE",
+            AppLetter = "M",
+            AccentColorHex = "#8B6CFF"
         });
 
         // 3. Velox Link Mobile Gateway
@@ -221,7 +228,9 @@ public class HubService : INotifyPropertyChanged
             Category = "Mobile Companion",
             LocalVersion = "Web Companion",
             RequiredPlanTier = "Starter / Pro / Enterprise",
-            ActionType = "WEB"
+            ActionType = "WEB",
+            AppLetter = "L",
+            AccentColorHex = "#4F7CFF"
         });
 
         RefreshInstalledStates();

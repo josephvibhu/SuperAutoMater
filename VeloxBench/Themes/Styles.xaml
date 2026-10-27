@@ -262,6 +262,64 @@
         </Setter>
     </Style>
 
+    <!-- Ghost Button (Transparent, hover background, text secondary) -->
+    <Style x:Key="StyleGhostButton" TargetType="Button">
+        <Setter Property="Cursor" Value="Hand"/>
+        <Setter Property="FocusVisualStyle" Value="{x:Null}"/>
+        <Setter Property="Foreground" Value="{DynamicResource TokenTextSecondaryBrush}"/>
+        <Setter Property="FontFamily" Value="{StaticResource FontSans}"/>
+        <Setter Property="FontSize" Value="12"/>
+        <Setter Property="FontWeight" Value="SemiBold"/>
+        <Setter Property="Height" Value="32"/>
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="Button">
+                    <Border x:Name="border"
+                            Background="Transparent"
+                            BorderBrush="Transparent"
+                            BorderThickness="1"
+                            CornerRadius="6"
+                            Padding="8,4">
+                        <ContentPresenter x:Name="cp" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                    </Border>
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="IsMouseOver" Value="True">
+                            <Setter TargetName="border" Property="Background" Value="{DynamicResource TokenBgHoverBrush}"/>
+                            <Setter TargetName="border" Property="BorderBrush" Value="{DynamicResource TokenBorderSubtleBrush}"/>
+                            <Setter Property="Foreground" Value="{DynamicResource TokenTextPrimaryBrush}"/>
+                        </Trigger>
+                        <Trigger Property="IsPressed" Value="True">
+                            <Setter TargetName="border" Property="Background" Value="{DynamicResource TokenBgInsetBrush}"/>
+                        </Trigger>
+                        <Trigger Property="IsEnabled" Value="False">
+                            <Setter Property="Opacity" Value="0.45"/>
+                        </Trigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <!-- Status Chip Pill -->
+    <Style x:Key="StyleChipPill" TargetType="Border">
+        <Setter Property="CornerRadius" Value="11"/>
+        <Setter Property="Height" Value="22"/>
+        <Setter Property="Padding" Value="8,2"/>
+        <Setter Property="BorderThickness" Value="1"/>
+        <Setter Property="Background" Value="{DynamicResource TokenBgHoverBrush}"/>
+        <Setter Property="BorderBrush" Value="{DynamicResource TokenBorderStrongBrush}"/>
+    </Style>
+
+    <!-- Keyboard Keycap Pill -->
+    <Style x:Key="StyleKeycap" TargetType="Border">
+        <Setter Property="CornerRadius" Value="4"/>
+        <Setter Property="BorderThickness" Value="1,1,1,2"/>
+        <Setter Property="Background" Value="{DynamicResource TokenBgInsetBrush}"/>
+        <Setter Property="BorderBrush" Value="{DynamicResource TokenBorderStrongBrush}"/>
+        <Setter Property="Padding" Value="5,1"/>
+        <Setter Property="VerticalAlignment" Value="Center"/>
+    </Style>
+
     <!-- Modern Dark ComboBox ToggleButton Template -->
     <ControlTemplate x:Key="DarkComboBoxToggleButton" TargetType="{x:Type ToggleButton}">
         <Grid>

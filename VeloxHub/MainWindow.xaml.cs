@@ -29,13 +29,21 @@ public partial class MainWindow : Window
 
     private async void MainWindow_Loaded(object sender, RoutedEventArgs e)
     {
+        ThemeService.Instance.Initialize(_hubService.Config.Theme);
+        UpdateThemeButtonText();
+        ThemeService.Instance.ThemeChanged += (_, _) =>
+        {
+            UpdateThemeButtonText();
+            ApplyFilter(_currentFilter);
+        };
+
         ApplyFilter("All");
 
         if (string.IsNullOrWhiteSpace(_hubService.Config.LicenseKey))
         {
             // First time launch: prompt user to activate depot key
             TxtLicensePill.Text = "Activation Required";
-            PillDot.Fill = new SolidColorBrush(Color.FromRgb(245, 158, 11)); // Amber
+            PillDot.Fill = (Brush)FindResource("TokenWarningBrush");
             TxtStatusBanner.Text = "Welcome to Velox Hub. Please enter your organization license key to unlock your suite.";
 
             ShowLicenseModal(isFirstTime: true);
@@ -43,6 +51,36 @@ public partial class MainWindow : Window
         else
         {
             await RefreshLicenseStatusAsync();
+        }
+    }
+
+    private void BtnThemeToggle_Click(object sender, RoutedEventArgs e)
+    {
+        var current = ThemeService.Instance.CurrentMode;
+        var next = current switch
+        {
+            AppThemeMode.Dark => AppThemeMode.Light,
+            AppThemeMode.Light => AppThemeMode.System,
+            _ => AppThemeMode.Dark
+        };
+
+        ThemeService.Instance.SetTheme(next);
+        _hubService.Config.Theme = next.ToString();
+        _hubService.SaveConfig();
+        UpdateThemeButtonText();
+        ApplyFilter(_currentFilter);
+    }
+
+    private void UpdateThemeButtonText()
+    {
+        if (BtnThemeToggle != null)
+        {
+            BtnThemeToggle.Content = ThemeService.Instance.CurrentMode switch
+            {
+                AppThemeMode.Dark => "🌙 Dark",
+                AppThemeMode.Light => "☀️ Light",
+                _ => "💻 System"
+            };
         }
     }
 
@@ -55,13 +93,13 @@ public partial class MainWindow : Window
         {
             var lic = _hubService.CurrentLicense;
             TxtLicensePill.Text = $"{lic.CompanyName} • {lic.PlanTier} Plan";
-            PillDot.Fill = new SolidColorBrush(Color.FromRgb(16, 185, 129)); // Green
+            PillDot.Fill = (Brush)FindResource("TokenSuccessBrush");
             TxtStatusBanner.Text = $"Active Depot License • {lic.DaysRemaining} days remaining • {lic.DevicesUsedMonth}/{lic.MaxDevicesMonth} units tested";
         }
         else
         {
             TxtLicensePill.Text = "No Active License";
-            PillDot.Fill = new SolidColorBrush(Color.FromRgb(239, 68, 68)); // Red
+            PillDot.Fill = (Brush)FindResource("TokenDangerBrush");
             TxtStatusBanner.Text = _hubService.StatusBanner ?? "License inactive. Please click 'Change Key' to enter credentials.";
         }
 
@@ -84,22 +122,27 @@ public partial class MainWindow : Window
             _displayedApps.Add(app);
         }
 
-        // Update button visual styles
+        // Update button visual styles using theme tokens
         if (BtnNavAll != null && BtnNavInstalled != null)
         {
+            var activeBg = (Brush)FindResource("TokenBgHoverBrush");
+            var activeFg = (Brush)FindResource("TokenTextPrimaryBrush");
+            var inactiveBg = Brushes.Transparent;
+            var inactiveFg = (Brush)FindResource("TokenTextSecondaryBrush");
+
             if (filter == "Installed")
             {
-                BtnNavInstalled.Background = new SolidColorBrush(Color.FromRgb(20, 31, 54));
-                BtnNavInstalled.Foreground = new SolidColorBrush(Colors.White);
-                BtnNavAll.Background = Brushes.Transparent;
-                BtnNavAll.Foreground = new SolidColorBrush(Color.FromRgb(148, 163, 184));
+                BtnNavInstalled.Background = activeBg;
+                BtnNavInstalled.Foreground = activeFg;
+                BtnNavAll.Background = inactiveBg;
+                BtnNavAll.Foreground = inactiveFg;
             }
             else
             {
-                BtnNavAll.Background = new SolidColorBrush(Color.FromRgb(20, 31, 54));
-                BtnNavAll.Foreground = new SolidColorBrush(Colors.White);
-                BtnNavInstalled.Background = Brushes.Transparent;
-                BtnNavInstalled.Foreground = new SolidColorBrush(Color.FromRgb(148, 163, 184));
+                BtnNavAll.Background = activeBg;
+                BtnNavAll.Foreground = activeFg;
+                BtnNavInstalled.Background = inactiveBg;
+                BtnNavInstalled.Foreground = inactiveFg;
             }
         }
     }
@@ -185,7 +228,6 @@ public partial class MainWindow : Window
 
     private async void BtnModalActivate_Click(object sender, RoutedEventArgs e)
     {
-        // If already in success mode, button acts as Done
         if (BtnModalActivate.Content?.ToString() == "Done")
         {
             LicenseModal.Visibility = Visibility.Collapsed;
@@ -195,12 +237,12 @@ public partial class MainWindow : Window
         var key = TxtModalKeyInput.Text?.Trim();
         if (string.IsNullOrWhiteSpace(key))
         {
-            TxtModalStatus.Foreground = new SolidColorBrush(Color.FromRgb(239, 68, 68));
+            TxtModalStatus.Foreground = (Brush)FindResource("TokenDangerBrush");
             TxtModalStatus.Text = "Please enter an organization license key.";
             return;
         }
 
-        TxtModalStatus.Foreground = new SolidColorBrush(Color.FromRgb(245, 158, 11));
+        TxtModalStatus.Foreground = (Brush)FindResource("TokenWarningBrush");
         TxtModalStatus.Text = "Connecting to Velox Cloud licensing cluster...";
         BtnModalActivate.IsEnabled = false;
 
@@ -224,7 +266,7 @@ public partial class MainWindow : Window
         }
         else
         {
-            TxtModalStatus.Foreground = new SolidColorBrush(Color.FromRgb(239, 68, 68));
+            TxtModalStatus.Foreground = (Brush)FindResource("TokenDangerBrush");
             TxtModalStatus.Text = _hubService.StatusBanner ?? "License validation failed. Check the key format or active subscription.";
             BtnModalActivate.IsEnabled = true;
         }

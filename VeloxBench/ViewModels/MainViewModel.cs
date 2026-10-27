@@ -179,10 +179,26 @@ namespace SuperAutoMater.Wpf.ViewModels
             {
                 if (_hw.SystemIdentity != null) _hw.SystemIdentity.Grade = value;
                 OnPropertyChanged();
+                OnPropertyChanged(nameof(GradeAccentHex));
+                OnPropertyChanged(nameof(CanPassQc));
+                OnPropertyChanged(nameof(PassQcLockHint));
+                OnPropertyChanged(nameof(IsQcCompleted));
+                OnPropertyChanged(nameof(QcVerdictTitle));
+                OnPropertyChanged(nameof(QcVerdictSubtitle));
+                OnPropertyChanged(nameof(IsQcPassedVerdict));
                 OnPropertyChanged(nameof(RefurbReportPreviewText));
                 OnPropertyChanged(nameof(ECommerceListingText));
             }
         }
+
+        public string GradeAccentHex => Grade switch
+        {
+            "A+" => ThemeService.Instance.IsDarkActive ? "#3DD68C" : "#12805C",
+            "A" => ThemeService.Instance.IsDarkActive ? "#5FD3B0" : "#2C9C7E",
+            "B" => ThemeService.Instance.IsDarkActive ? "#F5B94A" : "#D98A00",
+            "C" => ThemeService.Instance.IsDarkActive ? "#FF9A4D" : "#D9631A",
+            _ => ThemeService.Instance.IsDarkActive ? "#8A92A3" : "#6B7385"
+        };
 
         private string _supplier = "";
         public string Supplier
@@ -814,12 +830,94 @@ namespace SuperAutoMater.Wpf.ViewModels
                 _passCount = value;
                 OnPropertyChanged();
                 OnPropertyChanged(nameof(PipelineStatusText));
+                OnPropertyChanged(nameof(CanPassQc));
+                OnPropertyChanged(nameof(PassQcLockHint));
+                OnPropertyChanged(nameof(IsQcCompleted));
+                OnPropertyChanged(nameof(QcVerdictTitle));
+                OnPropertyChanged(nameof(QcVerdictSubtitle));
+                OnPropertyChanged(nameof(IsQcPassedVerdict));
                 OnPropertyChanged(nameof(RefurbReportPreviewText));
                 OnPropertyChanged(nameof(ECommerceListingText));
             }
         }
         public int RequiredTestCount => TestPipeline.Count(t => t.IsApplicable);
         public string PipelineStatusText => $"{_passCount}/{(RequiredTestCount > 0 ? RequiredTestCount : 9)} PASSED";
+
+        // One-Glance High-Contrast Verdict Properties
+        public bool HasFailures => TestPipeline.Any(t => t.Status == "FAILED");
+        public bool IsQcCompleted => (PassCount >= (RequiredTestCount > 0 ? RequiredTestCount : 9) || HasFailures) && !string.IsNullOrWhiteSpace(Grade) && Grade != "GRADE PENDING";
+        public bool IsQcPassedVerdict => IsQcCompleted && !HasFailures;
+
+        public string QcVerdictTitle => IsQcPassedVerdict ? "✓ QC AUDIT CERTIFIED — READY FOR RETAIL" : (HasFailures ? "⚠ QC DEFECTS DETECTED — REWORK REQUIRED" : "DIAGNOSTIC WORKBENCH ONLINE");
+        public string QcVerdictSubtitle => IsQcPassedVerdict 
+            ? $"All {PassCount} required subsystems certified nominal · {Model} ({Serial}) · Assigned {Grade}" 
+            : (HasFailures ? $"Subsystem test failed · Re-test or override required prior to packaging sign-off" : "Click any test on the left sideline or press [F1]-[F7] to run inspection");
+
+        public bool CanPassQc => PassCount >= (RequiredTestCount > 0 ? RequiredTestCount : 9) && !HasFailures && !string.IsNullOrWhiteSpace(Grade) && Grade != "GRADE PENDING";
+
+        public string PassQcLockHint => CanPassQc 
+            ? "All required tests passed & grade assigned · Ready to certify" 
+            : (HasFailures 
+                ? "Locked: Resolve or override failed tests" 
+                : (string.IsNullOrWhiteSpace(Grade) || Grade == "GRADE PENDING" 
+                    ? "Locked: Assign cosmetic grade first" 
+                    : $"Locked: {PassCount}/{(RequiredTestCount > 0 ? RequiredTestCount : 9)} tests certified"));
+
+        // Fleet Mesh Token Masking (Security & UX Handoff Compliance)
+        private string _fleetMeshToken = "vx-mesh-4f9a8820c7d4";
+        private bool _isFleetTokenRevealed = false;
+        private System.Windows.Threading.DispatcherTimer? _fleetTokenMaskTimer;
+
+        public string FleetMeshToken
+        {
+            get => _fleetMeshToken;
+            set
+            {
+                _fleetMeshToken = value;
+                OnPropertyChanged();
+                OnPropertyChanged(nameof(FleetTokenDisplayText));
+            }
+        }
+
+        public bool IsFleetTokenRevealed
+        {
+            get => _isFleetTokenRevealed;
+            set
+            {
+                _isFleetTokenRevealed = value;
+                OnPropertyChanged();
+                OnPropertyChanged(nameof(FleetTokenDisplayText));
+                OnPropertyChanged(nameof(FleetTokenRevealButtonText));
+            }
+        }
+
+        public string FleetTokenDisplayText => _isFleetTokenRevealed ? _fleetMeshToken : "••••••••••••••••";
+        public string FleetTokenRevealButtonText => _isFleetTokenRevealed ? "Hide" : "Reveal";
+
+        public void RevealFleetTokenTemporary(int seconds = 10)
+        {
+            IsFleetTokenRevealed = true;
+            _fleetTokenMaskTimer?.Stop();
+            _fleetTokenMaskTimer = new System.Windows.Threading.DispatcherTimer
+            {
+                Interval = TimeSpan.FromSeconds(seconds)
+            };
+            _fleetTokenMaskTimer.Tick += (s, e) =>
+            {
+                _fleetTokenMaskTimer.Stop();
+                IsFleetTokenRevealed = false;
+            };
+            _fleetTokenMaskTimer.Start();
+        }
+
+        public void CopyFleetTokenToClipboard()
+        {
+            try
+            {
+                System.Windows.Clipboard.SetText(_fleetMeshToken);
+            }
+            catch { }
+        }
 
         public int BatteryVoltageMv => _hw.BatteryTelemetry?.VoltageMv ?? 12300;
         public int CpuTempC => _hw.CpuTelemetry?.TemperatureC ?? 40;
@@ -1213,6 +1311,12 @@ namespace SuperAutoMater.Wpf.ViewModels
 
                         try
                         {
+                            AudioFeedbackService.Instance.PlayPassChime();
+                        }
+                        catch { }
+
+                        try
+                        {
                             QcRunOrchestrator.Instance.RecordTestPassed(test.Key, test.Title, isAutomated: true);
                         }
                         catch (Exception ex)
@@ -1235,6 +1339,12 @@ namespace SuperAutoMater.Wpf.ViewModels
                     test.IsActive = false;
                     test.Status = "FAILED";
                     test.StatusBadge = "✗";
+
+                    try
+                    {
+                        AudioFeedbackService.Instance.PlayFailChime();
+                    }
+                    catch { }
 
                     try
                     {
@@ -1264,6 +1374,13 @@ namespace SuperAutoMater.Wpf.ViewModels
                         test.Status = "OVERRIDDEN";
                         test.StatusBadge = "⚠";
                         PassCount++;
+
+                        try
+                        {
+                            AudioFeedbackService.Instance.PlayWarningChime();
+                        }
+                        catch { }
+
                         return true;
                     }
                     return false;

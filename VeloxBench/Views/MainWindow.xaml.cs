@@ -96,6 +96,9 @@ namespace SuperAutoMater.Wpf.Views
         {
             WindowState = WindowState.Maximized;
 
+            // Initialize active theme toggle button icon
+            UpdateThemeIcon(ThemeService.Instance.CurrentMode);
+
             // 0. Wire Alpha License & Auto-Update status indicators
             VeloxBench.Services.LicenseService.Instance.LicenseStatusChanged += UpdateLicenseUi;
             VeloxBench.Services.AutoUpdateService.Instance.UpdateStatusChanged += (msg) =>
@@ -1618,11 +1621,86 @@ namespace SuperAutoMater.Wpf.Views
 
         private void BtnSetGrade_Click(object sender, RoutedEventArgs e)
         {
-            if (sender is Button btn && ViewModel != null && btn.Content is string grade)
+            if (sender is Button btn && ViewModel != null)
             {
-                ViewModel.Grade = $"GRADE {grade.Trim()}";
-                ShowFeedback($"Cosmetic Recondition Grade set to {ViewModel.Grade} ✓", "🏷", "#58A6FF");
+                string grade = btn.Tag as string ?? btn.Content as string ?? "";
+                if (!string.IsNullOrWhiteSpace(grade))
+                {
+                    ViewModel.Grade = $"GRADE {grade.Trim()}";
+                    try { AudioFeedbackService.Instance.PlayPassChime(); } catch { }
+                    ShowFeedback($"Cosmetic Recondition Grade set to {ViewModel.Grade} ✓", "🏷", "#3DD68C");
+                }
             }
+        }
+
+        private void BtnStatusPopover_Click(object sender, RoutedEventArgs e)
+        {
+            PopupStatusFlyout.IsOpen = !PopupStatusFlyout.IsOpen;
+        }
+
+        private void BtnThemeToggle_Click(object sender, RoutedEventArgs e)
+        {
+            var cur = ThemeService.Instance.CurrentMode;
+            var next = cur switch
+            {
+                AppThemeMode.Dark => AppThemeMode.Light,
+                AppThemeMode.Light => AppThemeMode.System,
+                _ => AppThemeMode.Dark
+            };
+            ThemeService.Instance.SetTheme(next);
+            UpdateThemeIcon(next);
+            ShowFeedback($"Theme Mode: {next} ✓", next == AppThemeMode.Dark ? "🌙" : (next == AppThemeMode.Light ? "☀️" : "💻"), "#19B5D8");
+        }
+
+        private void BtnThemeSelect_Dark(object sender, RoutedEventArgs e)
+        {
+            ThemeService.Instance.SetTheme(AppThemeMode.Dark);
+            UpdateThemeIcon(AppThemeMode.Dark);
+            PopupStatusFlyout.IsOpen = false;
+            ShowFeedback("Theme switched to Dark Graphite ✓", "🌙", "#9279FF");
+        }
+
+        private void BtnThemeSelect_Light(object sender, RoutedEventArgs e)
+        {
+            ThemeService.Instance.SetTheme(AppThemeMode.Light);
+            UpdateThemeIcon(AppThemeMode.Light);
+            PopupStatusFlyout.IsOpen = false;
+            ShowFeedback("Theme switched to Crisp Light Studio ✓", "☀️", "#5B3FE0");
+        }
+
+        private void BtnThemeSelect_System(object sender, RoutedEventArgs e)
+        {
+            ThemeService.Instance.SetTheme(AppThemeMode.System);
+            UpdateThemeIcon(AppThemeMode.System);
+            PopupStatusFlyout.IsOpen = false;
+            ShowFeedback("Theme switched to Windows System Sync ✓", "💻", "#19B5D8");
+        }
+
+        private void UpdateThemeIcon(AppThemeMode mode)
+        {
+            TxtThemeQuickIcon.Text = mode switch
+            {
+                AppThemeMode.Dark => "🌙",
+                AppThemeMode.Light => "☀️",
+                _ => "💻"
+            };
+        }
+
+        private void BtnRevealFleetToken_Click(object sender, RoutedEventArgs e)
+        {
+            ViewModel?.RevealFleetTokenTemporary(10);
+            ShowFeedback("Fleet Token Revealed for 10s 👁", "🔑", "#19B5D8");
+        }
+
+        private void BtnCopyFleetToken_Click(object sender, RoutedEventArgs e)
+        {
+            ViewModel?.CopyFleetTokenToClipboard();
+            ShowFeedback("Fleet Token Copied to Clipboard ✓", "📋", "#3DD68C");
+        }
+
+        private void BtnPassQcAndSync_Click(object sender, RoutedEventArgs e)
+        {
+            BtnOpenSyncMenu_Click(sender, e);
         }
 
         private void GpuSelectorPill_Click(object sender, RoutedEventArgs e)

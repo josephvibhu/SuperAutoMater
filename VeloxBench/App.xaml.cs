@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.IO;
 using System.Linq;
 using System.Windows;
@@ -31,6 +31,12 @@ namespace SuperAutoMater.Wpf
 
             DispatcherUnhandledException += App_DispatcherUnhandledException;
             AppDomain.CurrentDomain.UnhandledException += CurrentDomain_UnhandledException;
+
+            try
+            {
+                VeloxBench.Services.ThemeService.Instance.Initialize();
+            }
+            catch { }
 
             AppLogger.Info("Lifecycle", $"VeloxBench v1.6.10 starting on {Environment.MachineName} ({Environment.OSVersion}) [Elevated: {Environment.IsPrivilegedProcess}].");
 

@@ -1,4 +1,4 @@
-<Window x:Class="SuperAutoMater.Wpf.Views.FleetDashboardWindow"
+﻿<Window x:Class="SuperAutoMater.Wpf.Views.FleetDashboardWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         Title="SuperAutoMater — Warehouse Fleet LAN HUD &amp; Mobile Matrix"

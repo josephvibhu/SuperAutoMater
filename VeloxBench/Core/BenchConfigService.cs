@@ -15,6 +15,7 @@ public sealed class BenchConfig
     public int ManagerLanPort { get; set; } = 9000;
     public string UpdateChannel { get; set; } = "alpha";
     public bool AutoUpdateEnabled { get; set; } = true;
+    public string Theme { get; set; } = "dark";
 }
 
 public static class BenchConfigService

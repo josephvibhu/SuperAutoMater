@@ -3,17 +3,27 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              StartupUri="MainWindow.xaml">
     <Application.Resources>
-        <!-- Global Theme Colors -->
-        <SolidColorBrush x:Key="BgDark" Color="#070a12"/>
-        <SolidColorBrush x:Key="BgCard" Color="#0e1526"/>
-        <SolidColorBrush x:Key="BgCardHover" Color="#152038"/>
-        <SolidColorBrush x:Key="BorderBrushColor" Color="#1e293b"/>
-        <SolidColorBrush x:Key="PrimaryBlue" Color="#2563eb"/>
-        <SolidColorBrush x:Key="PrimaryBlueLight" Color="#3b82f6"/>
-        <SolidColorBrush x:Key="TextMain" Color="#f8fafc"/>
-        <SolidColorBrush x:Key="TextMuted" Color="#94a3b8"/>
-        <SolidColorBrush x:Key="SuccessGreen" Color="#10b981"/>
-        <SolidColorBrush x:Key="WarningAmber" Color="#f59e0b"/>
-        <SolidColorBrush x:Key="DangerRed" Color="#ef4444"/>
+        <ResourceDictionary>
+            <ResourceDictionary.MergedDictionaries>
+                <ResourceDictionary Source="Themes/TokensDark.xaml"/>
+            </ResourceDictionary.MergedDictionaries>
+
+            <!-- Typography & Font Families -->
+            <FontFamily x:Key="FontUi">Source Sans 3, Segoe UI, Inter, sans-serif</FontFamily>
+            <FontFamily x:Key="FontMono">JetBrains Mono, Consolas, Courier New, monospace</FontFamily>
+
+            <!-- Semantic Token Aliases for Backward Compatibility -->
+            <SolidColorBrush x:Key="BgDark" Color="{DynamicResource ColorBgApp}"/>
+            <SolidColorBrush x:Key="BgCard" Color="{DynamicResource ColorBgCard}"/>
+            <SolidColorBrush x:Key="BgCardHover" Color="{DynamicResource ColorBgHover}"/>
+            <SolidColorBrush x:Key="BorderBrushColor" Color="{DynamicResource ColorBorderSubtle}"/>
+            <SolidColorBrush x:Key="PrimaryBlue" Color="{DynamicResource ColorBrandSolid}"/>
+            <SolidColorBrush x:Key="PrimaryBlueLight" Color="{DynamicResource ColorBrand}"/>
+            <SolidColorBrush x:Key="TextMain" Color="{DynamicResource ColorTextPrimary}"/>
+            <SolidColorBrush x:Key="TextMuted" Color="{DynamicResource ColorTextMuted}"/>
+            <SolidColorBrush x:Key="SuccessGreen" Color="{DynamicResource ColorSuccess}"/>
+            <SolidColorBrush x:Key="WarningAmber" Color="{DynamicResource ColorWarning}"/>
+            <SolidColorBrush x:Key="DangerRed" Color="{DynamicResource ColorDanger}"/>
+        </ResourceDictionary>
     </Application.Resources>
 </Application>

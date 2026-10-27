@@ -1,4 +1,4 @@
-<Window x:Class="SuperAutoMater.Wpf.Views.AssetSyncDialog"
+﻿<Window x:Class="SuperAutoMater.Wpf.Views.AssetSyncDialog"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         Title="ITAM Asset Dispatch &amp; Velox Cloud Synchronization"
