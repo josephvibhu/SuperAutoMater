@@ -392,10 +392,10 @@
                         <StackPanel>
                             <Grid Margin="0,0,0,4">
                                 <TextBlock Text="IMAGE" FontSize="11.5" FontWeight="Bold" Foreground="{DynamicResource Text3Brush}" VerticalAlignment="Center" />
-                                <Button Content="Change" Style="{StaticResource GhostButton}" HorizontalAlignment="Right" />
+                                <Button Content="Change" Command="{Binding ChangeImageCommand}" Style="{StaticResource GhostButton}" HorizontalAlignment="Right" />
                             </Grid>
-                            <TextBlock Text="Windows 11 Pro 24H2 (x64)" FontSize="15" FontWeight="Bold" Foreground="{DynamicResource Text1Brush}" />
-                            <TextBlock Text="14.5 GB, streamed from local repository" FontSize="13" Foreground="{DynamicResource Text3Brush}" Margin="0,2,0,0" />
+                            <TextBlock Text="{Binding Config.SelectedImageName}" FontSize="15" FontWeight="Bold" Foreground="{DynamicResource Text1Brush}" TextTrimming="CharacterEllipsis" />
+                            <TextBlock Text="{Binding Config.SelectedImageDetails}" FontSize="13" Foreground="{DynamicResource Text3Brush}" Margin="0,2,0,0" TextTrimming="CharacterEllipsis" />
                         </StackPanel>
                     </Border>
 
@@ -461,8 +461,8 @@
                                     <TextBlock Text="✓" Foreground="#FFFFFF" FontSize="13" FontWeight="Bold" HorizontalAlignment="Center" VerticalAlignment="Center" />
                                 </Border>
                                 <StackPanel VerticalAlignment="Center">
-                                    <TextBlock Text="Probe" FontSize="13" FontWeight="Bold" Foreground="{DynamicResource Text1Brush}" />
-                                    <TextBlock Text="Done, 0:04" FontSize="12.5" Foreground="{DynamicResource Text3Brush}" />
+                                    <TextBlock Text="{Binding Steps[0].Name, FallbackValue='Probe'}" FontSize="13" FontWeight="Bold" Foreground="{DynamicResource Text1Brush}" />
+                                    <TextBlock Text="{Binding Steps[0].Status, FallbackValue='Done, 0:04'}" FontSize="12.5" Foreground="{DynamicResource Text3Brush}" />
                                 </StackPanel>
                             </StackPanel>
 
@@ -504,8 +504,8 @@
                                     <TextBlock Text="2" FontSize="13" FontWeight="Bold" Foreground="{DynamicResource Text3Brush}" HorizontalAlignment="Center" VerticalAlignment="Center" />
                                 </Border>
                                 <StackPanel VerticalAlignment="Center">
-                                    <TextBlock Text="Partition" FontSize="13" FontWeight="Bold" Foreground="{DynamicResource Text1Brush}" />
-                                    <TextBlock Text="Waiting" FontSize="12.5" Foreground="{DynamicResource Text3Brush}" />
+                                    <TextBlock Text="{Binding Steps[1].Name, FallbackValue='Partition'}" FontSize="13" FontWeight="Bold" Foreground="{DynamicResource Text1Brush}" />
+                                    <TextBlock Text="{Binding Steps[1].Status, FallbackValue='Waiting'}" FontSize="12.5" Foreground="{DynamicResource Text3Brush}" />
                                 </StackPanel>
                             </StackPanel>
 
@@ -543,8 +543,8 @@
                                     <TextBlock Text="3" FontSize="13" FontWeight="Bold" Foreground="{DynamicResource Text3Brush}" HorizontalAlignment="Center" VerticalAlignment="Center" />
                                 </Border>
                                 <StackPanel VerticalAlignment="Center">
-                                    <TextBlock Text="Stream" FontSize="13" FontWeight="Bold" Foreground="{DynamicResource Text1Brush}" />
-                                    <TextBlock Text="Waiting" FontSize="12.5" Foreground="{DynamicResource Text3Brush}" />
+                                    <TextBlock Text="{Binding Steps[2].Name, FallbackValue='Stream'}" FontSize="13" FontWeight="Bold" Foreground="{DynamicResource Text1Brush}" />
+                                    <TextBlock Text="{Binding Steps[2].Status, FallbackValue='Waiting'}" FontSize="12.5" Foreground="{DynamicResource Text3Brush}" />
                                 </StackPanel>
                             </StackPanel>
 
@@ -578,8 +578,8 @@
                                     <TextBlock Text="4" FontSize="13" FontWeight="Bold" Foreground="{DynamicResource Text3Brush}" HorizontalAlignment="Center" VerticalAlignment="Center" />
                                 </Border>
                                 <StackPanel VerticalAlignment="Center">
-                                    <TextBlock Text="Drivers" FontSize="13" FontWeight="Bold" Foreground="{DynamicResource Text1Brush}" />
-                                    <TextBlock Text="Waiting" FontSize="12.5" Foreground="{DynamicResource Text3Brush}" />
+                                    <TextBlock Text="{Binding Steps[3].Name, FallbackValue='Drivers'}" FontSize="13" FontWeight="Bold" Foreground="{DynamicResource Text1Brush}" />
+                                    <TextBlock Text="{Binding Steps[3].Status, FallbackValue='Waiting'}" FontSize="12.5" Foreground="{DynamicResource Text3Brush}" />
                                 </StackPanel>
                             </StackPanel>
 
@@ -609,8 +609,8 @@
                                     <TextBlock Text="5" FontSize="13" FontWeight="Bold" Foreground="{DynamicResource Text3Brush}" HorizontalAlignment="Center" VerticalAlignment="Center" />
                                 </Border>
                                 <StackPanel VerticalAlignment="Center">
-                                    <TextBlock Text="Unattend" FontSize="13" FontWeight="Bold" Foreground="{DynamicResource Text1Brush}" />
-                                    <TextBlock Text="Waiting" FontSize="12.5" Foreground="{DynamicResource Text3Brush}" />
+                                    <TextBlock Text="{Binding Steps[4].Name, FallbackValue='Unattend'}" FontSize="13" FontWeight="Bold" Foreground="{DynamicResource Text1Brush}" />
+                                    <TextBlock Text="{Binding Steps[4].Status, FallbackValue='Waiting'}" FontSize="12.5" Foreground="{DynamicResource Text3Brush}" />
                                 </StackPanel>
                             </StackPanel>
 
@@ -633,8 +633,8 @@
                                     <TextBlock Text="6" FontSize="13" FontWeight="Bold" Foreground="{DynamicResource Text3Brush}" HorizontalAlignment="Center" VerticalAlignment="Center" />
                                 </Border>
                                 <StackPanel VerticalAlignment="Center">
-                                    <TextBlock Text="Ready" FontSize="13" FontWeight="Bold" Foreground="{DynamicResource Text1Brush}" />
-                                    <TextBlock Text="Waiting" FontSize="12.5" Foreground="{DynamicResource Text3Brush}" />
+                                    <TextBlock Text="{Binding Steps[5].Name, FallbackValue='Ready'}" FontSize="13" FontWeight="Bold" Foreground="{DynamicResource Text1Brush}" />
+                                    <TextBlock Text="{Binding Steps[5].Status, FallbackValue='Waiting'}" FontSize="12.5" Foreground="{DynamicResource Text3Brush}" />
                                 </StackPanel>
                             </StackPanel>
                         </Grid>
@@ -765,7 +765,7 @@
                                 <TextBlock Text="PREFLIGHT CHECKS" FontSize="11.5" FontWeight="Bold" Foreground="{DynamicResource Text3Brush}" VerticalAlignment="Center" />
                                 <!-- Chip on the right (e.g. Ready to deploy, 1 warning in amber) -->
                                 <Border Height="24" CornerRadius="12" Padding="10,0" Background="{DynamicResource WarnBgBrush}" BorderBrush="{DynamicResource WarnBdBrush}" BorderThickness="1" HorizontalAlignment="Right">
-                                    <TextBlock Text="Ready to deploy, 1 warning" FontSize="12.5" FontWeight="SemiBold" Foreground="{DynamicResource WarnBrush}" VerticalAlignment="Center" />
+                                    <TextBlock Text="{Binding PreflightSummaryText, FallbackValue='Ready to deploy, 1 warning'}" FontSize="12.5" FontWeight="SemiBold" Foreground="{DynamicResource WarnBrush}" VerticalAlignment="Center" />
                                 </Border>
                             </Grid>
 
@@ -784,8 +784,8 @@
                                             <TextBlock Text="✓" Foreground="#FFFFFF" FontSize="10" FontWeight="Bold" HorizontalAlignment="Center" VerticalAlignment="Center" />
                                         </Border>
                                         <StackPanel>
-                                            <TextBlock Text="Target disk" FontSize="13" FontWeight="Bold" Foreground="{DynamicResource Text1Brush}" />
-                                            <TextBlock Text="Disk 0 selected, not boot media" FontSize="12.5" Foreground="{DynamicResource Text3Brush}" TextWrapping="Wrap" Margin="0,2,0,0" />
+                                            <TextBlock Text="{Binding PreflightChecks[0].Name, FallbackValue='Target disk'}" FontSize="13" FontWeight="Bold" Foreground="{DynamicResource Text1Brush}" />
+                                            <TextBlock Text="{Binding PreflightChecks[0].Message, FallbackValue='Disk 0 selected, not boot media'}" FontSize="12.5" Foreground="{DynamicResource Text3Brush}" TextWrapping="Wrap" Margin="0,2,0,0" />
                                         </StackPanel>
                                     </StackPanel>
                                 </Border>
@@ -797,8 +797,8 @@
                                             <TextBlock Text="✓" Foreground="#FFFFFF" FontSize="10" FontWeight="Bold" HorizontalAlignment="Center" VerticalAlignment="Center" />
                                         </Border>
                                         <StackPanel>
-                                            <TextBlock Text="Image" FontSize="13" FontWeight="Bold" Foreground="{DynamicResource Text1Brush}" />
-                                            <TextBlock Text="Reachable, 14.5 GB" FontSize="12.5" Foreground="{DynamicResource Text3Brush}" TextWrapping="Wrap" Margin="0,2,0,0" />
+                                            <TextBlock Text="{Binding PreflightChecks[1].Name, FallbackValue='Image'}" FontSize="13" FontWeight="Bold" Foreground="{DynamicResource Text1Brush}" />
+                                            <TextBlock Text="{Binding PreflightChecks[1].Message, FallbackValue='Reachable, 14.5 GB'}" FontSize="12.5" Foreground="{DynamicResource Text3Brush}" TextWrapping="Wrap" Margin="0,2,0,0" />
                                         </StackPanel>
                                     </StackPanel>
                                 </Border>
@@ -810,8 +810,8 @@
                                             <TextBlock Text="✓" Foreground="#FFFFFF" FontSize="10" FontWeight="Bold" HorizontalAlignment="Center" VerticalAlignment="Center" />
                                         </Border>
                                         <StackPanel>
-                                            <TextBlock Text="Drivers" FontSize="13" FontWeight="Bold" Foreground="{DynamicResource Text1Brush}" />
-                                            <TextBlock Text="18 packages matched" FontSize="12.5" Foreground="{DynamicResource Text3Brush}" TextWrapping="Wrap" Margin="0,2,0,0" />
+                                            <TextBlock Text="{Binding PreflightChecks[2].Name, FallbackValue='Drivers'}" FontSize="13" FontWeight="Bold" Foreground="{DynamicResource Text1Brush}" />
+                                            <TextBlock Text="{Binding PreflightChecks[2].Message, FallbackValue='18 packages matched'}" FontSize="12.5" Foreground="{DynamicResource Text3Brush}" TextWrapping="Wrap" Margin="0,2,0,0" />
                                         </StackPanel>
                                     </StackPanel>
                                 </Border>
@@ -819,12 +819,33 @@
                                 <!-- 4. Windows Key Check (Warning) -->
                                 <Border Grid.Column="3" Background="{DynamicResource InsetBgBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" CornerRadius="10" Padding="12,10" Margin="5,0,0,0">
                                     <StackPanel Orientation="Horizontal">
-                                        <Border Width="18" Height="18" CornerRadius="9" Background="{DynamicResource WarnBrush}" Margin="0,0,10,0" VerticalAlignment="Top">
-                                            <TextBlock Text="!" Foreground="#FFFFFF" FontSize="11" FontWeight="Bold" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                        <Border Width="18" Height="18" CornerRadius="9" Margin="0,0,10,0" VerticalAlignment="Top">
+                                            <Border.Style>
+                                                <Style TargetType="Border">
+                                                    <Setter Property="Background" Value="{DynamicResource WarnBrush}" />
+                                                    <Style.Triggers>
+                                                        <DataTrigger Binding="{Binding Profile.AcpiKey.HasKey}" Value="True">
+                                                            <Setter Property="Background" Value="{DynamicResource OkBrush}" />
+                                                        </DataTrigger>
+                                                    </Style.Triggers>
+                                                </Style>
+                                            </Border.Style>
+                                            <TextBlock FontSize="11" FontWeight="Bold" Foreground="#FFFFFF" HorizontalAlignment="Center" VerticalAlignment="Center">
+                                                <TextBlock.Style>
+                                                    <Style TargetType="TextBlock">
+                                                        <Setter Property="Text" Value="!" />
+                                                        <Style.Triggers>
+                                                            <DataTrigger Binding="{Binding Profile.AcpiKey.HasKey}" Value="True">
+                                                                <Setter Property="Text" Value="✓" />
+                                                            </DataTrigger>
+                                                        </Style.Triggers>
+                                                    </Style>
+                                                </TextBlock.Style>
+                                            </TextBlock>
                                         </Border>
                                         <StackPanel>
-                                            <TextBlock Text="Windows key" FontSize="13" FontWeight="Bold" Foreground="{DynamicResource Text1Brush}" />
-                                            <TextBlock Text="Not found, continues unactivated" FontSize="12.5" Foreground="{DynamicResource Text3Brush}" TextWrapping="Wrap" Margin="0,2,0,0" />
+                                            <TextBlock Text="{Binding PreflightChecks[3].Name, FallbackValue='Windows key'}" FontSize="13" FontWeight="Bold" Foreground="{DynamicResource Text1Brush}" />
+                                            <TextBlock Text="{Binding PreflightChecks[3].Message, FallbackValue='Not found, continues unactivated'}" FontSize="12.5" Foreground="{DynamicResource Text3Brush}" TextWrapping="Wrap" Margin="0,2,0,0" />
                                         </StackPanel>
                                     </StackPanel>
                                 </Border>
@@ -855,11 +876,11 @@
                                     <!-- Segmented Filter (1 px -bd2, radius 8, items padding 4 12, 13 px weight 600 -t2) -->
                                     <Border Grid.Column="1" HorizontalAlignment="Center" BorderBrush="{DynamicResource Border2Brush}" BorderThickness="1" CornerRadius="8" Padding="2">
                                         <StackPanel Orientation="Horizontal">
-                                            <RadioButton Content="All" IsChecked="True" GroupName="LogFilterGrp" Height="26" Padding="12,0" 
+                                            <RadioButton Content="All" IsChecked="{Binding IsFilterAll, Mode=TwoWay}" GroupName="LogFilterGrp" Height="26" Padding="12,0" 
                                                          Foreground="{DynamicResource BrandBrush}" Background="{DynamicResource BrandSubtleBrush}" FontSize="13" FontWeight="SemiBold" />
-                                            <RadioButton Content="Warnings" GroupName="LogFilterGrp" Height="26" Padding="12,0" 
+                                            <RadioButton Content="Warnings" IsChecked="{Binding IsFilterWarnings, Mode=TwoWay}" GroupName="LogFilterGrp" Height="26" Padding="12,0" 
                                                          Foreground="{DynamicResource Text2Brush}" Background="Transparent" FontSize="13" FontWeight="SemiBold" />
-                                            <RadioButton Content="Errors" GroupName="LogFilterGrp" Height="26" Padding="12,0" 
+                                            <RadioButton Content="Errors" IsChecked="{Binding IsFilterErrors, Mode=TwoWay}" GroupName="LogFilterGrp" Height="26" Padding="12,0" 
                                                          Foreground="{DynamicResource Text2Brush}" Background="Transparent" FontSize="13" FontWeight="SemiBold" />
                                         </StackPanel>
                                     </Border>

@@ -1,5 +1,7 @@
 using System;
 using System.Collections.Generic;
+using System.ComponentModel;
+using System.Runtime.CompilerServices;
 
 namespace VeloxDeploy.Models
 {
@@ -15,6 +17,41 @@ namespace VeloxDeploy.Models
         Completed,
         Failed,
         Aborted
+    }
+
+    public enum StepState
+    {
+        Waiting,
+        Running,
+        Done,
+        Failed
+    }
+
+    public class StepItem : INotifyPropertyChanged
+    {
+        private string _status = "Waiting";
+        private StepState _state = StepState.Waiting;
+
+        public int Index { get; set; }
+        public string Name { get; set; } = string.Empty;
+
+        public string Status
+        {
+            get => _status;
+            set { _status = value; OnPropertyChanged(); }
+        }
+
+        public StepState State
+        {
+            get => _state;
+            set { _state = value; OnPropertyChanged(); }
+        }
+
+        public event PropertyChangedEventHandler? PropertyChanged;
+        private void OnPropertyChanged([CallerMemberName] string? prop = null)
+        {
+            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(prop));
+        }
     }
 
     public enum CheckStatus
@@ -57,6 +94,17 @@ namespace VeloxDeploy.Models
         public bool IsUsb => InterfaceType.Contains("USB", StringComparison.OrdinalIgnoreCase);
         public bool IsBootMedia { get; set; } = false;
         public bool HasExistingData { get; set; } = true;
+
+        // Smart Target Identification
+        public bool IsUsbFlashDrive => IsUsb && SizeBytes < (128L * 1024 * 1024 * 1024) && 
+            (Model.Contains("Flash", StringComparison.OrdinalIgnoreCase) || 
+             Model.Contains("SanDisk", StringComparison.OrdinalIgnoreCase) ||
+             Model.Contains("Cruzer", StringComparison.OrdinalIgnoreCase) ||
+             Model.Contains("Kingston", StringComparison.OrdinalIgnoreCase));
+
+        public bool IsDirectTargetSsd => IsNvme || !IsUsbFlashDrive;
+
+        public string TargetModeBadge => IsUsbFlashDrive ? "Bootable USB Pendrive" : "Direct SSD Target";
         public string SafetyBadge => IsBootMedia ? "Boot media (Excluded)" : (HasExistingData ? "Has data" : "Unformatted");
         public string DisplayText => $"Disk {DiskIndex}: {Model} ({SizeFormatted} {InterfaceType})";
     }
@@ -77,11 +125,30 @@ namespace VeloxDeploy.Models
         public List<TargetDiskInfo> Disks { get; set; } = new();
     }
 
-    public class PreflightCheckItem
+    public class PreflightCheckItem : INotifyPropertyChanged
     {
+        private CheckStatus _status = CheckStatus.Passed;
+        private string _message = string.Empty;
+
         public string Name { get; set; } = string.Empty;
-        public CheckStatus Status { get; set; } = CheckStatus.Passed;
-        public string Message { get; set; } = string.Empty;
+
+        public CheckStatus Status
+        {
+            get => _status;
+            set { _status = value; OnPropertyChanged(); }
+        }
+
+        public string Message
+        {
+            get => _message;
+            set { _message = value; OnPropertyChanged(); }
+        }
+
+        public event PropertyChangedEventHandler? PropertyChanged;
+        private void OnPropertyChanged([CallerMemberName] string? prop = null)
+        {
+            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(prop));
+        }
     }
 
     public class DriverVaultPackage
@@ -110,6 +177,10 @@ namespace VeloxDeploy.Models
         public bool AutoReboot { get; set; } = true;
         public int AutoRebootCountdownSecs { get; set; } = 15;
         public string AdminUsername { get; set; } = "User";
+
+        // Image display details
+        public string SelectedImageName { get; set; } = "Windows 11 Pro 24H2 (x64)";
+        public string SelectedImageDetails { get; set; } = "14.5 GB, streamed from local repository";
     }
 
     public class DeployProgressUpdate

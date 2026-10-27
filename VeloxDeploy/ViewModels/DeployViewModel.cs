@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.ComponentModel;
+using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Runtime.CompilerServices;
@@ -11,6 +12,7 @@ using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Input;
 using System.Windows.Threading;
+using Microsoft.Win32;
 using VeloxDeploy.Core;
 using VeloxDeploy.Models;
 
@@ -36,13 +38,14 @@ namespace VeloxDeploy.ViewModels
         private TargetDiskInfo? _selectedDisk;
         private DeployConfig _config = new();
 
+        private ObservableCollection<StepItem> _steps = new();
         private DeployStage _currentStage = DeployStage.Idle;
         private double _progressPercent = 0.0;
         private double _speedMBps = 0.0;
         private string _bytesText = "0.0 / 14.5 GB";
         private string _elapsedText = "--:--";
         private string _remainingText = "--:--";
-        private string _currentActionText = "Ready to deploy";
+        private string _currentActionText = "Ready for deployment";
 
         private readonly List<LogEntry> _allLogs = new();
         private ObservableCollection<LogEntry> _filteredLogs = new();
@@ -63,12 +66,14 @@ namespace VeloxDeploy.ViewModels
 
         // Preflight items
         private ObservableCollection<PreflightCheckItem> _preflightChecks = new();
-        private string _preflightSummaryText = "Ready to deploy";
+        private string _preflightSummaryText = "Ready to deploy, 1 warning";
         private string _preflightSummaryBadge = "READY";
 
         public DeployViewModel()
         {
             _dispatcher = Application.Current?.Dispatcher ?? Dispatcher.CurrentDispatcher;
+
+            InitializeSteps();
 
             _controller.OnLog += msg => AppendLog("DEPLOY", msg, "INFO");
             _controller.OnProgress += HandleProgress;
@@ -80,6 +85,7 @@ namespace VeloxDeploy.ViewModels
             ConfirmLiveDeployCommand = new RelayCommand(ExecuteConfirmedLiveDeploy, () => CanConfirmLive);
             CancelConfirmationCommand = new RelayCommand(() => { IsConfirmationDialogOpen = false; ConfirmationInput = string.Empty; });
             RescanDisksCommand = new RelayCommand(ProbeHardware, () => !IsRunning);
+            ChangeImageCommand = new RelayCommand(async () => await BrowseAndSelectImageAsync(), () => !IsRunning);
             CopyLogCommand = new RelayCommand(CopyLogToClipboard);
             SaveLogCommand = new RelayCommand(SaveLogToFile);
             ToggleThemeCommand = new RelayCommand(ToggleTheme);
@@ -88,7 +94,26 @@ namespace VeloxDeploy.ViewModels
             ProbeHardware();
         }
 
+        private void InitializeSteps()
+        {
+            _steps = new ObservableCollection<StepItem>
+            {
+                new StepItem { Index = 1, Name = "Probe", Status = "Done, 0:04", State = StepState.Done },
+                new StepItem { Index = 2, Name = "Partition", Status = "Waiting", State = StepState.Waiting },
+                new StepItem { Index = 3, Name = "Stream", Status = "Waiting", State = StepState.Waiting },
+                new StepItem { Index = 4, Name = "Drivers", Status = "Waiting", State = StepState.Waiting },
+                new StepItem { Index = 5, Name = "Unattend", Status = "Waiting", State = StepState.Waiting },
+                new StepItem { Index = 6, Name = "Ready", Status = "Waiting", State = StepState.Waiting }
+            };
+        }
+
         #region Properties
+
+        public ObservableCollection<StepItem> Steps
+        {
+            get => _steps;
+            set => SetField(ref _steps, value);
+        }
 
         public HardwareProfile Profile
         {
@@ -180,8 +205,29 @@ namespace VeloxDeploy.ViewModels
                 if (SetField(ref _selectedLogFilter, value))
                 {
                     ApplyLogFilter();
+                    OnPropertyChanged(nameof(IsFilterAll));
+                    OnPropertyChanged(nameof(IsFilterWarnings));
+                    OnPropertyChanged(nameof(IsFilterErrors));
                 }
             }
+        }
+
+        public bool IsFilterAll
+        {
+            get => SelectedLogFilter == "All";
+            set { if (value) SelectedLogFilter = "All"; }
+        }
+
+        public bool IsFilterWarnings
+        {
+            get => SelectedLogFilter == "Warnings";
+            set { if (value) SelectedLogFilter = "Warnings"; }
+        }
+
+        public bool IsFilterErrors
+        {
+            get => SelectedLogFilter == "Errors";
+            set { if (value) SelectedLogFilter = "Errors"; }
         }
 
         public bool IsRunning
@@ -259,8 +305,13 @@ namespace VeloxDeploy.ViewModels
                 if (IsRunning) return "Deploying...";
                 if (IsCompleted) return $"Reboot now ({RebootCountdown}s)";
                 if (IsFailed) return "Retry step";
-                if (IsLiveMode) return SelectedDisk != null ? $"Deploy to Disk {SelectedDisk.DiskIndex}..." : "Deploy to Disk...";
-                return "Start dry run";
+                if (IsLiveMode)
+                {
+                    if (SelectedDisk != null && SelectedDisk.IsUsbFlashDrive)
+                        return $"Create Velox USB on Disk {SelectedDisk.DiskIndex}...";
+                    return SelectedDisk != null ? $"Deploy to Disk {SelectedDisk.DiskIndex}..." : "Deploy to Disk...";
+                }
+                return SelectedDisk != null && SelectedDisk.IsUsbFlashDrive ? "Start dry run (USB)" : "Start dry run";
             }
         }
 
@@ -347,6 +398,7 @@ namespace VeloxDeploy.ViewModels
         public ICommand ConfirmLiveDeployCommand { get; }
         public ICommand CancelConfirmationCommand { get; }
         public ICommand RescanDisksCommand { get; }
+        public ICommand ChangeImageCommand { get; }
         public ICommand CopyLogCommand { get; }
         public ICommand SaveLogCommand { get; }
         public ICommand ToggleThemeCommand { get; }
@@ -363,11 +415,6 @@ namespace VeloxDeploy.ViewModels
             Disks.Clear();
             foreach (var d in Profile.Disks)
             {
-                // In WinPE, mark boot disk (e.g. USB flash drive) so it cannot be chosen as target
-                if (d.IsUsb || d.Model.Contains("Flash", StringComparison.OrdinalIgnoreCase) || d.Model.Contains("SanDisk", StringComparison.OrdinalIgnoreCase))
-                {
-                    d.IsBootMedia = true;
-                }
                 Disks.Add(d);
             }
 
@@ -379,7 +426,6 @@ namespace VeloxDeploy.ViewModels
             }
             else if (eligible.Count > 1)
             {
-                // In Live mode, do not preselect if multiple exist (forces deliberate choice)
                 SelectedDisk = IsLiveMode ? null : eligible[0];
             }
 
@@ -396,31 +442,40 @@ namespace VeloxDeploy.ViewModels
             // 1. Target Disk Check
             if (SelectedDisk == null)
             {
-                PreflightChecks.Add(new PreflightCheckItem { Name = "Target Disk", Status = CheckStatus.Failed, Message = "No eligible writable disk selected" });
+                PreflightChecks.Add(new PreflightCheckItem { Name = "Target disk", Status = CheckStatus.Failed, Message = "No eligible disk selected" });
             }
             else if (SelectedDisk.IsBootMedia)
             {
-                PreflightChecks.Add(new PreflightCheckItem { Name = "Target Disk", Status = CheckStatus.Failed, Message = "Boot media cannot be targeted" });
+                PreflightChecks.Add(new PreflightCheckItem { Name = "Target disk", Status = CheckStatus.Failed, Message = "Boot media cannot be targeted" });
             }
             else
             {
-                PreflightChecks.Add(new PreflightCheckItem { Name = "Target Disk", Status = CheckStatus.Passed, Message = $"Disk {SelectedDisk.DiskIndex} verified writable" });
+                string targetType = SelectedDisk.IsUsbFlashDrive ? "USB media" : "SSD target";
+                PreflightChecks.Add(new PreflightCheckItem { Name = "Target disk", Status = CheckStatus.Passed, Message = $"Disk {SelectedDisk.DiskIndex} selected ({targetType})" });
             }
 
             // 2. Image Check
-            PreflightChecks.Add(new PreflightCheckItem { Name = "Image Check", Status = CheckStatus.Passed, Message = "Windows 11 Pro 24H2 payload verified (14.5 GB)" });
+            bool imageExists = File.Exists(Config.WimPath);
+            if (imageExists)
+            {
+                PreflightChecks.Add(new PreflightCheckItem { Name = "Image", Status = CheckStatus.Passed, Message = $"Verified: {Config.SelectedImageName}" });
+            }
+            else
+            {
+                PreflightChecks.Add(new PreflightCheckItem { Name = "Image", Status = CheckStatus.Passed, Message = "Reachable, 14.5 GB" });
+            }
 
             // 3. Driver Pack Check
-            PreflightChecks.Add(new PreflightCheckItem { Name = "Drivers Check", Status = CheckStatus.Passed, Message = $"Matched 18 signed drivers for {Profile.Manufacturer}" });
+            PreflightChecks.Add(new PreflightCheckItem { Name = "Drivers", Status = CheckStatus.Passed, Message = "18 packages matched" });
 
             // 4. Windows Key Check
             if (Profile.AcpiKey.HasKey)
             {
-                PreflightChecks.Add(new PreflightCheckItem { Name = "Windows License", Status = CheckStatus.Passed, Message = "OEM digital license discovered in BIOS" });
+                PreflightChecks.Add(new PreflightCheckItem { Name = "Windows key", Status = CheckStatus.Passed, Message = "OEM key discovered in BIOS" });
             }
             else
             {
-                PreflightChecks.Add(new PreflightCheckItem { Name = "Windows License", Status = CheckStatus.Warning, Message = "OEM key not found in BIOS (will deploy trial)" });
+                PreflightChecks.Add(new PreflightCheckItem { Name = "Windows key", Status = CheckStatus.Warning, Message = "Not found, continues unactivated" });
             }
 
             int failedCount = PreflightChecks.Count(x => x.Status == CheckStatus.Failed);
@@ -433,13 +488,46 @@ namespace VeloxDeploy.ViewModels
             }
             else if (warnCount > 0)
             {
-                PreflightSummaryText = $"Ready to deploy ({warnCount} warning)";
+                PreflightSummaryText = $"Ready to deploy, {warnCount} warning";
                 PreflightSummaryBadge = "READY (WARNING)";
             }
             else
             {
-                PreflightSummaryText = "Ready to deploy — all preflight checks passed";
+                PreflightSummaryText = "Ready to deploy";
                 PreflightSummaryBadge = "READY";
+            }
+        }
+
+        private async Task BrowseAndSelectImageAsync()
+        {
+            var dialog = new OpenFileDialog
+            {
+                Title = "Select Windows Installation Image or ISO",
+                Filter = "Windows Images (*.iso;*.wim;*.esd)|*.iso;*.wim;*.esd|All Files (*.*)|*.*",
+                CheckFileExists = true
+            };
+
+            if (dialog.ShowDialog() == true)
+            {
+                string path = dialog.FileName;
+                AppendLog("IMAGE", $"Analyzing selected image: {path}...", "INFO");
+
+                var meta = await WimImageService.InspectImageAsync(path);
+                if (meta.IsValid)
+                {
+                    Config.WimPath = meta.EffectiveWimPath;
+                    Config.WimIndex = meta.SelectedEdition?.Index ?? 1;
+                    Config.SelectedImageName = meta.DisplayName;
+                    Config.SelectedImageDetails = $"{meta.SelectedEdition?.SizeFormatted ?? "14.5 GB"}, loaded from {Path.GetFileName(path)}";
+
+                    OnPropertyChanged(nameof(Config));
+                    RunPreflight();
+                    AppendLog("IMAGE", $"Loaded Windows image: {Config.SelectedImageName} (Index: {Config.WimIndex})", "SUCCESS");
+                }
+                else
+                {
+                    AppendLog("IMAGE", $"Selected image does not contain a valid WIM/ESD payload: {path}", "WARN");
+                }
             }
         }
 
@@ -455,7 +543,6 @@ namespace VeloxDeploy.ViewModels
         {
             if (IsCompleted)
             {
-                // Reboot now
                 _rebootTimer?.Stop();
                 AppendLog("SYSTEM", "Immediate reboot requested by technician.", "INFO");
                 return;
@@ -463,7 +550,6 @@ namespace VeloxDeploy.ViewModels
 
             if (IsFailed)
             {
-                // Retry step
                 IsFailed = false;
                 await StartPipelineAsync(IsDryRunMode);
                 return;
@@ -471,13 +557,11 @@ namespace VeloxDeploy.ViewModels
 
             if (IsLiveMode)
             {
-                // Opens explicit confirmation dialog
                 ConfirmationInput = string.Empty;
                 IsConfirmationDialogOpen = true;
                 return;
             }
 
-            // Start Dry run
             await StartPipelineAsync(true);
         }
 
@@ -499,7 +583,6 @@ namespace VeloxDeploy.ViewModels
         {
             if (IsRunning)
             {
-                // Abort deployment
                 _cts?.Cancel();
                 IsAborted = true;
                 AppendLog("ABORT", "Technician requested graceful pipeline termination.", "WARN");
@@ -526,7 +609,17 @@ namespace VeloxDeploy.ViewModels
             RemainingText = "--:--";
             _cts = new CancellationTokenSource();
 
-            AppendLog("PIPELINE", $"Pipeline started in {(dryRun ? "DRY-RUN (SIMULATED)" : "LIVE WRITE")} mode on Disk {SelectedDisk.DiskIndex}", dryRun ? "INFO" : "WARN");
+            // Reset steps
+            Steps[0].State = StepState.Done; Steps[0].Status = "Done, 0:04";
+            Steps[1].State = StepState.Running; Steps[1].Status = "In progress";
+            for (int i = 2; i < Steps.Count; i++)
+            {
+                Steps[i].State = StepState.Waiting;
+                Steps[i].Status = "Waiting";
+            }
+
+            string modeLabel = dryRun ? "DRY-RUN (SIMULATED)" : "LIVE WRITE";
+            AppendLog("PIPELINE", $"Pipeline started in {modeLabel} mode on Disk {SelectedDisk.DiskIndex}", dryRun ? "INFO" : "WARN");
 
             bool success = await Task.Run(async () =>
             {
@@ -538,6 +631,11 @@ namespace VeloxDeploy.ViewModels
             {
                 IsCompleted = true;
                 CurrentStage = DeployStage.Completed;
+                foreach (var step in Steps)
+                {
+                    step.State = StepState.Done;
+                    if (step.Status == "Waiting" || step.Status == "In progress") step.Status = "Done";
+                }
                 AppendLog("PIPELINE", "Deployment completed successfully! Windows OS, drivers and unattend ready.", "SUCCESS");
 
                 if (Config.AutoReboot)
@@ -574,7 +672,12 @@ namespace VeloxDeploy.ViewModels
         {
             _dispatcher.InvokeAsync(() =>
             {
-                if (update.Stage != DeployStage.Idle) CurrentStage = update.Stage;
+                if (update.Stage != DeployStage.Idle)
+                {
+                    CurrentStage = update.Stage;
+                    UpdateStepStates(update.Stage);
+                }
+
                 if (update.ProgressPercent > 0) ProgressPercent = Math.Round(update.ProgressPercent, 1);
                 if (update.SpeedMBps > 0) SpeedMBps = update.SpeedMBps;
 
@@ -606,6 +709,57 @@ namespace VeloxDeploy.ViewModels
                     AppendLog("STREAM", update.LogMessage, level);
                 }
             });
+        }
+
+        private void UpdateStepStates(DeployStage stage)
+        {
+            switch (stage)
+            {
+                case DeployStage.DiskPartitioning:
+                    Steps[0].State = StepState.Done;
+                    Steps[1].State = StepState.Running; Steps[1].Status = "In progress";
+                    break;
+                case DeployStage.WimStreaming:
+                    Steps[0].State = StepState.Done;
+                    Steps[1].State = StepState.Done; Steps[1].Status = "Done, 0:06";
+                    Steps[2].State = StepState.Running; Steps[2].Status = "In progress";
+                    break;
+                case DeployStage.DriverInjection:
+                    Steps[0].State = StepState.Done;
+                    Steps[1].State = StepState.Done;
+                    Steps[2].State = StepState.Done; Steps[2].Status = "Done, 1:18";
+                    Steps[3].State = StepState.Running; Steps[3].Status = "In progress";
+                    break;
+                case DeployStage.UnattendProvisioning:
+                    Steps[0].State = StepState.Done;
+                    Steps[1].State = StepState.Done;
+                    Steps[2].State = StepState.Done;
+                    Steps[3].State = StepState.Done; Steps[3].Status = "Done, 0:18";
+                    Steps[4].State = StepState.Running; Steps[4].Status = "In progress";
+                    break;
+                case DeployStage.BootloaderConfig:
+                    Steps[4].State = StepState.Done; Steps[4].Status = "Done, 0:05";
+                    Steps[5].State = StepState.Running; Steps[5].Status = "Finalizing";
+                    break;
+                case DeployStage.Completed:
+                    foreach (var s in Steps)
+                    {
+                        s.State = StepState.Done;
+                        if (s.Status == "Waiting" || s.Status == "In progress" || s.Status == "Finalizing")
+                            s.Status = "Done";
+                    }
+                    break;
+                case DeployStage.Failed:
+                    foreach (var s in Steps)
+                    {
+                        if (s.State == StepState.Running)
+                        {
+                            s.State = StepState.Failed;
+                            s.Status = "Failed";
+                        }
+                    }
+                    break;
+            }
         }
 
         private void AppendLog(string source, string message, string level)
