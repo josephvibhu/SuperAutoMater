@@ -10,7 +10,7 @@
             <converters:HexToBrushConverter x:Key="HexToBrushConverter"/>
 
             <ResourceDictionary.MergedDictionaries>
-                <ResourceDictionary Source="pack://application:,,,/Themes/Colors.xaml"/>
+                <ResourceDictionary Source="pack://application:,,,/Themes/TokensDark.xaml"/>
                 <ResourceDictionary Source="pack://application:,,,/Themes/Typography.xaml"/>
                 <ResourceDictionary Source="pack://application:,,,/Themes/Effects.xaml"/>
                 <ResourceDictionary Source="pack://application:,,,/Themes/Styles.xaml"/>

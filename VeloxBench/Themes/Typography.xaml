@@ -1,42 +1,42 @@
-﻿<ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+<ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
                     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
 
     <!-- Font Families with clean fallbacks -->
     <FontFamily x:Key="FontMono">JetBrains Mono, Consolas, Courier New, monospace</FontFamily>
     <FontFamily x:Key="FontSans">Source Sans 3, Segoe UI, sans-serif</FontFamily>
 
-    <!-- Text Styles -->
+    <!-- Text Styles with Dynamic Theme Adaptivity -->
     <Style x:Key="TextHeaderBrand" TargetType="TextBlock">
         <Setter Property="FontFamily" Value="{StaticResource FontSans}"/>
         <Setter Property="FontSize" Value="15"/>
         <Setter Property="FontWeight" Value="ExtraBold"/>
-        <Setter Property="Foreground" Value="{StaticResource BrushTextWhite}"/>
+        <Setter Property="Foreground" Value="{DynamicResource BrushTextWhite}"/>
     </Style>
 
     <Style x:Key="TextCardHeader" TargetType="TextBlock">
         <Setter Property="FontFamily" Value="{StaticResource FontMono}"/>
         <Setter Property="FontSize" Value="11"/>
         <Setter Property="FontWeight" Value="Bold"/>
-        <Setter Property="Foreground" Value="{StaticResource BrushTextVioletMuted}"/>
+        <Setter Property="Foreground" Value="{DynamicResource BrushTextVioletMuted}"/>
     </Style>
 
     <Style x:Key="TextCardValueLarge" TargetType="TextBlock">
         <Setter Property="FontFamily" Value="{StaticResource FontSans}"/>
         <Setter Property="FontSize" Value="14"/>
         <Setter Property="FontWeight" Value="Bold"/>
-        <Setter Property="Foreground" Value="{StaticResource BrushTextWhite}"/>
+        <Setter Property="Foreground" Value="{DynamicResource BrushTextWhite}"/>
     </Style>
 
     <Style x:Key="TextCardSubtle" TargetType="TextBlock">
         <Setter Property="FontFamily" Value="{StaticResource FontMono}"/>
         <Setter Property="FontSize" Value="11"/>
-        <Setter Property="Foreground" Value="{StaticResource BrushTextVioletLight}"/>
+        <Setter Property="Foreground" Value="{DynamicResource BrushTextVioletLight}"/>
     </Style>
 
     <Style x:Key="TextAvionicsChip" TargetType="TextBlock">
         <Setter Property="FontFamily" Value="{StaticResource FontMono}"/>
         <Setter Property="FontSize" Value="11"/>
-        <Setter Property="Foreground" Value="{StaticResource BrushTextVioletLight}"/>
+        <Setter Property="Foreground" Value="{DynamicResource BrushTextVioletLight}"/>
     </Style>
 
     <Style x:Key="TextBadgeMono" TargetType="TextBlock">
@@ -48,7 +48,7 @@
     <Style x:Key="TextHotkeyFoot" TargetType="TextBlock">
         <Setter Property="FontFamily" Value="{StaticResource FontMono}"/>
         <Setter Property="FontSize" Value="11"/>
-        <Setter Property="Foreground" Value="{StaticResource BrushTextVioletLight}"/>
+        <Setter Property="Foreground" Value="{DynamicResource BrushTextVioletLight}"/>
     </Style>
 
 </ResourceDictionary>

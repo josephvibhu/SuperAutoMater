@@ -127,11 +127,11 @@
         </Setter>
     </Style>
 
-    <!-- Secondary Dark Action Button (Crisp Light Gray Text on Dark Slate) -->
+    <!-- Secondary Dark Action Button (Theme-Aware) -->
     <Style x:Key="StyleDarkActionBtn" TargetType="Button">
         <Setter Property="Cursor" Value="Hand"/>
         <Setter Property="FocusVisualStyle" Value="{x:Null}"/>
-        <Setter Property="Foreground" Value="#E1E4E8"/>
+        <Setter Property="Foreground" Value="{DynamicResource TokenTextPrimaryBrush}"/>
         <Setter Property="FontFamily" Value="{StaticResource FontMono}"/>
         <Setter Property="FontSize" Value="11"/>
         <Setter Property="FontWeight" Value="SemiBold"/>
@@ -139,21 +139,20 @@
             <Setter.Value>
                 <ControlTemplate TargetType="Button">
                     <Border x:Name="border"
-                            Background="#1C2128"
-                            BorderBrush="#30363D"
+                            Background="{DynamicResource TokenBgInsetBrush}"
+                            BorderBrush="{DynamicResource TokenBorderSubtleBrush}"
                             BorderThickness="1"
                             CornerRadius="8"
                             Padding="10,6">
-                        <ContentPresenter x:Name="cp" HorizontalAlignment="Center" VerticalAlignment="Center" TextElement.Foreground="#E1E4E8"/>
+                        <ContentPresenter x:Name="cp" HorizontalAlignment="Center" VerticalAlignment="Center"/>
                     </Border>
                     <ControlTemplate.Triggers>
                         <Trigger Property="IsMouseOver" Value="True">
-                            <Setter TargetName="border" Property="Background" Value="#282E37"/>
-                            <Setter TargetName="border" Property="BorderBrush" Value="#58A6FF"/>
-                            <Setter TargetName="cp" Property="TextElement.Foreground" Value="#FFFFFF"/>
+                            <Setter TargetName="border" Property="Background" Value="{DynamicResource TokenBgHoverBrush}"/>
+                            <Setter TargetName="border" Property="BorderBrush" Value="{DynamicResource TokenBorderStrongBrush}"/>
                         </Trigger>
                         <Trigger Property="IsPressed" Value="True">
-                            <Setter TargetName="border" Property="Background" Value="#161B22"/>
+                            <Setter TargetName="border" Property="Background" Value="{DynamicResource TokenBgInsetBrush}"/>
                         </Trigger>
                     </ControlTemplate.Triggers>
                 </ControlTemplate>

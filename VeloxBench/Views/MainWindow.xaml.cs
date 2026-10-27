@@ -96,8 +96,12 @@ namespace SuperAutoMater.Wpf.Views
         {
             WindowState = WindowState.Maximized;
 
-            // Initialize active theme toggle button icon
+            // Initialize active theme toggle button icon & listen for changes
             UpdateThemeIcon(ThemeService.Instance.CurrentMode);
+            ThemeService.Instance.ThemeChanged += (mode, _) =>
+            {
+                Dispatcher.Invoke(() => UpdateThemeIcon(mode));
+            };
 
             // 0. Wire Alpha License & Auto-Update status indicators
             VeloxBench.Services.LicenseService.Instance.LicenseStatusChanged += UpdateLicenseUi;

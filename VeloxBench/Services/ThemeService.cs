@@ -92,13 +92,13 @@ public sealed class ThemeService
                 Application.Current.Dispatcher.Invoke(() =>
                 {
                     var appResources = Application.Current.Resources;
-                    var dictUri = new Uri($"pack://application:,,,/VeloxBench;component/{tokenSource}", UriKind.Absolute);
+                    var dictUri = new Uri($"pack://application:,,,/{tokenSource}", UriKind.Absolute);
 
                     // Find and replace existing token dictionary or add it
                     ResourceDictionary? existingTokenDict = null;
                     foreach (var dict in appResources.MergedDictionaries)
                     {
-                        if (dict.Source != null && (dict.Source.ToString().Contains("TokensDark.xaml") || dict.Source.ToString().Contains("TokensLight.xaml")))
+                        if (dict.Source != null && (dict.Source.ToString().Contains("TokensDark") || dict.Source.ToString().Contains("TokensLight")))
                         {
                             existingTokenDict = dict;
                             break;
@@ -110,11 +110,17 @@ public sealed class ThemeService
                     if (existingTokenDict != null)
                     {
                         int index = appResources.MergedDictionaries.IndexOf(existingTokenDict);
-                        appResources.MergedDictionaries[index] = newDict;
+                        appResources.MergedDictionaries.RemoveAt(index);
+                        appResources.MergedDictionaries.Insert(index, newDict);
                     }
                     else
                     {
                         appResources.MergedDictionaries.Insert(0, newDict);
+                    }
+
+                    foreach (Window win in Application.Current.Windows)
+                    {
+                        win.InvalidateVisual();
                     }
 
                     AppLogger.Info($"[ThemeService] Switched theme to: {mode} (Active Palette: {(isDark ? "Dark" : "Light")})");
