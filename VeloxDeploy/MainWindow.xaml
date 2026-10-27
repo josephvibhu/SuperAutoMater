@@ -5,549 +5,942 @@
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:vm="clr-namespace:VeloxDeploy.ViewModels"
         mc:Ignorable="d"
-        Title="VeloxDeploy — Rapid OS Imaging &amp; Depot Provisioning Cockpit" 
-        Height="840" Width="1380"
-        MinHeight="720" MinWidth="1100"
+        Title="Velox Deploy — Developer UI Cockpit" 
+        Height="940" Width="1600"
+        MinHeight="768" MinWidth="1024"
         WindowStartupLocation="CenterScreen"
-        Background="{DynamicResource SurfaceBgBrush}">
+        Background="{DynamicResource BgAppBrush}">
 
     <Window.DataContext>
         <vm:DeployViewModel />
     </Window.DataContext>
 
-    <Grid>
-        <Grid.RowDefinitions>
-            <!-- Header (54px) -->
-            <RowDefinition Height="54" />
-            <!-- Main Cockpit Body -->
-            <RowDefinition Height="*" />
-            <!-- Action Toolbar (64px) -->
-            <RowDefinition Height="64" />
-        </Grid.RowDefinitions>
+    <Window.Resources>
+        <!-- Toggle Switch Style (Violet on, Grey off) -->
+        <Style x:Key="ModernToggleSwitch" TargetType="CheckBox">
+            <Setter Property="Cursor" Value="Hand" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="CheckBox">
+                        <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                            <Border x:Name="Track" Width="36" Height="20" CornerRadius="10" Background="#262C38" Padding="2" Margin="0,0,10,0">
+                                <Ellipse x:Name="Thumb" Width="16" Height="16" Fill="#9AA2B5" HorizontalAlignment="Left" />
+                            </Border>
+                            <ContentPresenter VerticalAlignment="Center" TextElement.Foreground="{DynamicResource TextPrimaryBrush}" TextElement.FontSize="12" />
+                        </StackPanel>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsChecked" Value="True">
+                                <Setter TargetName="Track" Property="Background" Value="{DynamicResource BrandVioletBrush}" />
+                                <Setter TargetName="Thumb" Property="HorizontalAlignment" Value="Right" />
+                                <Setter TargetName="Thumb" Property="Fill" Value="#FFFFFF" />
+                            </Trigger>
+                            <Trigger Property="IsEnabled" Value="False">
+                                <Setter Property="Opacity" Value="0.5" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
 
-        <!-- TOP BAR (54px) -->
-        <Border Grid.Row="0" Background="{DynamicResource SurfaceCardBrush}" BorderBrush="{DynamicResource BorderBaseBrush}" BorderThickness="0,0,0,1">
-            <Grid Margin="18,0">
+        <BooleanToVisibilityConverter x:Key="BoolToVis" />
+    </Window.Resources>
+
+    <Grid>
+        <!-- Main Application Layout -->
+        <Grid>
+            <Grid.RowDefinitions>
+                <!-- Top Bar (56px) -->
+                <RowDefinition Height="56" />
+                <!-- Optional Live Armed Warning Banner (34px) -->
+                <RowDefinition Height="Auto" />
+                <!-- Main Content Area -->
+                <RowDefinition Height="*" />
+                <!-- Bottom Action Bar (76px) -->
+                <RowDefinition Height="76" />
+            </Grid.RowDefinitions>
+
+            <!-- 1. TOP BAR (56px) -->
+            <Border Grid.Row="0" Background="{DynamicResource BgPanelBrush}" BorderBrush="{DynamicResource BorderSubtleBrush}" BorderThickness="0,0,0,1">
+                <Grid Margin="20,0">
+                    <Grid.ColumnDefinitions>
+                        <!-- Logo & Title -->
+                        <ColumnDefinition Width="Auto" />
+                        <!-- Center Depot Unit Chip -->
+                        <ColumnDefinition Width="*" />
+                        <!-- Status Chips & Theme Toggle -->
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+
+                    <!-- Left: Official Deploy Logo (V with Lime D) & App Title -->
+                    <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center">
+                        <Viewbox Width="32" Height="28" Margin="0,0,12,0">
+                            <Canvas Width="50" Height="44">
+                                <!-- V Mark in primary text color -->
+                                <Path Data="M7 5L22 39L32 16" Stroke="{DynamicResource TextPrimaryBrush}" StrokeThickness="9" StrokeLineJoin="Bevel" />
+                                <!-- Lime Accent Stroke -->
+                                <Path Data="M27 27.5L32 16" Stroke="{DynamicResource DeployLogoLimeBrush}" StrokeThickness="9" />
+                                <!-- Lime D for Deploy -->
+                                <Path Data="M37.65 1.5V14.5M37.65 2.95H42Q47.3 2.95 47.3 8Q47.3 13.05 42 13.05H37.65" 
+                                      Stroke="{DynamicResource DeployLogoLimeBrush}" StrokeThickness="2.9" StrokeLineJoin="Miter" StrokeStartLineCap="Flat" StrokeEndLineCap="Flat" />
+                            </Canvas>
+                        </Viewbox>
+
+                        <TextBlock Text="VELOX" Foreground="{DynamicResource TextPrimaryBrush}" FontSize="18" FontWeight="Black" VerticalAlignment="Center" />
+                        <TextBlock Text="Deploy" Foreground="{DynamicResource TextSecondaryBrush}" FontSize="18" FontWeight="Normal" Margin="6,0,0,0" VerticalAlignment="Center" />
+                        
+                        <Border Background="{DynamicResource BgCardBrush}" BorderBrush="{DynamicResource BorderSubtleBrush}" BorderThickness="1" CornerRadius="4" Padding="6,2" Margin="12,0,0,0" VerticalAlignment="Center">
+                            <TextBlock Text="v1.0 Beta" Foreground="{DynamicResource TextMutedBrush}" FontSize="11" FontWeight="SemiBold" />
+                        </Border>
+                    </StackPanel>
+
+                    <!-- Center: Depot Unit Chip -->
+                    <Border Grid.Column="1" HorizontalAlignment="Center" VerticalAlignment="Center"
+                            Background="{DynamicResource BgCardBrush}" BorderBrush="{DynamicResource BorderSubtleBrush}" BorderThickness="1" CornerRadius="16" Padding="14,6">
+                        <StackPanel Orientation="Horizontal">
+                            <TextBlock Text="Depot unit" Foreground="{DynamicResource TextMutedBrush}" FontSize="11" FontWeight="SemiBold" Margin="0,0,6,0" />
+                            <TextBlock Text="{Binding Profile.Model}" Foreground="{DynamicResource TextPrimaryBrush}" FontSize="12" FontWeight="Bold" />
+                            <TextBlock Text="•" Foreground="{DynamicResource TextMutedBrush}" Margin="8,0" />
+                            <TextBlock Text="SN" Foreground="{DynamicResource TextMutedBrush}" FontSize="11" />
+                            <TextBlock Text="{Binding Profile.BiosSerial}" FontFamily="Consolas, monospace" Foreground="{DynamicResource BrandVioletBrush}" FontSize="12" FontWeight="Bold" Margin="5,0,0,0" />
+                        </StackPanel>
+                    </Border>
+
+                    <!-- Right: License, Cloud & Theme Toggle -->
+                    <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center">
+                        <!-- License Chip -->
+                        <Border CornerRadius="14" Padding="10,5" Margin="0,0,10,0">
+                            <Border.Style>
+                                <Style TargetType="Border">
+                                    <Setter Property="Background" Value="{DynamicResource WarningAmberBgBrush}" />
+                                    <Setter Property="BorderBrush" Value="{DynamicResource WarningAmberBrush}" />
+                                    <Setter Property="BorderThickness" Value="1" />
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding Profile.AcpiKey.HasKey}" Value="True">
+                                            <Setter Property="Background" Value="{DynamicResource SuccessGreenBgBrush}" />
+                                            <Setter Property="BorderBrush" Value="{DynamicResource SuccessGreenBrush}" />
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </Border.Style>
+                            <StackPanel Orientation="Horizontal">
+                                <Ellipse Width="7" Height="7" Margin="0,0,6,0">
+                                    <Ellipse.Style>
+                                        <Style TargetType="Ellipse">
+                                            <Setter Property="Fill" Value="{DynamicResource WarningAmberBrush}" />
+                                            <Style.Triggers>
+                                                <DataTrigger Binding="{Binding Profile.AcpiKey.HasKey}" Value="True">
+                                                    <Setter Property="Fill" Value="{DynamicResource SuccessGreenBrush}" />
+                                                </DataTrigger>
+                                            </Style.Triggers>
+                                        </Style>
+                                    </Ellipse.Style>
+                                </Ellipse>
+                                <TextBlock FontSize="11" FontWeight="SemiBold">
+                                    <TextBlock.Style>
+                                        <Style TargetType="TextBlock">
+                                            <Setter Property="Text" Value="Windows key not found" />
+                                            <Setter Property="Foreground" Value="{DynamicResource WarningAmberBrush}" />
+                                            <Style.Triggers>
+                                                <DataTrigger Binding="{Binding Profile.AcpiKey.HasKey}" Value="True">
+                                                    <Setter Property="Text" Value="Windows key detected" />
+                                                    <Setter Property="Foreground" Value="{DynamicResource SuccessGreenBrush}" />
+                                                </DataTrigger>
+                                            </Style.Triggers>
+                                        </Style>
+                                    </TextBlock.Style>
+                                </TextBlock>
+                            </StackPanel>
+                        </Border>
+
+                        <!-- Cloud Chip -->
+                        <Border Background="{DynamicResource BgCardBrush}" BorderBrush="{DynamicResource BorderSubtleBrush}" BorderThickness="1" CornerRadius="14" Padding="10,5" Margin="0,0,12,0">
+                            <StackPanel Orientation="Horizontal">
+                                <Ellipse Width="7" Height="7" Fill="{DynamicResource SuccessGreenBrush}" Margin="0,0,6,0" />
+                                <TextBlock Text="{Binding CloudStatusText}" Foreground="{DynamicResource TextSecondaryBrush}" FontSize="11" />
+                            </StackPanel>
+                        </Border>
+
+                        <!-- Theme Toggle Button -->
+                        <Button Command="{Binding ToggleThemeCommand}" Width="32" Height="32" Background="Transparent" BorderThickness="0" Cursor="Hand" ToolTip="Toggle Theme">
+                            <TextBlock Text="🌓" FontSize="15" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                        </Button>
+                    </StackPanel>
+                </Grid>
+            </Border>
+
+            <!-- 2. OPTIONAL LIVE ARMED WARNING BANNER (34px) -->
+            <Border Grid.Row="1" Background="{DynamicResource DangerRedBgBrush}" BorderBrush="{DynamicResource DangerRedBrush}" BorderThickness="0,0,0,1" Height="34"
+                    Visibility="{Binding IsLiveArmedBannerVisible, Converter={StaticResource BoolToVis}}">
+                <Grid Margin="20,0">
+                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                        <TextBlock Text="⚠" Foreground="{DynamicResource DangerRedBrush}" FontWeight="Bold" Margin="0,0,8,0" />
+                        <TextBlock Text="{Binding LiveBannerText}" Foreground="{DynamicResource DangerRedBrush}" FontSize="12" FontWeight="SemiBold" />
+                    </StackPanel>
+                </Grid>
+            </Border>
+
+            <!-- 3. MAIN CONTENT AREA -->
+            <Grid Grid.Row="2" Margin="20,14">
                 <Grid.ColumnDefinitions>
-                    <!-- Logo & Brand -->
-                    <ColumnDefinition Width="Auto" />
-                    <!-- Machine Identity Chip -->
+                    <!-- Left Settings Column (392px) -->
+                    <ColumnDefinition Width="392" />
+                    <!-- Center Flexible Pipeline Column -->
                     <ColumnDefinition Width="*" />
-                    <!-- Status Chips & Options -->
-                    <ColumnDefinition Width="Auto" />
                 </Grid.ColumnDefinitions>
 
-                <!-- Left: Official Velox Deploy Vector Mark & Name -->
-                <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center">
-                    <Viewbox Width="32" Height="28" Margin="0,0,10,0">
-                        <Canvas Width="50" Height="44">
-                            <!-- Main Velox V stroke in crisp white -->
-                            <Path Data="M7 5L22 39L32 16" Stroke="#E8EAF0" StrokeThickness="9" StrokeLineJoin="Bevel" />
-                            <!-- Electric Orange Accent stroke -->
-                            <Path Data="M27 27.5L32 16" Stroke="{DynamicResource BrandOrangeBrush}" StrokeThickness="9" />
-                            <!-- Electric Orange D for Deploy -->
-                            <Path Data="M37.65 1.5V14.5 M37.65 1.5H42 C45.5 1.5 46.55 4.5 46.55 8 C46.55 11.5 45.5 14.5 42 14.5 H37.65" 
-                                  Stroke="{DynamicResource BrandOrangeBrush}" StrokeThickness="2.9" StrokeLineJoin="Round" StrokeStartLineCap="Round" StrokeEndLineCap="Round" />
-                        </Canvas>
-                    </Viewbox>
-
-                    <TextBlock Text="VELOX" Foreground="{DynamicResource TextPrimaryBrush}" FontSize="18" FontWeight="Bold" VerticalAlignment="Center" />
-                    <TextBlock Text="DEPLOY" Foreground="{DynamicResource BrandOrangeBrush}" FontSize="18" FontWeight="SemiBold" Margin="6,0,0,0" VerticalAlignment="Center" />
-                    <Border Background="{DynamicResource BrandOrangeMutedBrush}" CornerRadius="4" Padding="6,2" Margin="10,0,0,0" VerticalAlignment="Center">
-                        <TextBlock Text="v1.0 BETA" Foreground="{DynamicResource BrandOrangeBrush}" FontSize="10" FontWeight="Bold" />
-                    </Border>
-                </StackPanel>
-
-                <!-- Center: Hardware Summary Pill -->
-                <StackPanel Grid.Column="1" Orientation="Horizontal" HorizontalAlignment="Center" VerticalAlignment="Center">
-                    <Border Background="{DynamicResource SurfacePanelBrush}" BorderBrush="{DynamicResource BorderBaseBrush}" BorderThickness="1" CornerRadius="16" Padding="14,5">
-                        <StackPanel Orientation="Horizontal">
-                            <TextBlock Text="DEPOT UNIT:" Foreground="{DynamicResource TextMutedBrush}" FontSize="11" FontWeight="SemiBold" Margin="0,0,6,0" />
-                            <TextBlock Text="{Binding Profile.Manufacturer}" Foreground="{DynamicResource TextPrimaryBrush}" FontSize="12" FontWeight="Bold" />
-                            <TextBlock Text="{Binding Profile.Model}" Foreground="{DynamicResource TextPrimaryBrush}" FontSize="12" FontWeight="Bold" Margin="5,0,0,0" />
-                            <TextBlock Text="•" Foreground="{DynamicResource TextMutedBrush}" Margin="8,0" />
-                            <TextBlock Text="SN:" Foreground="{DynamicResource TextMutedBrush}" FontSize="11" />
-                            <TextBlock Text="{Binding Profile.BiosSerial}" Foreground="{DynamicResource BrandOrangeBrush}" FontSize="12" FontWeight="SemiBold" Margin="4,0,0,0" />
-                        </StackPanel>
-                    </Border>
-                </StackPanel>
-
-                <!-- Right: Status Badges -->
-                <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center">
-                    <!-- ACPI OEM License Badge -->
-                    <Border CornerRadius="14" Padding="10,4" Margin="0,0,10,0"
-                            Background="{DynamicResource SurfacePanelBrush}"
-                            BorderBrush="{Binding Profile.AcpiKey.HasKey, Converter={x:Null}}"
-                            BorderThickness="1">
-                        <StackPanel Orientation="Horizontal">
-                            <Ellipse Width="7" Height="7" Margin="0,0,6,0"
-                                     Fill="{Binding Profile.AcpiKey.HasKey, Converter={x:Null}}">
-                                <Ellipse.Style>
-                                    <Style TargetType="Ellipse">
-                                        <Setter Property="Fill" Value="#FF4B55" />
-                                        <Style.Triggers>
-                                            <DataTrigger Binding="{Binding Profile.AcpiKey.HasKey}" Value="True">
-                                                <Setter Property="Fill" Value="#00E599" />
-                                            </DataTrigger>
-                                        </Style.Triggers>
-                                    </Style>
-                                </Ellipse.Style>
-                            </Ellipse>
-                            <TextBlock FontSize="11" FontWeight="Bold">
-                                <TextBlock.Style>
-                                    <Style TargetType="TextBlock">
-                                        <Setter Property="Text" Value="NO OEM LICENSE" />
-                                        <Setter Property="Foreground" Value="#FF4B55" />
-                                        <Style.Triggers>
-                                            <DataTrigger Binding="{Binding Profile.AcpiKey.HasKey}" Value="True">
-                                                <Setter Property="Text" Value="GENUINE OEM PRO" />
-                                                <Setter Property="Foreground" Value="#00E599" />
-                                            </DataTrigger>
-                                        </Style.Triggers>
-                                    </Style>
-                                </TextBlock.Style>
-                            </TextBlock>
-                        </StackPanel>
-                    </Border>
-
-                    <!-- Cloud Status Chip -->
-                    <Border Background="{DynamicResource SurfacePanelBrush}" BorderBrush="{DynamicResource BorderBaseBrush}" BorderThickness="1" CornerRadius="14" Padding="10,4">
-                        <StackPanel Orientation="Horizontal">
-                            <Ellipse Width="7" Height="7" Fill="#00E599" Margin="0,0,6,0" />
-                            <TextBlock Text="{Binding CloudStatusText}" Foreground="{DynamicResource TextSecondaryBrush}" FontSize="11" />
-                        </StackPanel>
-                    </Border>
-                </StackPanel>
-            </Grid>
-        </Border>
-
-        <!-- MAIN BODY -->
-        <Grid Grid.Row="1" Margin="18,14">
-            <Grid.ColumnDefinitions>
-                <!-- Left Hardware & Configuration Column (320px) -->
-                <ColumnDefinition Width="320" />
-                <!-- Right Main HUD & Progress (Rest) -->
-                <ColumnDefinition Width="*" />
-            </Grid.ColumnDefinitions>
-
-            <!-- LEFT CONFIGURATION COLUMN -->
-            <Grid Grid.Column="0" Margin="0,0,14,0">
-                <Grid.RowDefinitions>
-                    <!-- System Details Card -->
-                    <RowDefinition Height="Auto" />
-                    <!-- Storage Target Card -->
-                    <RowDefinition Height="Auto" />
-                    <!-- Driver & Unattend Card -->
-                    <RowDefinition Height="*" />
-                </Grid.RowDefinitions>
-
-                <!-- 1. System Details Card -->
-                <Border Grid.Row="0" Background="{DynamicResource SurfaceCardBrush}" BorderBrush="{DynamicResource BorderBaseBrush}" BorderThickness="1" CornerRadius="8" Padding="14" Margin="0,0,0,12">
+                <!-- LEFT SETTINGS COLUMN -->
+                <ScrollViewer Grid.Column="0" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" Margin="0,0,14,0">
                     <StackPanel>
-                        <TextBlock Text="HARDWARE IDENTIFICATION" Foreground="{DynamicResource TextMutedBrush}" FontSize="10" FontWeight="Bold" Margin="0,0,0,10" />
-                        
-                        <Grid Margin="0,3">
-                            <TextBlock Text="Processor" Foreground="{DynamicResource TextSecondaryBrush}" FontSize="12" />
-                            <TextBlock Text="{Binding Profile.CpuName}" Foreground="{DynamicResource TextPrimaryBrush}" FontSize="12" FontWeight="SemiBold" HorizontalAlignment="Right" TextTrimming="CharacterEllipsis" MaxWidth="190" />
-                        </Grid>
-                        <Grid Margin="0,3">
-                            <TextBlock Text="Cores / Threads" Foreground="{DynamicResource TextSecondaryBrush}" FontSize="12" />
-                            <TextBlock HorizontalAlignment="Right" Foreground="{DynamicResource TextPrimaryBrush}" FontSize="12">
-                                <Run Text="{Binding Profile.CpuCores}" FontWeight="Bold" />
-                                <Run Text=" Cores (" />
-                                <Run Text="{Binding Profile.CpuThreads}" FontWeight="Bold" />
-                                <Run Text=" Threads)" />
-                            </TextBlock>
-                        </Grid>
-                        <Grid Margin="0,3">
-                            <TextBlock Text="Memory (RAM)" Foreground="{DynamicResource TextSecondaryBrush}" FontSize="12" />
-                            <TextBlock HorizontalAlignment="Right" Foreground="{DynamicResource TextPrimaryBrush}" FontSize="12">
-                                <Run Text="{Binding Profile.RamGb, Mode=OneWay}" FontWeight="Bold" />
-                                <Run Text=" GB" />
-                            </TextBlock>
-                        </Grid>
-                        <Grid Margin="0,3">
-                            <TextBlock Text="Firmware Boot" Foreground="{DynamicResource TextSecondaryBrush}" FontSize="12" />
-                            <TextBlock Text="UEFI 64-bit (Native)" Foreground="{DynamicResource StatusGreenBrush}" FontSize="12" FontWeight="SemiBold" HorizontalAlignment="Right" />
-                        </Grid>
-                        <Grid Margin="0,3">
-                            <TextBlock Text="BIOS MSDM Key" Foreground="{DynamicResource TextSecondaryBrush}" FontSize="12" />
-                            <TextBlock Text="{Binding Profile.AcpiKey.MaskedKey}" Foreground="{DynamicResource BrandOrangeBrush}" FontSize="11" FontWeight="SemiBold" HorizontalAlignment="Right" />
-                        </Grid>
-                    </StackPanel>
-                </Border>
-
-                <!-- 2. Target Storage Disk Selector -->
-                <Border Grid.Row="1" Background="{DynamicResource SurfaceCardBrush}" BorderBrush="{DynamicResource BorderBaseBrush}" BorderThickness="1" CornerRadius="8" Padding="14" Margin="0,0,0,12">
-                    <StackPanel>
-                        <Grid Margin="0,0,0,8">
-                            <TextBlock Text="TARGET STORAGE APPLIANCE" Foreground="{DynamicResource TextMutedBrush}" FontSize="10" FontWeight="Bold" VerticalAlignment="Center" />
-                            <Button Content="Rescan" Command="{Binding RefreshDisksCommand}" HorizontalAlignment="Right" FontSize="11" Padding="6,2" Background="Transparent" Foreground="{DynamicResource BrandOrangeBrush}" BorderThickness="0" Cursor="Hand" />
-                        </Grid>
-
-                        <ComboBox ItemsSource="{Binding Disks}" SelectedItem="{Binding SelectedDisk}" DisplayMemberPath="DisplayText" Height="32" Margin="0,4,0,10" Background="{DynamicResource SurfacePanelBrush}" Foreground="{DynamicResource TextPrimaryBrush}" BorderBrush="{DynamicResource BorderBaseBrush}" />
-
-                        <!-- Disk Geometry Diagram -->
-                        <Border Background="{DynamicResource SurfacePanelBrush}" BorderBrush="{DynamicResource BorderSubtleBrush}" BorderThickness="1" CornerRadius="6" Padding="8">
+                        <!-- 6.1 Hardware Details Card -->
+                        <Border Background="{DynamicResource BgPanelBrush}" BorderBrush="{DynamicResource BorderSubtleBrush}" BorderThickness="1" CornerRadius="12" Padding="16,14" Margin="0,0,0,12">
                             <StackPanel>
-                                <TextBlock Text="Standard Depot GPT Partition Layout:" Foreground="{DynamicResource TextMutedBrush}" FontSize="10" Margin="0,0,0,6" />
-                                <Grid Height="22">
-                                    <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="3*" />
-                                        <ColumnDefinition Width="1*" />
-                                        <ColumnDefinition Width="18*" />
-                                        <ColumnDefinition Width="4*" />
-                                    </Grid.ColumnDefinitions>
-                                    <Border Grid.Column="0" Background="#1E3A5F" Margin="1" CornerRadius="2">
-                                        <TextBlock Text="EFI (300M)" Foreground="#60A5FA" FontSize="9" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                <TextBlock Text="HARDWARE" Foreground="{DynamicResource TextMutedBrush}" FontSize="11" FontWeight="Bold" Margin="0,0,0,10" />
+
+                                <Grid Margin="0,4">
+                                    <TextBlock Text="Processor" Foreground="{DynamicResource TextSecondaryBrush}" FontSize="12" />
+                                    <TextBlock Text="{Binding Profile.CpuName}" Foreground="{DynamicResource TextPrimaryBrush}" FontSize="12" FontWeight="Bold" HorizontalAlignment="Right" TextTrimming="CharacterEllipsis" MaxWidth="220" />
+                                </Grid>
+                                <Grid Margin="0,4">
+                                    <TextBlock Text="Cores &amp; threads" Foreground="{DynamicResource TextSecondaryBrush}" FontSize="12" />
+                                    <TextBlock HorizontalAlignment="Right" Foreground="{DynamicResource TextPrimaryBrush}" FontSize="12">
+                                        <Run Text="{Binding Profile.CpuCores}" FontWeight="Bold" />
+                                        <Run Text=" cores, " />
+                                        <Run Text="{Binding Profile.CpuThreads}" FontWeight="Bold" />
+                                        <Run Text=" threads" />
+                                    </TextBlock>
+                                </Grid>
+                                <Grid Margin="0,4">
+                                    <TextBlock Text="Memory" Foreground="{DynamicResource TextSecondaryBrush}" FontSize="12" />
+                                    <TextBlock HorizontalAlignment="Right" Foreground="{DynamicResource TextPrimaryBrush}" FontSize="12">
+                                        <Run Text="{Binding Profile.RamGb, Mode=OneWay}" FontWeight="Bold" />
+                                        <Run Text=" GB" />
+                                    </TextBlock>
+                                </Grid>
+                                <Grid Margin="0,4">
+                                    <TextBlock Text="Firmware" Foreground="{DynamicResource TextSecondaryBrush}" FontSize="12" />
+                                    <Border Background="{DynamicResource SuccessGreenBgBrush}" BorderBrush="{DynamicResource SuccessGreenBrush}" BorderThickness="1" CornerRadius="4" Padding="6,2" HorizontalAlignment="Right">
+                                        <TextBlock Text="UEFI 64-bit" Foreground="{DynamicResource SuccessGreenBrush}" FontSize="11" FontWeight="Bold" />
                                     </Border>
-                                    <Border Grid.Column="1" Background="#262626" Margin="1" CornerRadius="2">
-                                        <TextBlock Text="MSR" Foreground="#A3A3A3" FontSize="8" HorizontalAlignment="Center" VerticalAlignment="Center" />
-                                    </Border>
-                                    <Border Grid.Column="2" Background="{DynamicResource BrandOrangeMutedBrush}" Margin="1" CornerRadius="2">
-                                        <TextBlock Text="Windows OS NTFS (W:\)" Foreground="{DynamicResource BrandOrangeBrush}" FontSize="10" FontWeight="Bold" HorizontalAlignment="Center" VerticalAlignment="Center" />
-                                    </Border>
-                                    <Border Grid.Column="3" Background="#3B2A1E" Margin="1" CornerRadius="2">
-                                        <TextBlock Text="WinRE" Foreground="#FDBA74" FontSize="9" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                </Grid>
+                                <Grid Margin="0,4">
+                                    <TextBlock Text="Windows key" Foreground="{DynamicResource TextSecondaryBrush}" FontSize="12" />
+                                    <Border CornerRadius="4" Padding="6,2" HorizontalAlignment="Right">
+                                        <Border.Style>
+                                            <Style TargetType="Border">
+                                                <Setter Property="Background" Value="{DynamicResource WarningAmberBgBrush}" />
+                                                <Setter Property="BorderBrush" Value="{DynamicResource WarningAmberBrush}" />
+                                                <Setter Property="BorderThickness" Value="1" />
+                                                <Style.Triggers>
+                                                    <DataTrigger Binding="{Binding Profile.AcpiKey.HasKey}" Value="True">
+                                                        <Setter Property="Background" Value="{DynamicResource SuccessGreenBgBrush}" />
+                                                        <Setter Property="BorderBrush" Value="{DynamicResource SuccessGreenBrush}" />
+                                                    </DataTrigger>
+                                                </Style.Triggers>
+                                            </Style>
+                                        </Border.Style>
+                                        <TextBlock FontSize="11" FontWeight="Bold">
+                                            <TextBlock.Style>
+                                                <Style TargetType="TextBlock">
+                                                    <Setter Property="Text" Value="Not detected" />
+                                                    <Setter Property="Foreground" Value="{DynamicResource WarningAmberBrush}" />
+                                                    <Style.Triggers>
+                                                        <DataTrigger Binding="{Binding Profile.AcpiKey.HasKey}" Value="True">
+                                                            <Setter Property="Text" Value="Detected" />
+                                                            <Setter Property="Foreground" Value="{DynamicResource SuccessGreenBrush}" />
+                                                        </DataTrigger>
+                                                    </Style.Triggers>
+                                                </Style>
+                                            </TextBlock.Style>
+                                        </TextBlock>
                                     </Border>
                                 </Grid>
                             </StackPanel>
                         </Border>
-                    </StackPanel>
-                </Border>
 
-                <!-- 3. DriverVault & Staging Configuration -->
-                <Border Grid.Row="2" Background="{DynamicResource SurfaceCardBrush}" BorderBrush="{DynamicResource BorderBaseBrush}" BorderThickness="1" CornerRadius="8" Padding="14">
-                    <StackPanel>
-                        <TextBlock Text="DRIVERVAULT &amp; AUTOMATION" Foreground="{DynamicResource TextMutedBrush}" FontSize="10" FontWeight="Bold" Margin="0,0,0,10" />
-
-                        <Border Background="{DynamicResource SurfacePanelBrush}" BorderBrush="{DynamicResource BorderSubtleBrush}" BorderThickness="1" CornerRadius="6" Padding="10" Margin="0,0,0,8">
+                        <!-- 6.2 Target Disk Card -->
+                        <Border Background="{DynamicResource BgPanelBrush}" BorderBrush="{DynamicResource BorderSubtleBrush}" BorderThickness="1" CornerRadius="12" Padding="16,14" Margin="0,0,0,12">
                             <StackPanel>
-                                <TextBlock Text="Hardware Driver Match" Foreground="{DynamicResource TextMutedBrush}" FontSize="10" />
-                                <TextBlock Foreground="{DynamicResource StatusGreenBrush}" FontSize="12" FontWeight="SemiBold" Margin="0,2,0,0">
-                                    <Run Text="✓ " />
-                                    <Run Text="{Binding Profile.Manufacturer}" />
-                                    <Run Text=" " />
-                                    <Run Text="{Binding Profile.Model}" />
-                                </TextBlock>
-                                <TextBlock Text="18 signed INF driver packages ready" Foreground="{DynamicResource TextSecondaryBrush}" FontSize="11" Margin="0,2,0,0" />
+                                <Grid Margin="0,0,0,8">
+                                    <TextBlock Text="TARGET DISK" Foreground="{DynamicResource TextMutedBrush}" FontSize="11" FontWeight="Bold" VerticalAlignment="Center" />
+                                    <Button Content="Rescan (F5)" Command="{Binding RescanDisksCommand}" HorizontalAlignment="Right" FontSize="11" Padding="6,2" Background="Transparent" Foreground="{DynamicResource BrandVioletBrush}" BorderThickness="0" Cursor="Hand" />
+                                </Grid>
+
+                                <!-- Styled Select Dropdown (40px) -->
+                                <ComboBox ItemsSource="{Binding Disks}" SelectedItem="{Binding SelectedDisk}" DisplayMemberPath="DisplayText" Height="40" Background="{DynamicResource BgCardBrush}" Foreground="{DynamicResource TextPrimaryBrush}" BorderBrush="{DynamicResource BorderSubtleBrush}" IsEnabled="{Binding IsRunning, Converter={x:Null}}" Margin="0,0,0,10" />
+
+                                <!-- Partition Layout Bar (22px) -->
+                                <Border Background="{DynamicResource BgCardBrush}" BorderBrush="{DynamicResource BorderSubtleBrush}" BorderThickness="1" CornerRadius="6" Padding="8" Margin="0,0,0,8">
+                                    <StackPanel>
+                                        <TextBlock Text="Standard depot GPT partition layout:" Foreground="{DynamicResource TextMutedBrush}" FontSize="10" Margin="0,0,0,6" />
+                                        <Grid Height="22">
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="3*" />
+                                                <ColumnDefinition Width="1*" />
+                                                <ColumnDefinition Width="18*" />
+                                                <ColumnDefinition Width="4*" />
+                                            </Grid.ColumnDefinitions>
+                                            <!-- EFI (Blue) -->
+                                            <Border Grid.Column="0" Background="{DynamicResource InfoBlueBgBrush}" BorderBrush="{DynamicResource InfoBlueBrush}" BorderThickness="1" Margin="1" CornerRadius="3">
+                                                <TextBlock Text="EFI 300M" Foreground="{DynamicResource InfoBlueBrush}" FontSize="9" FontWeight="Bold" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                            </Border>
+                                            <!-- MSR (Grey) -->
+                                            <Border Grid.Column="1" Background="#222834" Margin="1" CornerRadius="3">
+                                                <TextBlock Text="MSR" Foreground="{DynamicResource TextMutedBrush}" FontSize="8" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                            </Border>
+                                            <!-- Windows NTFS (Violet) -->
+                                            <Border Grid.Column="2" Background="{DynamicResource BrandVioletMutedBrush}" BorderBrush="{DynamicResource BrandVioletBrush}" BorderThickness="1" Margin="1" CornerRadius="3">
+                                                <TextBlock Text="Windows NTFS (W:)" Foreground="{DynamicResource BrandVioletBrush}" FontSize="10" FontWeight="Bold" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                            </Border>
+                                            <!-- WinRE (Neutral) -->
+                                            <Border Grid.Column="3" Background="#2B3242" Margin="1" CornerRadius="3">
+                                                <TextBlock Text="WinRE" Foreground="{DynamicResource TextSecondaryBrush}" FontSize="9" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                            </Border>
+                                        </Grid>
+                                    </StackPanel>
+                                </Border>
+
+                                <!-- Live Warning Chip under layout -->
+                                <Border Background="{DynamicResource DangerRedBgBrush}" BorderBrush="{DynamicResource DangerRedBrush}" BorderThickness="1" CornerRadius="4" Padding="6,3" Margin="0,2,0,0"
+                                        Visibility="{Binding IsLiveMode, Converter={StaticResource BoolToVis}}">
+                                    <TextBlock Text="All data on this disk will be erased." Foreground="{DynamicResource DangerRedBrush}" FontSize="11" FontWeight="SemiBold" HorizontalAlignment="Center" />
+                                </Border>
                             </StackPanel>
                         </Border>
 
-                        <Border Background="{DynamicResource SurfacePanelBrush}" BorderBrush="{DynamicResource BorderSubtleBrush}" BorderThickness="1" CornerRadius="6" Padding="10" Margin="0,0,0,8">
-                            <StackPanel>
-                                <TextBlock Text="Panther OOBE Automation" Foreground="{DynamicResource TextMutedBrush}" FontSize="10" />
-                                <TextBlock Text="✓ Microsoft Account Login Bypassed" Foreground="{DynamicResource TextPrimaryBrush}" FontSize="11" Margin="0,2,0,0" />
-                                <TextBlock Text="✓ Auto-Logon Enabled (User)" Foreground="{DynamicResource TextPrimaryBrush}" FontSize="11" Margin="0,1,0,0" />
-                                <TextBlock Text="✓ VeloxBench Auto-Launch Hooked" Foreground="{DynamicResource BrandOrangeBrush}" FontSize="11" FontWeight="SemiBold" Margin="0,1,0,0" />
-                            </StackPanel>
+                        <!-- 6.3 Image Selection Card -->
+                        <Border Background="{DynamicResource BgPanelBrush}" BorderBrush="{DynamicResource BorderSubtleBrush}" BorderThickness="1" CornerRadius="12" Padding="16,14" Margin="0,0,0,12">
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <StackPanel Grid.Column="0">
+                                    <TextBlock Text="IMAGE" Foreground="{DynamicResource TextMutedBrush}" FontSize="11" FontWeight="Bold" Margin="0,0,0,6" />
+                                    <TextBlock Text="Windows 11 Pro 24H2 (x64)" Foreground="{DynamicResource TextPrimaryBrush}" FontSize="13" FontWeight="Bold" />
+                                    <TextBlock Text="14.5 GB • Streamed from local repository" Foreground="{DynamicResource TextSecondaryBrush}" FontSize="11" Margin="0,2,0,0" />
+                                </StackPanel>
+                                <Button Grid.Column="1" Content="Change" Foreground="{DynamicResource BrandVioletBrush}" Background="Transparent" BorderThickness="0" FontSize="11" Cursor="Hand" VerticalAlignment="Center" />
+                            </Grid>
                         </Border>
 
-                        <CheckBox IsChecked="{Binding AutoReboot}" Content="Auto-Reboot on Complete (15s)" Foreground="{DynamicResource TextSecondaryBrush}" FontSize="12" VerticalAlignment="Center" Margin="0,4,0,0" />
+                        <!-- 6.4 Drivers and Automation Card -->
+                        <Border Background="{DynamicResource BgPanelBrush}" BorderBrush="{DynamicResource BorderSubtleBrush}" BorderThickness="1" CornerRadius="12" Padding="16,14">
+                            <StackPanel>
+                                <TextBlock Text="DRIVERS &amp; AUTOMATION" Foreground="{DynamicResource TextMutedBrush}" FontSize="11" FontWeight="Bold" Margin="0,0,0,10" />
+
+                                <!-- Driver Match Row -->
+                                <Border Background="{DynamicResource BgCardBrush}" BorderBrush="{DynamicResource BorderSubtleBrush}" BorderThickness="1" CornerRadius="8" Padding="10" Margin="0,0,0,12">
+                                    <Grid>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="Auto" />
+                                        </Grid.ColumnDefinitions>
+                                        <StackPanel Grid.Column="0">
+                                            <TextBlock Text="{Binding Profile.Model}" Foreground="{DynamicResource TextPrimaryBrush}" FontSize="12" FontWeight="Bold" />
+                                            <TextBlock Text="18 signed driver packages ready" Foreground="{DynamicResource TextMutedBrush}" FontSize="11" Margin="0,2,0,0" />
+                                        </StackPanel>
+                                        <Border Grid.Column="1" Background="{DynamicResource SuccessGreenBgBrush}" BorderBrush="{DynamicResource SuccessGreenBrush}" BorderThickness="1" CornerRadius="4" Padding="6,2" VerticalAlignment="Center">
+                                            <TextBlock Text="Matched" Foreground="{DynamicResource SuccessGreenBrush}" FontSize="11" FontWeight="Bold" />
+                                        </Border>
+                                    </Grid>
+                                </Border>
+
+                                <!-- Toggle Switches (Violet on, Grey off) -->
+                                <CheckBox Style="{StaticResource ModernToggleSwitch}" Content="Skip Microsoft account sign-in" IsChecked="{Binding Config.SkipMicrosoftAccount}" IsEnabled="{Binding IsRunning, Converter={x:Null}}" Margin="0,4" />
+                                <CheckBox Style="{StaticResource ModernToggleSwitch}" Content="Auto-logon (User)" IsChecked="{Binding Config.AutoLogonUser}" IsEnabled="{Binding IsRunning, Converter={x:Null}}" Margin="0,4" />
+                                <CheckBox Style="{StaticResource ModernToggleSwitch}" Content="Launch Velox Bench after first boot" IsChecked="{Binding Config.LaunchVeloxBench}" IsEnabled="{Binding IsRunning, Converter={x:Null}}" Margin="0,4" />
+                                <CheckBox Style="{StaticResource ModernToggleSwitch}" Content="Reboot automatically when done (15 s)" IsChecked="{Binding Config.AutoReboot}" IsEnabled="{Binding IsRunning, Converter={x:Null}}" Margin="0,4" />
+                            </StackPanel>
+                        </Border>
                     </StackPanel>
-                </Border>
-            </Grid>
+                </ScrollViewer>
 
-            <!-- RIGHT COCKPIT -->
-            <Grid Grid.Column="1">
-                <Grid.RowDefinitions>
-                    <!-- Pipeline Step Indicator (48px) -->
-                    <RowDefinition Height="52" />
-                    <!-- Hero Telemetry Box (160px) -->
-                    <RowDefinition Height="165" />
-                    <!-- Monospace Console Terminal (*) -->
-                    <RowDefinition Height="*" />
-                </Grid.RowDefinitions>
+                <!-- CENTER PIPELINE COLUMN -->
+                <Grid Grid.Column="1">
+                    <Grid.RowDefinitions>
+                        <!-- 7.1 Step Indicator Card (58px) -->
+                        <RowDefinition Height="58" />
+                        <!-- 7.2 Progress Card (170px) -->
+                        <RowDefinition Height="170" />
+                        <!-- 7.3 Preflight / Summary Card (Auto) -->
+                        <RowDefinition Height="Auto" />
+                        <!-- 7.4 Deployment Log (*) -->
+                        <RowDefinition Height="*" />
+                    </Grid.RowDefinitions>
 
-                <!-- 1. Pipeline Stepper -->
-                <Border Grid.Row="0" Background="{DynamicResource SurfaceCardBrush}" BorderBrush="{DynamicResource BorderBaseBrush}" BorderThickness="1" CornerRadius="8" Padding="12,6" Margin="0,0,0,12">
-                    <Grid VerticalAlignment="Center">
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="*" />
-                            <ColumnDefinition Width="*" />
-                            <ColumnDefinition Width="*" />
-                            <ColumnDefinition Width="*" />
-                            <ColumnDefinition Width="*" />
-                            <ColumnDefinition Width="*" />
-                        </Grid.ColumnDefinitions>
-
-                        <!-- Step 1: Probe -->
-                        <StackPanel Grid.Column="0" Orientation="Horizontal" HorizontalAlignment="Center">
-                            <Ellipse Width="18" Height="18" Fill="{DynamicResource BrandOrangeBrush}" Margin="0,0,6,0">
-                                <Ellipse.Effect>
-                                    <DropShadowEffect Color="{DynamicResource BrandOrangeColor}" BlurRadius="8" ShadowDepth="0" Opacity="0.6"/>
-                                </Ellipse.Effect>
-                            </Ellipse>
-                            <TextBlock Text="1. PROBE" Foreground="{DynamicResource TextPrimaryBrush}" FontSize="11" FontWeight="Bold" VerticalAlignment="Center" />
-                        </StackPanel>
-
-                        <!-- Step 2: Partition -->
-                        <StackPanel Grid.Column="1" Orientation="Horizontal" HorizontalAlignment="Center">
-                            <Ellipse Width="18" Height="18" Margin="0,0,6,0"
-                                     Fill="{Binding ProgressPercent, Converter={x:Null}}">
-                                <Ellipse.Style>
-                                    <Style TargetType="Ellipse">
-                                        <Setter Property="Fill" Value="#2A2F3D" />
-                                        <Style.Triggers>
-                                            <DataTrigger Binding="{Binding CurrentStage}" Value="DiskPartitioning">
-                                                <Setter Property="Fill" Value="{DynamicResource BrandOrangeBrush}" />
-                                            </DataTrigger>
-                                            <DataTrigger Binding="{Binding CurrentStage}" Value="WimStreaming">
-                                                <Setter Property="Fill" Value="#00E599" />
-                                            </DataTrigger>
-                                            <DataTrigger Binding="{Binding CurrentStage}" Value="DriverInjection">
-                                                <Setter Property="Fill" Value="#00E599" />
-                                            </DataTrigger>
-                                            <DataTrigger Binding="{Binding CurrentStage}" Value="UnattendProvisioning">
-                                                <Setter Property="Fill" Value="#00E599" />
-                                            </DataTrigger>
-                                            <DataTrigger Binding="{Binding CurrentStage}" Value="BootloaderConfig">
-                                                <Setter Property="Fill" Value="#00E599" />
-                                            </DataTrigger>
-                                            <DataTrigger Binding="{Binding CurrentStage}" Value="Completed">
-                                                <Setter Property="Fill" Value="#00E599" />
-                                            </DataTrigger>
-                                        </Style.Triggers>
-                                    </Style>
-                                </Ellipse.Style>
-                            </Ellipse>
-                            <TextBlock Text="2. PARTITION" Foreground="{DynamicResource TextSecondaryBrush}" FontSize="11" FontWeight="SemiBold" VerticalAlignment="Center" />
-                        </StackPanel>
-
-                        <!-- Step 3: Stream -->
-                        <StackPanel Grid.Column="2" Orientation="Horizontal" HorizontalAlignment="Center">
-                            <Ellipse Width="18" Height="18" Margin="0,0,6,0">
-                                <Ellipse.Style>
-                                    <Style TargetType="Ellipse">
-                                        <Setter Property="Fill" Value="#2A2F3D" />
-                                        <Style.Triggers>
-                                            <DataTrigger Binding="{Binding CurrentStage}" Value="WimStreaming">
-                                                <Setter Property="Fill" Value="{DynamicResource BrandOrangeBrush}" />
-                                            </DataTrigger>
-                                            <DataTrigger Binding="{Binding CurrentStage}" Value="DriverInjection">
-                                                <Setter Property="Fill" Value="#00E599" />
-                                            </DataTrigger>
-                                            <DataTrigger Binding="{Binding CurrentStage}" Value="UnattendProvisioning">
-                                                <Setter Property="Fill" Value="#00E599" />
-                                            </DataTrigger>
-                                            <DataTrigger Binding="{Binding CurrentStage}" Value="BootloaderConfig">
-                                                <Setter Property="Fill" Value="#00E599" />
-                                            </DataTrigger>
-                                            <DataTrigger Binding="{Binding CurrentStage}" Value="Completed">
-                                                <Setter Property="Fill" Value="#00E599" />
-                                            </DataTrigger>
-                                        </Style.Triggers>
-                                    </Style>
-                                </Ellipse.Style>
-                            </Ellipse>
-                            <TextBlock Text="3. STREAM WIM" Foreground="{DynamicResource TextSecondaryBrush}" FontSize="11" FontWeight="SemiBold" VerticalAlignment="Center" />
-                        </StackPanel>
-
-                        <!-- Step 4: DriverVault -->
-                        <StackPanel Grid.Column="3" Orientation="Horizontal" HorizontalAlignment="Center">
-                            <Ellipse Width="18" Height="18" Margin="0,0,6,0">
-                                <Ellipse.Style>
-                                    <Style TargetType="Ellipse">
-                                        <Setter Property="Fill" Value="#2A2F3D" />
-                                        <Style.Triggers>
-                                            <DataTrigger Binding="{Binding CurrentStage}" Value="DriverInjection">
-                                                <Setter Property="Fill" Value="{DynamicResource BrandOrangeBrush}" />
-                                            </DataTrigger>
-                                            <DataTrigger Binding="{Binding CurrentStage}" Value="UnattendProvisioning">
-                                                <Setter Property="Fill" Value="#00E599" />
-                                            </DataTrigger>
-                                            <DataTrigger Binding="{Binding CurrentStage}" Value="BootloaderConfig">
-                                                <Setter Property="Fill" Value="#00E599" />
-                                            </DataTrigger>
-                                            <DataTrigger Binding="{Binding CurrentStage}" Value="Completed">
-                                                <Setter Property="Fill" Value="#00E599" />
-                                            </DataTrigger>
-                                        </Style.Triggers>
-                                    </Style>
-                                </Ellipse.Style>
-                            </Ellipse>
-                            <TextBlock Text="4. DRIVERS" Foreground="{DynamicResource TextSecondaryBrush}" FontSize="11" FontWeight="SemiBold" VerticalAlignment="Center" />
-                        </StackPanel>
-
-                        <!-- Step 5: Unattend -->
-                        <StackPanel Grid.Column="4" Orientation="Horizontal" HorizontalAlignment="Center">
-                            <Ellipse Width="18" Height="18" Margin="0,0,6,0">
-                                <Ellipse.Style>
-                                    <Style TargetType="Ellipse">
-                                        <Setter Property="Fill" Value="#2A2F3D" />
-                                        <Style.Triggers>
-                                            <DataTrigger Binding="{Binding CurrentStage}" Value="UnattendProvisioning">
-                                                <Setter Property="Fill" Value="{DynamicResource BrandOrangeBrush}" />
-                                            </DataTrigger>
-                                            <DataTrigger Binding="{Binding CurrentStage}" Value="BootloaderConfig">
-                                                <Setter Property="Fill" Value="#00E599" />
-                                            </DataTrigger>
-                                            <DataTrigger Binding="{Binding CurrentStage}" Value="Completed">
-                                                <Setter Property="Fill" Value="#00E599" />
-                                            </DataTrigger>
-                                        </Style.Triggers>
-                                    </Style>
-                                </Ellipse.Style>
-                            </Ellipse>
-                            <TextBlock Text="5. UNATTEND" Foreground="{DynamicResource TextSecondaryBrush}" FontSize="11" FontWeight="SemiBold" VerticalAlignment="Center" />
-                        </StackPanel>
-
-                        <!-- Step 6: Ready -->
-                        <StackPanel Grid.Column="5" Orientation="Horizontal" HorizontalAlignment="Center">
-                            <Ellipse Width="18" Height="18" Margin="0,0,6,0">
-                                <Ellipse.Style>
-                                    <Style TargetType="Ellipse">
-                                        <Setter Property="Fill" Value="#2A2F3D" />
-                                        <Style.Triggers>
-                                            <DataTrigger Binding="{Binding CurrentStage}" Value="Completed">
-                                                <Setter Property="Fill" Value="#00E599" />
-                                            </DataTrigger>
-                                        </Style.Triggers>
-                                    </Style>
-                                </Ellipse.Style>
-                            </Ellipse>
-                            <TextBlock Text="6. READY" Foreground="{DynamicResource TextSecondaryBrush}" FontSize="11" FontWeight="SemiBold" VerticalAlignment="Center" />
-                        </StackPanel>
-                    </Grid>
-                </Border>
-
-                <!-- 2. Hero Telemetry Box -->
-                <Border Grid.Row="1" Background="{DynamicResource SurfaceCardBrush}" BorderBrush="{DynamicResource BorderBaseBrush}" BorderThickness="1" CornerRadius="8" Padding="18,14" Margin="0,0,0,12">
-                    <Grid>
-                        <Grid.RowDefinitions>
-                            <!-- Top metrics row -->
-                            <RowDefinition Height="Auto" />
-                            <!-- Big Progress Bar -->
-                            <RowDefinition Height="Auto" />
-                            <!-- Action and Timers -->
-                            <RowDefinition Height="Auto" />
-                        </Grid.RowDefinitions>
-
-                        <!-- Row 0: Large Metrics -->
-                        <Grid Grid.Row="0" Margin="0,0,0,12">
+                    <!-- 7.1 STEP INDICATOR (Probe, Partition, Stream image, Drivers, Unattend, Ready) -->
+                    <Border Grid.Row="0" Background="{DynamicResource BgPanelBrush}" BorderBrush="{DynamicResource BorderSubtleBrush}" BorderThickness="1" CornerRadius="12" Padding="14,8" Margin="0,0,0,12">
+                        <Grid VerticalAlignment="Center">
                             <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="Auto" />
                                 <ColumnDefinition Width="*" />
-                                <ColumnDefinition Width="Auto" />
-                                <ColumnDefinition Width="Auto" />
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="*" />
                             </Grid.ColumnDefinitions>
 
-                            <!-- Big Percentage -->
-                            <StackPanel Grid.Column="0" Orientation="Horizontal">
-                                <TextBlock Text="{Binding ProgressPercent, StringFormat={}{0:F1}}" Foreground="{DynamicResource BrandOrangeBrush}" FontSize="38" FontWeight="Bold" VerticalAlignment="Bottom" />
-                                <TextBlock Text="%" Foreground="{DynamicResource BrandOrangeBrush}" FontSize="20" FontWeight="SemiBold" Margin="4,0,0,4" VerticalAlignment="Bottom" />
+                            <!-- Step 1: Probe -->
+                            <StackPanel Grid.Column="0" Orientation="Horizontal" HorizontalAlignment="Center">
+                                <Border Width="22" Height="22" CornerRadius="11" Background="{DynamicResource SuccessGreenBrush}" Margin="0,0,8,0">
+                                    <TextBlock Text="✓" Foreground="#000000" FontSize="11" FontWeight="Bold" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                </Border>
+                                <StackPanel VerticalAlignment="Center">
+                                    <TextBlock Text="1. Probe" Foreground="{DynamicResource TextPrimaryBrush}" FontSize="12" FontWeight="Bold" />
+                                    <TextBlock Text="Done" Foreground="{DynamicResource SuccessGreenBrush}" FontSize="10" />
+                                </StackPanel>
                             </StackPanel>
 
-                            <!-- Center Status Action -->
-                            <TextBlock Grid.Column="1" Text="{Binding CurrentActionText}" Foreground="{DynamicResource TextPrimaryBrush}" FontSize="15" FontWeight="SemiBold" VerticalAlignment="Center" Margin="24,0,0,0" TextTrimming="CharacterEllipsis" />
+                            <!-- Step 2: Partition -->
+                            <StackPanel Grid.Column="1" Orientation="Horizontal" HorizontalAlignment="Center">
+                                <Border Width="22" Height="22" CornerRadius="11" Margin="0,0,8,0">
+                                    <Border.Style>
+                                        <Style TargetType="Border">
+                                            <Setter Property="Background" Value="Transparent" />
+                                            <Setter Property="BorderBrush" Value="{DynamicResource BorderStrongBrush}" />
+                                            <Setter Property="BorderThickness" Value="1.5" />
+                                            <Style.Triggers>
+                                                <DataTrigger Binding="{Binding CurrentStage}" Value="DiskPartitioning">
+                                                    <Setter Property="Background" Value="{DynamicResource InfoBlueBrush}" />
+                                                    <Setter Property="BorderBrush" Value="{DynamicResource InfoBlueBrush}" />
+                                                </DataTrigger>
+                                                <DataTrigger Binding="{Binding CurrentStage}" Value="WimStreaming">
+                                                    <Setter Property="Background" Value="{DynamicResource SuccessGreenBrush}" />
+                                                    <Setter Property="BorderBrush" Value="{DynamicResource SuccessGreenBrush}" />
+                                                </DataTrigger>
+                                                <DataTrigger Binding="{Binding CurrentStage}" Value="DriverInjection">
+                                                    <Setter Property="Background" Value="{DynamicResource SuccessGreenBrush}" />
+                                                    <Setter Property="BorderBrush" Value="{DynamicResource SuccessGreenBrush}" />
+                                                </DataTrigger>
+                                                <DataTrigger Binding="{Binding CurrentStage}" Value="UnattendProvisioning">
+                                                    <Setter Property="Background" Value="{DynamicResource SuccessGreenBrush}" />
+                                                    <Setter Property="BorderBrush" Value="{DynamicResource SuccessGreenBrush}" />
+                                                </DataTrigger>
+                                                <DataTrigger Binding="{Binding CurrentStage}" Value="BootloaderConfig">
+                                                    <Setter Property="Background" Value="{DynamicResource SuccessGreenBrush}" />
+                                                    <Setter Property="BorderBrush" Value="{DynamicResource SuccessGreenBrush}" />
+                                                </DataTrigger>
+                                                <DataTrigger Binding="{Binding CurrentStage}" Value="Completed">
+                                                    <Setter Property="Background" Value="{DynamicResource SuccessGreenBrush}" />
+                                                    <Setter Property="BorderBrush" Value="{DynamicResource SuccessGreenBrush}" />
+                                                </DataTrigger>
+                                            </Style.Triggers>
+                                        </Style>
+                                    </Border.Style>
+                                    <TextBlock Text="2" Foreground="{DynamicResource TextPrimaryBrush}" FontSize="11" FontWeight="Bold" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                </Border>
+                                <StackPanel VerticalAlignment="Center">
+                                    <TextBlock Text="2. Partition" Foreground="{DynamicResource TextPrimaryBrush}" FontSize="12" FontWeight="SemiBold" />
+                                    <TextBlock Text="Waiting" Foreground="{DynamicResource TextMutedBrush}" FontSize="10" />
+                                </StackPanel>
+                            </StackPanel>
 
-                            <!-- Write Speed Gauge -->
-                            <Border Grid.Column="2" Background="{DynamicResource SurfacePanelBrush}" BorderBrush="{DynamicResource BorderSubtleBrush}" BorderThickness="1" CornerRadius="6" Padding="12,6" Margin="0,0,14,0">
-                                <StackPanel HorizontalAlignment="Center">
-                                    <TextBlock Text="THROUGHPUT" Foreground="{DynamicResource TextMutedBrush}" FontSize="9" FontWeight="Bold" />
-                                    <StackPanel Orientation="Horizontal" Margin="0,2,0,0">
-                                        <TextBlock Text="{Binding SpeedMBps, StringFormat={}{0:F1}}" Foreground="{DynamicResource StatusGreenBrush}" FontSize="16" FontWeight="Bold" />
-                                        <TextBlock Text=" MB/s" Foreground="{DynamicResource TextSecondaryBrush}" FontSize="11" VerticalAlignment="Bottom" Margin="2,0,0,1" />
+                            <!-- Step 3: Stream image -->
+                            <StackPanel Grid.Column="2" Orientation="Horizontal" HorizontalAlignment="Center">
+                                <Border Width="22" Height="22" CornerRadius="11" Margin="0,0,8,0">
+                                    <Border.Style>
+                                        <Style TargetType="Border">
+                                            <Setter Property="Background" Value="Transparent" />
+                                            <Setter Property="BorderBrush" Value="{DynamicResource BorderStrongBrush}" />
+                                            <Setter Property="BorderThickness" Value="1.5" />
+                                            <Style.Triggers>
+                                                <DataTrigger Binding="{Binding CurrentStage}" Value="WimStreaming">
+                                                    <Setter Property="Background" Value="{DynamicResource InfoBlueBrush}" />
+                                                    <Setter Property="BorderBrush" Value="{DynamicResource InfoBlueBrush}" />
+                                                </DataTrigger>
+                                                <DataTrigger Binding="{Binding CurrentStage}" Value="DriverInjection">
+                                                    <Setter Property="Background" Value="{DynamicResource SuccessGreenBrush}" />
+                                                    <Setter Property="BorderBrush" Value="{DynamicResource SuccessGreenBrush}" />
+                                                </DataTrigger>
+                                                <DataTrigger Binding="{Binding CurrentStage}" Value="UnattendProvisioning">
+                                                    <Setter Property="Background" Value="{DynamicResource SuccessGreenBrush}" />
+                                                    <Setter Property="BorderBrush" Value="{DynamicResource SuccessGreenBrush}" />
+                                                </DataTrigger>
+                                                <DataTrigger Binding="{Binding CurrentStage}" Value="BootloaderConfig">
+                                                    <Setter Property="Background" Value="{DynamicResource SuccessGreenBrush}" />
+                                                    <Setter Property="BorderBrush" Value="{DynamicResource SuccessGreenBrush}" />
+                                                </DataTrigger>
+                                                <DataTrigger Binding="{Binding CurrentStage}" Value="Completed">
+                                                    <Setter Property="Background" Value="{DynamicResource SuccessGreenBrush}" />
+                                                    <Setter Property="BorderBrush" Value="{DynamicResource SuccessGreenBrush}" />
+                                                </DataTrigger>
+                                            </Style.Triggers>
+                                        </Style>
+                                    </Border.Style>
+                                    <TextBlock Text="3" Foreground="{DynamicResource TextPrimaryBrush}" FontSize="11" FontWeight="Bold" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                </Border>
+                                <StackPanel VerticalAlignment="Center">
+                                    <TextBlock Text="3. Stream" Foreground="{DynamicResource TextPrimaryBrush}" FontSize="12" FontWeight="SemiBold" />
+                                    <TextBlock Text="Waiting" Foreground="{DynamicResource TextMutedBrush}" FontSize="10" />
+                                </StackPanel>
+                            </StackPanel>
+
+                            <!-- Step 4: Drivers -->
+                            <StackPanel Grid.Column="3" Orientation="Horizontal" HorizontalAlignment="Center">
+                                <Border Width="22" Height="22" CornerRadius="11" Margin="0,0,8,0">
+                                    <Border.Style>
+                                        <Style TargetType="Border">
+                                            <Setter Property="Background" Value="Transparent" />
+                                            <Setter Property="BorderBrush" Value="{DynamicResource BorderStrongBrush}" />
+                                            <Setter Property="BorderThickness" Value="1.5" />
+                                            <Style.Triggers>
+                                                <DataTrigger Binding="{Binding CurrentStage}" Value="DriverInjection">
+                                                    <Setter Property="Background" Value="{DynamicResource InfoBlueBrush}" />
+                                                    <Setter Property="BorderBrush" Value="{DynamicResource InfoBlueBrush}" />
+                                                </DataTrigger>
+                                                <DataTrigger Binding="{Binding CurrentStage}" Value="UnattendProvisioning">
+                                                    <Setter Property="Background" Value="{DynamicResource SuccessGreenBrush}" />
+                                                    <Setter Property="BorderBrush" Value="{DynamicResource SuccessGreenBrush}" />
+                                                </DataTrigger>
+                                                <DataTrigger Binding="{Binding CurrentStage}" Value="BootloaderConfig">
+                                                    <Setter Property="Background" Value="{DynamicResource SuccessGreenBrush}" />
+                                                    <Setter Property="BorderBrush" Value="{DynamicResource SuccessGreenBrush}" />
+                                                </DataTrigger>
+                                                <DataTrigger Binding="{Binding CurrentStage}" Value="Completed">
+                                                    <Setter Property="Background" Value="{DynamicResource SuccessGreenBrush}" />
+                                                    <Setter Property="BorderBrush" Value="{DynamicResource SuccessGreenBrush}" />
+                                                </DataTrigger>
+                                            </Style.Triggers>
+                                        </Style>
+                                    </Border.Style>
+                                    <TextBlock Text="4" Foreground="{DynamicResource TextPrimaryBrush}" FontSize="11" FontWeight="Bold" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                </Border>
+                                <StackPanel VerticalAlignment="Center">
+                                    <TextBlock Text="4. Drivers" Foreground="{DynamicResource TextPrimaryBrush}" FontSize="12" FontWeight="SemiBold" />
+                                    <TextBlock Text="Waiting" Foreground="{DynamicResource TextMutedBrush}" FontSize="10" />
+                                </StackPanel>
+                            </StackPanel>
+
+                            <!-- Step 5: Unattend -->
+                            <StackPanel Grid.Column="4" Orientation="Horizontal" HorizontalAlignment="Center">
+                                <Border Width="22" Height="22" CornerRadius="11" Margin="0,0,8,0">
+                                    <Border.Style>
+                                        <Style TargetType="Border">
+                                            <Setter Property="Background" Value="Transparent" />
+                                            <Setter Property="BorderBrush" Value="{DynamicResource BorderStrongBrush}" />
+                                            <Setter Property="BorderThickness" Value="1.5" />
+                                            <Style.Triggers>
+                                                <DataTrigger Binding="{Binding CurrentStage}" Value="UnattendProvisioning">
+                                                    <Setter Property="Background" Value="{DynamicResource InfoBlueBrush}" />
+                                                    <Setter Property="BorderBrush" Value="{DynamicResource InfoBlueBrush}" />
+                                                </DataTrigger>
+                                                <DataTrigger Binding="{Binding CurrentStage}" Value="BootloaderConfig">
+                                                    <Setter Property="Background" Value="{DynamicResource SuccessGreenBrush}" />
+                                                    <Setter Property="BorderBrush" Value="{DynamicResource SuccessGreenBrush}" />
+                                                </DataTrigger>
+                                                <DataTrigger Binding="{Binding CurrentStage}" Value="Completed">
+                                                    <Setter Property="Background" Value="{DynamicResource SuccessGreenBrush}" />
+                                                    <Setter Property="BorderBrush" Value="{DynamicResource SuccessGreenBrush}" />
+                                                </DataTrigger>
+                                            </Style.Triggers>
+                                        </Style>
+                                    </Border.Style>
+                                    <TextBlock Text="5" Foreground="{DynamicResource TextPrimaryBrush}" FontSize="11" FontWeight="Bold" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                </Border>
+                                <StackPanel VerticalAlignment="Center">
+                                    <TextBlock Text="5. Unattend" Foreground="{DynamicResource TextPrimaryBrush}" FontSize="12" FontWeight="SemiBold" />
+                                    <TextBlock Text="Waiting" Foreground="{DynamicResource TextMutedBrush}" FontSize="10" />
+                                </StackPanel>
+                            </StackPanel>
+
+                            <!-- Step 6: Ready -->
+                            <StackPanel Grid.Column="5" Orientation="Horizontal" HorizontalAlignment="Center">
+                                <Border Width="22" Height="22" CornerRadius="11" Margin="0,0,8,0">
+                                    <Border.Style>
+                                        <Style TargetType="Border">
+                                            <Setter Property="Background" Value="Transparent" />
+                                            <Setter Property="BorderBrush" Value="{DynamicResource BorderStrongBrush}" />
+                                            <Setter Property="BorderThickness" Value="1.5" />
+                                            <Style.Triggers>
+                                                <DataTrigger Binding="{Binding CurrentStage}" Value="Completed">
+                                                    <Setter Property="Background" Value="{DynamicResource SuccessGreenBrush}" />
+                                                    <Setter Property="BorderBrush" Value="{DynamicResource SuccessGreenBrush}" />
+                                                </DataTrigger>
+                                            </Style.Triggers>
+                                        </Style>
+                                    </Border.Style>
+                                    <TextBlock Text="6" Foreground="{DynamicResource TextPrimaryBrush}" FontSize="11" FontWeight="Bold" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                </Border>
+                                <StackPanel VerticalAlignment="Center">
+                                    <TextBlock Text="6. Ready" Foreground="{DynamicResource TextPrimaryBrush}" FontSize="12" FontWeight="SemiBold" />
+                                    <TextBlock Text="Waiting" Foreground="{DynamicResource TextMutedBrush}" FontSize="10" />
+                                </StackPanel>
+                            </StackPanel>
+                        </Grid>
+                    </Border>
+
+                    <!-- 7.2 PROGRESS CARD -->
+                    <Border Grid.Row="1" Background="{DynamicResource BgPanelBrush}" BorderBrush="{DynamicResource BorderSubtleBrush}" BorderThickness="1" CornerRadius="12" Padding="20,16" Margin="0,0,0,12">
+                        <Grid>
+                            <Grid.RowDefinitions>
+                                <!-- Hero Stats Row -->
+                                <RowDefinition Height="*" />
+                                <!-- 10px Progress Bar -->
+                                <RowDefinition Height="Auto" />
+                            </Grid.RowDefinitions>
+
+                            <Grid Grid.Row="0">
+                                <Grid.ColumnDefinitions>
+                                    <!-- Percentage & Current Activity -->
+                                    <ColumnDefinition Width="*" />
+                                    <!-- 4 Stat Boxes (Throughput, Applied, Elapsed, Remaining) -->
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+
+                                <!-- Left: 52px Percentage & Mode Chip -->
+                                <StackPanel Grid.Column="0" VerticalAlignment="Center">
+                                    <StackPanel Orientation="Horizontal">
+                                        <TextBlock Text="{Binding ProgressPercent, StringFormat={}{0:F1}}" Foreground="{DynamicResource TextPrimaryBrush}" FontSize="52" FontWeight="Bold" />
+                                        <TextBlock Text="%" Foreground="{DynamicResource TextSecondaryBrush}" FontSize="24" FontWeight="SemiBold" Margin="4,0,0,8" VerticalAlignment="Bottom" />
+                                        
+                                        <!-- Mode Chip -->
+                                        <Border CornerRadius="12" Padding="10,4" Margin="16,0,0,12" VerticalAlignment="Bottom">
+                                            <Border.Style>
+                                                <Style TargetType="Border">
+                                                    <Setter Property="Background" Value="{DynamicResource InfoBlueBgBrush}" />
+                                                    <Setter Property="BorderBrush" Value="{DynamicResource InfoBlueBrush}" />
+                                                    <Setter Property="BorderThickness" Value="1" />
+                                                    <Style.Triggers>
+                                                        <DataTrigger Binding="{Binding IsLiveMode}" Value="True">
+                                                            <Setter Property="Background" Value="{DynamicResource DangerRedBgBrush}" />
+                                                            <Setter Property="BorderBrush" Value="{DynamicResource DangerRedBrush}" />
+                                                        </DataTrigger>
+                                                    </Style.Triggers>
+                                                </Style>
+                                            </Border.Style>
+                                            <TextBlock FontSize="11" FontWeight="Bold">
+                                                <TextBlock.Style>
+                                                    <Style TargetType="TextBlock">
+                                                        <Setter Property="Text" Value="Dry run, nothing is written" />
+                                                        <Setter Property="Foreground" Value="{DynamicResource InfoBlueBrush}" />
+                                                        <Style.Triggers>
+                                                            <DataTrigger Binding="{Binding IsLiveMode}" Value="True">
+                                                                <Setter Property="Text" Value="Live deployment" />
+                                                                <Setter Property="Foreground" Value="{DynamicResource DangerRedBrush}" />
+                                                            </DataTrigger>
+                                                        </Style.Triggers>
+                                                    </Style>
+                                                </TextBlock.Style>
+                                            </TextBlock>
+                                        </Border>
                                     </StackPanel>
-                                </StackPanel>
-                            </Border>
 
-                            <!-- Processed Data -->
-                            <Border Grid.Column="3" Background="{DynamicResource SurfacePanelBrush}" BorderBrush="{DynamicResource BorderSubtleBrush}" BorderThickness="1" CornerRadius="6" Padding="12,6">
-                                <StackPanel HorizontalAlignment="Center">
-                                    <TextBlock Text="DATA APPLIED" Foreground="{DynamicResource TextMutedBrush}" FontSize="9" FontWeight="Bold" />
-                                    <TextBlock Text="{Binding BytesText}" Foreground="{DynamicResource TextPrimaryBrush}" FontSize="14" FontWeight="SemiBold" Margin="0,3,0,0" />
+                                    <!-- Current Activity -->
+                                    <TextBlock Text="{Binding CurrentActionText}" Foreground="{DynamicResource TextPrimaryBrush}" FontSize="15" FontWeight="SemiBold" Margin="0,4,0,0" />
                                 </StackPanel>
+
+                                <!-- Right: 4 Stat Boxes -->
+                                <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
+                                    <!-- Throughput -->
+                                    <Border Background="{DynamicResource BgCardBrush}" BorderBrush="{DynamicResource BorderSubtleBrush}" BorderThickness="1" CornerRadius="8" Padding="14,8" Margin="0,0,8,0">
+                                        <StackPanel HorizontalAlignment="Center">
+                                            <TextBlock Text="THROUGHPUT" Foreground="{DynamicResource TextMutedBrush}" FontSize="9" FontWeight="Bold" />
+                                            <StackPanel Orientation="Horizontal" Margin="0,2,0,0">
+                                                <TextBlock Text="{Binding SpeedMBps, StringFormat={}{0:F1}}" Foreground="{DynamicResource InfoBlueBrush}" FontSize="16" FontWeight="Bold" />
+                                                <TextBlock Text=" MB/s" Foreground="{DynamicResource TextSecondaryBrush}" FontSize="11" VerticalAlignment="Bottom" Margin="2,0,0,1" />
+                                            </StackPanel>
+                                        </StackPanel>
+                                    </Border>
+
+                                    <!-- Data Applied -->
+                                    <Border Background="{DynamicResource BgCardBrush}" BorderBrush="{DynamicResource BorderSubtleBrush}" BorderThickness="1" CornerRadius="8" Padding="14,8" Margin="0,0,8,0">
+                                        <StackPanel HorizontalAlignment="Center">
+                                            <TextBlock Text="DATA APPLIED" Foreground="{DynamicResource TextMutedBrush}" FontSize="9" FontWeight="Bold" />
+                                            <TextBlock Text="{Binding BytesText}" Foreground="{DynamicResource TextPrimaryBrush}" FontSize="14" FontWeight="Bold" Margin="0,4,0,0" />
+                                        </StackPanel>
+                                    </Border>
+
+                                    <!-- Elapsed -->
+                                    <Border Background="{DynamicResource BgCardBrush}" BorderBrush="{DynamicResource BorderSubtleBrush}" BorderThickness="1" CornerRadius="8" Padding="14,8" Margin="0,0,8,0">
+                                        <StackPanel HorizontalAlignment="Center">
+                                            <TextBlock Text="ELAPSED" Foreground="{DynamicResource TextMutedBrush}" FontSize="9" FontWeight="Bold" />
+                                            <TextBlock Text="{Binding ElapsedText}" FontFamily="Consolas, monospace" Foreground="{DynamicResource TextSecondaryBrush}" FontSize="14" FontWeight="Bold" Margin="0,4,0,0" />
+                                        </StackPanel>
+                                    </Border>
+
+                                    <!-- Remaining -->
+                                    <Border Background="{DynamicResource BgCardBrush}" BorderBrush="{DynamicResource BorderSubtleBrush}" BorderThickness="1" CornerRadius="8" Padding="14,8">
+                                        <StackPanel HorizontalAlignment="Center">
+                                            <TextBlock Text="REMAINING" Foreground="{DynamicResource TextMutedBrush}" FontSize="9" FontWeight="Bold" />
+                                            <TextBlock Text="{Binding RemainingText}" FontFamily="Consolas, monospace" Foreground="{DynamicResource TextPrimaryBrush}" FontSize="14" FontWeight="Bold" Margin="0,4,0,0" />
+                                        </StackPanel>
+                                    </Border>
+                                </StackPanel>
+                            </Grid>
+
+                            <!-- 10px Progress Bar (Blue while running, Green when done, Red if failed) -->
+                            <Border Grid.Row="1" Height="10" Background="{DynamicResource BgCardBrush}" CornerRadius="5" BorderBrush="{DynamicResource BorderSubtleBrush}" BorderThickness="1" Margin="0,10,0,0">
+                                <ProgressBar Value="{Binding ProgressPercent}" Minimum="0" Maximum="100" Height="8" Background="Transparent" BorderThickness="0" Margin="1">
+                                    <ProgressBar.Style>
+                                        <Style TargetType="ProgressBar">
+                                            <Setter Property="Foreground" Value="{DynamicResource InfoBlueBrush}" />
+                                            <Style.Triggers>
+                                                <DataTrigger Binding="{Binding IsCompleted}" Value="True">
+                                                    <Setter Property="Foreground" Value="{DynamicResource SuccessGreenBrush}" />
+                                                </DataTrigger>
+                                                <DataTrigger Binding="{Binding IsFailed}" Value="True">
+                                                    <Setter Property="Foreground" Value="{DynamicResource DangerRedBrush}" />
+                                                </DataTrigger>
+                                            </Style.Triggers>
+                                        </Style>
+                                    </ProgressBar.Style>
+                                </ProgressBar>
                             </Border>
                         </Grid>
+                    </Border>
 
-                        <!-- Row 1: High-Tech Progress Bar -->
-                        <Border Grid.Row="1" Height="14" Background="{DynamicResource SurfacePanelBrush}" CornerRadius="7" BorderBrush="{DynamicResource BorderSubtleBrush}" BorderThickness="1">
-                            <ProgressBar Value="{Binding ProgressPercent}" Minimum="0" Maximum="100" Height="12" Foreground="{DynamicResource BrandOrangeBrush}" Background="Transparent" BorderThickness="0" Margin="1" />
+                    <!-- 7.3 PREFLIGHT CHECKS CARD (Ready state only) -->
+                    <Border Grid.Row="2" Background="{DynamicResource BgPanelBrush}" BorderBrush="{DynamicResource BorderSubtleBrush}" BorderThickness="1" CornerRadius="12" Padding="16,12" Margin="0,0,0,12"
+                            Visibility="{Binding IsCompleted, Converter={StaticResource BoolToVis}}">
+                        <!-- Swapped to Complete Summary Card when completed -->
+                        <Border.Style>
+                            <Style TargetType="Border">
+                                <Setter Property="Visibility" Value="Visible" />
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding IsCompleted}" Value="True">
+                                        <Setter Property="Background" Value="{DynamicResource SuccessGreenBgBrush}" />
+                                        <Setter Property="BorderBrush" Value="{DynamicResource SuccessGreenBrush}" />
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </Border.Style>
+
+                        <Grid>
+                            <!-- Normal Preflight (when not completed) -->
+                            <StackPanel Visibility="{Binding IsCompleted, Converter={x:Null}}">
+                                <Grid Margin="0,0,0,8">
+                                    <TextBlock Text="PREFLIGHT CHECKS" Foreground="{DynamicResource TextMutedBrush}" FontSize="11" FontWeight="Bold" VerticalAlignment="Center" />
+                                    <Border Background="{DynamicResource SuccessGreenBgBrush}" BorderBrush="{DynamicResource SuccessGreenBrush}" BorderThickness="1" CornerRadius="4" Padding="8,3" HorizontalAlignment="Right">
+                                        <TextBlock Text="{Binding PreflightSummaryText}" Foreground="{DynamicResource SuccessGreenBrush}" FontSize="11" FontWeight="Bold" />
+                                    </Border>
+                                </Grid>
+
+                                <ItemsControl ItemsSource="{Binding PreflightChecks}">
+                                    <ItemsControl.ItemsPanel>
+                                        <ItemsPanelTemplate>
+                                            <UniformGrid Columns="4" />
+                                        </ItemsPanelTemplate>
+                                    </ItemsControl.ItemsPanel>
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate>
+                                            <Border Background="{DynamicResource BgCardBrush}" BorderBrush="{DynamicResource BorderSubtleBrush}" BorderThickness="1" CornerRadius="8" Padding="10" Margin="4,0">
+                                                <StackPanel>
+                                                    <StackPanel Orientation="Horizontal">
+                                                        <TextBlock Text="✓" Foreground="{DynamicResource SuccessGreenBrush}" FontWeight="Bold" Margin="0,0,6,0" />
+                                                        <TextBlock Text="{Binding Name}" Foreground="{DynamicResource TextPrimaryBrush}" FontSize="12" FontWeight="Bold" />
+                                                    </StackPanel>
+                                                    <TextBlock Text="{Binding Message}" Foreground="{DynamicResource TextSecondaryBrush}" FontSize="10" Margin="0,4,0,0" TextTrimming="CharacterEllipsis" />
+                                                </StackPanel>
+                                            </Border>
+                                        </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                </ItemsControl>
+                            </StackPanel>
+
+                            <!-- Complete State Summary (when completed) -->
+                            <StackPanel Visibility="{Binding IsCompleted, Converter={StaticResource BoolToVis}}">
+                                <Grid>
+                                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                        <TextBlock Text="✓" Foreground="{DynamicResource SuccessGreenBrush}" FontSize="18" FontWeight="Bold" Margin="0,0,10,0" />
+                                        <TextBlock Text="Deployment complete" Foreground="{DynamicResource SuccessGreenBrush}" FontSize="15" FontWeight="Bold" VerticalAlignment="Center" />
+                                        <TextBlock Text="• Windows 11 Pro 24H2 • 18 drivers injected • Velox Bench will start on first boot." Foreground="{DynamicResource TextPrimaryBrush}" FontSize="13" Margin="12,0,0,0" VerticalAlignment="Center" />
+                                    </StackPanel>
+                                    <Border Background="{DynamicResource SuccessGreenBgBrush}" BorderBrush="{DynamicResource SuccessGreenBrush}" BorderThickness="1" CornerRadius="4" Padding="8,4" HorizontalAlignment="Right">
+                                        <TextBlock Text="READY FOR QC" Foreground="{DynamicResource SuccessGreenBrush}" FontSize="11" FontWeight="Bold" />
+                                    </Border>
+                                </Grid>
+                            </StackPanel>
+                        </Grid>
+                    </Border>
+
+                    <!-- 7.4 DEPLOYMENT LOG (Filter, Copy, Save log, Monospace lines) -->
+                    <Border Grid.Row="3" Background="{DynamicResource BgInsetBrush}" BorderBrush="{DynamicResource BorderSubtleBrush}" BorderThickness="1" CornerRadius="12" Padding="14">
+                        <Grid>
+                            <Grid.RowDefinitions>
+                                <!-- Log Header & Filter Toolbar -->
+                                <RowDefinition Height="Auto" />
+                                <!-- Scrollable Log Items -->
+                                <RowDefinition Height="*" />
+                            </Grid.RowDefinitions>
+
+                            <Grid Grid.Row="0" Margin="0,0,0,10">
+                                <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                    <TextBlock Text="DEPLOYMENT LOG" Foreground="{DynamicResource TextMutedBrush}" FontSize="11" FontWeight="Bold" VerticalAlignment="Center" Margin="0,0,16,0" />
+                                    
+                                    <!-- Filter segmented control -->
+                                    <RadioButton Content="All" IsChecked="True" GroupName="LogFilter" Margin="0,0,10,0" Foreground="{DynamicResource TextSecondaryBrush}" FontSize="11" />
+                                    <RadioButton Content="Warnings" GroupName="LogFilter" Margin="0,0,10,0" Foreground="{DynamicResource TextSecondaryBrush}" FontSize="11" />
+                                    <RadioButton Content="Errors" GroupName="LogFilter" Foreground="{DynamicResource TextSecondaryBrush}" FontSize="11" />
+                                </StackPanel>
+
+                                <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+                                    <Button Content="Copy" Command="{Binding CopyLogCommand}" Height="26" Padding="10,0" Margin="0,0,8,0" Background="{DynamicResource BgCardBrush}" Foreground="{DynamicResource TextSecondaryBrush}" BorderBrush="{DynamicResource BorderSubtleBrush}" BorderThickness="1" FontSize="11" Cursor="Hand" />
+                                    <Button Content="Save log (Ctrl+S)" Command="{Binding SaveLogCommand}" Height="26" Padding="10,0" Background="{DynamicResource BgCardBrush}" Foreground="{DynamicResource TextSecondaryBrush}" BorderBrush="{DynamicResource BorderSubtleBrush}" BorderThickness="1" FontSize="11" Cursor="Hand" />
+                                </StackPanel>
+                            </Grid>
+
+                            <!-- Log List Box -->
+                            <ListBox Grid.Row="1" ItemsSource="{Binding FilteredLogs}" Background="Transparent" BorderThickness="0" ScrollViewer.HorizontalScrollBarVisibility="Disabled">
+                                <ListBox.ItemTemplate>
+                                    <DataTemplate>
+                                        <Grid Margin="0,2">
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="70" />
+                                                <ColumnDefinition Width="75" />
+                                                <ColumnDefinition Width="*" />
+                                            </Grid.ColumnDefinitions>
+                                            <TextBlock Grid.Column="0" Text="{Binding Timestamp, StringFormat={}{0:HH:mm:ss}}" FontFamily="Consolas, monospace" FontSize="12" Foreground="{DynamicResource TextMutedBrush}" />
+                                            <TextBlock Grid.Column="1" Text="{Binding Source, StringFormat={}[{0}]}" FontFamily="Consolas, monospace" FontSize="12" Foreground="{DynamicResource InfoBlueBrush}" FontWeight="SemiBold" />
+                                            <TextBlock Grid.Column="2" Text="{Binding Message}" FontFamily="Consolas, monospace" FontSize="12" Foreground="{DynamicResource TextPrimaryBrush}" TextWrapping="Wrap" />
+                                        </Grid>
+                                    </DataTemplate>
+                                </ListBox.ItemTemplate>
+                            </ListBox>
+                        </Grid>
+                    </Border>
+                </Grid>
+            </Grid>
+
+            <!-- 4. BOTTOM ACTION BAR (76px) -->
+            <Border Grid.Row="3" Background="{DynamicResource BgPanelBrush}" BorderBrush="{DynamicResource BorderSubtleBrush}" BorderThickness="0,1,0,0">
+                <Grid Margin="20,0">
+                    <Grid.ColumnDefinitions>
+                        <!-- Mode Switch & Helper Text -->
+                        <ColumnDefinition Width="Auto" />
+                        <!-- Spacer -->
+                        <ColumnDefinition Width="*" />
+                        <!-- Action Buttons -->
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+
+                    <!-- Left: Mode Switch (42px) & Helper Text -->
+                    <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center">
+                        <!-- Two-Part Segmented Control (42px) -->
+                        <Border Background="{DynamicResource BgCardBrush}" BorderBrush="{DynamicResource BorderSubtleBrush}" BorderThickness="1" CornerRadius="8" Height="42" Padding="3" Margin="0,0,16,0">
+                            <StackPanel Orientation="Horizontal">
+                                <RadioButton Content="Dry run" IsChecked="{Binding IsDryRunMode}" Height="34" Padding="14,0" GroupName="DeployModeGroup"
+                                             IsEnabled="{Binding IsRunning, Converter={x:Null}}"
+                                             Background="Transparent" Foreground="{DynamicResource TextPrimaryBrush}" FontSize="12" FontWeight="SemiBold" />
+                                <RadioButton Content="Live, writes to disk" IsChecked="{Binding IsLiveMode}" Height="34" Padding="14,0" GroupName="DeployModeGroup"
+                                             IsEnabled="{Binding IsRunning, Converter={x:Null}}"
+                                             Background="Transparent" FontSize="12" FontWeight="SemiBold">
+                                    <RadioButton.Style>
+                                        <Style TargetType="RadioButton">
+                                            <Setter Property="Foreground" Value="{DynamicResource TextSecondaryBrush}" />
+                                            <Style.Triggers>
+                                                <Trigger Property="IsChecked" Value="True">
+                                                    <Setter Property="Foreground" Value="#FFFFFF" />
+                                                </Trigger>
+                                            </Style.Triggers>
+                                        </Style>
+                                    </RadioButton.Style>
+                                </RadioButton>
+                            </StackPanel>
                         </Border>
 
-                        <!-- Row 2: Timers & Stats -->
-                        <Grid Grid.Row="2" Margin="4,10,4,0">
-                            <StackPanel Orientation="Horizontal">
-                                <TextBlock Text="Elapsed: " Foreground="{DynamicResource TextMutedBrush}" FontSize="11" />
-                                <TextBlock Text="{Binding ElapsedText}" Foreground="{DynamicResource TextSecondaryBrush}" FontSize="11" FontWeight="SemiBold" />
-                                <TextBlock Text="  •  Estimated Remaining: " Foreground="{DynamicResource TextMutedBrush}" FontSize="11" Margin="8,0,0,0" />
-                                <TextBlock Text="{Binding RemainingText}" Foreground="{DynamicResource BrandOrangeBrush}" FontSize="11" FontWeight="SemiBold" />
-                            </StackPanel>
+                        <!-- Mode Helper Text -->
+                        <TextBlock Text="{Binding ModeHelperText}" Foreground="{DynamicResource TextMutedBrush}" FontSize="12" VerticalAlignment="Center" />
+                    </StackPanel>
 
-                            <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
-                                <TextBlock Text="Mode: " Foreground="{DynamicResource TextMutedBrush}" FontSize="11" />
-                                <TextBlock Text="SIMULATION (DRY-RUN)" Foreground="{DynamicResource StatusYellowBrush}" FontSize="11" FontWeight="Bold" Visibility="{Binding IsDryRun, Converter={x:Null}}" />
-                            </StackPanel>
-                        </Grid>
-                    </Grid>
-                </Border>
+                    <!-- Right: Action Buttons -->
+                    <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center">
+                        <!-- Secondary Action Button (Abort / Save log) -->
+                        <Button Content="{Binding SecondaryButtonText}" Command="{Binding SecondaryActionCommand}" Height="40" Padding="16,0" Margin="0,0,12,0" 
+                                Background="{DynamicResource BgCardBrush}" Foreground="{DynamicResource DangerRedBrush}" BorderBrush="{DynamicResource DangerRedBrush}" BorderThickness="1" Cursor="Hand"
+                                Visibility="{Binding CanExecuteSecondaryAction, Converter={x:Null}}" />
 
-                <!-- 3. Monospace Console Terminal -->
-                <Border Grid.Row="2" Background="#07080B" BorderBrush="{DynamicResource BorderBaseBrush}" BorderThickness="1" CornerRadius="8" Padding="10">
-                    <Grid>
-                        <Grid.RowDefinitions>
-                            <RowDefinition Height="Auto" />
-                            <RowDefinition Height="*" />
-                        </Grid.RowDefinitions>
-
-                        <!-- Terminal Title Bar -->
-                        <Grid Grid.Row="0" Margin="4,0,4,8">
-                            <StackPanel Orientation="Horizontal">
-                                <Ellipse Width="9" Height="9" Fill="#FF4B55" Margin="0,0,6,0" />
-                                <Ellipse Width="9" Height="9" Fill="#FFB800" Margin="0,0,6,0" />
-                                <Ellipse Width="9" Height="9" Fill="#00E599" Margin="0,0,8,0" />
-                                <TextBlock Text="PROVISIONING HUD TERMINAL — WINPE SUBSYSTEM" Foreground="{DynamicResource TextMutedBrush}" FontSize="10" FontWeight="Bold" VerticalAlignment="Center" />
-                            </StackPanel>
-
-                            <TextBlock Text="LIVE BUFFER" Foreground="{DynamicResource TextMutedBrush}" FontSize="9" HorizontalAlignment="Right" VerticalAlignment="Center" />
-                        </Grid>
-
-                        <!-- Monospace Console Log TextBox -->
-                        <TextBox x:Name="ConsoleLogBox" Grid.Row="1" Text="{Binding ConsoleOutput, Mode=OneWay}" 
-                                 FontFamily="Consolas, Segoe UI Mono, Courier New" FontSize="11" 
-                                 Foreground="#E2E8F0" Background="Transparent" 
-                                 BorderThickness="0" IsReadOnly="True" TextWrapping="Wrap" 
-                                 VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled"
-                                 TextChanged="ConsoleLogBox_TextChanged" />
-                    </Grid>
-                </Border>
-            </Grid>
+                        <!-- Primary Action Button (Start dry run / Deploy to Disk 0... / Reboot now) -->
+                        <Button Content="{Binding PrimaryButtonText}" Command="{Binding PrimaryActionCommand}" Height="40" Padding="22,0" FontWeight="Bold" FontSize="13" BorderThickness="0" Cursor="Hand">
+                            <Button.Style>
+                                <Style TargetType="Button">
+                                    <!-- Violet for Dry run & Normal actions -->
+                                    <Setter Property="Background" Value="{DynamicResource BrandVioletBrush}" />
+                                    <Setter Property="Foreground" Value="#FFFFFF" />
+                                    <Style.Triggers>
+                                        <!-- Solid Red for Live deployment -->
+                                        <DataTrigger Binding="{Binding IsLiveMode}" Value="True">
+                                            <Setter Property="Background" Value="{DynamicResource DangerRedButtonBrush}" />
+                                            <Setter Property="Foreground" Value="#FFFFFF" />
+                                        </DataTrigger>
+                                        <DataTrigger Binding="{Binding IsRunning}" Value="True">
+                                            <Setter Property="Opacity" Value="0.6" />
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </Button.Style>
+                        </Button>
+                    </StackPanel>
+                </Grid>
+            </Border>
         </Grid>
 
-        <!-- ACTION TOOLBAR (64px) -->
-        <Border Grid.Row="2" Background="{DynamicResource SurfaceCardBrush}" BorderBrush="{DynamicResource BorderBaseBrush}" BorderThickness="0,1,0,0">
-            <Grid Margin="18,0">
-                <Grid.ColumnDefinitions>
-                    <!-- Mode switch & options -->
-                    <ColumnDefinition Width="Auto" />
-                    <ColumnDefinition Width="*" />
-                    <!-- Action buttons -->
-                    <ColumnDefinition Width="Auto" />
-                </Grid.ColumnDefinitions>
+        <!-- 9. LIVE CONFIRMATION MODAL DIALOG (560px centered over dimmed backdrop) -->
+        <Grid Background="#B0000000" Visibility="{Binding IsConfirmationDialogOpen, Converter={StaticResource BoolToVis}}">
+            <Border Width="560" Background="{DynamicResource BgPanelBrush}" BorderBrush="{DynamicResource DangerRedBrush}" BorderThickness="1.5" CornerRadius="12" Padding="24" HorizontalAlignment="Center" VerticalAlignment="Center">
+                <StackPanel>
+                    <!-- Header with Red Exclamation Circle -->
+                    <StackPanel Orientation="Horizontal" Margin="0,0,0,16">
+                        <Border Width="36" Height="36" CornerRadius="18" Background="{DynamicResource DangerRedBgBrush}" BorderBrush="{DynamicResource DangerRedBrush}" BorderThickness="1.5" Margin="0,0,12,0">
+                            <TextBlock Text="!" Foreground="{DynamicResource DangerRedBrush}" FontSize="20" FontWeight="Black" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                        </Border>
+                        <StackPanel VerticalAlignment="Center">
+                            <TextBlock Text="Erase Disk and deploy?" Foreground="{DynamicResource TextPrimaryBrush}" FontSize="18" FontWeight="Bold" />
+                            <TextBlock Text="This action will replace the operating system on the target drive." Foreground="{DynamicResource TextSecondaryBrush}" FontSize="12" Margin="0,2,0,0" />
+                        </StackPanel>
+                    </StackPanel>
 
-                <!-- Left: Mode Selection -->
-                <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center">
-                    <RadioButton IsChecked="{Binding IsDryRun}" Content="Dry-Run Simulation Mode (Safe Demo)" Foreground="{DynamicResource TextSecondaryBrush}" FontSize="12" Margin="0,0,16,0" IsEnabled="{Binding IsRunning, Converter={x:Null}}" />
-                    <RadioButton IsChecked="{Binding IsDryRun, Converter={x:Null}}" Content="Armed Live Target Mode (Real Disk Write)" Foreground="{DynamicResource TextSecondaryBrush}" FontSize="12" IsEnabled="{Binding IsRunning, Converter={x:Null}}" />
+                    <!-- Summary Rows Card -->
+                    <Border Background="{DynamicResource BgCardBrush}" BorderBrush="{DynamicResource BorderSubtleBrush}" BorderThickness="1" CornerRadius="8" Padding="14" Margin="0,0,0,14">
+                        <StackPanel>
+                            <Grid Margin="0,3">
+                                <TextBlock Text="Target Disk:" Foreground="{DynamicResource TextSecondaryBrush}" FontSize="12" />
+                                <TextBlock Text="{Binding SelectedDisk.DisplayText}" Foreground="{DynamicResource TextPrimaryBrush}" FontSize="12" FontWeight="Bold" HorizontalAlignment="Right" />
+                            </Grid>
+                            <Grid Margin="0,3">
+                                <TextBlock Text="Image Payload:" Foreground="{DynamicResource TextSecondaryBrush}" FontSize="12" />
+                                <TextBlock Text="Windows 11 Pro 24H2 (14.5 GB)" Foreground="{DynamicResource TextPrimaryBrush}" FontSize="12" FontWeight="Bold" HorizontalAlignment="Right" />
+                            </Grid>
+                            <Grid Margin="0,3">
+                                <TextBlock Text="Depot Unit:" Foreground="{DynamicResource TextSecondaryBrush}" FontSize="12" />
+                                <TextBlock HorizontalAlignment="Right" Foreground="{DynamicResource TextPrimaryBrush}" FontSize="12">
+                                    <Run Text="{Binding Profile.Model}" FontWeight="Bold" />
+                                    <Run Text=" (SN: " />
+                                    <Run Text="{Binding Profile.BiosSerial}" FontWeight="Bold" />
+                                    <Run Text=")" />
+                                </TextBlock>
+                            </Grid>
+                        </StackPanel>
+                    </Border>
+
+                    <!-- Permanent Erase Warning -->
+                    <Border Background="{DynamicResource DangerRedBgBrush}" BorderBrush="{DynamicResource DangerRedBrush}" BorderThickness="1" CornerRadius="6" Padding="10" Margin="0,0,0,14">
+                        <TextBlock Text="All partitions and data on this disk will be permanently erased. This cannot be undone." Foreground="{DynamicResource DangerRedBrush}" FontSize="12" FontWeight="SemiBold" TextWrapping="Wrap" />
+                    </Border>
+
+                    <!-- Safety Check Confirmation Lines -->
+                    <StackPanel Margin="0,0,0,16">
+                        <StackPanel Orientation="Horizontal" Margin="0,2">
+                            <TextBlock Text="✓" Foreground="{DynamicResource SuccessGreenBrush}" FontWeight="Bold" Margin="0,0,8,0" />
+                            <TextBlock Text="Target disk is verified and is not the boot media." Foreground="{DynamicResource TextSecondaryBrush}" FontSize="12" />
+                        </StackPanel>
+                        <StackPanel Orientation="Horizontal" Margin="0,2">
+                            <TextBlock Text="✓" Foreground="{DynamicResource SuccessGreenBrush}" FontWeight="Bold" Margin="0,0,8,0" />
+                            <TextBlock Text="Image payload and 18 driver packages are verified." Foreground="{DynamicResource TextSecondaryBrush}" FontSize="12" />
+                        </StackPanel>
+                    </StackPanel>
+
+                    <!-- Typed Confirmation Field ('Type ERASE to confirm') -->
+                    <TextBlock Text="Type ERASE to confirm:" Foreground="{DynamicResource TextPrimaryBrush}" FontSize="12" FontWeight="Bold" Margin="0,0,0,6" />
+                    <TextBox Text="{Binding ConfirmationInput, UpdateSourceTrigger=PropertyChanged}" Height="38" Background="{DynamicResource BgInsetBrush}" Foreground="{DynamicResource TextPrimaryBrush}" BorderBrush="{DynamicResource BorderStrongBrush}" FontSize="14" FontFamily="Consolas, monospace" FontWeight="Bold" Padding="10,8" Margin="0,0,0,20" />
+
+                    <!-- Dialog Action Buttons -->
+                    <Grid>
+                        <Button Content="Cancel" Command="{Binding CancelConfirmationCommand}" Width="100" Height="38" HorizontalAlignment="Left" Background="{DynamicResource BgCardBrush}" Foreground="{DynamicResource TextPrimaryBrush}" BorderBrush="{DynamicResource BorderSubtleBrush}" BorderThickness="1" Cursor="Hand" />
+                        <Button Content="Erase and deploy" Command="{Binding ConfirmLiveDeployCommand}" Width="160" Height="38" HorizontalAlignment="Right" Background="{DynamicResource DangerRedButtonBrush}" Foreground="#FFFFFF" FontWeight="Bold" BorderThickness="0" Cursor="Hand" IsEnabled="{Binding CanConfirmLive}" />
+                    </Grid>
                 </StackPanel>
-
-                <!-- Right: Action Buttons -->
-                <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center">
-                    <!-- Abort Button (when running) -->
-                    <Button Content="Abort Pipeline" Command="{Binding AbortCommand}" Height="38" Padding="16,0" Margin="0,0,12,0" Background="#331416" Foreground="{DynamicResource StatusRedBrush}" BorderBrush="{DynamicResource StatusRedBrush}" BorderThickness="1" Cursor="Hand" Visibility="{Binding IsRunning, Converter={x:Null}}" />
-
-                    <!-- Dry-Run Simulation Button -->
-                    <Button Content="Simulate Deployment (Dry-Run)" Command="{Binding SimulateDeployCommand}" Height="38" Padding="18,0" Margin="0,0,12,0" Background="{DynamicResource SurfacePanelBrush}" Foreground="{DynamicResource TextPrimaryBrush}" BorderBrush="{DynamicResource BorderBaseBrush}" BorderThickness="1" Cursor="Hand" IsEnabled="{Binding IsRunning, Converter={x:Null}}" />
-
-                    <!-- Live Armed Deploy Button -->
-                    <Button Content="⚡ START LIVE DEPLOYMENT" Command="{Binding StartDeployCommand}" Height="38" Padding="22,0" Background="{DynamicResource BrandOrangeBrush}" Foreground="#0A0B0E" FontWeight="Bold" BorderThickness="0" Cursor="Hand" IsEnabled="{Binding IsRunning, Converter={x:Null}}">
-                        <Button.Effect>
-                            <DropShadowEffect Color="{DynamicResource BrandOrangeColor}" BlurRadius="12" ShadowDepth="0" Opacity="0.5"/>
-                        </Button.Effect>
-                    </Button>
-                </StackPanel>
-            </Grid>
-        </Border>
+            </Border>
+        </Grid>
     </Grid>
 </Window>

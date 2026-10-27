@@ -1,5 +1,4 @@
 using System.Windows;
-using System.Windows.Controls;
 
 namespace VeloxDeploy
 {
@@ -8,11 +7,6 @@ namespace VeloxDeploy
         public MainWindow()
         {
             InitializeComponent();
-        }
-
-        private void ConsoleLogBox_TextChanged(object sender, TextChangedEventArgs e)
-        {
-            ConsoleLogBox.ScrollToEnd();
         }
     }
 }

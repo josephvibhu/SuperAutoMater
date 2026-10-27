@@ -1,55 +1,75 @@
 <ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
                     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
 
-    <!-- Velox Deploy Electric Orange Tokens (Light Theme) -->
-    <Color x:Key="BrandOrangeColor">#D95F00</Color>
-    <Color x:Key="BrandOrangeHoverColor">#C25400</Color>
-    <Color x:Key="BrandOrangePressedColor">#A84900</Color>
-    <Color x:Key="BrandOrangeMutedColor">#FFEBD6</Color>
+    <!-- Velox Deploy Semantic Color Tokens (Light Theme per Handoff Spec) -->
 
-    <SolidColorBrush x:Key="BrandOrangeBrush" Color="{StaticResource BrandOrangeColor}" />
-    <SolidColorBrush x:Key="BrandOrangeHoverBrush" Color="{StaticResource BrandOrangeHoverColor}" />
-    <SolidColorBrush x:Key="BrandOrangePressedBrush" Color="{StaticResource BrandOrangePressedColor}" />
-    <SolidColorBrush x:Key="BrandOrangeMutedBrush" Color="{StaticResource BrandOrangeMutedColor}" />
+    <!-- Surfaces -->
+    <Color x:Key="BgAppColor">#F5F7FA</Color>
+    <Color x:Key="BgPanelColor">#FFFFFF</Color>
+    <Color x:Key="BgCardColor">#F8FAFC</Color>
+    <Color x:Key="BgInsetColor">#EEF2F6</Color>
+    <Color x:Key="BgHoverColor">#E2E8F0</Color>
 
-    <!-- Surfaces & Backgrounds -->
-    <Color x:Key="SurfaceBgColor">#F5F7FA</Color>
-    <Color x:Key="SurfaceCardColor">#FFFFFF</Color>
-    <Color x:Key="SurfaceCardHoverColor">#F0F3F7</Color>
-    <Color x:Key="SurfacePanelColor">#EDF1F7</Color>
-
-    <SolidColorBrush x:Key="SurfaceBgBrush" Color="{StaticResource SurfaceBgColor}" />
-    <SolidColorBrush x:Key="SurfaceCardBrush" Color="{StaticResource SurfaceCardColor}" />
-    <SolidColorBrush x:Key="SurfaceCardHoverBrush" Color="{StaticResource SurfaceCardHoverColor}" />
-    <SolidColorBrush x:Key="SurfacePanelBrush" Color="{StaticResource SurfacePanelColor}" />
+    <SolidColorBrush x:Key="BgAppBrush" Color="{StaticResource BgAppColor}" />
+    <SolidColorBrush x:Key="BgPanelBrush" Color="{StaticResource BgPanelColor}" />
+    <SolidColorBrush x:Key="BgCardBrush" Color="{StaticResource BgCardColor}" />
+    <SolidColorBrush x:Key="BgInsetBrush" Color="{StaticResource BgInsetColor}" />
+    <SolidColorBrush x:Key="BgHoverBrush" Color="{StaticResource BgHoverColor}" />
 
     <!-- Borders -->
-    <Color x:Key="BorderBaseColor">#D8DFEA</Color>
-    <Color x:Key="BorderSubtleColor">#E6ECF5</Color>
-    <Color x:Key="BorderOrangeColor">#F2B680</Color>
+    <Color x:Key="BorderSubtleColor">#E2E8F0</Color>
+    <Color x:Key="BorderStrongColor">#CBD5E1</Color>
 
-    <SolidColorBrush x:Key="BorderBaseBrush" Color="{StaticResource BorderBaseColor}" />
     <SolidColorBrush x:Key="BorderSubtleBrush" Color="{StaticResource BorderSubtleColor}" />
-    <SolidColorBrush x:Key="BorderOrangeBrush" Color="{StaticResource BorderOrangeColor}" />
+    <SolidColorBrush x:Key="BorderStrongBrush" Color="{StaticResource BorderStrongColor}" />
 
-    <!-- Typography Colors -->
-    <Color x:Key="TextPrimaryColor">#111827</Color>
-    <Color x:Key="TextSecondaryColor">#4B5563</Color>
-    <Color x:Key="TextMutedColor">#9CA3AF</Color>
+    <!-- Typography -->
+    <Color x:Key="TextPrimaryColor">#0F172A</Color>
+    <Color x:Key="TextSecondaryColor">#475569</Color>
+    <Color x:Key="TextMutedColor">#94A3B8</Color>
 
     <SolidColorBrush x:Key="TextPrimaryBrush" Color="{StaticResource TextPrimaryColor}" />
     <SolidColorBrush x:Key="TextSecondaryBrush" Color="{StaticResource TextSecondaryColor}" />
     <SolidColorBrush x:Key="TextMutedBrush" Color="{StaticResource TextMutedColor}" />
 
-    <!-- Status Indicators -->
-    <Color x:Key="StatusGreenColor">#059669</Color>
-    <Color x:Key="StatusYellowColor">#D97706</Color>
-    <Color x:Key="StatusRedColor">#DC2626</Color>
-    <Color x:Key="StatusBlueColor">#2563EB</Color>
+    <!-- Semantic Statuses -->
+    <Color x:Key="InfoBlueColor">#2563EB</Color>
+    <Color x:Key="InfoBlueBgColor">#EFF6FF</Color>
+    <SolidColorBrush x:Key="InfoBlueBrush" Color="{StaticResource InfoBlueColor}" />
+    <SolidColorBrush x:Key="InfoBlueBgBrush" Color="{StaticResource InfoBlueBgColor}" />
 
-    <SolidColorBrush x:Key="StatusGreenBrush" Color="{StaticResource StatusGreenColor}" />
-    <SolidColorBrush x:Key="StatusYellowBrush" Color="{StaticResource StatusYellowColor}" />
-    <SolidColorBrush x:Key="StatusRedBrush" Color="{StaticResource StatusRedColor}" />
-    <SolidColorBrush x:Key="StatusBlueBrush" Color="{StaticResource StatusBlueColor}" />
+    <Color x:Key="SuccessGreenColor">#059669</Color>
+    <Color x:Key="SuccessGreenBgColor">#ECFDF5</Color>
+    <SolidColorBrush x:Key="SuccessGreenBrush" Color="{StaticResource SuccessGreenColor}" />
+    <SolidColorBrush x:Key="SuccessGreenBgBrush" Color="{StaticResource SuccessGreenBgColor}" />
+
+    <Color x:Key="WarningAmberColor">#D97706</Color>
+    <Color x:Key="WarningAmberBgColor">#FFFBEB</Color>
+    <SolidColorBrush x:Key="WarningAmberBrush" Color="{StaticResource WarningAmberColor}" />
+    <SolidColorBrush x:Key="WarningAmberBgBrush" Color="{StaticResource WarningAmberBgColor}" />
+
+    <Color x:Key="DangerRedColor">#DC2626</Color>
+    <Color x:Key="DangerRedBgColor">#FEF2F2</Color>
+    <Color x:Key="DangerRedButtonColor">#C9302C</Color>
+    <Color x:Key="DangerRedButtonHoverColor">#A8221E</Color>
+    <SolidColorBrush x:Key="DangerRedBrush" Color="{StaticResource DangerRedColor}" />
+    <SolidColorBrush x:Key="DangerRedBgBrush" Color="{StaticResource DangerRedBgColor}" />
+    <SolidColorBrush x:Key="DangerRedButtonBrush" Color="{StaticResource DangerRedButtonColor}" />
+    <SolidColorBrush x:Key="DangerRedButtonHoverBrush" Color="{StaticResource DangerRedButtonHoverColor}" />
+
+    <!-- Primary Action / Violet CTA -->
+    <Color x:Key="BrandVioletColor">#6B4CE0</Color>
+    <Color x:Key="BrandVioletHoverColor">#5838CF</Color>
+    <Color x:Key="BrandVioletPressedColor">#4829B2</Color>
+    <Color x:Key="BrandVioletMutedColor">#EFEBFF</Color>
+
+    <SolidColorBrush x:Key="BrandVioletBrush" Color="{StaticResource BrandVioletColor}" />
+    <SolidColorBrush x:Key="BrandVioletHoverBrush" Color="{StaticResource BrandVioletHoverColor}" />
+    <SolidColorBrush x:Key="BrandVioletPressedBrush" Color="{StaticResource BrandVioletPressedColor}" />
+    <SolidColorBrush x:Key="BrandVioletMutedBrush" Color="{StaticResource BrandVioletMutedColor}" />
+
+    <!-- Deploy Official Logo Accent: Lime -->
+    <Color x:Key="DeployLogoLimeColor">#5E8F0E</Color>
+    <SolidColorBrush x:Key="DeployLogoLimeBrush" Color="{StaticResource DeployLogoLimeColor}" />
 
 </ResourceDictionary>
