@@ -133,8 +133,18 @@ namespace VeloxDeploy.Core
             sb.AppendLine("<?xml version=\"1.0\" encoding=\"utf-8\"?>");
             sb.AppendLine("<unattend xmlns=\"urn:schemas-microsoft-com:unattend\">");
 
-            // windowsPE Pass: Zero-click partition & install on target machine
+            // windowsPE Pass: Zero-click language selection, partition & install on target machine
             sb.AppendLine("  <settings pass=\"windowsPE\">");
+            sb.AppendLine("    <component name=\"Microsoft-Windows-International-Core-WinPE\" processorArchitecture=\"amd64\" publicKeyToken=\"31bf3856ad364e35\" language=\"neutral\" versionScope=\"nonSxS\" xmlns:wcm=\"http://schemas.microsoft.com/WMIConfig/2002/State\" xmlns:xsi=\"http://www.w3.org/2001/XMLSchema-instance\">");
+            sb.AppendLine("      <SetupUILanguage>");
+            sb.AppendLine("        <UILanguage>en-US</UILanguage>");
+            sb.AppendLine("      </SetupUILanguage>");
+            sb.AppendLine("      <InputLocale>en-US</InputLocale>");
+            sb.AppendLine("      <SystemLocale>en-US</SystemLocale>");
+            sb.AppendLine("      <UILanguage>en-US</UILanguage>");
+            sb.AppendLine("      <UILanguageFallback>en-US</UILanguageFallback>");
+            sb.AppendLine("      <UserLocale>en-US</UserLocale>");
+            sb.AppendLine("    </component>");
             sb.AppendLine("    <component name=\"Microsoft-Windows-Setup\" processorArchitecture=\"amd64\" publicKeyToken=\"31bf3856ad364e35\" language=\"neutral\" versionScope=\"nonSxS\">");
             sb.AppendLine("      <DiskConfiguration>");
             sb.AppendLine("        <Disk wcm:action=\"add\" xmlns:wcm=\"http://schemas.microsoft.com/WMIConfig/2002/State\">");
@@ -166,6 +176,13 @@ namespace VeloxDeploy.Core
 
             // specialize Pass
             sb.AppendLine("  <settings pass=\"specialize\">");
+            sb.AppendLine("    <component name=\"Microsoft-Windows-International-Core\" processorArchitecture=\"amd64\" publicKeyToken=\"31bf3856ad364e35\" language=\"neutral\" versionScope=\"nonSxS\" xmlns:wcm=\"http://schemas.microsoft.com/WMIConfig/2002/State\" xmlns:xsi=\"http://www.w3.org/2001/XMLSchema-instance\">");
+            sb.AppendLine("      <InputLocale>en-US</InputLocale>");
+            sb.AppendLine("      <SystemLocale>en-US</SystemLocale>");
+            sb.AppendLine("      <UILanguage>en-US</UILanguage>");
+            sb.AppendLine("      <UILanguageFallback>en-US</UILanguageFallback>");
+            sb.AppendLine("      <UserLocale>en-US</UserLocale>");
+            sb.AppendLine("    </component>");
             sb.AppendLine("    <component name=\"Microsoft-Windows-Shell-Setup\" processorArchitecture=\"amd64\" publicKeyToken=\"31bf3856ad364e35\" language=\"neutral\" versionScope=\"nonSxS\">");
             sb.AppendLine($"      <ComputerName>VLX-{SanitizeComputerName(profile.BiosSerial)}</ComputerName>");
             if (!string.IsNullOrWhiteSpace(productKeyXml)) sb.AppendLine($"      {productKeyXml}");
@@ -226,8 +243,15 @@ namespace VeloxDeploy.Core
             sb.AppendLine("<?xml version=\"1.0\" encoding=\"utf-8\"?>");
             sb.AppendLine("<unattend xmlns=\"urn:schemas-microsoft-com:unattend\">");
 
-            // Specialize Pass: OEM Product Key & Computer Name
+            // Specialize Pass: OEM Product Key, Language/Locale & Computer Name
             sb.AppendLine("  <settings pass=\"specialize\">");
+            sb.AppendLine("    <component name=\"Microsoft-Windows-International-Core\" processorArchitecture=\"amd64\" publicKeyToken=\"31bf3856ad364e35\" language=\"neutral\" versionScope=\"nonSxS\" xmlns:wcm=\"http://schemas.microsoft.com/WMIConfig/2002/State\" xmlns:xsi=\"http://www.w3.org/2001/XMLSchema-instance\">");
+            sb.AppendLine("      <InputLocale>en-US</InputLocale>");
+            sb.AppendLine("      <SystemLocale>en-US</SystemLocale>");
+            sb.AppendLine("      <UILanguage>en-US</UILanguage>");
+            sb.AppendLine("      <UILanguageFallback>en-US</UILanguageFallback>");
+            sb.AppendLine("      <UserLocale>en-US</UserLocale>");
+            sb.AppendLine("    </component>");
             sb.AppendLine("    <component name=\"Microsoft-Windows-Shell-Setup\" processorArchitecture=\"amd64\" publicKeyToken=\"31bf3856ad364e35\" language=\"neutral\" versionScope=\"nonSxS\">");
             sb.AppendLine($"      <ComputerName>VLX-{SanitizeComputerName(profile.BiosSerial)}</ComputerName>");
             if (!string.IsNullOrWhiteSpace(productKeyXml))
