@@ -67,6 +67,15 @@ namespace VeloxDeploy.ViewModels
         private string _preflightSummaryText = "Ready to deploy, 1 warning";
         private string _preflightSummaryBadge = "READY";
 
+        // Driver Vault Management (1-Click OEM Download & Hot-Capture)
+        private string _targetDriverModel = "Dell Latitude 7490";
+        private ObservableCollection<string> _availableDriverModels = new();
+        private bool _isDriverOperationInProgress = false;
+        private double _driverProgressPercent = 0.0;
+        private string _driverProgressStatus = string.Empty;
+        private bool _isTargetDriverCached = false;
+        private string _targetDriverStatusText = "Checking...";
+
         public DeployViewModel()
         {
             _dispatcher = Application.Current?.Dispatcher ?? Dispatcher.CurrentDispatcher;
@@ -87,6 +96,12 @@ namespace VeloxDeploy.ViewModels
             CopyLogCommand = new RelayCommand(CopyLogToClipboard);
             SaveLogCommand = new RelayCommand(SaveLogToFile);
             ToggleThemeCommand = new RelayCommand(ToggleTheme);
+
+            DownloadDriverPackCommand = new RelayCommand(async () => await DownloadSelectedDriverPackAsync(), () => CanRunDriverAction);
+            CaptureLocalDriversCommand = new RelayCommand(async () => await CaptureLocalDriversAsync(), () => CanRunDriverAction);
+            OpenDriverVaultCommand = new RelayCommand(OpenDriverVaultFolder);
+
+            InitializeDriverModels();
 
             // Initial hardware interrogation & preflight
             ProbeHardware();
@@ -411,6 +426,62 @@ namespace VeloxDeploy.ViewModels
             }
         }
 
+        public string TargetDriverModel
+        {
+            get => _targetDriverModel;
+            set
+            {
+                if (SetField(ref _targetDriverModel, value))
+                {
+                    RefreshDriverStatus();
+                }
+            }
+        }
+
+        public ObservableCollection<string> AvailableDriverModels
+        {
+            get => _availableDriverModels;
+            set => SetField(ref _availableDriverModels, value);
+        }
+
+        public bool IsDriverOperationInProgress
+        {
+            get => _isDriverOperationInProgress;
+            set
+            {
+                if (SetField(ref _isDriverOperationInProgress, value))
+                {
+                    OnPropertyChanged(nameof(CanRunDriverAction));
+                }
+            }
+        }
+
+        public bool CanRunDriverAction => !IsDriverOperationInProgress && !IsRunning;
+
+        public double DriverProgressPercent
+        {
+            get => _driverProgressPercent;
+            set => SetField(ref _driverProgressPercent, value);
+        }
+
+        public string DriverProgressStatus
+        {
+            get => _driverProgressStatus;
+            set => SetField(ref _driverProgressStatus, value);
+        }
+
+        public bool IsTargetDriverCached
+        {
+            get => _isTargetDriverCached;
+            set => SetField(ref _isTargetDriverCached, value);
+        }
+
+        public string TargetDriverStatusText
+        {
+            get => _targetDriverStatusText;
+            set => SetField(ref _targetDriverStatusText, value);
+        }
+
         #endregion
 
         #region Commands
@@ -425,6 +496,10 @@ namespace VeloxDeploy.ViewModels
         public ICommand CopyLogCommand { get; }
         public ICommand SaveLogCommand { get; }
         public ICommand ToggleThemeCommand { get; }
+
+        public ICommand DownloadDriverPackCommand { get; }
+        public ICommand CaptureLocalDriversCommand { get; }
+        public ICommand OpenDriverVaultCommand { get; }
 
         #endregion
 
@@ -493,7 +568,15 @@ namespace VeloxDeploy.ViewModels
             }
 
             // 3. Driver Pack Check
-            PreflightChecks.Add(new PreflightCheckItem { Name = "Drivers", Status = CheckStatus.Passed, Message = "18 packages matched" });
+            var (isCached, count, _) = OemDriverService.CheckModelCache(TargetDriverModel);
+            if (isCached)
+            {
+                PreflightChecks.Add(new PreflightCheckItem { Name = "Drivers", Status = CheckStatus.Passed, Message = $"{count} drivers ready ({TargetDriverModel})" });
+            }
+            else
+            {
+                PreflightChecks.Add(new PreflightCheckItem { Name = "Drivers", Status = CheckStatus.Warning, Message = $"{TargetDriverModel} (Not cached, 1-Click ready)" });
+            }
 
             // 4. Windows Key Check
             if (Profile.AcpiKey.HasKey)
@@ -935,6 +1018,124 @@ namespace VeloxDeploy.ViewModels
             catch (Exception ex)
             {
                 AppendLog("SYSTEM", $"Failed to load theme dictionary: {ex.Message}", "WARN");
+            }
+        }
+
+        #endregion
+
+        #region Driver Vault Methods
+
+        private void InitializeDriverModels()
+        {
+            AvailableDriverModels.Clear();
+            foreach (var item in OemDriverService.Catalog)
+            {
+                AvailableDriverModels.Add(item.ModelName);
+            }
+
+            if (!string.IsNullOrWhiteSpace(Profile.Model) && !AvailableDriverModels.Contains(Profile.Model))
+            {
+                AvailableDriverModels.Add($"{Profile.Manufacturer} {Profile.Model}".Trim());
+            }
+
+            if (string.IsNullOrWhiteSpace(TargetDriverModel) || !AvailableDriverModels.Contains(TargetDriverModel))
+            {
+                TargetDriverModel = "Dell Latitude 7490";
+            }
+            else
+            {
+                RefreshDriverStatus();
+            }
+        }
+
+        public void RefreshDriverStatus()
+        {
+            var (isCached, count, _) = OemDriverService.CheckModelCache(TargetDriverModel);
+            IsTargetDriverCached = isCached;
+            TargetDriverStatusText = isCached ? $"✓ {count} drivers ready" : "Not cached";
+            RunPreflight();
+        }
+
+        private async Task DownloadSelectedDriverPackAsync()
+        {
+            if (IsDriverOperationInProgress) return;
+            IsDriverOperationInProgress = true;
+            DriverProgressPercent = 5.0;
+            DriverProgressStatus = "Connecting to OEM CDN...";
+            AppendLog("DRIVER", $"Connecting to OEM CDN to retrieve: {TargetDriverModel}...", "INFO");
+
+            using var cts = new CancellationTokenSource();
+            bool success = await OemDriverService.DownloadAndExtractAsync(
+                TargetDriverModel,
+                (pct, status) =>
+                {
+                    _dispatcher.InvokeAsync(() =>
+                    {
+                        DriverProgressPercent = pct;
+                        DriverProgressStatus = status;
+                    });
+                },
+                msg => AppendLog("DRIVER", msg, "INFO"),
+                cts.Token);
+
+            IsDriverOperationInProgress = false;
+            RefreshDriverStatus();
+            if (success)
+            {
+                AppendLog("DRIVER", $"Driver pack for '{TargetDriverModel}' downloaded, extracted, and cached in DriverVault!", "SUCCESS");
+            }
+            else
+            {
+                AppendLog("DRIVER", $"Failed downloading driver pack for '{TargetDriverModel}'.", "ERROR");
+            }
+        }
+
+        private async Task CaptureLocalDriversAsync()
+        {
+            if (IsDriverOperationInProgress) return;
+            IsDriverOperationInProgress = true;
+            DriverProgressPercent = 10.0;
+            DriverProgressStatus = "Exporting drivers from local PC...";
+            AppendLog("DRIVER", $"Beginning driver capture from this machine: {Profile.Manufacturer} {Profile.Model}...", "INFO");
+
+            using var cts = new CancellationTokenSource();
+            bool success = await OemDriverService.CaptureLocalMachineDriversAsync(
+                Profile.Manufacturer,
+                Profile.Model,
+                (pct, status) =>
+                {
+                    _dispatcher.InvokeAsync(() =>
+                    {
+                        DriverProgressPercent = pct;
+                        DriverProgressStatus = status;
+                    });
+                },
+                msg => AppendLog("DRIVER", msg, "INFO"),
+                cts.Token);
+
+            IsDriverOperationInProgress = false;
+            RefreshDriverStatus();
+            if (success)
+            {
+                AppendLog("DRIVER", $"Captured local machine drivers successfully into DriverVault!", "SUCCESS");
+            }
+            else
+            {
+                AppendLog("DRIVER", $"Driver export completed with warnings or no drivers found.", "WARNING");
+            }
+        }
+
+        private void OpenDriverVaultFolder()
+        {
+            try
+            {
+                string vaultRoot = DriverVaultManager.ResolveDriverVaultRoot("DriverVault");
+                Directory.CreateDirectory(vaultRoot);
+                Process.Start(new ProcessStartInfo("explorer.exe", vaultRoot) { UseShellExecute = true });
+            }
+            catch (Exception ex)
+            {
+                AppendLog("DRIVER", $"Unable to open DriverVault folder: {ex.Message}", "ERROR");
             }
         }
 
