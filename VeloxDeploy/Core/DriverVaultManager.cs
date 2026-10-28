@@ -97,7 +97,21 @@ namespace VeloxDeploy.Core
                     string destDir = Path.Combine(oemDriversDir, pack.Name);
                     Log($"[DriverVault] Staging driver pack '{pack.Name}' ({pack.DriverCount} INFs) to USB using multi-threaded acceleration...");
 
-                    bool fastOk = await FastCopyDirectoryAsync(pack.DirectoryPath, destDir, cancellationToken);
+                    long totalPackBytes = 0;
+                    try
+                    {
+                        var srcDi = new DirectoryInfo(pack.DirectoryPath);
+                        foreach (var fi in srcDi.EnumerateFiles("*", SearchOption.AllDirectories))
+                        {
+                            totalPackBytes += fi.Length;
+                        }
+                    }
+                    catch
+                    {
+                        totalPackBytes = 2_000_000_000L;
+                    }
+
+                    bool fastOk = await FastCopyDirectoryAsync(pack.DirectoryPath, destDir, usbDriveLetter, pack.Name, totalPackBytes, cancellationToken);
                     if (!fastOk)
                     {
                         Log("[DriverVault] Falling back to standard file stream copy...");
@@ -236,24 +250,93 @@ namespace VeloxDeploy.Core
             return matchedTopLevel;
         }
 
-        private async Task<bool> FastCopyDirectoryAsync(string sourceDir, string destinationDir, CancellationToken cancellationToken)
+        private async Task<bool> FastCopyDirectoryAsync(
+            string sourceDir, 
+            string destinationDir, 
+            string targetDriveLetter, 
+            string packName, 
+            long totalPackBytes, 
+            CancellationToken cancellationToken)
         {
             try
             {
                 Directory.CreateDirectory(destinationDir);
-                string args = $"\"{sourceDir}\" \"{destinationDir}\" /E /MT:8 /R:1 /W:1 /NDL /NFL /NP";
+                // Robocopy with /MT:16 parallel threads for rapid small file transfer.
+                // Do NOT redirect stdout/stderr to avoid OS anonymous pipe buffer deadlocks.
+                string args = $"\"{sourceDir}\" \"{destinationDir}\" /E /MT:16 /R:1 /W:1 /NDL /NFL /NP";
                 var psi = new ProcessStartInfo("robocopy.exe", args)
                 {
-                    RedirectStandardOutput = true,
-                    RedirectStandardError = true,
+                    RedirectStandardOutput = false,
+                    RedirectStandardError = false,
                     UseShellExecute = false,
                     CreateNoWindow = true
                 };
 
+                var sw = Stopwatch.StartNew();
                 using var proc = Process.Start(psi);
                 if (proc == null) return false;
 
+                // Live drive usage monitor to stream active MB/s, % progress, and remaining time to the UI
+                string cleanLetter = targetDriveLetter.TrimEnd('\\', ':');
+                DriveInfo? driveInfo = null;
+                long initialFree = 0;
+                try
+                {
+                    driveInfo = new DriveInfo(cleanLetter);
+                    initialFree = driveInfo.AvailableFreeSpace;
+                }
+                catch
+                {
+                }
+
+                var monitorTask = Task.Run(async () =>
+                {
+                    int tick = 0;
+                    while (!proc.HasExited && !cancellationToken.IsCancellationRequested)
+                    {
+                        try
+                        {
+                            tick++;
+                            long currentFree = driveInfo != null && driveInfo.IsReady ? driveInfo.AvailableFreeSpace : initialFree;
+                            long bytesWritten = Math.Max(0, initialFree - currentFree);
+
+                            double streamPercent = totalPackBytes > 0 
+                                ? Math.Min(99.0, (double)bytesWritten / totalPackBytes * 100.0) 
+                                : 0.0;
+                            // Driver injection stage spans 75% to 88%
+                            double pipelinePercent = 75.0 + (streamPercent * 0.13);
+                            double elapsedSec = Math.Max(0.5, sw.Elapsed.TotalSeconds);
+                            double mbps = (bytesWritten / (1024.0 * 1024.0)) / elapsedSec;
+                            double remainingSec = streamPercent > 0 
+                                ? (elapsedSec / (streamPercent / 100.0)) - elapsedSec 
+                                : 45;
+
+                            bool logNow = (tick % 5 == 0);
+
+                            OnProgress?.Invoke(new DeployProgressUpdate
+                            {
+                                Stage = DeployStage.DriverInjection,
+                                ProgressPercent = Math.Round(pipelinePercent, 1),
+                                SpeedMBps = Math.Round(mbps, 1),
+                                BytesProcessed = bytesWritten,
+                                TotalBytes = totalPackBytes,
+                                Elapsed = sw.Elapsed,
+                                EstimatedRemaining = TimeSpan.FromSeconds(Math.Max(0, remainingSec)),
+                                CurrentAction = $"Staging OEM drivers ({packName}): {bytesWritten / (1024 * 1024)} MB ({mbps:F1} MB/s)",
+                                LogMessage = logNow ? $"[DRIVERS] {bytesWritten / (1024 * 1024):N0} of {totalPackBytes / (1024 * 1024):N0} MB written ({mbps:F1} MB/s)" : null
+                            });
+                        }
+                        catch
+                        {
+                        }
+
+                        await Task.Delay(1000, cancellationToken);
+                    }
+                }, cancellationToken);
+
                 await proc.WaitForExitAsync(cancellationToken);
+                await monitorTask;
+
                 return proc.ExitCode < 8;
             }
             catch (Exception ex)

@@ -209,7 +209,7 @@ namespace VeloxDeploy.Models
         public TimeSpan Elapsed { get; set; }
         public TimeSpan EstimatedRemaining { get; set; }
         public string CurrentAction { get; set; } = string.Empty;
-        public string LogMessage { get; set; } = string.Empty;
+        public string? LogMessage { get; set; }
         public bool IsError { get; set; }
         public bool IsWarning { get; set; }
     }

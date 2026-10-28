@@ -250,8 +250,8 @@ namespace VeloxDeploy.Core
 
                 var psi = new ProcessStartInfo("robocopy.exe", robocopyArgs)
                 {
-                    RedirectStandardOutput = true,
-                    RedirectStandardError = true,
+                    RedirectStandardOutput = false,
+                    RedirectStandardError = false,
                     UseShellExecute = false,
                     CreateNoWindow = true
                 };
@@ -270,10 +270,12 @@ namespace VeloxDeploy.Core
 
                 var monitorTask = Task.Run(async () =>
                 {
+                    int tick = 0;
                     while (!proc.HasExited && !cancellationToken.IsCancellationRequested)
                     {
                         try
                         {
+                            tick++;
                             long currentFree = targetDriveInfo.AvailableFreeSpace;
                             long bytesWritten = Math.Max(0, initialFree - currentFree);
                             double streamPercent = totalSourceBytes > 0 
@@ -288,6 +290,8 @@ namespace VeloxDeploy.Core
                                 ? (elapsedSec / (streamPercent / 100.0)) - elapsedSec 
                                 : 120;
 
+                            bool logNow = (tick % 5 == 0);
+
                             OnProgress?.Invoke(new DeployProgressUpdate
                             {
                                 Stage = DeployStage.WimStreaming,
@@ -298,7 +302,7 @@ namespace VeloxDeploy.Core
                                 Elapsed = sw.Elapsed,
                                 EstimatedRemaining = TimeSpan.FromSeconds(Math.Max(0, remainingSec)),
                                 CurrentAction = $"Writing installation files to USB: {streamPercent:F1}% ({mbps:F1} MB/s)",
-                                LogMessage = $"[STREAM] {bytesWritten / (1024 * 1024):N0} of {totalSourceBytes / (1024 * 1024):N0} MB written ({mbps:F1} MB/s)"
+                                LogMessage = logNow ? $"[STREAM] {bytesWritten / (1024 * 1024):N0} of {totalSourceBytes / (1024 * 1024):N0} MB written ({mbps:F1} MB/s)" : null
                             });
                         }
                         catch
@@ -310,15 +314,8 @@ namespace VeloxDeploy.Core
                     }
                 }, cancellationToken);
 
-                // Drain output streams to prevent pipe buffer deadlock
-                var stdoutTask = proc.StandardOutput.ReadToEndAsync(cancellationToken);
-                var stderrTask = proc.StandardError.ReadToEndAsync(cancellationToken);
-
                 await proc.WaitForExitAsync(cancellationToken);
                 await monitorTask;
-
-                string stdout = await stdoutTask;
-                string stderr = await stderrTask;
 
                 // Robocopy exit code < 8 indicates success (0: no change, 1: files copied, 2-7: normal copy variations)
                 bool ok = proc.ExitCode < 8;
@@ -329,8 +326,6 @@ namespace VeloxDeploy.Core
                 else
                 {
                     Log($"[WimEngine] ERROR: Robocopy file transfer failed with exit code {proc.ExitCode}.");
-                    if (!string.IsNullOrWhiteSpace(stdout)) Log($"[Robocopy stdout] {stdout.Trim()}");
-                    if (!string.IsNullOrWhiteSpace(stderr)) Log($"[Robocopy stderr] {stderr.Trim()}");
                 }
                 return ok;
             }
