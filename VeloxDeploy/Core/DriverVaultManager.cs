@@ -90,19 +90,25 @@ namespace VeloxDeploy.Core
                 }
 
                 int totalPacksStaged = 0;
-                foreach (var pack in matchedPacks.Where(p => p.IsMatched))
+                foreach (var pack in matchedPacks)
                 {
                     if (cancellationToken.IsCancellationRequested) return false;
 
                     string destDir = Path.Combine(oemDriversDir, pack.Name);
-                    Log($"[DriverVault] Copying driver pack '{pack.Name}' ({pack.DriverCount} INFs) -> USB $OEM$\\$1\\Drivers\\{pack.Name}...");
-                    CopyDirectory(pack.DirectoryPath, destDir);
+                    Log($"[DriverVault] Staging driver pack '{pack.Name}' ({pack.DriverCount} INFs) to USB using multi-threaded acceleration...");
+
+                    bool fastOk = await FastCopyDirectoryAsync(pack.DirectoryPath, destDir, cancellationToken);
+                    if (!fastOk)
+                    {
+                        Log("[DriverVault] Falling back to standard file stream copy...");
+                        CopyDirectory(pack.DirectoryPath, destDir);
+                    }
                     totalPacksStaged++;
 
                     OnProgress?.Invoke(new DeployProgressUpdate
                     {
                         Stage = DeployStage.DriverInjection,
-                        ProgressPercent = 80.0,
+                        ProgressPercent = 88.0,
                         CurrentAction = $"Staged Driver Pack: {pack.Name}",
                         LogMessage = $"Copied {pack.DriverCount} driver definitions to USB installer"
                     });
@@ -175,12 +181,12 @@ namespace VeloxDeploy.Core
 
         public List<DriverVaultPackage> FindDriverPackages(string driverVaultRoot, HardwareProfile profile)
         {
-            var packages = new List<DriverVaultPackage>();
+            var rawPackages = new List<DriverVaultPackage>();
             string resolvedRoot = ResolveDriverVaultRoot(driverVaultRoot);
 
             if (string.IsNullOrWhiteSpace(resolvedRoot) || !Directory.Exists(resolvedRoot))
             {
-                return packages;
+                return rawPackages;
             }
 
             try
@@ -200,7 +206,7 @@ namespace VeloxDeploy.Core
                                       fullPath.Contains("7490") ||
                                       fullPath.Contains("generic");
 
-                        packages.Add(new DriverVaultPackage
+                        rawPackages.Add(new DriverVaultPackage
                         {
                             Name = dirName,
                             Manufacturer = profile.Manufacturer,
@@ -217,7 +223,44 @@ namespace VeloxDeploy.Core
                 Log($"[DriverVault] Error scanning directory: {ex.Message}");
             }
 
-            return packages.OrderByDescending(p => p.IsMatched).ToList();
+            // STRICT DEDUPLICATION:
+            // If any matched package is a subdirectory of another matched package (e.g. Latitude-7490\Win10 inside Latitude 7490),
+            // discard the child subdirectories completely! Only keep the topmost root package.
+            var matchedTopLevel = rawPackages
+                .Where(p => p.IsMatched)
+                .Where(p => !rawPackages.Any(parent => parent.IsMatched &&
+                                                       !string.Equals(parent.DirectoryPath, p.DirectoryPath, StringComparison.OrdinalIgnoreCase) &&
+                                                       p.DirectoryPath.StartsWith(parent.DirectoryPath.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar) + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase)))
+                .ToList();
+
+            return matchedTopLevel;
+        }
+
+        private async Task<bool> FastCopyDirectoryAsync(string sourceDir, string destinationDir, CancellationToken cancellationToken)
+        {
+            try
+            {
+                Directory.CreateDirectory(destinationDir);
+                string args = $"\"{sourceDir}\" \"{destinationDir}\" /E /MT:8 /R:1 /W:1 /NDL /NFL /NP";
+                var psi = new ProcessStartInfo("robocopy.exe", args)
+                {
+                    RedirectStandardOutput = true,
+                    RedirectStandardError = true,
+                    UseShellExecute = false,
+                    CreateNoWindow = true
+                };
+
+                using var proc = Process.Start(psi);
+                if (proc == null) return false;
+
+                await proc.WaitForExitAsync(cancellationToken);
+                return proc.ExitCode < 8;
+            }
+            catch (Exception ex)
+            {
+                Log($"[DriverVault] Robocopy acceleration fallback: {ex.Message}");
+                return false;
+            }
         }
 
         private static void CopyDirectory(string sourceDir, string destinationDir)
