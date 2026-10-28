@@ -83,6 +83,15 @@ namespace VeloxDeploy.Core
 
                     UpdateStatus(DeployStage.BootloaderConfig, 96.0, "Writing master boot record & UEFI bootloader to USB...");
                     await _wimEngine.MakeUsbBootableAsync("U", disk.DiskIndex, config.IsDryRun, cancellationToken);
+
+                    // Auto-dismount source ISO immediately upon USB completion to keep File Explorer navigation clean
+                    try
+                    {
+                        await WimImageService.DismountLastIsoAsync();
+                    }
+                    catch
+                    {
+                    }
                 }
                 else
                 {
