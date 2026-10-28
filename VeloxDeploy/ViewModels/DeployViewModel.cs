@@ -545,6 +545,7 @@ namespace VeloxDeploy.ViewModels
                 {
                     Config.WimPath = meta.EffectiveWimPath;
                     Config.WimIndex = meta.SelectedEdition?.Index ?? 1;
+                    Config.MountedIsoDriveLetter = meta.MountedIsoDriveLetter;
                     Config.SelectedImageName = meta.DisplayName;
                     Config.SelectedImageDetails = $"{meta.SelectedEdition?.SizeFormatted ?? "14.5 GB"}, loaded from {Path.GetFileName(path)}";
 

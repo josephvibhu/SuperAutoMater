@@ -1,5 +1,6 @@
 using System;
 using System.Diagnostics;
+using System.IO;
 using System.Threading;
 using System.Threading.Tasks;
 using VeloxDeploy.Models;
@@ -46,62 +47,98 @@ namespace VeloxDeploy.Core
                 UpdateStatus(DeployStage.HardwareProbe, 5.0, "Verifying hardware integrity and UEFI boot state...");
                 await Task.Delay(400, cancellationToken);
 
-                // Stage 2: Disk Partitioning
-                UpdateStatus(DeployStage.DiskPartitioning, 12.0, $"Applying GPT layout on Disk {disk.DiskIndex}...");
-                bool diskOk = await _diskManager.PartitionDiskAsync(disk.DiskIndex, config.IsDryRun, cancellationToken);
-                if (!diskOk)
+                if (disk.IsUsbFlashDrive)
                 {
-                    FailPipeline("Failed to partition target disk layout.");
-                    return false;
+                    // RUFUS MODE: Bootable USB Pendrive Creation
+                    UpdateStatus(DeployStage.DiskPartitioning, 12.0, $"Formatting USB Pendrive (Disk {disk.DiskIndex}) as bootable volume...");
+                    bool diskOk = await _diskManager.PartitionUsbDriveAsync(disk.DiskIndex, config.IsDryRun, cancellationToken);
+                    if (!diskOk)
+                    {
+                        FailPipeline("Failed to partition USB pendrive.");
+                        return false;
+                    }
+
+                    UpdateStatus(DeployStage.WimStreaming, 25.0, "Writing bootable Windows installation media to USB...");
+                    bool streamOk;
+                    if (!string.IsNullOrWhiteSpace(config.MountedIsoDriveLetter) && Directory.Exists($"{config.MountedIsoDriveLetter}:\\"))
+                    {
+                        streamOk = await _wimEngine.CopyIsoPayloadToUsbAsync(config.MountedIsoDriveLetter!, "U", config.IsDryRun, cancellationToken);
+                    }
+                    else
+                    {
+                        streamOk = await _wimEngine.ApplyImageAsync(config.WimPath, config.WimIndex, "U", "U", config.IsDryRun, cancellationToken);
+                    }
+
+                    if (!streamOk)
+                    {
+                        FailPipeline("Failed streaming installation payload to USB pendrive.");
+                        return false;
+                    }
+
+                    UpdateStatus(DeployStage.DriverInjection, 75.0, "Staging DriverVault packages into USB $OEM$ directory...");
+                    await _driverManager.MatchAndInjectDriversAsync(config.DriverVaultPath, profile, "U", config.IsDryRun, cancellationToken);
+
+                    UpdateStatus(DeployStage.UnattendProvisioning, 90.0, "Generating automated autounattend.xml on USB root...");
+                    await _unattendBuilder.ProvisionUsbAutounattendAsync("U", profile, config.AdminUsername, config.IsDryRun, cancellationToken);
+
+                    UpdateStatus(DeployStage.BootloaderConfig, 96.0, "Writing master boot record & UEFI bootloader to USB...");
+                    await _wimEngine.MakeUsbBootableAsync("U", disk.DiskIndex, config.IsDryRun, cancellationToken);
                 }
-
-                // Stage 3: WIM Block Streaming
-                UpdateStatus(DeployStage.WimStreaming, 20.0, "Streaming Windows image payload to NVMe...");
-                bool wimOk = await _wimEngine.ApplyImageAsync(
-                    config.WimPath,
-                    config.WimIndex,
-                    "W",
-                    "S",
-                    config.IsDryRun,
-                    cancellationToken);
-
-                if (!wimOk)
+                else
                 {
-                    FailPipeline("Failed applying Windows WIM payload.");
-                    return false;
+                    // DIRECT SSD PROVISIONING MODE
+                    UpdateStatus(DeployStage.DiskPartitioning, 12.0, $"Applying GPT layout on Target SSD (Disk {disk.DiskIndex})...");
+                    bool diskOk = await _diskManager.PartitionDiskAsync(disk.DiskIndex, config.IsDryRun, cancellationToken);
+                    if (!diskOk)
+                    {
+                        FailPipeline("Failed to partition target disk layout.");
+                        return false;
+                    }
+
+                    UpdateStatus(DeployStage.WimStreaming, 20.0, "Streaming Windows image payload to SSD...");
+                    bool wimOk = await _wimEngine.ApplyImageAsync(
+                        config.WimPath,
+                        config.WimIndex,
+                        "W",
+                        "S",
+                        config.IsDryRun,
+                        cancellationToken);
+
+                    if (!wimOk)
+                    {
+                        FailPipeline("Failed applying Windows WIM payload.");
+                        return false;
+                    }
+
+                    UpdateStatus(DeployStage.DriverInjection, 75.0, "Matching and injecting OEM hardware driver packages...");
+                    bool driverOk = await _driverManager.MatchAndInjectDriversAsync(
+                        config.DriverVaultPath,
+                        profile,
+                        "W",
+                        config.IsDryRun,
+                        cancellationToken);
+
+                    if (!driverOk)
+                    {
+                        Log("[VeloxDeploy] WARNING: Driver injection encountered warnings; proceeding with baseline.");
+                    }
+
+                    UpdateStatus(DeployStage.UnattendProvisioning, 90.0, "Injecting Panther unattend.xml and staging VeloxBench...");
+                    bool unattendOk = await _unattendBuilder.ProvisionUnattendAsync(
+                        "W",
+                        profile,
+                        config.AdminUsername,
+                        config.IsDryRun,
+                        cancellationToken);
+
+                    if (!unattendOk)
+                    {
+                        Log("[VeloxDeploy] WARNING: Unattend staging encountered warning.");
+                    }
+
+                    UpdateStatus(DeployStage.BootloaderConfig, 96.0, "Writing UEFI BCD bootloader files to EFI partition...");
+                    await _wimEngine.ConfigureUefiBootloaderAsync("W", "S", config.IsDryRun, cancellationToken);
                 }
-
-                // Stage 4: DriverVault Offline Injection
-                UpdateStatus(DeployStage.DriverInjection, 75.0, "Matching and injecting OEM hardware driver packages...");
-                bool driverOk = await _driverManager.MatchAndInjectDriversAsync(
-                    config.DriverVaultPath,
-                    profile,
-                    "W",
-                    config.IsDryRun,
-                    cancellationToken);
-
-                if (!driverOk)
-                {
-                    Log("[VeloxDeploy] WARNING: Driver injection encountered warnings; proceeding with baseline.");
-                }
-
-                // Stage 5: Unattend & VeloxBench Seeding
-                UpdateStatus(DeployStage.UnattendProvisioning, 90.0, "Injecting Panther unattend.xml and staging VeloxBench...");
-                bool unattendOk = await _unattendBuilder.ProvisionUnattendAsync(
-                    "W",
-                    profile,
-                    config.AdminUsername,
-                    config.IsDryRun,
-                    cancellationToken);
-
-                if (!unattendOk)
-                {
-                    Log("[VeloxDeploy] WARNING: Unattend staging encountered warning.");
-                }
-
-                // Stage 6: Bootloader Configuration
-                UpdateStatus(DeployStage.BootloaderConfig, 96.0, "Writing UEFI BCD bootloader files to EFI partition...");
-                await _wimEngine.ConfigureUefiBootloaderAsync("W", "S", config.IsDryRun, cancellationToken);
 
                 // Stage 7: Telemetry Report
                 totalSw.Stop();

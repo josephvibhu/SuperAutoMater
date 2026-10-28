@@ -104,6 +104,86 @@ namespace VeloxDeploy.Core
             }
         }
 
+        public async Task<bool> PartitionUsbDriveAsync(int diskIndex, bool isDryRun, CancellationToken cancellationToken)
+        {
+            Log($"[DiskGeometry] Initializing USB Pendrive layout for Disk {diskIndex} (DryRun={isDryRun})...");
+
+            if (isDryRun)
+            {
+                Log("[DiskGeometry] [SIMULATION] Selecting USB Disk " + diskIndex);
+                await Task.Delay(300, cancellationToken);
+                Log("[DiskGeometry] [SIMULATION] Executing CLEAN (Zeroing partition table)...");
+                await Task.Delay(400, cancellationToken);
+                Log("[DiskGeometry] [SIMULATION] Initializing MBR bootable scheme...");
+                await Task.Delay(200, cancellationToken);
+                Log("[DiskGeometry] [SIMULATION] Creating Primary Bootable Partition (NTFS) -> Mounted as U:");
+                await Task.Delay(400, cancellationToken);
+                Log("[DiskGeometry] [SIMULATION] Marking partition as Active (Boot flag armed).");
+                await Task.Delay(250, cancellationToken);
+                Log("[DiskGeometry] [SIMULATION] USB Pendrive storage geometry ready.");
+                return true;
+            }
+
+            // Live Diskpart Execution for USB
+            string scriptPath = Path.Combine(Path.GetTempPath(), $"velox_usb_diskpart_{diskIndex}_{DateTime.Now.Ticks}.txt");
+            var script = new StringBuilder();
+            script.AppendLine($"select disk {diskIndex}");
+            script.AppendLine("clean");
+            script.AppendLine("convert mbr");
+            script.AppendLine("create partition primary");
+            script.AppendLine("format quick fs=ntfs label=\"VELOX_BOOT\"");
+            script.AppendLine("assign letter=U");
+            script.AppendLine("active");
+            script.AppendLine("exit");
+
+            await File.WriteAllTextAsync(scriptPath, script.ToString(), cancellationToken);
+
+            try
+            {
+                var psi = new ProcessStartInfo("diskpart.exe", $"/s \"{scriptPath}\"")
+                {
+                    RedirectStandardOutput = true,
+                    RedirectStandardError = true,
+                    UseShellExecute = false,
+                    CreateNoWindow = true
+                };
+
+                using var proc = Process.Start(psi);
+                if (proc == null)
+                {
+                    Log("[DiskGeometry] ERROR: Failed to launch diskpart.exe for USB");
+                    return false;
+                }
+
+                string? line;
+                while ((line = await proc.StandardOutput.ReadLineAsync(cancellationToken)) != null)
+                {
+                    if (!string.IsNullOrWhiteSpace(line))
+                    {
+                        Log($"[Diskpart] {line.Trim()}");
+                    }
+                }
+
+                await proc.WaitForExitAsync(cancellationToken);
+                if (proc.ExitCode != 0)
+                {
+                    string err = await proc.StandardError.ReadToEndAsync(cancellationToken);
+                    Log($"[DiskGeometry] ERROR: Diskpart exited with code {proc.ExitCode}: {err}");
+                    return false;
+                }
+
+                Log("[DiskGeometry] USB Pendrive formatted as VELOX_BOOT and mounted as U:\\");
+                return true;
+            }
+            finally
+            {
+                if (File.Exists(scriptPath))
+                {
+                    try { File.Delete(scriptPath); } catch { }
+                }
+            }
+        }
+
         private void Log(string message)
         {
             OnLog?.Invoke(message);

@@ -180,6 +180,7 @@ namespace VeloxDeploy.Models
         public int TargetDiskIndex { get; set; } = 0;
         public string WimPath { get; set; } = "install.wim";
         public int WimIndex { get; set; } = 1;
+        public string? MountedIsoDriveLetter { get; set; }
         public string DriverVaultPath { get; set; } = "DriverVault";
         public bool IsDryRun { get; set; } = true; // Always start in Dry run per handoff spec
         public string ApiEndpoint { get; set; } = "http://13.206.106.146";
