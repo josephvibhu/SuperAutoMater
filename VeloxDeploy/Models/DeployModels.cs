@@ -104,6 +104,8 @@ namespace VeloxDeploy.Models
         public bool IsUsbFlashDrive => !IsSimulated && IsUsb && (SizeBytes < (135L * 1024 * 1024 * 1024));
         public bool IsDirectTargetSsd => !IsUsbFlashDrive && !IsSimulated;
 
+        public string TypeBadge => IsUsbFlashDrive ? "USB" : (IsHostSystemDisk ? "Host" : (IsNvme ? "NVMe" : "SSD"));
+
         public string TargetModeBadge => IsSimulated 
             ? "Dry Run Simulation" 
             : (IsHostSystemDisk ? "Host Windows (Protected)" : (IsUsbFlashDrive ? "Bootable USB Pendrive" : "Direct SSD Target"));

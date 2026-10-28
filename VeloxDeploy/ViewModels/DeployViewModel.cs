@@ -55,7 +55,7 @@ namespace VeloxDeploy.ViewModels
         private bool _isCompleted = false;
         private bool _isFailed = false;
         private bool _isAborted = false;
-        private bool _isLiveMode = true; // Always live deployment appliance like Rufus
+        private bool _isLiveMode = false; // Always starts in Dry run per handoff spec
         private bool _isConfirmationDialogOpen = false;
         private string _confirmationInput = string.Empty;
 
@@ -276,6 +276,7 @@ namespace VeloxDeploy.ViewModels
                     OnPropertyChanged(nameof(PrimaryButtonText));
                     OnPropertyChanged(nameof(IsLiveArmedBannerVisible));
                     OnPropertyChanged(nameof(LiveBannerText));
+                    OnPropertyChanged(nameof(TargetHintText));
                     RunPreflight();
                     CommandManager.InvalidateRequerySuggested();
                 }
@@ -293,26 +294,52 @@ namespace VeloxDeploy.ViewModels
 
         public string ModeHelperText => "Destructive writes require typing ERASE to confirm.";
 
-        public bool IsLiveArmedBannerVisible => false; // Persistent red warning banner removed per user request
+        public bool IsLiveArmedBannerVisible => IsLiveMode && !IsCompleted && !IsFailed;
 
         public string LiveBannerText => SelectedDisk != null
-            ? $"Target Disk {SelectedDisk.DiskIndex} ({SelectedDisk.Model}) will be formatted and written."
-            : "Please select an eligible target disk.";
+            ? $"Write mode is armed. Starting will erase {SelectedDisk.DisplayText} ({SelectedDisk.TypeBadge}) and write the Windows image."
+            : "Write mode is armed. Please select an eligible target disk.";
+
+        public string TargetHintText
+        {
+            get
+            {
+                if (IsRunning) return "Mode and target are locked while writing.";
+                if (IsLiveMode) return "Typing ERASE is required before writing.";
+                return "Dry run mode simulates all operations safely.";
+            }
+        }
 
         public string PrimaryButtonText
         {
             get
             {
-                if (IsRunning) return "Deploying...";
+                if (IsRunning) return SelectedDisk != null && SelectedDisk.IsUsbFlashDrive ? "Creating USB" : "Deploying...";
                 if (IsCompleted) return "Flash Another Drive";
                 if (IsFailed) return "Retry step";
-                if (SelectedDisk != null)
+                if (IsLiveMode)
                 {
-                    if (SelectedDisk.IsHostSystemDisk) return "Host Drive Protected";
-                    if (SelectedDisk.IsUsbFlashDrive) return $"Create Bootable USB on Disk {SelectedDisk.DiskIndex}...";
-                    return $"Deploy Windows to Disk {SelectedDisk.DiskIndex}...";
+                    if (SelectedDisk != null)
+                    {
+                        if (SelectedDisk.IsHostSystemDisk) return "Host Drive Protected";
+                        if (SelectedDisk.IsUsbFlashDrive) return $"Create bootable USB on Disk {SelectedDisk.DiskIndex}…";
+                        return $"Deploy Windows to Disk {SelectedDisk.DiskIndex}…";
+                    }
+                    return "Select target disk…";
                 }
-                return "Select target disk...";
+                return "Start dry run";
+            }
+        }
+
+        public bool IsLightTheme
+        {
+            get => !_isDarkTheme;
+            set
+            {
+                if (_isDarkTheme == value)
+                {
+                    IsDarkTheme = !value;
+                }
             }
         }
 
@@ -374,7 +401,14 @@ namespace VeloxDeploy.ViewModels
         public bool IsDarkTheme
         {
             get => _isDarkTheme;
-            set => SetField(ref _isDarkTheme, value);
+            set
+            {
+                if (SetField(ref _isDarkTheme, value))
+                {
+                    OnPropertyChanged(nameof(IsLightTheme));
+                    ApplyTheme(value);
+                }
+            }
         }
 
         #endregion
@@ -546,15 +580,29 @@ namespace VeloxDeploy.ViewModels
             if (IsFailed)
             {
                 IsFailed = false;
-                ConfirmationInput = string.Empty;
-                IsConfirmationDialogOpen = true;
+                if (IsLiveMode)
+                {
+                    ConfirmationInput = string.Empty;
+                    IsConfirmationDialogOpen = true;
+                }
+                else
+                {
+                    await StartPipelineAsync(true);
+                }
                 return;
             }
 
             if (SelectedDisk != null && !SelectedDisk.IsHostSystemDisk)
             {
-                ConfirmationInput = string.Empty;
-                IsConfirmationDialogOpen = true;
+                if (IsLiveMode)
+                {
+                    ConfirmationInput = string.Empty;
+                    IsConfirmationDialogOpen = true;
+                }
+                else
+                {
+                    await StartPipelineAsync(true);
+                }
             }
         }
 
@@ -869,15 +917,25 @@ namespace VeloxDeploy.ViewModels
         private void ToggleTheme()
         {
             IsDarkTheme = !IsDarkTheme;
-            string themeFile = IsDarkTheme ? "Themes/TokensDark.xaml" : "Themes/TokensLight.xaml";
+        }
 
-            var dict = new ResourceDictionary
+        public void ApplyTheme(bool isDark)
+        {
+            try
             {
-                Source = new Uri(themeFile, UriKind.Relative)
-            };
+                string themeFile = isDark ? "Themes/TokensDark.xaml" : "Themes/TokensLight.xaml";
+                var dict = new ResourceDictionary
+                {
+                    Source = new Uri(themeFile, UriKind.Relative)
+                };
 
-            Application.Current.Resources.MergedDictionaries.Clear();
-            Application.Current.Resources.MergedDictionaries.Add(dict);
+                Application.Current.Resources.MergedDictionaries.Clear();
+                Application.Current.Resources.MergedDictionaries.Add(dict);
+            }
+            catch (Exception ex)
+            {
+                AppendLog("SYSTEM", $"Failed to load theme dictionary: {ex.Message}", "WARN");
+            }
         }
 
         #endregion

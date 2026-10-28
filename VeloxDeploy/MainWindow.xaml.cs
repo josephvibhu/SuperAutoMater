@@ -26,8 +26,21 @@ namespace VeloxDeploy
 
         private void MainWindow_Loaded(object sender, RoutedEventArgs e)
         {
-            if (LogListBox.Items is INotifyCollectionChanged notifyCollection)
+            HookLogAutoScroll();
+            var dpd = System.ComponentModel.DependencyPropertyDescriptor.FromProperty(ItemsControl.ItemsSourceProperty, typeof(ListBox));
+            dpd?.AddValueChanged(LogListBox, (s, args) => HookLogAutoScroll());
+        }
+
+        private void HookLogAutoScroll()
+        {
+            if (LogListBox.ItemsSource is INotifyCollectionChanged notifySource)
             {
+                notifySource.CollectionChanged -= LogListBox_CollectionChanged;
+                notifySource.CollectionChanged += LogListBox_CollectionChanged;
+            }
+            else if (LogListBox.Items is INotifyCollectionChanged notifyCollection)
+            {
+                notifyCollection.CollectionChanged -= LogListBox_CollectionChanged;
                 notifyCollection.CollectionChanged += LogListBox_CollectionChanged;
             }
         }
