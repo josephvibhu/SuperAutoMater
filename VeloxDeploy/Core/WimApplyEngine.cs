@@ -242,11 +242,11 @@ namespace VeloxDeploy.Core
 
             try
             {
-                // CRUCIAL: Do NOT wrap drive letters with trailing backslash in quotes (e.g. "D:\" "U:\")
-                // because in Windows CommandLineToArgvW, \" escapes the quote and breaks argument parsing (Robocopy Code 16).
-                // Passing D:\ and U:\ directly without quotes is clean and universally supported.
-                string robocopyArgs = $"{srcRoot} {tgtRoot} /E /R:2 /W:1 /MT:8 /NDL /NFL /NP";
-                Log($"[WimEngine] Executing: robocopy.exe {robocopyArgs}");
+                // Hyper-Transfer: Use /J (Unbuffered direct I/O for large files to bypass cache thrashing)
+                // and /MT:16 (16 parallel threads for small setup files). 
+                // Robocopy differentials skip already-present identical files (e.g. 8.15 GB install.wim) in seconds.
+                string robocopyArgs = $"{srcRoot} {tgtRoot} /E /R:1 /W:1 /MT:16 /J /NDL /NFL /NP";
+                Log($"[WimEngine] Executing Hyper-Transfer: robocopy.exe {robocopyArgs}");
 
                 var psi = new ProcessStartInfo("robocopy.exe", robocopyArgs)
                 {

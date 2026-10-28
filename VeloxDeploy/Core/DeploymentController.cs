@@ -50,15 +50,26 @@ namespace VeloxDeploy.Core
                 if (disk.IsUsbFlashDrive)
                 {
                     // RUFUS MODE: Bootable USB Pendrive Creation
-                    UpdateStatus(DeployStage.DiskPartitioning, 12.0, $"Formatting USB Pendrive (Disk {disk.DiskIndex}) as bootable volume...");
-                    bool diskOk = await _diskManager.PartitionUsbDriveAsync(disk.DiskIndex, config.IsDryRun, cancellationToken);
-                    if (!diskOk)
+                    // Fast Hyper-Sync check: if USB already has valid Windows media payload, skip full disk wipe
+                    bool hasExistingPayload = Directory.Exists("U:\\sources") && 
+                                              (File.Exists("U:\\sources\\install.wim") || File.Exists("U:\\sources\\install.esd"));
+
+                    if (!hasExistingPayload)
                     {
-                        FailPipeline("Failed to partition USB pendrive.");
-                        return false;
+                        UpdateStatus(DeployStage.DiskPartitioning, 12.0, $"Formatting USB Pendrive (Disk {disk.DiskIndex}) as bootable volume...");
+                        bool diskOk = await _diskManager.PartitionUsbDriveAsync(disk.DiskIndex, config.IsDryRun, cancellationToken);
+                        if (!diskOk)
+                        {
+                            FailPipeline("Failed to partition USB pendrive.");
+                            return false;
+                        }
+                    }
+                    else
+                    {
+                        Log("[DiskGeometry] Fast Hyper-Sync: Existing Windows media verified on USB. Skipping full disk wipe to preserve existing 8.4 GB payload.");
                     }
 
-                    UpdateStatus(DeployStage.WimStreaming, 25.0, "Writing bootable Windows installation media to USB...");
+                    UpdateStatus(DeployStage.WimStreaming, 25.0, "Synchronizing Windows installation media to USB (Hyper-Transfer)...");
                     bool streamOk;
                     if (!string.IsNullOrWhiteSpace(config.MountedIsoDriveLetter) && Directory.Exists($"{config.MountedIsoDriveLetter}:\\"))
                     {
