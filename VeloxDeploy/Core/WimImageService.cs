@@ -36,6 +36,8 @@ namespace VeloxDeploy.Core
 
     public class WimImageService
     {
+        private static string? _lastMountedIsoPath;
+
         public static async Task<WimMetadata> InspectImageAsync(string filePath)
         {
             var meta = new WimMetadata { OriginalPath = filePath };
@@ -49,11 +51,21 @@ namespace VeloxDeploy.Core
 
             if (ext == ".iso")
             {
-                // Mount ISO to inspect contents
+                // If switching to a different ISO, clean up the previous one first
+                if (!string.IsNullOrWhiteSpace(_lastMountedIsoPath) && 
+                    !string.Equals(_lastMountedIsoPath, filePath, StringComparison.OrdinalIgnoreCase))
+                {
+                    await DismountIsoAsync(_lastMountedIsoPath);
+                    _lastMountedIsoPath = null;
+                }
+
+                // Mount ISO to inspect contents (or re-use existing mount)
                 string? driveLetter = await MountIsoAsync(filePath);
                 if (!string.IsNullOrWhiteSpace(driveLetter))
                 {
                     meta.MountedIsoDriveLetter = driveLetter;
+                    _lastMountedIsoPath = filePath;
+
                     string candidateWim = Path.Combine($"{driveLetter}:\\", "sources", "install.wim");
                     string candidateEsd = Path.Combine($"{driveLetter}:\\", "sources", "install.esd");
 
@@ -64,6 +76,17 @@ namespace VeloxDeploy.Core
                     else if (File.Exists(candidateEsd))
                     {
                         meta.EffectiveWimPath = candidateEsd;
+                    }
+                }
+
+                // If this ISO is NOT a valid Windows OS installer (e.g. Office ISO), dismount immediately so Explorer stays clean
+                if (string.IsNullOrWhiteSpace(meta.EffectiveWimPath))
+                {
+                    await DismountIsoAsync(filePath);
+                    meta.MountedIsoDriveLetter = null;
+                    if (string.Equals(_lastMountedIsoPath, filePath, StringComparison.OrdinalIgnoreCase))
+                    {
+                        _lastMountedIsoPath = null;
                     }
                 }
             }
@@ -152,7 +175,8 @@ namespace VeloxDeploy.Core
         {
             try
             {
-                string cmd = $"(Mount-DiskImage -ImagePath '{isoPath}' -StorageType ISO -PassThru | Get-Volume).DriveLetter";
+                // Check if already mounted first to avoid duplicate DVD drive letters in File Explorer
+                string cmd = $"$p = '{isoPath}'; $img = Get-DiskImage -ImagePath $p -ErrorAction SilentlyContinue; if ($img -and $img.Attached) {{ ((Get-DiskImage -ImagePath $p | Get-Volume).DriveLetter | Select-Object -First 1) }} else {{ ((Mount-DiskImage -ImagePath $p -StorageType ISO -PassThru | Get-Volume).DriveLetter | Select-Object -First 1) }}";
                 var psi = new ProcessStartInfo("powershell", $"-NoProfile -Command \"{cmd}\"")
                 {
                     RedirectStandardOutput = true,
@@ -163,11 +187,12 @@ namespace VeloxDeploy.Core
                 using var proc = Process.Start(psi);
                 if (proc != null)
                 {
-                    string letter = (await proc.StandardOutput.ReadToEndAsync()).Trim();
+                    string output = (await proc.StandardOutput.ReadToEndAsync()).Trim();
                     await proc.WaitForExitAsync();
-                    if (!string.IsNullOrWhiteSpace(letter) && letter.Length == 1)
+                    string letter = output.Split(new[] { '\r', '\n', ' ', '\t' }, StringSplitOptions.RemoveEmptyEntries).FirstOrDefault() ?? "";
+                    if (!string.IsNullOrWhiteSpace(letter) && letter.Length == 1 && char.IsLetter(letter[0]))
                     {
-                        return letter;
+                        return letter.ToUpperInvariant();
                     }
                 }
             }
@@ -177,6 +202,38 @@ namespace VeloxDeploy.Core
             }
 
             return null;
+        }
+
+        public static async Task DismountIsoAsync(string? isoPath)
+        {
+            if (string.IsNullOrWhiteSpace(isoPath)) return;
+            try
+            {
+                string cmd = $"Dismount-DiskImage -ImagePath '{isoPath}' -ErrorAction SilentlyContinue";
+                var psi = new ProcessStartInfo("powershell", $"-NoProfile -Command \"{cmd}\"")
+                {
+                    UseShellExecute = false,
+                    CreateNoWindow = true
+                };
+                using var proc = Process.Start(psi);
+                if (proc != null)
+                {
+                    await proc.WaitForExitAsync();
+                }
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"[WimImageService] ISO dismount error: {ex.Message}");
+            }
+        }
+
+        public static async Task DismountLastIsoAsync()
+        {
+            if (!string.IsNullOrWhiteSpace(_lastMountedIsoPath))
+            {
+                await DismountIsoAsync(_lastMountedIsoPath);
+                _lastMountedIsoPath = null;
+            }
         }
     }
 }
