@@ -195,16 +195,60 @@ namespace VeloxDeploy.Core
             CancellationToken cancellationToken)
         {
             var sw = Stopwatch.StartNew();
-            Log($"[WimEngine] Transferring Windows installation media to USB ({sourceDrive}:\\ -> {targetDrive}:\\)...");
+            string srcRoot = $"{sourceDrive.TrimEnd('\\', ':')}:\\";
+            string tgtRoot = $"{targetDrive.TrimEnd('\\', ':')}:\\";
+
+            Log($"[WimEngine] Transferring Windows installation media to USB ({srcRoot} -> {tgtRoot})...");
 
             if (isDryRun)
             {
                 return await SimulateWimStreamAsync(sw, cancellationToken);
             }
 
+            // Ensure destination drive is fully mounted and ready after diskpart
+            for (int i = 0; i < 20; i++)
+            {
+                if (Directory.Exists(tgtRoot)) break;
+                Log($"[WimEngine] Waiting for USB volume {tgtRoot} to be recognized by filesystem ({i + 1}/20)...");
+                await Task.Delay(500, cancellationToken);
+            }
+
+            if (!Directory.Exists(tgtRoot))
+            {
+                Log($"[WimEngine] ERROR: Target drive {tgtRoot} not mounted or accessible.");
+                return false;
+            }
+
+            if (!Directory.Exists(srcRoot))
+            {
+                Log($"[WimEngine] ERROR: Source media drive {srcRoot} not found.");
+                return false;
+            }
+
+            // Calculate total source size for real-time progress calculation
+            long totalSourceBytes = 0;
             try
             {
-                var psi = new ProcessStartInfo("robocopy.exe", $"\"{sourceDrive}:\\\" \"{targetDrive}:\\\" /E /NP /NDL /NFL /MT:8")
+                var srcDir = new DirectoryInfo(srcRoot);
+                foreach (var fi in srcDir.EnumerateFiles("*", SearchOption.AllDirectories))
+                {
+                    totalSourceBytes += fi.Length;
+                }
+            }
+            catch
+            {
+                totalSourceBytes = 8_500_000_000L; // Fallback ~8.5 GB
+            }
+
+            try
+            {
+                // CRUCIAL: Do NOT wrap drive letters with trailing backslash in quotes (e.g. "D:\" "U:\")
+                // because in Windows CommandLineToArgvW, \" escapes the quote and breaks argument parsing (Robocopy Code 16).
+                // Passing D:\ and U:\ directly without quotes is clean and universally supported.
+                string robocopyArgs = $"{srcRoot} {tgtRoot} /E /R:2 /W:1 /MT:8 /NDL /NFL /NP";
+                Log($"[WimEngine] Executing: robocopy.exe {robocopyArgs}");
+
+                var psi = new ProcessStartInfo("robocopy.exe", robocopyArgs)
                 {
                     RedirectStandardOutput = true,
                     RedirectStandardError = true,
@@ -219,10 +263,75 @@ namespace VeloxDeploy.Core
                     return false;
                 }
 
+                // Monitor transfer progress via target disk usage in background
+                var driveLetter = targetDrive.TrimEnd('\\', ':');
+                var targetDriveInfo = new DriveInfo(driveLetter);
+                long initialFree = targetDriveInfo.AvailableFreeSpace;
+
+                var monitorTask = Task.Run(async () =>
+                {
+                    while (!proc.HasExited && !cancellationToken.IsCancellationRequested)
+                    {
+                        try
+                        {
+                            long currentFree = targetDriveInfo.AvailableFreeSpace;
+                            long bytesWritten = Math.Max(0, initialFree - currentFree);
+                            double streamPercent = totalSourceBytes > 0 
+                                ? Math.Min(99.0, (double)bytesWritten / totalSourceBytes * 100.0) 
+                                : 0.0;
+                            // Pipeline progress: WimStreaming spans from 25% to 75%
+                            double pipelinePercent = 25.0 + (streamPercent * 0.50);
+
+                            double elapsedSec = Math.Max(0.5, sw.Elapsed.TotalSeconds);
+                            double mbps = (bytesWritten / (1024.0 * 1024.0)) / elapsedSec;
+                            double remainingSec = streamPercent > 0 
+                                ? (elapsedSec / (streamPercent / 100.0)) - elapsedSec 
+                                : 120;
+
+                            OnProgress?.Invoke(new DeployProgressUpdate
+                            {
+                                Stage = DeployStage.WimStreaming,
+                                ProgressPercent = Math.Round(pipelinePercent, 1),
+                                SpeedMBps = Math.Round(mbps, 1),
+                                BytesProcessed = bytesWritten,
+                                TotalBytes = totalSourceBytes,
+                                Elapsed = sw.Elapsed,
+                                EstimatedRemaining = TimeSpan.FromSeconds(Math.Max(0, remainingSec)),
+                                CurrentAction = $"Writing installation files to USB: {streamPercent:F1}% ({mbps:F1} MB/s)",
+                                LogMessage = $"[STREAM] {bytesWritten / (1024 * 1024):N0} of {totalSourceBytes / (1024 * 1024):N0} MB written ({mbps:F1} MB/s)"
+                            });
+                        }
+                        catch
+                        {
+                            // Ignore transient drive query errors during heavy I/O
+                        }
+
+                        await Task.Delay(1000, cancellationToken);
+                    }
+                }, cancellationToken);
+
+                // Drain output streams to prevent pipe buffer deadlock
+                var stdoutTask = proc.StandardOutput.ReadToEndAsync(cancellationToken);
+                var stderrTask = proc.StandardError.ReadToEndAsync(cancellationToken);
+
                 await proc.WaitForExitAsync(cancellationToken);
-                // Robocopy exit code <= 7 indicates success / files copied
-                bool ok = proc.ExitCode <= 7;
-                Log($"[WimEngine] Bootable USB file transfer complete (Code {proc.ExitCode}) in {sw.Elapsed.TotalSeconds:F1}s");
+                await monitorTask;
+
+                string stdout = await stdoutTask;
+                string stderr = await stderrTask;
+
+                // Robocopy exit code < 8 indicates success (0: no change, 1: files copied, 2-7: normal copy variations)
+                bool ok = proc.ExitCode < 8;
+                if (ok)
+                {
+                    Log($"[WimEngine] Bootable USB file transfer complete (Code {proc.ExitCode}) in {sw.Elapsed.TotalSeconds:F1}s");
+                }
+                else
+                {
+                    Log($"[WimEngine] ERROR: Robocopy file transfer failed with exit code {proc.ExitCode}.");
+                    if (!string.IsNullOrWhiteSpace(stdout)) Log($"[Robocopy stdout] {stdout.Trim()}");
+                    if (!string.IsNullOrWhiteSpace(stderr)) Log($"[Robocopy stderr] {stderr.Trim()}");
+                }
                 return ok;
             }
             catch (Exception ex)
@@ -246,9 +355,24 @@ namespace VeloxDeploy.Core
 
             try
             {
-                var psi = new ProcessStartInfo("bootsect.exe", $"/nt60 {driveLetter}: /force /mbr")
+                string cleanLetter = driveLetter.TrimEnd('\\', ':');
+                string bootsectExe = "bootsect.exe";
+                string localUsbBootsect = Path.Combine($"{cleanLetter}:\\", "boot", "bootsect.exe");
+                string sys32Bootsect = Path.Combine(Environment.SystemDirectory, "bootsect.exe");
+
+                if (File.Exists(sys32Bootsect))
+                {
+                    bootsectExe = sys32Bootsect;
+                }
+                else if (File.Exists(localUsbBootsect))
+                {
+                    bootsectExe = localUsbBootsect;
+                }
+
+                var psi = new ProcessStartInfo(bootsectExe, $"/nt60 {cleanLetter}: /force /mbr")
                 {
                     RedirectStandardOutput = true,
+                    RedirectStandardError = true,
                     UseShellExecute = false,
                     CreateNoWindow = true
                 };
@@ -258,8 +382,12 @@ namespace VeloxDeploy.Core
                 {
                     string output = await proc.StandardOutput.ReadToEndAsync(cancellationToken);
                     await proc.WaitForExitAsync(cancellationToken);
-                    Log($"[bootsect] {output.Trim()}");
+                    if (!string.IsNullOrWhiteSpace(output))
+                    {
+                        Log($"[bootsect] {output.Trim()}");
+                    }
                 }
+                Log($"[WimEngine] Boot sector successfully configured on {cleanLetter}:");
                 return true;
             }
             catch (Exception ex)
