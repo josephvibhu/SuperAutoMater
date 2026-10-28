@@ -26,9 +26,36 @@ namespace VeloxDeploy
 
         private void MainWindow_Loaded(object sender, RoutedEventArgs e)
         {
+            EnsureWindowFitsScreen();
             HookLogAutoScroll();
             var dpd = System.ComponentModel.DependencyPropertyDescriptor.FromProperty(ItemsControl.ItemsSourceProperty, typeof(ListBox));
             dpd?.AddValueChanged(LogListBox, (s, args) => HookLogAutoScroll());
+        }
+
+        private void EnsureWindowFitsScreen()
+        {
+            try
+            {
+                var workArea = SystemParameters.WorkArea;
+                if (workArea.Width > 0 && workArea.Height > 0)
+                {
+                    if (Width > workArea.Width)
+                    {
+                        Width = Math.Max(MinWidth, workArea.Width - 40);
+                    }
+                    if (Height > workArea.Height)
+                    {
+                        Height = Math.Max(MinHeight, workArea.Height - 40);
+                    }
+
+                    Left = Math.Max(workArea.Left + 10, (workArea.Width - Width) / 2 + workArea.Left);
+                    Top = Math.Max(workArea.Top + 10, (workArea.Height - Height) / 2 + workArea.Top);
+                }
+            }
+            catch
+            {
+                // Fallback to default centering if DWM query fails
+            }
         }
 
         private void HookLogAutoScroll()
