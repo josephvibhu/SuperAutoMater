@@ -139,7 +139,7 @@ namespace VeloxDeploy.Core
             sb.AppendLine("      <SetupUILanguage>");
             sb.AppendLine("        <UILanguage>en-US</UILanguage>");
             sb.AppendLine("      </SetupUILanguage>");
-            sb.AppendLine("      <InputLocale>en-US</InputLocale>");
+            sb.AppendLine("      <InputLocale>0409:00000409</InputLocale>");
             sb.AppendLine("      <SystemLocale>en-US</SystemLocale>");
             sb.AppendLine("      <UILanguage>en-US</UILanguage>");
             sb.AppendLine("      <UILanguageFallback>en-US</UILanguageFallback>");
@@ -192,8 +192,15 @@ namespace VeloxDeploy.Core
             sb.AppendLine("    </component>");
             sb.AppendLine("  </settings>");
 
-            // oobeSystem Pass
+            // oobeSystem Pass: Automated Region, Language, Keyboard Layout, and OOBE Bypass
             sb.AppendLine("  <settings pass=\"oobeSystem\">");
+            sb.AppendLine("    <component name=\"Microsoft-Windows-International-Core\" processorArchitecture=\"amd64\" publicKeyToken=\"31bf3856ad364e35\" language=\"neutral\" versionScope=\"nonSxS\" xmlns:wcm=\"http://schemas.microsoft.com/WMIConfig/2002/State\" xmlns:xsi=\"http://www.w3.org/2001/XMLSchema-instance\">");
+            sb.AppendLine("      <InputLocale>0409:00000409</InputLocale>");
+            sb.AppendLine("      <SystemLocale>en-US</SystemLocale>");
+            sb.AppendLine("      <UILanguage>en-US</UILanguage>");
+            sb.AppendLine("      <UILanguageFallback>en-US</UILanguageFallback>");
+            sb.AppendLine("      <UserLocale>en-US</UserLocale>");
+            sb.AppendLine("    </component>");
             sb.AppendLine("    <component name=\"Microsoft-Windows-Shell-Setup\" processorArchitecture=\"amd64\" publicKeyToken=\"31bf3856ad364e35\" language=\"neutral\" versionScope=\"nonSxS\">");
             sb.AppendLine("      <OOBE>");
             sb.AppendLine("        <HideEULAPage>true</HideEULAPage>");
@@ -264,8 +271,15 @@ namespace VeloxDeploy.Core
             sb.AppendLine("    </component>");
             sb.AppendLine("  </settings>");
 
-            // OOBE Pass: Bypass Microsoft Account, Setup Local User, AutoLogon, and FirstLogonCommands
+            // OOBE Pass: Automated Region, Language, Keyboard Layout, and OOBE Bypass
             sb.AppendLine("  <settings pass=\"oobeSystem\">");
+            sb.AppendLine("    <component name=\"Microsoft-Windows-International-Core\" processorArchitecture=\"amd64\" publicKeyToken=\"31bf3856ad364e35\" language=\"neutral\" versionScope=\"nonSxS\" xmlns:wcm=\"http://schemas.microsoft.com/WMIConfig/2002/State\" xmlns:xsi=\"http://www.w3.org/2001/XMLSchema-instance\">");
+            sb.AppendLine("      <InputLocale>0409:00000409</InputLocale>");
+            sb.AppendLine("      <SystemLocale>en-US</SystemLocale>");
+            sb.AppendLine("      <UILanguage>en-US</UILanguage>");
+            sb.AppendLine("      <UILanguageFallback>en-US</UILanguageFallback>");
+            sb.AppendLine("      <UserLocale>en-US</UserLocale>");
+            sb.AppendLine("    </component>");
             sb.AppendLine("    <component name=\"Microsoft-Windows-Shell-Setup\" processorArchitecture=\"amd64\" publicKeyToken=\"31bf3856ad364e35\" language=\"neutral\" versionScope=\"nonSxS\">");
             sb.AppendLine("      <OOBE>");
             sb.AppendLine("        <HideEULAPage>true</HideEULAPage>");
