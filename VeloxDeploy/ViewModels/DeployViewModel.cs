@@ -433,6 +433,7 @@ namespace VeloxDeploy.ViewModels
             {
                 if (SetField(ref _targetDriverModel, value))
                 {
+                    Config.TargetDriverModel = value;
                     RefreshDriverStatus();
                 }
             }
@@ -825,6 +826,7 @@ namespace VeloxDeploy.ViewModels
             RemainingText = "--:--";
             _cts = new CancellationTokenSource();
             Config.IsDryRun = dryRun;
+            Config.TargetDriverModel = TargetDriverModel;
 
             // Reset steps
             Steps[0].State = StepState.Done; Steps[0].Status = "Done, 0:04";

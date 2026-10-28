@@ -184,6 +184,7 @@ namespace VeloxDeploy.Models
         public int WimIndex { get; set; } = 1;
         public string? MountedIsoDriveLetter { get; set; }
         public string DriverVaultPath { get; set; } = "DriverVault";
+        public string TargetDriverModel { get; set; } = "Dell Latitude 7490";
         public bool IsDryRun { get; set; } = false; // Always live write to target disk by default
         public string ApiEndpoint { get; set; } = "http://13.206.106.146";
 

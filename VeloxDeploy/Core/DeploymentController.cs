@@ -86,8 +86,8 @@ namespace VeloxDeploy.Core
                         return false;
                     }
 
-                    UpdateStatus(DeployStage.DriverInjection, 75.0, "Staging DriverVault packages into USB $OEM$ directory...");
-                    await _driverManager.StageDriversForUsbAsync(config.DriverVaultPath, profile, "U", config.IsDryRun, cancellationToken);
+                    UpdateStatus(DeployStage.DriverInjection, 75.0, $"Staging {config.TargetDriverModel} DriverVault packages into USB $OEM$ directory...");
+                    await _driverManager.StageDriversForUsbAsync(config.DriverVaultPath, profile, config.TargetDriverModel, "U", config.IsDryRun, cancellationToken);
 
                     UpdateStatus(DeployStage.UnattendProvisioning, 90.0, "Generating automated autounattend.xml on USB root...");
                     await _unattendBuilder.ProvisionUsbAutounattendAsync("U", profile, config.AdminUsername, config.IsDryRun, cancellationToken);
@@ -130,10 +130,11 @@ namespace VeloxDeploy.Core
                         return false;
                     }
 
-                    UpdateStatus(DeployStage.DriverInjection, 75.0, "Matching and injecting OEM hardware driver packages...");
+                    UpdateStatus(DeployStage.DriverInjection, 75.0, $"Matching and injecting {config.TargetDriverModel} OEM hardware driver packages...");
                     bool driverOk = await _driverManager.InjectDriversOfflineAsync(
                         config.DriverVaultPath,
                         profile,
+                        config.TargetDriverModel,
                         "W",
                         config.IsDryRun,
                         cancellationToken);

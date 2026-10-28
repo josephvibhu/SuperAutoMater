@@ -46,14 +46,15 @@ namespace VeloxDeploy.Core
         public async Task<bool> StageDriversForUsbAsync(
             string driverVaultRoot,
             HardwareProfile profile,
+            string targetModelName,
             string usbDriveLetter,
             bool isDryRun,
             CancellationToken cancellationToken)
         {
             string resolvedRoot = ResolveDriverVaultRoot(driverVaultRoot);
-            Log($"[DriverVault] Scanning repository for USB staging: {resolvedRoot} (Target: {profile.Manufacturer} {profile.Model})...");
+            Log($"[DriverVault] Scanning repository for USB staging: {resolvedRoot} (Target Model: {targetModelName})...");
 
-            var matchedPacks = FindDriverPackages(resolvedRoot, profile);
+            var matchedPacks = FindDriverPackages(resolvedRoot, profile, targetModelName);
 
             if (isDryRun)
             {
@@ -141,14 +142,15 @@ namespace VeloxDeploy.Core
         public async Task<bool> InjectDriversOfflineAsync(
             string driverVaultRoot,
             HardwareProfile profile,
+            string targetModelName,
             string targetDriveLetter,
             bool isDryRun,
             CancellationToken cancellationToken)
         {
             string resolvedRoot = ResolveDriverVaultRoot(driverVaultRoot);
-            Log($"[DriverVault] Scanning repository for machine: {profile.Manufacturer} {profile.Model} (SKU: {profile.SystemSku})...");
+            Log($"[DriverVault] Scanning repository for machine: {targetModelName}...");
 
-            var matchedPacks = FindDriverPackages(resolvedRoot, profile);
+            var matchedPacks = FindDriverPackages(resolvedRoot, profile, targetModelName);
 
             if (isDryRun || matchedPacks.Count == 0 || !Directory.Exists(resolvedRoot))
             {
@@ -193,7 +195,7 @@ namespace VeloxDeploy.Core
             return true;
         }
 
-        public List<DriverVaultPackage> FindDriverPackages(string driverVaultRoot, HardwareProfile profile)
+        public List<DriverVaultPackage> FindDriverPackages(string driverVaultRoot, HardwareProfile profile, string? targetModelName = null)
         {
             var rawPackages = new List<DriverVaultPackage>();
             string resolvedRoot = ResolveDriverVaultRoot(driverVaultRoot);
@@ -202,6 +204,73 @@ namespace VeloxDeploy.Core
             {
                 return rawPackages;
             }
+
+            string effectiveTarget = !string.IsNullOrWhiteSpace(targetModelName) 
+                ? targetModelName 
+                : $"{profile.Manufacturer} {profile.Model}".Trim();
+
+            Log($"[DriverVault] Matching driver packs for target model: '{effectiveTarget}'");
+
+            // Step 1: Direct Catalog Match Check (e.g. "HP EliteBook 640 G9" -> "HP\EliteBook 640 G9")
+            var catalogItem = OemDriverService.Catalog.FirstOrDefault(c =>
+                c.ModelName.Equals(effectiveTarget, StringComparison.OrdinalIgnoreCase) ||
+                effectiveTarget.Contains(c.ModelName, StringComparison.OrdinalIgnoreCase) ||
+                c.ModelName.Contains(effectiveTarget, StringComparison.OrdinalIgnoreCase));
+
+            if (catalogItem != null)
+            {
+                string directDir = Path.Combine(resolvedRoot, catalogItem.RelativeVaultPath);
+                if (Directory.Exists(directDir))
+                {
+                    int infCount = Directory.GetFiles(directDir, "*.inf", SearchOption.AllDirectories).Length;
+                    if (infCount > 0)
+                    {
+                        Log($"[DriverVault] EXACT CATALOG MATCH: Found {infCount} driver packages in: {directDir}");
+                        return new List<DriverVaultPackage>
+                        {
+                            new DriverVaultPackage
+                            {
+                                Name = catalogItem.ModelName,
+                                Manufacturer = catalogItem.Manufacturer,
+                                ModelPattern = catalogItem.ModelName,
+                                DirectoryPath = directDir,
+                                DriverCount = infCount,
+                                IsMatched = true
+                            }
+                        };
+                    }
+                }
+            }
+
+            // Step 2: Direct Directory Name Probe (e.g. DriverVault\HP\EliteBook 640 G9 or DriverVault\EliteBook 640 G9)
+            string sanitizedTarget = effectiveTarget.Replace("/", "\\").Trim();
+            string directTargetDir = Path.Combine(resolvedRoot, sanitizedTarget);
+            if (Directory.Exists(directTargetDir))
+            {
+                int infCount = Directory.GetFiles(directTargetDir, "*.inf", SearchOption.AllDirectories).Length;
+                if (infCount > 0)
+                {
+                    Log($"[DriverVault] DIRECT FOLDER MATCH: Found {infCount} driver packages in: {directTargetDir}");
+                    return new List<DriverVaultPackage>
+                    {
+                        new DriverVaultPackage
+                        {
+                            Name = Path.GetFileName(directTargetDir),
+                            Manufacturer = profile.Manufacturer,
+                            ModelPattern = effectiveTarget,
+                            DirectoryPath = directTargetDir,
+                            DriverCount = infCount,
+                            IsMatched = true
+                        }
+                    };
+                }
+            }
+
+            // Step 3: Heuristic Multi-Token Match (e.g. "hp", "elitebook", "640", "g9")
+            var targetTokens = effectiveTarget.ToLowerInvariant()
+                .Split(new[] { ' ', '-', '_', '/', '\\' }, StringSplitOptions.RemoveEmptyEntries)
+                .Where(t => t.Length > 1 && t != "notebook" && t != "laptop" && t != "pc" && t != "inch" && t != "the")
+                .ToList();
 
             try
             {
@@ -213,22 +282,21 @@ namespace VeloxDeploy.Core
                     if (infFiles.Length > 0)
                     {
                         string fullPath = dir.ToLowerInvariant();
-                        bool isMatch = fullPath.Contains(profile.Model.ToLowerInvariant()) ||
-                                      (!string.IsNullOrWhiteSpace(profile.SystemSku) && fullPath.Contains(profile.SystemSku.ToLowerInvariant())) ||
-                                      fullPath.Contains(profile.Manufacturer.ToLowerInvariant()) ||
-                                      fullPath.Contains("latitude") ||
-                                      fullPath.Contains("7490") ||
-                                      fullPath.Contains("generic");
+                        int matchedTokens = targetTokens.Count(token => fullPath.Contains(token));
+                        bool isMatch = targetTokens.Count > 0 && matchedTokens >= Math.Min(2, targetTokens.Count);
 
-                        rawPackages.Add(new DriverVaultPackage
+                        if (isMatch)
                         {
-                            Name = dirName,
-                            Manufacturer = profile.Manufacturer,
-                            ModelPattern = dirName,
-                            DirectoryPath = dir,
-                            DriverCount = infFiles.Length,
-                            IsMatched = isMatch
-                        });
+                            rawPackages.Add(new DriverVaultPackage
+                            {
+                                Name = dirName,
+                                Manufacturer = profile.Manufacturer,
+                                ModelPattern = dirName,
+                                DirectoryPath = dir,
+                                DriverCount = infFiles.Length,
+                                IsMatched = true
+                            });
+                        }
                     }
                 }
             }
@@ -237,9 +305,7 @@ namespace VeloxDeploy.Core
                 Log($"[DriverVault] Error scanning directory: {ex.Message}");
             }
 
-            // STRICT DEDUPLICATION:
-            // If any matched package is a subdirectory of another matched package (e.g. Latitude-7490\Win10 inside Latitude 7490),
-            // discard the child subdirectories completely! Only keep the topmost root package.
+            // Deduplicate parent/child directories
             var matchedTopLevel = rawPackages
                 .Where(p => p.IsMatched)
                 .Where(p => !rawPackages.Any(parent => parent.IsMatched &&
