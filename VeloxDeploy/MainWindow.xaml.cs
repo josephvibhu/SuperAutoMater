@@ -1,7 +1,11 @@
 using System;
+using System.Collections.Specialized;
 using System.Threading.Tasks;
 using System.Windows;
+using System.Windows.Controls;
 using System.Windows.Interop;
+using System.Windows.Media;
+using System.Windows.Threading;
 using VeloxDeploy.ViewModels;
 
 namespace VeloxDeploy
@@ -12,9 +16,51 @@ namespace VeloxDeploy
         private const int DBT_DEVICEARRIVAL = 0x8000;
         private const int DBT_DEVICEREMOVECOMPLETE = 0x8004;
 
+        private ScrollViewer? _logScrollViewer;
+
         public MainWindow()
         {
             InitializeComponent();
+            Loaded += MainWindow_Loaded;
+        }
+
+        private void MainWindow_Loaded(object sender, RoutedEventArgs e)
+        {
+            if (LogListBox.Items is INotifyCollectionChanged notifyCollection)
+            {
+                notifyCollection.CollectionChanged += LogListBox_CollectionChanged;
+            }
+        }
+
+        private void LogListBox_CollectionChanged(object? sender, NotifyCollectionChangedEventArgs e)
+        {
+            if (LogListBox.Items.Count > 0)
+            {
+                Dispatcher.InvokeAsync(() =>
+                {
+                    _logScrollViewer ??= FindVisualChild<ScrollViewer>(LogListBox);
+                    if (_logScrollViewer != null)
+                    {
+                        _logScrollViewer.ScrollToEnd();
+                    }
+                    else
+                    {
+                        LogListBox.ScrollIntoView(LogListBox.Items[LogListBox.Items.Count - 1]);
+                    }
+                }, DispatcherPriority.Background);
+            }
+        }
+
+        private static T? FindVisualChild<T>(DependencyObject parent) where T : DependencyObject
+        {
+            for (int i = 0; i < VisualTreeHelper.GetChildrenCount(parent); i++)
+            {
+                var child = VisualTreeHelper.GetChild(parent, i);
+                if (child is T typedChild) return typedChild;
+                var result = FindVisualChild<T>(child);
+                if (result != null) return result;
+            }
+            return null;
         }
 
         protected override void OnSourceInitialized(EventArgs e)

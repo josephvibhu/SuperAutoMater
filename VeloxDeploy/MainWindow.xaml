@@ -905,7 +905,7 @@
 
                             <!-- Log Body -->
                             <Border Grid.Row="1" Background="{DynamicResource InsetBgBrush}" Padding="16,12" CornerRadius="0,0,12,12">
-                                <ListBox ItemsSource="{Binding FilteredLogs}" Background="Transparent" BorderThickness="0" ScrollViewer.HorizontalScrollBarVisibility="Disabled">
+                                <ListBox x:Name="LogListBox" ItemsSource="{Binding FilteredLogs}" Background="Transparent" BorderThickness="0" ScrollViewer.HorizontalScrollBarVisibility="Disabled">
                                     <ListBox.ItemTemplate>
                                         <DataTemplate>
                                             <Grid Margin="0,3">
