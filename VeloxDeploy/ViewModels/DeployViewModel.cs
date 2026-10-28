@@ -55,7 +55,7 @@ namespace VeloxDeploy.ViewModels
         private bool _isCompleted = false;
         private bool _isFailed = false;
         private bool _isAborted = false;
-        private bool _isLiveMode = false; // Always starts in Dry run per handoff spec
+        private bool _isLiveMode = true; // Always live deployment appliance like Rufus
         private bool _isConfirmationDialogOpen = false;
         private string _confirmationInput = string.Empty;
 
@@ -276,25 +276,6 @@ namespace VeloxDeploy.ViewModels
                     OnPropertyChanged(nameof(PrimaryButtonText));
                     OnPropertyChanged(nameof(IsLiveArmedBannerVisible));
                     OnPropertyChanged(nameof(LiveBannerText));
-
-                    if (value)
-                    {
-                        // In live mode, host disk or simulated disk cannot be targeted
-                        if (SelectedDisk != null && (SelectedDisk.IsHostSystemDisk || SelectedDisk.IsSimulated))
-                        {
-                            var real = Disks.FirstOrDefault(x => !x.IsHostSystemDisk && !x.IsSimulated);
-                            SelectedDisk = real;
-                        }
-                    }
-                    else
-                    {
-                        // In dry run mode, if nothing selected, select simulated or first disk
-                        if (SelectedDisk == null)
-                        {
-                            SelectedDisk = Disks.FirstOrDefault(x => x.IsSimulated) ?? Disks.FirstOrDefault();
-                        }
-                    }
-
                     RunPreflight();
                     CommandManager.InvalidateRequerySuggested();
                 }
@@ -310,15 +291,13 @@ namespace VeloxDeploy.ViewModels
             }
         }
 
-        public string ModeHelperText => IsLiveMode
-            ? "Live mode erases the target disk."
-            : "Dry run simulates every step and never touches the disk.";
+        public string ModeHelperText => "Destructive writes require typing ERASE to confirm.";
 
-        public bool IsLiveArmedBannerVisible => IsLiveMode && !IsCompleted && !IsFailed;
+        public bool IsLiveArmedBannerVisible => false; // Persistent red warning banner removed per user request
 
         public string LiveBannerText => SelectedDisk != null
-            ? $"Live mode is armed. Starting will erase Disk {SelectedDisk.DiskIndex} ({SelectedDisk.Model}) and write a new Windows image."
-            : "Live mode is armed. Please select an eligible target disk.";
+            ? $"Target Disk {SelectedDisk.DiskIndex} ({SelectedDisk.Model}) will be formatted and written."
+            : "Please select an eligible target disk.";
 
         public string PrimaryButtonText
         {
@@ -327,19 +306,13 @@ namespace VeloxDeploy.ViewModels
                 if (IsRunning) return "Deploying...";
                 if (IsCompleted) return "Flash Another Drive";
                 if (IsFailed) return "Retry step";
-                if (IsLiveMode)
+                if (SelectedDisk != null)
                 {
-                    if (SelectedDisk != null)
-                    {
-                        if (SelectedDisk.IsHostSystemDisk) return "Host drive protected";
-                        if (SelectedDisk.IsSimulated) return "Plug in target drive";
-                        if (SelectedDisk.IsUsbFlashDrive) return $"Create Bootable USB on Disk {SelectedDisk.DiskIndex}...";
-                        return $"Deploy Windows to Disk {SelectedDisk.DiskIndex}...";
-                    }
-                    return "Select target disk...";
+                    if (SelectedDisk.IsHostSystemDisk) return "Host Drive Protected";
+                    if (SelectedDisk.IsUsbFlashDrive) return $"Create Bootable USB on Disk {SelectedDisk.DiskIndex}...";
+                    return $"Deploy Windows to Disk {SelectedDisk.DiskIndex}...";
                 }
-                if (SelectedDisk != null && SelectedDisk.IsUsbFlashDrive) return "Simulate USB Creation";
-                return "Start dry run";
+                return "Select target disk...";
             }
         }
 
@@ -441,14 +414,10 @@ namespace VeloxDeploy.ViewModels
             {
                 SelectedDisk = realTargets[0];
             }
-            else if (!IsLiveMode)
-            {
-                // In dry run, select simulated target
-                SelectedDisk = Disks.FirstOrDefault(x => x.IsSimulated) ?? Disks.FirstOrDefault();
-            }
             else
             {
-                SelectedDisk = null;
+                // In testing/dev environment, fallback to simulated disk
+                SelectedDisk = Disks.FirstOrDefault(x => x.IsSimulated);
             }
 
             AppendLog("PROBE", $"Host: {Profile.Manufacturer} {Profile.Model} | Sku: {Profile.SystemSku} | SN: {Profile.BiosSerial}", "INFO");
@@ -466,13 +435,9 @@ namespace VeloxDeploy.ViewModels
             {
                 PreflightChecks.Add(new PreflightCheckItem { Name = "Target disk", Status = CheckStatus.Failed, Message = "No target disk selected" });
             }
-            else if (IsLiveMode && SelectedDisk.IsHostSystemDisk)
+            else if (SelectedDisk.IsHostSystemDisk)
             {
-                PreflightChecks.Add(new PreflightCheckItem { Name = "Target disk", Status = CheckStatus.Failed, Message = "Host Windows drive protected from live erase" });
-            }
-            else if (IsLiveMode && SelectedDisk.IsSimulated)
-            {
-                PreflightChecks.Add(new PreflightCheckItem { Name = "Target disk", Status = CheckStatus.Failed, Message = "Simulated disk not allowed in Live mode" });
+                PreflightChecks.Add(new PreflightCheckItem { Name = "Target disk", Status = CheckStatus.Failed, Message = "Host Windows drive protected from erase" });
             }
             else
             {
@@ -566,7 +531,7 @@ namespace VeloxDeploy.ViewModels
             if (IsCompleted) return true;
             if (IsFailed) return true;
             if (SelectedDisk == null) return false;
-            if (IsLiveMode && (SelectedDisk.IsHostSystemDisk || SelectedDisk.IsSimulated)) return false;
+            if (SelectedDisk.IsHostSystemDisk) return false;
             return true;
         }
 
@@ -581,18 +546,16 @@ namespace VeloxDeploy.ViewModels
             if (IsFailed)
             {
                 IsFailed = false;
-                await StartPipelineAsync(IsDryRunMode);
-                return;
-            }
-
-            if (IsLiveMode)
-            {
                 ConfirmationInput = string.Empty;
                 IsConfirmationDialogOpen = true;
                 return;
             }
 
-            await StartPipelineAsync(true);
+            if (SelectedDisk != null && !SelectedDisk.IsHostSystemDisk)
+            {
+                ConfirmationInput = string.Empty;
+                IsConfirmationDialogOpen = true;
+            }
         }
 
         private async void ExecuteConfirmedLiveDeploy()
@@ -682,6 +645,7 @@ namespace VeloxDeploy.ViewModels
             ElapsedText = "00:00";
             RemainingText = "--:--";
             _cts = new CancellationTokenSource();
+            Config.IsDryRun = dryRun;
 
             // Reset steps
             Steps[0].State = StepState.Done; Steps[0].Status = "Done, 0:04";

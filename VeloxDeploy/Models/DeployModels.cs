@@ -182,7 +182,7 @@ namespace VeloxDeploy.Models
         public int WimIndex { get; set; } = 1;
         public string? MountedIsoDriveLetter { get; set; }
         public string DriverVaultPath { get; set; } = "DriverVault";
-        public bool IsDryRun { get; set; } = true; // Always start in Dry run per handoff spec
+        public bool IsDryRun { get; set; } = false; // Always live write to target disk by default
         public string ApiEndpoint { get; set; } = "http://13.206.106.146";
 
         // Automation Toggles (Target Laptop & Bench Workflow)
