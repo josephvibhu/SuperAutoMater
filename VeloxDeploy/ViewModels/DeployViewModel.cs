@@ -444,6 +444,54 @@ namespace VeloxDeploy.ViewModels
             set => SetField(ref _availableDriverModels, value);
         }
 
+        private string _selectedDriverBrandFilter = "All";
+        public string SelectedDriverBrandFilter
+        {
+            get => _selectedDriverBrandFilter;
+            set
+            {
+                if (SetField(ref _selectedDriverBrandFilter, value))
+                {
+                    ApplyDriverModelFilter();
+                    OnPropertyChanged(nameof(IsBrandAll));
+                    OnPropertyChanged(nameof(IsBrandDell));
+                    OnPropertyChanged(nameof(IsBrandLenovo));
+                    OnPropertyChanged(nameof(IsBrandHP));
+                    OnPropertyChanged(nameof(IsBrandVault));
+                }
+            }
+        }
+
+        public bool IsBrandAll
+        {
+            get => SelectedDriverBrandFilter == "All";
+            set { if (value) SelectedDriverBrandFilter = "All"; }
+        }
+
+        public bool IsBrandDell
+        {
+            get => SelectedDriverBrandFilter == "Dell";
+            set { if (value) SelectedDriverBrandFilter = "Dell"; }
+        }
+
+        public bool IsBrandLenovo
+        {
+            get => SelectedDriverBrandFilter == "Lenovo";
+            set { if (value) SelectedDriverBrandFilter = "Lenovo"; }
+        }
+
+        public bool IsBrandHP
+        {
+            get => SelectedDriverBrandFilter == "HP";
+            set { if (value) SelectedDriverBrandFilter = "HP"; }
+        }
+
+        public bool IsBrandVault
+        {
+            get => SelectedDriverBrandFilter == "Vault";
+            set { if (value) SelectedDriverBrandFilter = "Vault"; }
+        }
+
         public bool IsDriverOperationInProgress
         {
             get => _isDriverOperationInProgress;
@@ -1027,24 +1075,84 @@ namespace VeloxDeploy.ViewModels
 
         private void InitializeDriverModels()
         {
-            AvailableDriverModels.Clear();
-            foreach (var item in OemDriverService.Catalog)
-            {
-                AvailableDriverModels.Add(item.ModelName);
-            }
-
-            if (!string.IsNullOrWhiteSpace(Profile.Model) && !AvailableDriverModels.Contains(Profile.Model))
-            {
-                AvailableDriverModels.Add($"{Profile.Manufacturer} {Profile.Model}".Trim());
-            }
-
+            ApplyDriverModelFilter();
             if (string.IsNullOrWhiteSpace(TargetDriverModel) || !AvailableDriverModels.Contains(TargetDriverModel))
             {
                 TargetDriverModel = "Dell Latitude 7490";
             }
+            RefreshDriverStatus();
+        }
+
+        private void ApplyDriverModelFilter()
+        {
+            string current = TargetDriverModel;
+            AvailableDriverModels.Clear();
+
+            var cachedModels = OemDriverService.GetLocallyCachedModels();
+
+            if (SelectedDriverBrandFilter == "Vault")
+            {
+                foreach (var c in cachedModels)
+                {
+                    if (!AvailableDriverModels.Contains(c)) AvailableDriverModels.Add(c);
+                }
+                foreach (var item in OemDriverService.Catalog)
+                {
+                    var (isCached, _, _) = OemDriverService.CheckModelCache(item.ModelName);
+                    if (isCached && !AvailableDriverModels.Contains(item.ModelName))
+                    {
+                        AvailableDriverModels.Add(item.ModelName);
+                    }
+                }
+                if (AvailableDriverModels.Count == 0)
+                {
+                    AvailableDriverModels.Add("No local drivers cached yet");
+                }
+            }
             else
             {
-                RefreshDriverStatus();
+                IEnumerable<OemModelDefinition> query = OemDriverService.Catalog;
+                if (SelectedDriverBrandFilter == "Dell")
+                {
+                    query = query.Where(c => c.Manufacturer.Equals("Dell", StringComparison.OrdinalIgnoreCase));
+                }
+                else if (SelectedDriverBrandFilter == "Lenovo")
+                {
+                    query = query.Where(c => c.Manufacturer.Equals("Lenovo", StringComparison.OrdinalIgnoreCase));
+                }
+                else if (SelectedDriverBrandFilter == "HP")
+                {
+                    query = query.Where(c => c.Manufacturer.Equals("HP", StringComparison.OrdinalIgnoreCase));
+                }
+
+                foreach (var item in query)
+                {
+                    AvailableDriverModels.Add(item.ModelName);
+                }
+
+                // Append any locally captured models
+                foreach (var c in cachedModels)
+                {
+                    if (!AvailableDriverModels.Contains(c)) AvailableDriverModels.Add(c);
+                }
+
+                if (!string.IsNullOrWhiteSpace(Profile.Model))
+                {
+                    string hostLabel = $"{Profile.Manufacturer} {Profile.Model}".Trim();
+                    if (!AvailableDriverModels.Contains(hostLabel))
+                    {
+                        AvailableDriverModels.Insert(0, hostLabel);
+                    }
+                }
+            }
+
+            if (!string.IsNullOrWhiteSpace(current) && AvailableDriverModels.Contains(current))
+            {
+                TargetDriverModel = current;
+            }
+            else if (AvailableDriverModels.Count > 0 && !AvailableDriverModels.Contains(TargetDriverModel))
+            {
+                TargetDriverModel = AvailableDriverModels[0];
             }
         }
 
@@ -1052,7 +1160,23 @@ namespace VeloxDeploy.ViewModels
         {
             var (isCached, count, _) = OemDriverService.CheckModelCache(TargetDriverModel);
             IsTargetDriverCached = isCached;
-            TargetDriverStatusText = isCached ? $"✓ {count} drivers ready" : "Not cached";
+            if (isCached)
+            {
+                TargetDriverStatusText = $"✓ {count} drivers ready in Vault";
+            }
+            else
+            {
+                var def = OemDriverService.Catalog.FirstOrDefault(c => c.ModelName.Equals(TargetDriverModel, StringComparison.OrdinalIgnoreCase))
+                          ?? OemDriverService.Catalog.FirstOrDefault(c => TargetDriverModel.Contains(c.ModelName, StringComparison.OrdinalIgnoreCase));
+                if (def != null)
+                {
+                    TargetDriverStatusText = $"☁ 1-Click {def.SizeFormatted} ({def.Manufacturer})";
+                }
+                else
+                {
+                    TargetDriverStatusText = "📥 Ready to Capture";
+                }
+            }
             RunPreflight();
         }
 

@@ -412,14 +412,27 @@
                                                     <ColumnDefinition Width="Auto" />
                                                 </Grid.ColumnDefinitions>
                                                 <StackPanel Grid.Column="0">
-                                                    <TextBlock Text="Target Laptop Model" FontSize="12" FontWeight="SemiBold" Foreground="{DynamicResource Text3Brush}" />
+                                                    <Grid>
+                                                        <TextBlock Text="Target Laptop Model" FontSize="12" FontWeight="SemiBold" Foreground="{DynamicResource Text3Brush}" VerticalAlignment="Center" />
+                                                        <!-- Brand Segmented Filters -->
+                                                        <Border HorizontalAlignment="Right" BorderBrush="{DynamicResource Border2Brush}" BorderThickness="1" CornerRadius="6" Padding="2">
+                                                            <StackPanel Orientation="Horizontal">
+                                                                <RadioButton Content="All" IsChecked="{Binding IsBrandAll, Mode=TwoWay}" GroupName="DriverBrandGrp" Style="{StaticResource SegmentedRadio}" Height="22" Padding="7,0" Margin="1,0" FontSize="11" />
+                                                                <RadioButton Content="Dell" IsChecked="{Binding IsBrandDell, Mode=TwoWay}" GroupName="DriverBrandGrp" Style="{StaticResource SegmentedRadio}" Height="22" Padding="7,0" Margin="1,0" FontSize="11" />
+                                                                <RadioButton Content="Lenovo" IsChecked="{Binding IsBrandLenovo, Mode=TwoWay}" GroupName="DriverBrandGrp" Style="{StaticResource SegmentedRadio}" Height="22" Padding="7,0" Margin="1,0" FontSize="11" />
+                                                                <RadioButton Content="HP" IsChecked="{Binding IsBrandHP, Mode=TwoWay}" GroupName="DriverBrandGrp" Style="{StaticResource SegmentedRadio}" Height="22" Padding="7,0" Margin="1,0" FontSize="11" />
+                                                                <RadioButton Content="📁 Vault" IsChecked="{Binding IsBrandVault, Mode=TwoWay}" GroupName="DriverBrandGrp" Style="{StaticResource SegmentedRadio}" Height="22" Padding="7,0" Margin="1,0" FontSize="11" />
+                                                            </StackPanel>
+                                                        </Border>
+                                                    </Grid>
                                                     <ComboBox ItemsSource="{Binding AvailableDriverModels}" SelectedItem="{Binding TargetDriverModel}" 
                                                               IsEnabled="{Binding CanRunDriverAction}"
-                                                              Height="32" Margin="0,4,0,0" VerticalContentAlignment="Center" FontSize="13" />
+                                                              IsEditable="True" IsTextSearchEnabled="True" MaxDropDownHeight="320"
+                                                              Height="32" Margin="0,5,0,0" VerticalContentAlignment="Center" FontSize="13" />
                                                 </StackPanel>
                                                 <Button Grid.Column="1" Command="{Binding OpenDriverVaultCommand}" 
                                                         ToolTip="Open local DriverVault folder in File Explorer"
-                                                        Height="32" Padding="10,0" Margin="8,18,0,0" VerticalAlignment="Bottom"
+                                                        Height="32" Padding="10,0" Margin="8,26,0,0" VerticalAlignment="Bottom"
                                                         Background="Transparent" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1"
                                                         Foreground="{DynamicResource Text2Brush}" Cursor="Hand">
                                                     <TextBlock Text="📁 Folder" FontSize="12" VerticalAlignment="Center" />
