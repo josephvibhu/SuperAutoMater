@@ -100,6 +100,7 @@ namespace VeloxDeploy.ViewModels
             DownloadDriverPackCommand = new RelayCommand(async () => await DownloadSelectedDriverPackAsync(), () => CanRunDriverAction);
             CaptureLocalDriversCommand = new RelayCommand(async () => await CaptureLocalDriversAsync(), () => CanRunDriverAction);
             OpenDriverVaultCommand = new RelayCommand(OpenDriverVaultFolder);
+            OpenModelBrowserCommand = new RelayCommand(OpenModelBrowser, () => CanRunDriverAction);
 
             InitializeDriverModels();
 
@@ -549,6 +550,43 @@ namespace VeloxDeploy.ViewModels
         public ICommand DownloadDriverPackCommand { get; }
         public ICommand CaptureLocalDriversCommand { get; }
         public ICommand OpenDriverVaultCommand { get; }
+        public ICommand OpenModelBrowserCommand { get; }
+
+        public string TargetDriverManufacturer
+        {
+            get
+            {
+                if (string.IsNullOrWhiteSpace(TargetDriverModel)) return "OEM";
+                if (TargetDriverModel.Contains("Dell", StringComparison.OrdinalIgnoreCase)) return "DELL";
+                if (TargetDriverModel.Contains("HP", StringComparison.OrdinalIgnoreCase) ||
+                    TargetDriverModel.Contains("EliteBook", StringComparison.OrdinalIgnoreCase) ||
+                    TargetDriverModel.Contains("ProBook", StringComparison.OrdinalIgnoreCase) ||
+                    TargetDriverModel.Contains("ZBook", StringComparison.OrdinalIgnoreCase)) return "HP";
+                if (TargetDriverModel.Contains("Lenovo", StringComparison.OrdinalIgnoreCase) ||
+                    TargetDriverModel.Contains("ThinkPad", StringComparison.OrdinalIgnoreCase)) return "LENOVO";
+                if (TargetDriverModel.Contains("Acer", StringComparison.OrdinalIgnoreCase)) return "ACER";
+                return "OEM";
+            }
+        }
+
+        public string TargetDriverDetailsText
+        {
+            get
+            {
+                var (isCached, count, _) = OemDriverService.CheckModelCache(TargetDriverModel);
+                if (isCached)
+                {
+                    return $"{count} driver definitions ready in local DriverVault • Windows 11/10 64-bit";
+                }
+                var def = OemDriverService.Catalog.FirstOrDefault(c => c.ModelName.Equals(TargetDriverModel, StringComparison.OrdinalIgnoreCase))
+                          ?? OemDriverService.Catalog.FirstOrDefault(c => TargetDriverModel.Contains(c.ModelName, StringComparison.OrdinalIgnoreCase));
+                if (def != null)
+                {
+                    return $"1-Click OEM Download Available ({def.SizeFormatted}) • {def.Series} • {def.OsVersion}";
+                }
+                return "Custom hardware profile • Ready to export or inject";
+            }
+        }
 
         #endregion
 
@@ -581,6 +619,8 @@ namespace VeloxDeploy.ViewModels
             AppendLog("PROBE", $"Host: {Profile.Manufacturer} {Profile.Model} | Sku: {Profile.SystemSku} | SN: {Profile.BiosSerial}", "INFO");
             AppendLog("PROBE", $"Firmware: {Profile.BootType} | ACPI OEM Key: {(Profile.AcpiKey.HasKey ? Profile.AcpiKey.MaskedKey : "None")}", "INFO");
 
+            OnPropertyChanged(nameof(TargetDriverManufacturer));
+            OnPropertyChanged(nameof(TargetDriverDetailsText));
             RunPreflight();
         }
 
@@ -1061,9 +1101,14 @@ namespace VeloxDeploy.ViewModels
                 {
                     Source = new Uri(themeFile, UriKind.Relative)
                 };
+                var controlsDict = new ResourceDictionary
+                {
+                    Source = new Uri("Themes/ControlsShared.xaml", UriKind.Relative)
+                };
 
                 Application.Current.Resources.MergedDictionaries.Clear();
                 Application.Current.Resources.MergedDictionaries.Add(dict);
+                Application.Current.Resources.MergedDictionaries.Add(controlsDict);
             }
             catch (Exception ex)
             {
@@ -1179,6 +1224,8 @@ namespace VeloxDeploy.ViewModels
                     TargetDriverStatusText = "📥 Ready to Capture";
                 }
             }
+            OnPropertyChanged(nameof(TargetDriverManufacturer));
+            OnPropertyChanged(nameof(TargetDriverDetailsText));
             RunPreflight();
         }
 
@@ -1262,6 +1309,19 @@ namespace VeloxDeploy.ViewModels
             catch (Exception ex)
             {
                 AppendLog("DRIVER", $"Unable to open DriverVault folder: {ex.Message}", "ERROR");
+            }
+        }
+
+        private void OpenModelBrowser()
+        {
+            var dialog = new ModelBrowserDialog(TargetDriverModel, Profile)
+            {
+                Owner = Application.Current.MainWindow
+            };
+            if (dialog.ShowDialog() == true && !string.IsNullOrWhiteSpace(dialog.SelectedModelName))
+            {
+                TargetDriverModel = dialog.SelectedModelName;
+                RefreshDriverStatus();
             }
         }
 

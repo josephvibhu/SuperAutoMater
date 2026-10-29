@@ -403,58 +403,63 @@
                                         </Border>
                                     </Grid>
 
-                                    <!-- Driver Vault Management Box -->
-                                    <Border Background="{DynamicResource InsetBgBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" CornerRadius="8" Padding="12,10" Margin="0,0,0,10">
+                                    <!-- Driver Vault Target Hardware Card & Dialog Launcher -->
+                                    <Border Background="{DynamicResource InsetBgBrush}" BorderBrush="{DynamicResource Border2Brush}" BorderThickness="1" CornerRadius="8" Padding="14,12" Margin="0,0,0,10">
                                         <StackPanel>
-                                            <Grid Margin="0,0,0,8">
+                                            <Grid Margin="0,0,0,10">
                                                 <Grid.ColumnDefinitions>
                                                     <ColumnDefinition Width="*" />
                                                     <ColumnDefinition Width="Auto" />
                                                 </Grid.ColumnDefinitions>
-                                                <StackPanel Grid.Column="0">
-                                                    <Grid>
-                                                        <TextBlock Text="Target Laptop Model" FontSize="12" FontWeight="SemiBold" Foreground="{DynamicResource Text3Brush}" VerticalAlignment="Center" />
-                                                        <!-- Brand Segmented Filters -->
-                                                        <Border HorizontalAlignment="Right" BorderBrush="{DynamicResource Border2Brush}" BorderThickness="1" CornerRadius="6" Padding="2">
-                                                            <StackPanel Orientation="Horizontal">
-                                                                <RadioButton Content="All" IsChecked="{Binding IsBrandAll, Mode=TwoWay}" GroupName="DriverBrandGrp" Style="{StaticResource SegmentedRadio}" Height="22" Padding="7,0" Margin="1,0" FontSize="11" />
-                                                                <RadioButton Content="Dell" IsChecked="{Binding IsBrandDell, Mode=TwoWay}" GroupName="DriverBrandGrp" Style="{StaticResource SegmentedRadio}" Height="22" Padding="7,0" Margin="1,0" FontSize="11" />
-                                                                <RadioButton Content="Lenovo" IsChecked="{Binding IsBrandLenovo, Mode=TwoWay}" GroupName="DriverBrandGrp" Style="{StaticResource SegmentedRadio}" Height="22" Padding="7,0" Margin="1,0" FontSize="11" />
-                                                                <RadioButton Content="HP" IsChecked="{Binding IsBrandHP, Mode=TwoWay}" GroupName="DriverBrandGrp" Style="{StaticResource SegmentedRadio}" Height="22" Padding="7,0" Margin="1,0" FontSize="11" />
-                                                                <RadioButton Content="📁 Vault" IsChecked="{Binding IsBrandVault, Mode=TwoWay}" GroupName="DriverBrandGrp" Style="{StaticResource SegmentedRadio}" Height="22" Padding="7,0" Margin="1,0" FontSize="11" />
-                                                            </StackPanel>
+
+                                                <!-- Model & Manufacturer Info -->
+                                                <StackPanel Grid.Column="0" VerticalAlignment="Center">
+                                                    <StackPanel Orientation="Horizontal" Margin="0,0,0,3">
+                                                        <Border Height="20" CornerRadius="4" Padding="6,0" Margin="0,0,8,0" VerticalAlignment="Center"
+                                                                Background="{DynamicResource BrandSubtleBrush}" BorderBrush="{DynamicResource BrandBrush}" BorderThickness="1">
+                                                            <TextBlock Text="{Binding TargetDriverManufacturer, FallbackValue='OEM'}" FontSize="11" FontWeight="Bold" Foreground="{DynamicResource BrandBrush}" VerticalAlignment="Center" />
                                                         </Border>
-                                                    </Grid>
-                                                    <ComboBox ItemsSource="{Binding AvailableDriverModels}" SelectedItem="{Binding TargetDriverModel}" 
-                                                              IsEnabled="{Binding CanRunDriverAction}"
-                                                              IsEditable="True" IsTextSearchEnabled="True" MaxDropDownHeight="320"
-                                                              Height="32" Margin="0,5,0,0" VerticalContentAlignment="Center" FontSize="13" />
+                                                        <TextBlock Text="{Binding TargetDriverModel}" FontSize="15" FontWeight="Bold" Foreground="{DynamicResource Text1Brush}" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
+                                                    </StackPanel>
+                                                    <TextBlock Text="{Binding TargetDriverDetailsText}" FontSize="12" Foreground="{DynamicResource Text2Brush}" TextTrimming="CharacterEllipsis" />
                                                 </StackPanel>
-                                                <Button Grid.Column="1" Command="{Binding OpenDriverVaultCommand}" 
-                                                        ToolTip="Open local DriverVault folder in File Explorer"
-                                                        Height="32" Padding="10,0" Margin="8,26,0,0" VerticalAlignment="Bottom"
-                                                        Background="Transparent" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1"
-                                                        Foreground="{DynamicResource Text2Brush}" Cursor="Hand">
-                                                    <TextBlock Text="📁 Folder" FontSize="12" VerticalAlignment="Center" />
+
+                                                <!-- Dedicated Model Browser Dialog Button -->
+                                                <Button Grid.Column="1" Command="{Binding OpenModelBrowserCommand}"
+                                                        IsEnabled="{Binding CanRunDriverAction}"
+                                                        Height="34" Padding="12,0" Margin="10,0,0,0" Cursor="Hand"
+                                                        Background="{DynamicResource HoverBgBrush}" BorderBrush="{DynamicResource Border2Brush}" BorderThickness="1">
+                                                    <Button.Template>
+                                                        <ControlTemplate TargetType="Button">
+                                                            <Border Background="{TemplateBinding Background}" BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="{TemplateBinding BorderThickness}" CornerRadius="6" Padding="{TemplateBinding Padding}">
+                                                                <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                                                    <TextBlock Text="🔍" FontSize="12" Margin="0,0,6,0" VerticalAlignment="Center" />
+                                                                    <TextBlock Text="Browse 105+ Models..." FontWeight="Bold" FontSize="12" Foreground="{DynamicResource Text1Brush}" VerticalAlignment="Center" />
+                                                                </StackPanel>
+                                                            </Border>
+                                                        </ControlTemplate>
+                                                    </Button.Template>
                                                 </Button>
                                             </Grid>
 
-                                            <!-- 1-Click OEM Download & Hot-Capture Buttons -->
+                                            <!-- 1-Click OEM Download & Hot-Capture & Folder Buttons -->
                                             <Grid Margin="0,2,0,0">
                                                 <Grid.ColumnDefinitions>
-                                                    <ColumnDefinition Width="*" />
-                                                    <ColumnDefinition Width="8" />
-                                                    <ColumnDefinition Width="*" />
+                                                    <ColumnDefinition Width="2*" />
+                                                    <ColumnDefinition Width="6" />
+                                                    <ColumnDefinition Width="2*" />
+                                                    <ColumnDefinition Width="6" />
+                                                    <ColumnDefinition Width="1.2*" />
                                                 </Grid.ColumnDefinitions>
 
                                                 <Button Grid.Column="0" Command="{Binding DownloadDriverPackCommand}" 
                                                         IsEnabled="{Binding CanRunDriverAction}"
-                                                        Height="34" Cursor="Hand" Background="{DynamicResource BrandBtnBrush}" BorderThickness="0">
+                                                        Height="32" Cursor="Hand" Background="{DynamicResource BrandBtnBrush}" BorderThickness="0">
                                                     <Button.Template>
                                                         <ControlTemplate TargetType="Button">
-                                                            <Border Background="{TemplateBinding Background}" CornerRadius="6" Padding="8,0">
+                                                            <Border Background="{TemplateBinding Background}" CornerRadius="6" Padding="6,0">
                                                                 <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" VerticalAlignment="Center">
-                                                                    <TextBlock Text="⬇ 1-Click Download" FontWeight="Bold" FontSize="12.5" Foreground="White" />
+                                                                    <TextBlock Text="⬇ 1-Click Download" FontWeight="Bold" FontSize="12" Foreground="White" />
                                                                 </StackPanel>
                                                             </Border>
                                                         </ControlTemplate>
@@ -463,12 +468,26 @@
 
                                                 <Button Grid.Column="2" Command="{Binding CaptureLocalDriversCommand}" 
                                                         IsEnabled="{Binding CanRunDriverAction}"
-                                                        Height="34" Cursor="Hand" Background="Transparent" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1">
+                                                        Height="32" Cursor="Hand" Background="Transparent" BorderBrush="{DynamicResource Border2Brush}" BorderThickness="1">
                                                     <Button.Template>
                                                         <ControlTemplate TargetType="Button">
-                                                            <Border Background="{TemplateBinding Background}" BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="{TemplateBinding BorderThickness}" CornerRadius="6" Padding="8,0">
+                                                            <Border Background="{TemplateBinding Background}" BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="{TemplateBinding BorderThickness}" CornerRadius="6" Padding="6,0">
                                                                 <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" VerticalAlignment="Center">
-                                                                    <TextBlock Text="📥 Capture This PC" FontWeight="SemiBold" FontSize="12" Foreground="{DynamicResource Text1Brush}" />
+                                                                    <TextBlock Text="📥 Capture This PC" FontWeight="SemiBold" FontSize="11.5" Foreground="{DynamicResource Text1Brush}" />
+                                                                </StackPanel>
+                                                            </Border>
+                                                        </ControlTemplate>
+                                                    </Button.Template>
+                                                </Button>
+
+                                                <Button Grid.Column="4" Command="{Binding OpenDriverVaultCommand}" 
+                                                        ToolTip="Open local DriverVault folder in File Explorer"
+                                                        Height="32" Cursor="Hand" Background="Transparent" BorderBrush="{DynamicResource Border2Brush}" BorderThickness="1">
+                                                    <Button.Template>
+                                                        <ControlTemplate TargetType="Button">
+                                                            <Border Background="{TemplateBinding Background}" BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="{TemplateBinding BorderThickness}" CornerRadius="6" Padding="6,0">
+                                                                <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" VerticalAlignment="Center">
+                                                                    <TextBlock Text="📁 Folder" FontWeight="SemiBold" FontSize="11.5" Foreground="{DynamicResource Text2Brush}" />
                                                                 </StackPanel>
                                                             </Border>
                                                         </ControlTemplate>
@@ -482,7 +501,7 @@
                                                     <TextBlock Text="{Binding DriverProgressStatus}" FontSize="12" Foreground="{DynamicResource Text2Brush}" VerticalAlignment="Center" />
                                                     <TextBlock Text="{Binding DriverProgressPercent, StringFormat='{}{0:F0}%'}" FontSize="12" FontWeight="Bold" Foreground="{DynamicResource BrandBrush}" HorizontalAlignment="Right" VerticalAlignment="Center" />
                                                 </Grid>
-                                                <ProgressBar Height="6" Value="{Binding DriverProgressPercent}" Maximum="100" Minimum="0" Background="{DynamicResource BorderBrush}" Foreground="{DynamicResource BrandBrush}" BorderThickness="0" />
+                                                <ProgressBar Height="5" Value="{Binding DriverProgressPercent}" Maximum="100" Minimum="0" Background="{DynamicResource BorderBrush}" Foreground="{DynamicResource BrandBrush}" BorderThickness="0" />
                                             </StackPanel>
                                         </StackPanel>
                                     </Border>

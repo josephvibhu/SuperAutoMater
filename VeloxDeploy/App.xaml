@@ -6,6 +6,7 @@
         <ResourceDictionary>
             <ResourceDictionary.MergedDictionaries>
                 <ResourceDictionary Source="Themes/TokensDark.xaml" />
+                <ResourceDictionary Source="Themes/ControlsShared.xaml" />
             </ResourceDictionary.MergedDictionaries>
 
             <Style TargetType="ToolTip">
