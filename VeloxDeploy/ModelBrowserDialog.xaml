@@ -247,7 +247,7 @@
                                 </Border>
 
                                 <!-- Model Name -->
-                                <TextBlock Text="{Binding ModelName}" FontSize="15" FontWeight="Bold" Foreground="{DynamicResource Text1Brush}" VerticalAlignment="Center" />
+                                <TextBlock Text="{Binding DisplayTitle}" FontSize="15" FontWeight="Bold" Foreground="{DynamicResource Text1Brush}" VerticalAlignment="Center" />
                             </StackPanel>
 
                             <!-- Sub-details: Series • OS • Package File -->

@@ -263,24 +263,26 @@ namespace VeloxDeploy.ViewModels
 
             // 3. Local DriverVault folders that might not be in the OEM Catalog
             var cachedFolders = OemDriverService.GetLocallyCachedModels();
-            foreach (var folder in cachedFolders)
+            foreach (var cached in cachedFolders)
             {
-                if (!_masterCatalog.Any(x => x.ModelName.Equals(folder, StringComparison.OrdinalIgnoreCase)))
-                {
-                    var (isCached, count, _) = OemDriverService.CheckModelCache(folder);
-                    string mfr = folder.Contains(" ") ? folder.Split(' ')[0] : "Generic";
+                bool alreadyInCatalog = _masterCatalog.Any(x =>
+                    x.ModelName.Equals(cached.ModelName, StringComparison.OrdinalIgnoreCase) ||
+                    x.ModelName.EndsWith(cached.ModelName, StringComparison.OrdinalIgnoreCase) ||
+                    cached.ModelName.EndsWith(x.ModelName, StringComparison.OrdinalIgnoreCase));
 
+                if (!alreadyInCatalog)
+                {
                     var item = new ModelBrowserItemViewModel
                     {
-                        ModelName = folder,
-                        Manufacturer = mfr,
-                        Series = "Custom / Captured Vault Model",
+                        ModelName = cached.ModelName,
+                        Manufacturer = cached.Manufacturer,
+                        Series = "Custom Captured Driver Pack",
                         OsVersion = "Windows 10/11 64-bit",
-                        FileName = "Local Folder Repository",
-                        SizeFormatted = "Local",
-                        IsCached = isCached,
-                        InfCount = count,
-                        StatusBadgeText = $"✓ Ready in Vault ({count} drivers)"
+                        FileName = "Local Driver Repository",
+                        SizeFormatted = "Local Vault",
+                        IsCached = true,
+                        InfCount = cached.DriverCount,
+                        StatusBadgeText = $"✓ Ready in Vault ({cached.DriverCount} drivers)"
                     };
                     _masterCatalog.Add(item);
                 }

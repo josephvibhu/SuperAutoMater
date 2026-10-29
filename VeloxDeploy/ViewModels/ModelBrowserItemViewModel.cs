@@ -22,6 +22,11 @@ namespace VeloxDeploy.ViewModels
         public string DownloadUrl { get; set; } = string.Empty;
         public bool IsHostUnit { get; set; }
 
+        public string DisplayTitle =>
+            !string.IsNullOrWhiteSpace(Manufacturer) && ModelName.StartsWith(Manufacturer + " ", StringComparison.OrdinalIgnoreCase)
+                ? ModelName.Substring(Manufacturer.Length).Trim()
+                : ModelName;
+
         public bool IsCached
         {
             get => _isCached;

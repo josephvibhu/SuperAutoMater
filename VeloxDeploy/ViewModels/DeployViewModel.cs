@@ -1141,7 +1141,7 @@ namespace VeloxDeploy.ViewModels
             {
                 foreach (var c in cachedModels)
                 {
-                    if (!AvailableDriverModels.Contains(c)) AvailableDriverModels.Add(c);
+                    if (!AvailableDriverModels.Contains(c.ModelName)) AvailableDriverModels.Add(c.ModelName);
                 }
                 foreach (var item in OemDriverService.Catalog)
                 {
@@ -1180,7 +1180,7 @@ namespace VeloxDeploy.ViewModels
                 // Append any locally captured models
                 foreach (var c in cachedModels)
                 {
-                    if (!AvailableDriverModels.Contains(c)) AvailableDriverModels.Add(c);
+                    if (!AvailableDriverModels.Contains(c.ModelName)) AvailableDriverModels.Add(c.ModelName);
                 }
 
                 if (!string.IsNullOrWhiteSpace(Profile.Model))

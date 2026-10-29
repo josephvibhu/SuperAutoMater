@@ -22,6 +22,14 @@ namespace VeloxDeploy.Core
         public string SizeFormatted => EstimatedSizeBytes > 0 ? $"{(EstimatedSizeBytes / (1024.0 * 1024.0)):F0} MB" : "Unknown";
     }
 
+    public class CachedVaultModel
+    {
+        public string Manufacturer { get; set; } = string.Empty;
+        public string ModelName { get; set; } = string.Empty;
+        public string RelativeVaultPath { get; set; } = string.Empty;
+        public int DriverCount { get; set; }
+    }
+
     public class OemDriverService
     {
         private static readonly HttpClient _httpClient = new() { Timeout = TimeSpan.FromMinutes(30) };
@@ -209,18 +217,30 @@ namespace VeloxDeploy.Core
                 if (count > 0) return (true, count, targetDir);
             }
 
-            // Also check loose subdirectories by clean model suffix (e.g. "Latitude 7490")
+            // Check Level 1 and Level 2 folders only (never search internal component subdirectories)
             try
             {
                 if (Directory.Exists(vaultRoot))
                 {
-                    string cleanSearch = modelName.Replace("Dell", "").Replace("Lenovo", "").Replace("HP", "").Trim().ToLowerInvariant();
-                    foreach (var subDir in Directory.GetDirectories(vaultRoot, "*", SearchOption.AllDirectories))
+                    string cleanSearch = modelName
+                        .Replace("Dell", "", StringComparison.OrdinalIgnoreCase)
+                        .Replace("Lenovo", "", StringComparison.OrdinalIgnoreCase)
+                        .Replace("HP", "", StringComparison.OrdinalIgnoreCase)
+                        .Trim().ToLowerInvariant();
+
+                    if (!string.IsNullOrWhiteSpace(cleanSearch))
                     {
-                        if (subDir.ToLowerInvariant().Contains(cleanSearch))
+                        foreach (var mfrDir in Directory.GetDirectories(vaultRoot, "*", SearchOption.TopDirectoryOnly))
                         {
-                            int count = Directory.GetFiles(subDir, "*.inf", SearchOption.AllDirectories).Length;
-                            if (count > 0) return (true, count, subDir);
+                            foreach (var modelDir in Directory.GetDirectories(mfrDir, "*", SearchOption.TopDirectoryOnly))
+                            {
+                                string folderName = Path.GetFileName(modelDir).ToLowerInvariant();
+                                if (folderName.Contains(cleanSearch) || cleanSearch.Contains(folderName))
+                                {
+                                    int count = Directory.GetFiles(modelDir, "*.inf", SearchOption.AllDirectories).Length;
+                                    if (count > 0) return (true, count, modelDir);
+                                }
+                            }
                         }
                     }
                 }
@@ -230,22 +250,42 @@ namespace VeloxDeploy.Core
             return (false, 0, targetDir);
         }
 
-        public static List<string> GetLocallyCachedModels()
+        public static List<CachedVaultModel> GetLocallyCachedModels()
         {
-            var result = new List<string>();
+            var result = new List<CachedVaultModel>();
             string vaultRoot = DriverVaultManager.ResolveDriverVaultRoot("DriverVault");
             if (!Directory.Exists(vaultRoot)) return result;
 
             try
             {
-                var directories = Directory.GetDirectories(vaultRoot, "*", SearchOption.AllDirectories);
-                foreach (var dir in directories)
+                // DriverVault structure is strictly:
+                // Level 1: Manufacturer folder (e.g. "Dell", "HP", "Lenovo")
+                // Level 2: Model folder (e.g. "Latitude 7490", "EliteBook 640 G9")
+                // Subdirectories below Level 2 are internal driver components and must never be treated as models.
+                foreach (var mfrDir in Directory.GetDirectories(vaultRoot, "*", SearchOption.TopDirectoryOnly))
                 {
-                    var infFiles = Directory.GetFiles(dir, "*.inf", SearchOption.TopDirectoryOnly);
-                    if (infFiles.Length > 0)
+                    string mfrName = Path.GetFileName(mfrDir);
+                    if (string.Equals(mfrName, "Generic", StringComparison.OrdinalIgnoreCase)) continue;
+
+                    foreach (var modelDir in Directory.GetDirectories(mfrDir, "*", SearchOption.TopDirectoryOnly))
                     {
-                        string relative = Path.GetRelativePath(vaultRoot, dir);
-                        result.Add(relative.Replace(Path.DirectorySeparatorChar, ' '));
+                        string folderName = Path.GetFileName(modelDir);
+                        int infCount = Directory.GetFiles(modelDir, "*.inf", SearchOption.AllDirectories).Length;
+                        if (infCount > 0)
+                        {
+                            // Avoid duplicate brand prefix, e.g. "HP EliteBook 640 G9" instead of "HP HP EliteBook 640 G9"
+                            string cleanModel = folderName.StartsWith(mfrName, StringComparison.OrdinalIgnoreCase)
+                                ? folderName
+                                : $"{mfrName} {folderName}".Trim();
+
+                            result.Add(new CachedVaultModel
+                            {
+                                Manufacturer = mfrName,
+                                ModelName = cleanModel,
+                                RelativeVaultPath = Path.Combine(mfrName, folderName),
+                                DriverCount = infCount
+                            });
+                        }
                     }
                 }
             }
